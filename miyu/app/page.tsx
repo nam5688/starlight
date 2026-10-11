@@ -163,7 +163,7 @@ export default function Home() {
               <span className="text-[34px] font-bold tracking-tight tabular-nums">{formatKrw(PERSONAL_REPORT.priceKrw)}</span>
               <StatusBadge>가격 {PERSONAL_REPORT.priceNote}</StatusBadge>
             </p>
-            <p className="mt-1 text-[14px] text-ink-3">단건 구매 · 구독 아님 · 결제 연결 전</p>
+            <p className="mt-1 text-[14px] text-ink-3">단건 구매 · 구독 아님 · 카드 결제</p>
             <ul className="mt-5 space-y-2 border-t border-line pt-5 text-[15px]">
               {["무료 요약 전체", "네 가지 상세 분석", "통합 해석 · 실천 제안", "MY 저장 · 다시보기"].map((t) => (
                 <li key={t} className="flex items-center gap-2">

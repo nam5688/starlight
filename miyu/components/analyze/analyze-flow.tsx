@@ -31,7 +31,7 @@ const TOTAL_ITEMS = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
  * 단계 이동은 브라우저 기록에도 남겨서, 휴대폰의 뒤로 가기로도 이전 단계로 돌아갈 수 있다.
  * 입력값은 이 화면의 메모리에만 있고 저장하지 않는다 (새로고침하면 처음부터).
  */
-export function AnalyzeFlow() {
+export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   const [step, setStep] = useState(0);
   const [info, setInfo] = useState<BasicInfo>(EMPTY_BASIC_INFO);
   const [infoErrors, setInfoErrors] = useState<BasicInfoErrors>({});
@@ -218,7 +218,14 @@ export function AnalyzeFlow() {
       </div>
 
       {step === SUMMARY_STEP && summary ? (
-        <FreeSummaryView summary={summary} info={info} onEdit={goBack} onRestart={restart} />
+        <FreeSummaryView
+          summary={summary}
+          info={info}
+          answers={answers}
+          authReady={authReady}
+          onEdit={goBack}
+          onRestart={restart}
+        />
       ) : (
         <div className="flex flex-1 flex-col">
           <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 pb-12 md:px-8 md:pt-12">

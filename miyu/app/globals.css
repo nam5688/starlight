@@ -22,6 +22,10 @@
   --color-accent-strong: #163a70;
   --color-accent-soft: #edf2f9;
 
+  /* 카카오 로그인 버튼 전용 (카카오 디자인 가이드) */
+  --color-kakao: #fee500;
+  --color-kakao-ink: #191919;
+
   /* 입력 오류 표시에만 사용 */
   --color-danger: #b3261e;
 

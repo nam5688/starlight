@@ -61,3 +61,14 @@ export function bipolarCode(module: AssessmentModule, scores: DimensionScore[]):
     })
     .join("");
 }
+
+/** 서버로 들어온 응답을 { 문항 id: 숫자 } 형태로만 받아들인다 (형식이 다르면 null) */
+export function parseAnswers(raw: unknown): Answers | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const out: Answers = {};
+  for (const [id, value] of Object.entries(raw)) {
+    if (typeof value !== "number") return null;
+    out[id] = value;
+  }
+  return out;
+}

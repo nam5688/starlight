@@ -1,4 +1,3 @@
-import "server-only";
 import { classifyTendency, TENDENCY_NAMES } from "../assessment/dev-rules.ts";
 import { mbtiModule, relationshipModule, temperamentModule } from "../assessment/modules/index.ts";
 import { bipolarCode, scoreModule, toScoreMap } from "../assessment/scoring.ts";

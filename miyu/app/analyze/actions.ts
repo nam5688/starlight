@@ -1,26 +1,65 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
-import { validateAnswers } from "@/lib/assessment/scoring";
+import { parseAnswers, validateAnswers } from "@/lib/assessment/scoring";
 import type { Answers } from "@/lib/assessment/types";
+import { parseBasicInfo, validateBasicInfo } from "@/lib/profile/basic-info";
 import { buildDevFreeSummary } from "@/lib/report/build-free-summary";
 import type { FreeSummary } from "@/lib/report/types";
+import { submitAssessment } from "@/lib/services/assessment-service";
+import { isAuthConfigured } from "@/server/env";
+import { kakaoAuthorizeUrl } from "@/server/kakao";
+import { savePendingSubmission } from "@/server/pending-submission";
+import { sajuEngine, writeRepository } from "@/server/services";
+import { getSessionUserId } from "@/server/session";
 
 export type ScoreResult = { ok: true; summary: FreeSummary } | { ok: false; message: string };
 
 /**
- * 검사 응답을 서버에서 채점해 무료 요약을 돌려준다.
- * 1단계: 개발용 예시 문항 + 임시 규칙. 응답은 저장하지 않고 로그에도 남기지 않는다.
- * 2단계: 로그인 회원 확인 → 채점 → 결과 저장으로 확장한다.
+ * 검사 응답을 서버에서 채점해 무료 요약을 돌려준다 (저장하지 않음, 로그에도 남기지 않음).
  */
 export async function scoreDevAnswers(input: unknown): Promise<ScoreResult> {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return { ok: false, message: "응답 형식이 올바르지 않습니다." };
-  }
-  const answers = input as Answers;
+  const answers = parseAnswers(input);
+  if (!answers) return { ok: false, message: "응답 형식이 올바르지 않습니다." };
   const check = validateAnswers(ASSESSMENT_MODULES, answers);
   if (!check.ok) {
     return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있습니다. 응답을 다시 확인해 주세요." };
   }
   return { ok: true, summary: buildDevFreeSummary(answers) };
+}
+
+export type SaveResult = { ok: false; message: string };
+
+/**
+ * 결과 저장. 로그인돼 있으면 바로 저장하고 결과 화면으로 이동한다.
+ * 로그인 전이면 결과를 암호화 쿠키에 잠시 보관하고 카카오 로그인으로 보낸다
+ * (로그인 후 /auth/callback에서 저장).
+ */
+export async function saveResultAndContinue(input: { info: unknown; answers: unknown }): Promise<SaveResult> {
+  if (!isAuthConfigured()) return { ok: false, message: "로그인이 아직 설정되지 않았습니다." };
+
+  const info = parseBasicInfo(input?.info);
+  const answers: Answers | null = parseAnswers(input?.answers);
+  if (!info || !answers) return { ok: false, message: "입력 형식이 올바르지 않습니다." };
+  const infoError = Object.values(validateBasicInfo(info, new Date()))[0];
+  if (infoError) return { ok: false, message: infoError };
+  if (!validateAnswers(ASSESSMENT_MODULES, answers).ok) {
+    return { ok: false, message: "답하지 않은 문항이 있습니다." };
+  }
+
+  const userId = await getSessionUserId();
+  if (userId) {
+    const saved = await submitAssessment(
+      { repo: writeRepository(), saju: sajuEngine },
+      { userId, channel: "web", info, answers, today: new Date() },
+    );
+    if (!saved.ok) return { ok: false, message: saved.message };
+    redirect(`/results/${saved.assessment.id}`);
+  }
+
+  await savePendingSubmission(info, answers);
+  const url = await kakaoAuthorizeUrl("/my");
+  if (!url) return { ok: false, message: "카카오 로그인을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요." };
+  redirect(url);
 }

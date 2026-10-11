@@ -1,5 +1,5 @@
-// 외부 서비스 연결 상태. 화면은 이 값을 보고 "연결 전" 상태를 표시한다.
-// 실제 연결 코드는 각 단계에서 lib/integrations/ 아래에 서비스별로 추가한다.
+// 외부 서비스·모듈별 진행 단계. 화면의 "N단계" 표시에 쓴다.
+// 실제 연결 여부는 서버 환경변수로 판단한다 (server/env.ts의 isAuthConfigured, paymentConfig).
 
 export type IntegrationKey =
   | "kakaoLogin"
@@ -9,11 +9,11 @@ export type IntegrationKey =
   | "payments"
   | "telegram";
 
-export const INTEGRATIONS: Record<IntegrationKey, { label: string; stage: number; connected: boolean }> = {
-  kakaoLogin: { label: "카카오 로그인", stage: 2, connected: false },
-  reportStorage: { label: "결과 저장", stage: 2, connected: false },
-  sajuEngine: { label: "만세력 계산", stage: 2, connected: false },
-  reportGeneration: { label: "리포트 생성(AI 해석)", stage: 3, connected: false },
-  payments: { label: "토스페이먼츠 결제", stage: 3, connected: false },
-  telegram: { label: "텔레그램 운영 알림", stage: 4, connected: false },
+export const INTEGRATIONS: Record<IntegrationKey, { label: string; stage: number }> = {
+  kakaoLogin: { label: "카카오 로그인", stage: 2 },
+  reportStorage: { label: "결과 저장", stage: 2 },
+  sajuEngine: { label: "만세력 계산", stage: 2 },
+  reportGeneration: { label: "리포트 생성(AI 해석)", stage: 3 },
+  payments: { label: "토스페이먼츠 결제", stage: 3 },
+  telegram: { label: "텔레그램 운영 알림", stage: 4 },
 };

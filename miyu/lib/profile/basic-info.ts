@@ -91,3 +91,24 @@ export const PROVINCES = [
   "울산광역시", "세종특별자치시", "경기도", "강원특별자치도", "충청북도", "충청남도",
   "전북특별자치도", "전라남도", "경상북도", "경상남도", "제주특별자치도",
 ] as const;
+
+/** 서버로 들어온 값을 BasicInfo 형태로만 받아들인다 (형식이 다르면 null). 내용 검증은 validateBasicInfo. */
+export function parseBasicInfo(raw: unknown): BasicInfo | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const str = (k: keyof BasicInfo, max: number) => (typeof r[k] === "string" ? (r[k] as string).slice(0, max) : null);
+  const info = {
+    nickname: str("nickname", 40),
+    calendar: r.calendar === "lunar" ? "lunar" : r.calendar === "solar" ? "solar" : null,
+    isLeapMonth: r.isLeapMonth === true,
+    birthYear: str("birthYear", 4),
+    birthMonth: str("birthMonth", 2),
+    birthDay: str("birthDay", 2),
+    birthTime: str("birthTime", 5),
+    birthTimeUnknown: r.birthTimeUnknown === true,
+    knownMbti: str("knownMbti", 4),
+    regionProvince: str("regionProvince", 20),
+    regionDistrict: str("regionDistrict", 20),
+  };
+  return Object.values(info).some((v) => v === null) ? null : (info as BasicInfo);
+}

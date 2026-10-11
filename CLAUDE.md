@@ -6,6 +6,7 @@
 - 상세 기획: `miyu/docs/product-spec.md`
 - 단계와 진행 상황: `miyu/docs/roadmap.md` — **현재 단계 범위만 구현한다**
 - 실행 방법: `miyu/README.md`
+- 외부 서비스 연결 순서: `miyu/docs/setup-guide.md`
 
 @miyu/AGENTS.md
 
@@ -14,9 +15,16 @@
 ```
 npm run dev        # http://localhost:3000
 npm run check      # 타입 검사 + 린트 + 단위 테스트 + 빌드
+npm run test:db    # DB·접근 정책 검사 (Linux 개발 환경에서 supabase/tests/local-stack.sh start 후)
 ```
 
 사용자는 Windows를 쓰는 비개발자다. 설명은 한국어로, 사용자가 직접 칠 명령은 PowerShell 기준으로 안내한다.
+
+## 채널
+
+- 독립형 모바일 웹으로 먼저 출시한다: 카카오 로그인 + Supabase 저장 + 토스페이먼츠 웹 결제(일반 카드 기본). 고객에게 토스 가입·앱 설치를 요구하지 않는다.
+- 앱인토스 SDK · 토스 로그인 · 앱인토스 인앱결제는 만들지 않는다 (보류).
+- 검사·채점·리포트·주문 규칙은 `miyu/lib/` 아래 채널 독립 코드로 둔다. 이 폴더는 Next.js·React·외부 SDK를 불러오지 않는다 (`lib/core.test.ts`가 검사). 채널 전용 코드는 `server/`·`app/`·`components/`에 둔다.
 
 ## 제품 원칙
 
@@ -32,7 +40,7 @@ npm run check      # 타입 검사 + 린트 + 단위 테스트 + 빌드
 
 ## 디자인 원칙
 
-- 화이트·밝은 회색 바탕, 차콜 글자, 포인트는 딥블루 하나. 색은 `miyu/app/globals.css` 토큰만 쓴다.
+- 화이트·밝은 회색 바탕, 차콜 글자, 포인트는 딥블루 하나. 색은 `miyu/app/globals.css` 토큰만 쓴다. (예외: 카카오 로그인 버튼은 카카오 가이드 색)
 - Pretendard 고딕만 사용. 표·구분선·점수 막대·요약 영역을 조합하고 카드 반복을 피한다.
 - 피할 것: 보라 그라데이션, 네온·발광, 파스텔 카드, 의미 없는 원·궤도·반짝이, 이모지 아이콘, 대문자 영어 소제목, 긴 감성 도입부.
 - 모바일 390px · PC 1440px에서 가로 넘침, 글자 잘림, 버튼 겹침이 없어야 한다. 괄호 바로 뒤 조사("(I)으로")처럼 어색하게 줄이 바뀌는 문장을 피한다.
@@ -43,6 +51,8 @@ npm run check      # 타입 검사 + 린트 + 단위 테스트 + 빌드
 - 회원은 내부 회원번호(Supabase user id)로 구분한다. 카카오 이메일은 없을 수 있다.
 - 본인 데이터만 보이도록 서버 권한 확인 + DB 접근 정책(RLS)을 둔다. 유료 내용은 구매 확인 전에는 브라우저로 보내지 않는다(CSS로 가리기 금지).
 - 결제 금액·주문 소유자는 서버에서 확인하고, 서버의 결제 승인 확인 후에만 구매 권한을 준다. 결제 상태와 리포트 생성 상태는 따로 관리한다.
+- 쓰기는 서버 비밀키 저장소(`writeRepository`)로, 화면 조회는 로그인 사용자 저장소(`readRepository`, RLS 적용)로 한다. 비밀키 저장소를 쓰기 전에 서비스에서 소유자를 확인한다.
+- 실결제는 `PAYMENTS_LIVE_MODE=true` + live 키가 있어야 켜진다. 운영자 승인 없이 바꾸지 않는다.
 - 텔레그램 알림에 고객 이름·생년월일·답변·분석 내용을 넣지 않는다. 알림 실패가 결제나 리포트 제공을 막지 않게 한다.
 - **사용자 승인 없이 하지 않는 것:** 실결제 켜기, 환불 실행, 외부 서비스 연결, 공개 배포, 과금 작업, 운영 쿠폰 발급, 파괴적인 파일·DB 변경.
 
@@ -50,12 +60,16 @@ npm run check      # 타입 검사 + 린트 + 단위 테스트 + 빌드
 
 | 경로 | 내용 |
 | --- | --- |
-| `miyu/lib/assessment/` | 검사 모듈(문항), 채점, 대표 경향 임시 규칙, 단위 테스트 |
-| `miyu/lib/report/` | 리포트 타입, 무료 요약 생성(서버 전용) |
-| `miyu/lib/samples/` | 리포트 예시용 가상 데이터 |
-| `miyu/lib/config/` | 상품·가격(가안), 외부 연결 상태 |
-| `miyu/lib/saju/` | 만세력 엔진 연결 지점(연결 전) |
-| `miyu/components/` | 화면 부품 (site · home · analyze · report · ui) |
-| `miyu/app/` | 화면: `/` · `/analyze` · `/report/sample` · `/my`, 서버 채점 `analyze/actions.ts` |
+| `miyu/lib/assessment/` | 검사 모듈(문항), 채점, 대표 경향 임시 규칙 |
+| `miyu/lib/report/` | 리포트 타입, 무료 요약 생성, 리포트 생성기(개발용) |
+| `miyu/lib/commerce/` | 주문번호, 주문·리포트 상태 규칙 |
+| `miyu/lib/services/` | 저장·주문·승인·리포트 흐름 (저장소·결제사·생성기는 `ports.ts` 약속으로만) |
+| `miyu/lib/integrations/` | Supabase 저장소, 토스페이먼츠 승인·조회 구현체 |
+| `miyu/lib/samples/` · `lib/config/` · `lib/saju/` | 예시 데이터 · 상품·가격 · 만세력 연결 지점(연결 전) |
+| `miyu/server/` | 웹 채널 서버 코드 (환경변수, Supabase 클라이언트, 세션, 로그인 전 결과 보관 쿠키) |
+| `miyu/app/` | 화면과 서버 함수: `/` `/analyze` `/results/[id]` `/checkout/[orderNumber]` `/payments/*` `/my` `/auth/*` `/api/webhooks/toss` |
+| `miyu/proxy.ts` | 로그인 세션 갱신 |
+| `miyu/supabase/` | DB 마이그레이션, 로컬 검증 스크립트·DB 테스트 |
 
-Next.js 16은 다른 화면으로 이동해도 이전 화면을 숨긴 채 DOM에 남겨둔다. 화면마다 HTML id가 겹치지 않게 한다.
+Next.js 16은 다른 화면으로 이동해도 이전 화면을 숨긴 채 DOM에 남겨둔다. 화면마다 HTML id가 겹치지 않게 한다 (`idPrefix`).
+Supabase 클라이언트는 요청 시점에만 만든다 (`server/supabase.ts`의 `connection()`).

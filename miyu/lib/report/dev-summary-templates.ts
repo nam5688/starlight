@@ -1,10 +1,9 @@
-import "server-only";
 import type { TendencyId } from "../assessment/dev-rules.ts";
 import type { CoreSummary } from "./types.ts";
 
 // 개발용 요약 문구 — 대표 경향 후보별 임시 문구.
 // 운영에서는 "서버 채점 → 구조화된 결과 → AI 해석 → 저장" 흐름으로 대체한다.
-// 서버 전용 파일이다 (브라우저 번들에 포함되지 않는다).
+// 서버에서만 불러온다 (화면 코드에서 import하지 않는다).
 
 export const DEV_SUMMARY_TEMPLATES: Record<TendencyId, { oneLiner: string; core: CoreSummary }> = {
   reassurance: {

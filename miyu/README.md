@@ -2,7 +2,11 @@
 
 사주 · MBTI · 기질 · 애착을 함께 정리하는 **개인 통합 분석 리포트** 웹서비스입니다.
 
-현재 상태: **1단계 — 화면과 흐름.** 검사 문항과 결과는 개발용 예시이며, 카카오 로그인 · 결과 저장 · 결제는 아직 연결되지 않았습니다. 진행 단계는 [`docs/roadmap.md`](docs/roadmap.md), 상세 기획은 [`docs/product-spec.md`](docs/product-spec.md)에 있습니다.
+현재 상태: 화면 · 검사 흐름에 더해 **카카오 로그인 · 결과 저장 · 토스페이먼츠 테스트 결제 · 리포트 저장**이 구현되어 있습니다. 검사 문항과 리포트 문장은 개발용 예시입니다.
+키를 넣기 전에는 로그인 · 결제가 "설정 전"으로 표시되고, 나머지 화면은 그대로 볼 수 있습니다.
+
+- 외부 서비스 연결 순서: [`docs/setup-guide.md`](docs/setup-guide.md)
+- 진행 단계: [`docs/roadmap.md`](docs/roadmap.md) · 상세 기획: [`docs/product-spec.md`](docs/product-spec.md)
 
 ---
 
@@ -66,7 +70,9 @@ npm run dev
 | 메인 | http://localhost:3000 | 소개 → 리포트 예시 → 제공 항목 → 이용 방법·가격 → 자주 묻는 질문 |
 | 내 분석 시작하기 | http://localhost:3000/analyze | 기본 정보 → MBTI 성향 → 기질 → 관계 → 무료 요약. 이전 버튼과 휴대폰 뒤로 가기, 답변 수정 |
 | 리포트 예시 | http://localhost:3000/report/sample | 결과 7단계 구성, 상세 분석 펼치기 |
-| MY | http://localhost:3000/my | 로그인 연결 전 상태 |
+| MY | http://localhost:3000/my | 카카오 로그인, 저장한 결과 목록 (키 설정 후) |
+| 결과 | `/results/...` | 저장된 무료 요약 + 결제하기 / 구매 후 리포트 (로그인 후) |
+| 결제 | `/checkout/...` | 토스페이먼츠 결제 화면 (테스트 결제) |
 
 휴대폰 화면으로 보려면 Chrome에서 `F12` → 왼쪽 위 휴대폰 아이콘(기기 툴바)을 누르고 폭을 390으로 맞춥니다.
 
@@ -78,11 +84,13 @@ npm run dev
 npm run check
 ```
 
-타입 검사 → 린트 → 단위 테스트(채점 규칙) → 빌드를 차례로 실행합니다. 하나씩 실행하려면 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.
+타입 검사 → 린트 → 단위 테스트(채점 · 결제 흐름 · 쿠키 암호화) → 빌드를 차례로 실행합니다. 하나씩 실행하려면 `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.
 
-## 환경변수 (2단계부터)
+`npm run test:db`(DB · 접근 정책 검사)는 Linux 개발 환경에서 로컬 검증용 DB를 띄운 뒤 실행합니다 (`supabase/tests/local-stack.sh`). Windows에서는 실행하지 않아도 됩니다.
 
-1단계에는 필요 없습니다. 이후 단계에서 키가 필요해지면:
+## 환경변수
+
+카카오 로그인 · 저장 · 결제를 쓰려면 키가 필요합니다. 값 얻는 방법은 [`docs/setup-guide.md`](docs/setup-guide.md)에 있습니다.
 
 ```powershell
 Copy-Item .env.example .env.local
@@ -90,6 +98,7 @@ notepad .env.local
 ```
 
 - `.env.local`에 값을 입력합니다. 이 파일은 git에 올라가지 않습니다.
+- 값을 바꾼 뒤에는 `npm run dev`를 껐다가(`Ctrl + C`) 다시 실행합니다.
 - 배포할 때는 Vercel 프로젝트 설정 → Environment Variables에 입력합니다.
 - 비밀키는 대화창, 코드, 스크린샷에 넣지 마세요.
 
@@ -97,14 +106,17 @@ notepad .env.local
 
 ```
 miyu/
-├── app/                  화면 (메인, analyze, report/sample, my)과 서버 채점(analyze/actions.ts)
-├── components/           화면 부품 (site · home · analyze · report · ui)
-├── lib/
-│   ├── assessment/       검사 모듈(문항) · 채점 · 대표 경향 임시 규칙 · 테스트
-│   ├── report/           리포트 데이터 구조 · 무료 요약 생성(서버 전용)
-│   ├── samples/          리포트 예시용 가상 데이터
-│   ├── config/           상품·가격(가안) · 외부 연결 상태
-│   ├── saju/             만세력 엔진 연결 지점(연결 전)
-│   └── profile/          기본 정보 입력·검증
-└── docs/                 기획서 · 진행 단계
+├── app/                  화면과 서버 함수 (메인, analyze, results, checkout, payments, my, auth, api/webhooks)
+├── components/           화면 부품
+├── lib/                  채널과 무관한 핵심 로직 (다른 채널에서도 재사용)
+│   ├── assessment/       검사 모듈(문항) · 채점
+│   ├── report/           리포트 데이터 · 무료 요약 · 리포트 생성기(개발용)
+│   ├── commerce/         주문 · 리포트 상태 규칙
+│   ├── services/         저장 · 주문 · 결제 승인 · 리포트 흐름
+│   ├── integrations/     Supabase 저장소 · 토스페이먼츠 연결
+│   └── samples/ config/ saju/ profile/
+├── server/               웹 서버 전용 (환경변수, 로그인 세션, 결과 보관 쿠키)
+├── supabase/             DB 마이그레이션 · 로컬 검증
+├── proxy.ts              로그인 세션 갱신
+└── docs/                 기획서 · 진행 단계 · 연결 안내
 ```

@@ -1,0 +1,113 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Suspense } from "react";
+import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
+import { FreeSummaryBody } from "@/components/report/free-summary-body";
+import { FullReportView } from "@/components/report/full-report-view";
+import { PurchasePanel } from "@/components/results/purchase-panel";
+import { SourceBadge } from "@/components/ui/source-badge";
+import { buttonSecondary, pageNarrow, pageWide } from "@/components/ui/styles";
+import { formatAssessmentBirth } from "@/lib/services/assessment-service";
+import { getResultView } from "@/lib/services/report-service";
+import { isAuthConfigured, paymentConfig } from "@/server/env";
+import { readRepository } from "@/server/services";
+import { getSessionUserId } from "@/server/session";
+
+export const metadata: Metadata = {
+  title: "내 리포트 · ME:U 미유",
+  robots: { index: false },
+};
+
+export default function ResultPage({ params }: PageProps<"/results/[id]">) {
+  return (
+    <main>
+      <Suspense fallback={<p className={`${pageNarrow} py-16 text-[16px] text-ink-2`}>결과를 불러오고 있어요.</p>}>
+        <ResultContent params={params} />
+      </Suspense>
+    </main>
+  );
+}
+
+async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "params">) {
+  const { id } = await params;
+  if (!isAuthConfigured()) notFound();
+
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return (
+      <div className={`${pageNarrow} py-14 md:py-20`}>
+        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있습니다. 카카오로 로그인해 주세요.</p>
+        <div className="mt-8">
+          <KakaoLoginForm next={`/results/${id}`} />
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인한 사용자 권한으로 조회 — 다른 회원의 결과는 DB 접근 정책에서도 걸러진다
+  const view = await getResultView(await readRepository(), { userId, assessmentId: id });
+  if (!view) notFound();
+
+  const { assessment, report } = view;
+  const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+
+  if (view.paidOrder && report?.status === "ready" && report.content) {
+    return (
+      <>
+        <ResultHeader
+          title={`${assessment.nickname} 님의 개인 통합 리포트`}
+          source={report.content.source}
+          meta={`검사일 ${created} · 저장된 리포트`}
+        />
+        <FullReportView
+          report={report.content}
+          idPrefix="r-"
+          footer={
+            <div className="space-y-4">
+              <p className="text-[13px] text-ink-3">
+                주문번호 {view.paidOrder.orderNumber} · 생성 {report.generator} {report.generatorVersion}
+              </p>
+              <Link href="/my" className={buttonSecondary}>
+                MY로 가기
+              </Link>
+            </div>
+          }
+        />
+      </>
+    );
+  }
+
+  const payment = paymentConfig();
+  return (
+    <>
+      <ResultHeader title={`${assessment.nickname} 님의 무료 요약`} source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      <div className={`${pageNarrow} space-y-16 py-10 md:py-14`}>
+        <FreeSummaryBody
+          summary={assessment.summary}
+          idPrefix="r-"
+          knownMbti={assessment.knownMbti}
+          birthText={formatAssessmentBirth(assessment)}
+          region={null /* 지역은 성향 분석과 분리해 보관하고 결과 화면에 다시 보여주지 않는다 */}
+        />
+        <PurchasePanel view={view} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} />
+      </div>
+    </>
+  );
+}
+
+function ResultHeader({ title, source, meta }: { title: string; source: "sample" | "dev-scoring"; meta: string }) {
+  return (
+    <div className="border-b border-line bg-mist">
+      <div className={`${pageWide} py-7 md:py-9`}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <SourceBadge source={source} />
+          <span className="text-[13px] text-ink-3">{meta}</span>
+        </div>
+        <h1 className="mt-3 text-[26px] font-bold tracking-tight md:text-[32px]">{title}</h1>
+        <p className="mt-1 text-[16px] text-ink-2">사주 · MBTI · 기질 · 애착</p>
+      </div>
+    </div>
+  );
+}
