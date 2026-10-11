@@ -1,92 +1,209 @@
 import Link from "next/link";
-import { questionSections } from "@/lib/questions";
-import { sampleReport } from "@/lib/report";
+import { Faq } from "@/components/home/faq";
+import { ReportPreview } from "@/components/home/report-preview";
+import { CheckIcon } from "@/components/ui/icons";
+import { StatusBadge } from "@/components/ui/source-badge";
+import { buttonPrimary, buttonSecondary, pageWide } from "@/components/ui/styles";
+import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 
-const areas = [
-  { name: "사주", text: "생년월일과 출생 시간으로 일간과 오행 분포를 봅니다." },
-  { name: "MBTI", text: "에너지 방향 · 인식 · 판단 · 생활 방식의 비율을 봅니다." },
-  { name: "기질", text: "자극추구 · 위험회피 · 사회적 민감성 · 인내력을 점수로 봅니다." },
-  { name: "애착", text: "가까운 관계에서의 불안과 회피 정도를 봅니다." },
+const INCLUDED: { name: string; desc: string; free: boolean }[] = [
+  { name: "대표 경향", desc: "지금의 응답에서 가장 두드러진 경향", free: true },
+  { name: "한 줄 요약", desc: "구체적인 행동으로 설명한 한 문장", free: true },
+  { name: "핵심 요약", desc: "편한 환경 · 반복되는 반응 · 스트레스 상황 · 바로 해볼 행동", free: true },
+  { name: "항목별 점수", desc: "기질과 관계 응답을 막대로 비교", free: true },
+  { name: "네 가지 상세 분석", desc: "MBTI · 기질 · 애착 · 사주를 근거와 한계와 함께", free: false },
+  { name: "통합 해석", desc: "공통점과 서로 다른 관점을 나눠 정리", free: false },
+  { name: "실천 제안", desc: "지금 적용할 행동", free: false },
+  { name: "MY 저장 · 다시보기", desc: "구매한 리포트를 같은 버전으로 다시 보기", free: false },
 ];
 
-const resultOrder = [
-  { name: "대표 경향", text: "네 영역을 종합한 핵심 경향 한 문장" },
-  { name: "한 줄 요약", text: "지금 알아야 할 결론" },
-  { name: "항목별 점수", text: "영역마다 수치와 막대로 비교" },
-  { name: "해석 근거", text: "결론을 뒷받침하는 지표" },
-  { name: "실천 제안", text: "바로 해볼 수 있는 행동 세 가지" },
+const PERSPECTIVES = [
+  {
+    name: "MBTI 성향",
+    sees: "에너지 방향, 정보 인식, 판단 기준, 생활 방식의 선호",
+    limit: "선호 경향이며 능력이나 성격 전체를 판정하지 않습니다.",
+  },
+  {
+    name: "기질",
+    sees: "새로운 일, 불확실함, 타인의 반응, 오래 걸리는 일에 대한 평소 반응",
+    limit: "현재 응답 기준의 경향이며, 높고 낮음이 좋고 나쁨이 아닙니다.",
+  },
+  {
+    name: "애착",
+    sees: "가까운 관계에서의 불안과 거리 두기",
+    limit: "임상 진단이 아니며 관계와 시기에 따라 달라질 수 있습니다.",
+  },
+  {
+    name: "사주",
+    sees: "생년월일·출생시간으로 계산한 원국과 오행 분포",
+    limit: "전통 해석 체계이며, 심리검사 점수와 합산하지 않습니다.",
+  },
 ];
 
-const questionCount = questionSections.reduce((n, s) => n + s.questions.length, 0);
+const STEPS = [
+  { title: "기본 정보 입력", desc: "닉네임, 생년월일, 출생시간(몰라도 됨)" },
+  { title: "검사 응답", desc: "MBTI 성향 · 기질 · 관계 문항. 이전 단계로 돌아가 답을 고칠 수 있습니다." },
+  { title: "무료 요약 확인", desc: "대표 경향, 한 줄 요약, 핵심 요약, 항목별 점수" },
+  { title: "카카오 로그인", desc: "결과를 회원 정보에 저장" },
+  { title: "개인 통합 리포트 구매", desc: "상세 분석, 통합 해석, 실천 제안" },
+  { title: "MY에서 다시보기", desc: "저장된 같은 버전을 언제든 다시 확인" },
+];
 
 export default function Home() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-5 pb-20">
-      <section className="pt-12 pb-12 sm:pt-16">
-        <h1 className="text-[28px] font-bold leading-snug tracking-tight sm:text-[34px]">
-          개인 통합 분석 리포트
-        </h1>
-        <p className="mt-2 text-lg font-medium text-sub">사주 · MBTI · 기질 · 애착</p>
-        <p className="mt-6 text-[17px] leading-relaxed">긴 서론 대신, 필요한 결론부터.</p>
-
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/test"
-            className="flex h-13 items-center justify-center rounded-xl bg-ink px-7 text-[16px] font-semibold text-paper hover:bg-black"
-          >
-            검사 시작하기
-          </Link>
-          <Link
-            href="/result"
-            className="flex h-13 items-center justify-center rounded-xl border border-line px-7 text-[16px] font-medium hover:bg-wash"
-          >
-            샘플 리포트 보기
-          </Link>
+    <main>
+      {/* 핵심 소개 + 실제 리포트 예시 */}
+      <section className={`${pageWide} grid gap-12 py-12 md:py-16 lg:grid-cols-[minmax(0,1fr)_480px] lg:items-center lg:gap-16 lg:py-20`}>
+        <div>
+          <p className="text-[15px] font-semibold text-accent">개인 통합 분석 리포트</p>
+          <h1 className="mt-3 text-[32px] font-bold leading-[1.3] tracking-[-0.02em] md:text-[44px]">
+            나에 대한 분석,
+            <br />한 번에 정리하세요.
+          </h1>
+          <p className="mt-5 text-[17px] leading-relaxed text-ink-2 md:text-[19px]">
+            <span className="font-semibold text-ink">사주 · MBTI · 기질 · 애착.</span>
+            <br />
+            네 가지 관점으로 성향과 행동 패턴을 정리합니다.
+          </p>
+          <p className="mt-3 text-[16px] text-ink-3">긴 서론 대신, 필요한 결론부터.</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link href="/analyze" className={buttonPrimary}>
+              내 분석 시작하기
+            </Link>
+            <Link href="/report/sample" className={buttonSecondary}>
+              리포트 예시 보기
+            </Link>
+          </div>
+          <ul className="mt-10 grid grid-cols-2 border-t border-line text-[14px] sm:grid-cols-4">
+            {["대표 경향", "한 줄 요약", "항목별 점수", "실천 제안"].map((t) => (
+              <li key={t} className="flex items-center gap-1.5 border-b border-line py-3 text-ink-2">
+                <CheckIcon className="size-4 text-accent" />
+                {t}
+              </li>
+            ))}
+          </ul>
         </div>
-        <p className="mt-4 text-sm text-faint">
-          기본 정보 + 질문 {questionCount}개 · 약 5분
-        </p>
+        <ReportPreview />
       </section>
 
-      <section className="border-t border-line pt-10">
-        <h2 className="text-sm font-semibold text-sub">리포트에 담기는 내용</h2>
-        <dl className="mt-4">
-          {areas.map((a) => (
-            <div key={a.name} className="flex gap-4 border-b border-line py-4 last:border-b-0">
-              <dt className="w-14 shrink-0 font-semibold">{a.name}</dt>
-              <dd className="text-[15px] leading-relaxed text-sub">{a.text}</dd>
+      {/* 제공 항목 */}
+      <section className="border-y border-line bg-mist py-14 md:py-20">
+        <div className={pageWide}>
+          <h2 className="text-[24px] font-bold tracking-tight md:text-[28px]">리포트에 담기는 항목</h2>
+          <p className="mt-2 text-[16px] text-ink-2">검사 후 무료 요약을 먼저 보고, 필요할 때 개인 통합 리포트를 구매합니다.</p>
+
+          <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-14">
+            <table className="w-full border-collapse bg-canvas text-left">
+              <thead>
+                <tr className="border-b border-ink text-[13px] text-ink-2">
+                  <th scope="col" className="px-3 py-3 font-semibold md:px-4">
+                    항목
+                  </th>
+                  <th scope="col" className="w-[72px] px-1 py-3 text-center font-semibold md:w-24">
+                    무료 요약
+                  </th>
+                  <th scope="col" className="w-[72px] px-1 py-3 text-center font-semibold text-accent md:w-24">
+                    통합 리포트
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {INCLUDED.map((row) => (
+                  <tr key={row.name} className="border-b border-line">
+                    <th scope="row" className="px-3 py-3.5 font-normal md:px-4">
+                      <span className="block text-[15px] font-semibold">{row.name}</span>
+                      <span className="mt-0.5 block text-[13px] leading-snug text-ink-3">{row.desc}</span>
+                    </th>
+                    <td className="text-center">
+                      {row.free ? <Included /> : <NotIncluded />}
+                    </td>
+                    <td className="text-center">
+                      <Included />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div>
+              <h3 className="text-[18px] font-bold">네 가지 관점의 근거와 한계</h3>
+              <dl className="mt-4 border-t border-ink">
+                {PERSPECTIVES.map((p) => (
+                  <div key={p.name} className="border-b border-line py-4">
+                    <dt className="text-[16px] font-semibold">{p.name}</dt>
+                    <dd className="mt-1 text-[15px] leading-relaxed text-ink-2">{p.sees}</dd>
+                    <dd className="mt-1 text-[13px] leading-relaxed text-ink-3">한계 · {p.limit}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-          ))}
-        </dl>
-      </section>
-
-      <section className="mt-10 border-t border-line pt-10">
-        <h2 className="text-sm font-semibold text-sub">결과는 이 순서로 보여드립니다</h2>
-        <ol className="mt-4 space-y-3">
-          {resultOrder.map((r, i) => (
-            <li key={r.name} className="flex items-baseline gap-4">
-              <span className="w-6 shrink-0 text-sm tabular-nums text-faint">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span className="font-semibold">{r.name}</span>
-              <span className="text-[15px] text-sub">{r.text}</span>
-            </li>
-          ))}
-        </ol>
-
-        <div className="mt-8 rounded-xl bg-wash p-5">
-          <p className="text-sm text-faint">샘플 · 대표 경향</p>
-          <p className="mt-1 text-lg font-semibold leading-snug">{sampleReport.headline}</p>
-          <p className="mt-3 text-[15px] leading-relaxed text-sub">{sampleReport.summary}</p>
-          <Link href="/result" className="mt-4 inline-block text-sm font-medium underline underline-offset-4">
-            샘플 리포트 전체 보기
-          </Link>
+          </div>
         </div>
       </section>
 
-      <p className="mt-14 text-xs leading-relaxed text-faint">
-        미유 리포트는 자기 이해를 돕는 참고 자료이며, 의학적·심리학적 진단을 대신하지 않습니다.
-      </p>
+      {/* 이용 방법 · 가격 */}
+      <section className={`${pageWide} py-14 md:py-20`}>
+        <h2 className="text-[24px] font-bold tracking-tight md:text-[28px]">이용 방법과 가격</h2>
+        <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16">
+          <ol className="border-t border-ink">
+            {STEPS.map((s, i) => (
+              <li key={s.title} className="flex gap-4 border-b border-line py-4">
+                <span className="w-6 shrink-0 text-[16px] font-bold tabular-nums text-accent">{i + 1}</span>
+                <div>
+                  <p className="text-[16px] font-semibold">{s.title}</p>
+                  <p className="mt-0.5 text-[14px] leading-relaxed text-ink-3">{s.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          <div className="self-start rounded-xl border border-line-strong p-6">
+            <p className="text-[15px] font-semibold text-ink-2">{PERSONAL_REPORT.name}</p>
+            <p className="mt-2 flex flex-wrap items-baseline gap-2">
+              <span className="text-[34px] font-bold tracking-tight tabular-nums">{formatKrw(PERSONAL_REPORT.priceKrw)}</span>
+              <StatusBadge>가격 {PERSONAL_REPORT.priceNote}</StatusBadge>
+            </p>
+            <p className="mt-1 text-[14px] text-ink-3">단건 구매 · 구독 아님 · 결제 연결 전</p>
+            <ul className="mt-5 space-y-2 border-t border-line pt-5 text-[15px]">
+              {["무료 요약 전체", "네 가지 상세 분석", "통합 해석 · 실천 제안", "MY 저장 · 다시보기"].map((t) => (
+                <li key={t} className="flex items-center gap-2">
+                  <CheckIcon className="size-4 shrink-0 text-accent" />
+                  {t}
+                </li>
+              ))}
+            </ul>
+            <Link href="/analyze" className={`${buttonPrimary} mt-6 w-full`}>
+              내 분석 시작하기
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 자주 묻는 질문 */}
+      <section className="border-t border-line py-14 md:py-20">
+        <div className={`${pageWide} grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-16`}>
+          <h2 className="text-[24px] font-bold tracking-tight md:text-[28px]">자주 묻는 질문</h2>
+          <Faq />
+        </div>
+      </section>
     </main>
+  );
+}
+
+function Included() {
+  return (
+    <span className="inline-flex text-accent">
+      <CheckIcon />
+      <span className="sr-only">포함</span>
+    </span>
+  );
+}
+
+function NotIncluded() {
+  return (
+    <span className="text-ink-3">
+      <span aria-hidden="true">—</span>
+      <span className="sr-only">포함 안 됨</span>
+    </span>
   );
 }
