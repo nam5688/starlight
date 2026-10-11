@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/*
+  미유 디자인 토큰 — 화이트 · 회색 · 차콜.
+  색을 바꿀 때는 아래 값만 수정하고, 화면 코드에서는
+  text-ink / text-sub / bg-wash / border-line 같은 이름을 사용한다.
+*/
+@theme {
+  --color-paper: #ffffff;
+  --color-wash: #f5f5f4;
+  --color-line: #e4e4e2;
+  --color-track: #ececea;
+  --color-faint: #767674;
+  --color-sub: #575755;
+  --color-ink: #222221;
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system,
+    BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR",
+    sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
