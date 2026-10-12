@@ -16,6 +16,7 @@ import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
 import { readRepository } from "@/server/services";
 import { topicLabel } from "@/lib/personalization/context";
+import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = {
   title: "MY · ME:U 미유",
@@ -27,7 +28,7 @@ export default function MyPage() {
     <main className={`${pageNarrow} py-12 md:py-16`}>
       <h1 className="text-[26px] font-bold tracking-tight md:text-[30px]">MY</h1>
       <p className="mt-2 text-[16px] text-ink-2">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있습니다.</p>
-      <Suspense fallback={<p className="mt-8 text-[16px] text-ink-2">불러오고 있어요.</p>}>
+      <Suspense fallback={<PageFallback className="mt-8" />}>
         <MyContent />
       </Suspense>
     </main>

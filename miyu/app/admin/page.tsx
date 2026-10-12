@@ -12,6 +12,7 @@ import type { OpsEventRecord } from "@/lib/services/ports";
 import { capacityConfig } from "@/server/env";
 import { getAdminMember } from "@/server/member";
 import { now, writeRepository } from "@/server/services";
+import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = { title: "관리자 · ME:U 미유", robots: { index: false, follow: false } };
 
@@ -21,7 +22,7 @@ export default function AdminPage({ searchParams }: PageProps<"/admin">) {
   return (
     <main className={`${pageWide} py-10 md:py-14`}>
       <h1 className="text-[26px] font-bold tracking-tight">관리자</h1>
-      <Suspense fallback={<p className="mt-6 text-[16px] text-ink-2">불러오고 있어요.</p>}>
+      <Suspense fallback={<PageFallback className="mt-6" />}>
         <AdminContent searchParams={searchParams} />
       </Suspense>
     </main>

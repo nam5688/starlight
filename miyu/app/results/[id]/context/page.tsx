@@ -9,6 +9,7 @@ import { getContextView } from "@/lib/services/context-service";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { readRepository, reportGenerator } from "@/server/services";
+import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = {
   title: "나를 더 반영하기 · ME:U 미유",
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
 export default function ContextPage({ params, searchParams }: PageProps<"/results/[id]/context">) {
   return (
     <main className={`${pageNarrow} py-12 md:py-16`}>
-      <Suspense fallback={<p className="text-[16px] text-ink-2">불러오고 있어요.</p>}>
+      <Suspense fallback={<PageFallback />}>
         <ContextContent params={params} searchParams={searchParams} />
       </Suspense>
     </main>

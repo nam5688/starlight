@@ -166,6 +166,9 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async listAiUsageSince(since, limit) {
       return aiUsage.filter((u) => u.createdAt >= since).sort((a, b) => b.id - a.id).slice(0, limit);
     },
+    async sumAiCostSince(since) {
+      return aiUsage.filter((u) => u.createdAt >= since).reduce((n, u) => n + (u.estCostKrw ?? 0), 0);
+    },
     async countActiveGenerations(staleBefore) {
       return [...reports.values()].filter((r) => r.status === "generating" && r.updatedAt >= staleBefore).length;
     },

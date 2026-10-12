@@ -71,12 +71,11 @@ export function estimateCostKrw(cfg: CapacityConfig, usage: { inputTokens: numbe
 
 export async function loadLoad(repo: MiyuRepository, now: Date) {
   const staleBefore = new Date(now.getTime() - REPORT_GENERATING_STALE_MS).toISOString();
-  const [generating, queued, usage] = await Promise.all([
+  const [generating, queued, todayCostKrw] = await Promise.all([
     repo.countActiveGenerations(staleBefore),
     repo.countQueuedReports(),
-    repo.listAiUsageSince(seoulDayStart(now), 5000),
+    repo.sumAiCostSince(seoulDayStart(now)),
   ]);
-  const todayCostKrw = usage.reduce((sum, u) => sum + (u.estCostKrw ?? 0), 0);
   return { generating, queued, todayCostKrw: Math.round(todayCostKrw * 100) / 100 };
 }
 

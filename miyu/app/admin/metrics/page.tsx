@@ -8,6 +8,7 @@ import { formatKrw } from "@/lib/config/product";
 import { getMetrics, type Metrics } from "@/lib/services/metrics-service";
 import { getAdminMember } from "@/server/member";
 import { now, writeRepository } from "@/server/services";
+import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = { title: "지표 · 관리자 · ME:U 미유", robots: { index: false, follow: false } };
 
@@ -23,7 +24,7 @@ export default function MetricsPage({ searchParams }: PageProps<"/admin/metrics"
         </Link>
       </p>
       <h1 className="mt-2 text-[26px] font-bold tracking-tight">사업 지표</h1>
-      <Suspense fallback={<p className="mt-6 text-[16px] text-ink-2">집계하고 있어요.</p>}>
+      <Suspense fallback={<PageFallback text="집계하고 있어요." className="mt-6" />}>
         <MetricsContent searchParams={searchParams} />
       </Suspense>
     </main>

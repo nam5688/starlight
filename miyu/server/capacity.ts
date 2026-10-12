@@ -13,9 +13,18 @@ export const saleGateCheck: SaleGateCheck = async (stage) => {
   return gate;
 };
 
-/** 화면 표시용 (알림 없이 상태만) */
+// 결과 화면을 열 때마다 DB를 세지 않도록, 화면 표시용 상태는 이 서버 안에서 20초 동안 재사용한다.
+// (표시용일 뿐이다 — 결제를 시작하기 직전 · 승인 요청 직전의 확인(saleGateCheck)은 항상 새로 센다. 개인 정보가 없는 전체 상태라 사용자 간에 나눠 써도 된다)
+const DISPLAY_TTL_MS = 20_000;
+let displayCache: { at: number; gate: SaleGate } | null = null;
+
+/** 화면 표시용 (알림 없이 상태만, 20초 재사용) */
 export async function currentSaleGate(): Promise<SaleGate> {
-  return saleGate(writeRepository(), capacityConfig(), now(), "start");
+  const t = now().getTime();
+  if (displayCache && t - displayCache.at < DISPLAY_TTL_MS) return displayCache.gate;
+  const gate = await saleGate(writeRepository(), capacityConfig(), now(), "start");
+  displayCache = { at: t, gate };
+  return gate;
 }
 
 async function notifyClosed(gate: SaleGate, stage: "start" | "confirm") {

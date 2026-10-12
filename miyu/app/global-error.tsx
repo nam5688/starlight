@@ -1,6 +1,6 @@
 "use client";
 
-import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+import "./fonts/pretendard-subset.css";
 import "./globals.css";
 import { errorIdFromDigest } from "@/lib/ops/redact";
 

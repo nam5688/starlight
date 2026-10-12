@@ -473,3 +473,35 @@ test("유입 출처: 주문에 기록되고 지표용 조회에 나온다. 8번 
     await sleep(800);
   }
 });
+
+test("Supabase 1,000행 제한: 집계용 목록은 나눠서 모두 가져오고, 하루 AI 비용 합계는 DB에서 계산한다 (기록이 많아져도 조용히 모자라지 않는다)", async () => {
+  const repo = createSupabaseRepository(admin);
+  const t0 = new Date(Date.now() - 1000).toISOString();
+  const rows = Array.from({ length: 1250 }, () => ({ provider: "bulk", model: "m", prompt_version: "p", input_tokens: 1, output_tokens: 1, est_cost_krw: 0.01, latency_ms: 1, outcome: "ok" }));
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await admin.from("ai_usage").insert(rows.slice(i, i + 500));
+    assert.equal(error, null);
+  }
+  const listed = (await repo.listAiUsageSince(t0, 5000)).filter((r) => r.provider === "bulk");
+  assert.equal(listed.length, 1250, "1,000행을 넘어도 모두 가져온다");
+  const limited = await repo.listAiUsageSince(t0, 1100);
+  assert.equal(limited.length, 1100, "상한(limit)을 지킨다");
+
+  const before = await repo.sumAiCostSince(new Date(Date.now() + 3600_000).toISOString());
+  assert.equal(before, 0, "기준 이후 기록이 없으면 0");
+  const sum = await repo.sumAiCostSince(t0);
+  assert.ok(Math.abs(sum - 12.5) < 0.001, `합계 ${sum}`);
+  // RPC 함수가 없는 경우(9번 마이그레이션 전)에도 같은 합계가 나온다
+  const psql = (q: string) => execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-q", "-c", q]);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  try {
+    psql("alter function public.ai_cost_since(timestamptz) rename to ai_cost_since_hidden; notify pgrst, 'reload schema'");
+    await sleep(800);
+    const fallback = await repo.sumAiCostSince(t0);
+    assert.ok(Math.abs(fallback - 12.5) < 0.001, `함수가 없을 때의 합계 ${fallback}`);
+  } finally {
+    psql("alter function public.ai_cost_since_hidden(timestamptz) rename to ai_cost_since; notify pgrst, 'reload schema'");
+    await sleep(800);
+  }
+  assert.ok(Math.abs((await repo.sumAiCostSince(t0)) - 12.5) < 0.001);
+});

@@ -9,6 +9,7 @@ import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { paymentConfig } from "@/server/env";
 import { readRepository, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
+import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = {
   title: "결제 · ME:U 미유",
@@ -19,7 +20,7 @@ export default function CheckoutPage({ params }: PageProps<"/checkout/[orderNumb
   return (
     <main className={`${pageNarrow} py-10 md:py-14`}>
       <h1 className="text-[26px] font-bold tracking-tight">결제</h1>
-      <Suspense fallback={<p className="mt-6 text-[16px] text-ink-2">주문 정보를 불러오고 있어요.</p>}>
+      <Suspense fallback={<PageFallback text="주문 정보를 불러오고 있어요." className="mt-6" />}>
         <CheckoutContent params={params} />
       </Suspense>
     </main>

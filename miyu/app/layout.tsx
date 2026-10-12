@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
-import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import { VisitTracker } from "@/components/analytics/track";
 import { PreviewNotice } from "@/components/site/preview-notice";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { siteUrl } from "@/server/env";
+import "./fonts/pretendard-subset.css";
 import "./globals.css";
 
 const TITLE = "ME:U 미유 · 개인 통합 분석 리포트";

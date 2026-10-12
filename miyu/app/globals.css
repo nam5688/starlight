@@ -29,7 +29,7 @@
   /* 입력 오류 표시에만 사용 */
   --color-danger: #b3261e;
 
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+  --font-sans: "Pretendard Subset", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
     "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
 }
 

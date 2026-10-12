@@ -223,6 +223,8 @@ export interface MiyuRepository {
   /** AI 사용 기록 (서버 전용). 테이블이 없으면(DB 변경 7번 전) 쓰기는 건너뛰고 조회는 빈 값 */
   addAiUsage(usage: AiUsageInput): Promise<void>;
   listAiUsageSince(since: string, limit: number): Promise<AiUsageRecord[]>;
+  /** 이 시각 이후 AI 예상 비용 합계 (원) — DB에서 합산한다 */
+  sumAiCostSince(since: string): Promise<number>;
   /** 지금 생성 중인 리포트 수 (staleBefore보다 오래 멈춘 것은 제외) */
   countActiveGenerations(staleBefore: string): Promise<number>;
   /** 생성 순서를 기다리는 리포트 수 */

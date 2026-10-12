@@ -24,6 +24,26 @@ const UNIQUE_VIOLATION = "23505";
 const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
 export const isMissingTableError = (error: { code?: string | null } | null | undefined) => Boolean(error?.code && MISSING_TABLE.has(error.code));
 
+/** Supabase는 한 번에 최대 1,000행만 돌려준다 — 더 필요하면 나눠서 가져온다 (집계용 목록, 상한 limit) */
+const PAGE = 1000;
+type PageResult<T> = PromiseLike<{ data: T[] | null; error: { message: string; code?: string } | null }>;
+async function fetchPages<T>(context: string, limit: number, page: (from: number, to: number) => PageResult<T>, tolerateMissing = false): Promise<T[]> {
+  const rows: T[] = [];
+  while (rows.length < limit) {
+    const from = rows.length;
+    const to = Math.min(from + PAGE, limit) - 1;
+    const { data, error } = await page(from, to);
+    if (error) {
+      if (tolerateMissing && isMissingTableError(error)) return rows;
+      fail(context, error);
+    }
+    const got = data?.length ?? 0;
+    rows.push(...(data ?? []));
+    if (got < to - from + 1) break; // 마지막 쪽
+  }
+  return rows;
+}
+
 function fail(context: string, error: { message: string; code?: string }): never {
   const e = new Error(`${context}: ${error.message}`) as Error & { code?: string };
   e.code = error.code;
@@ -345,12 +365,8 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     },
 
     async listFunnelEventsSince(since, limit) {
-      const { data, error } = await db.from("funnel_events").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
-      if (error) {
-        if (isMissingTableError(error)) return [];
-        fail("방문 단계 조회", error);
-      }
-      return (data ?? []).map((r) => ({
+      const data = await fetchPages("방문 단계 조회", limit, (from, to) => db.from("funnel_events").select().gte("created_at", since).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to), true);
+      return data.map((r) => ({
         id: r.id as number,
         createdAt: r.created_at as string,
         anonId: r.anon_id as string,
@@ -364,18 +380,16 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     },
 
     async listOrdersForMetrics(since, limit) {
-      const { data, error } = await db.from("orders").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
-      if (error) fail("주문 집계 조회", error);
-      return (data ?? []).map((r) => {
+      const data = await fetchPages("주문 집계 조회", limit, (from, to) => db.from("orders").select().gte("created_at", since).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
+      return data.map((r) => {
         const o = toOrder(r);
         return { id: o.id, userId: o.userId, assessmentId: o.assessmentId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null };
       });
     },
 
     async listReportsForMetrics(since, limit) {
-      const { data, error } = await db.from("reports").select("id, order_id, status, created_at, ready_at").gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
-      if (error) fail("리포트 집계 조회", error);
-      return (data ?? []).map((r) => ({ id: r.id as string, orderId: r.order_id as string, status: r.status as ReportRecord["status"], createdAt: r.created_at as string, readyAt: (r.ready_at as string | null) ?? null }));
+      const data = await fetchPages("리포트 집계 조회", limit, (from, to) => db.from("reports").select("id, order_id, status, created_at, ready_at").gte("created_at", since).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
+      return data.map((r) => ({ id: r.id as string, orderId: r.order_id as string, status: r.status as ReportRecord["status"], createdAt: r.created_at as string, readyAt: (r.ready_at as string | null) ?? null }));
     },
 
     async countAssessmentsAllSince(since) {
@@ -399,12 +413,8 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     },
 
     async listFeedbackSince(since, limit) {
-      const { data, error } = await db.from("report_feedback").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
-      if (error) {
-        if (isMissingTableError(error)) return [];
-        fail("만족도 집계 조회", error);
-      }
-      return (data ?? []).map((r) => ({ reportId: r.report_id as string, userId: r.user_id as string, rating: r.rating as number, createdAt: r.created_at as string, updatedAt: r.updated_at as string }));
+      const data = await fetchPages("만족도 집계 조회", limit, (from, to) => db.from("report_feedback").select().gte("created_at", since).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to), true);
+      return data.map((r) => ({ reportId: r.report_id as string, userId: r.user_id as string, rating: r.rating as number, createdAt: r.created_at as string, updatedAt: r.updated_at as string }));
     },
 
     async countAssessmentsSince(userId, since) {
@@ -430,12 +440,8 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     },
 
     async listAiUsageSince(since, limit) {
-      const { data, error } = await db.from("ai_usage").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
-      if (error) {
-        if (isMissingTableError(error)) return [];
-        fail("AI 사용 기록 조회", error);
-      }
-      return (data ?? []).map((r) => ({
+      const data = await fetchPages("AI 사용 기록 조회", limit, (from, to) => db.from("ai_usage").select().gte("created_at", since).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to), true);
+      return data.map((r) => ({
         id: r.id as number,
         createdAt: r.created_at as string,
         reportId: (r.report_id as string | null) ?? null,
@@ -449,6 +455,15 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         outcome: r.outcome as "ok" | "invalid" | "timeout" | "error",
         errorCode: (r.error_code as string | null) ?? null,
       }));
+    },
+
+    async sumAiCostSince(since) {
+      // DB에서 합산한다 (행 수 제한에 걸리지 않게). 함수가 아직 없으면(9번 마이그레이션 전) 나눠서 가져와 더한다
+      const { data, error } = await db.rpc("ai_cost_since", { p_since: since });
+      if (!error && data !== null && data !== undefined) return Number(data);
+      if (error && !["PGRST202", "42883", "PGRST205", "42P01"].includes(error.code ?? "")) fail("AI 비용 합계 조회", error);
+      const rows = await fetchPages<{ est_cost_krw: number | string | null }>("AI 비용 합계 조회", 100_000, (from, to) => db.from("ai_usage").select("est_cost_krw").gte("created_at", since).order("id", { ascending: false }).range(from, to), true);
+      return rows.reduce((n, r) => n + (r.est_cost_krw === null ? 0 : Number(r.est_cost_krw)), 0);
     },
 
     async countActiveGenerations(staleBefore) {

@@ -22,6 +22,7 @@ import { currentSaleGate } from "@/server/capacity";
 import { readRepository, reportGenerator } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
+import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = {
   title: "내 리포트 · ME:U 미유",
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
 export default function ResultPage({ params }: PageProps<"/results/[id]">) {
   return (
     <main>
-      <Suspense fallback={<p className={`${pageNarrow} py-16 text-[16px] text-ink-2`}>결과를 불러오고 있어요.</p>}>
+      <Suspense fallback={<PageFallback text="결과를 불러오고 있어요." className={`${pageNarrow} py-16`} tall />}>
         <ResultContent params={params} />
       </Suspense>
     </main>

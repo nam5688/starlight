@@ -90,8 +90,20 @@ export async function reconcileOneNow(order: OrderRecord): Promise<ReconcileOutc
  * 결제가 승인됐는데 돌아오지 못한 고객이 MY를 열면 자동으로 맞춰진다. 실패해도 화면에는 영향이 없다.
  * userId는 로그인 확인을 마친 회원 번호만 넘긴다 (after 안에서는 로그인 쿠키를 읽을 수 없어 서버 저장소로 본인 주문만 조회한다).
  */
+// 같은 회원이 화면을 계속 열어도 1분에 한 번만 대조한다 (DB · 결제사 조회 부담을 줄인다)
+const lastUserRun = new Map<string, number>();
+// (자동 검증에서는 RECONCILE_USER_INTERVAL_SECONDS=0으로 끈다)
+const USER_INTERVAL_MS = (() => {
+  const raw = Number(process.env.RECONCILE_USER_INTERVAL_SECONDS ?? "60");
+  return (Number.isFinite(raw) && raw >= 0 ? raw : 60) * 1000;
+})();
+
 export function reconcileUserInBackground(userId: string): void {
   if (!paymentConfig().ok) return;
+  const t = now().getTime();
+  if (t - (lastUserRun.get(userId) ?? 0) < USER_INTERVAL_MS) return;
+  lastUserRun.set(userId, t);
+  if (lastUserRun.size > 5000) lastUserRun.clear();
   after(async () => {
     try {
       const orders = await writeRepository().listOrdersForUser(userId);

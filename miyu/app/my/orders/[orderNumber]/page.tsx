@@ -11,6 +11,7 @@ import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
 import { readRepository, writeRepository } from "@/server/services";
 import { DOCS_KEY_NOTE } from "@/server/setup-checks";
+import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = { title: "주문 상세 · ME:U 미유", robots: { index: false } };
 
@@ -23,7 +24,7 @@ export default function OrderPage({ params }: PageProps<"/my/orders/[orderNumber
         </Link>
       </p>
       <h1 className="mt-2 text-[26px] font-bold tracking-tight">주문 상세</h1>
-      <Suspense fallback={<p className="mt-6 text-[16px] text-ink-2">불러오고 있어요.</p>}>
+      <Suspense fallback={<PageFallback className="mt-6" />}>
         <OrderContent params={params} />
       </Suspense>
     </main>
