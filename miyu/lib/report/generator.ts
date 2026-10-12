@@ -17,6 +17,8 @@ export type ReportInput = {
   saju: SajuResult;
   /** 대운 방향 · 배우자 별 해석에만 쓴다. 아직 묻지 않으므로 null (성별 문항은 다음 단계) */
   gender: "male" | "female" | null;
+  /** 시기 해석 기준 연 · 월 (없으면 지금, 한국 날짜 기준) */
+  reference?: { year: number; month: number };
   /** 나를 더 반영하기 (선택) — 해석의 초점과 예시에만 쓴다. 근거가 아니다 */
   context: (PersonalContextInput & { updatedAt?: string }) | null;
 };

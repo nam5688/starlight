@@ -4,7 +4,7 @@ import { BRANCHES, STEMS } from "@/lib/saju/glyphs";
 import { ChevronIcon } from "@/components/ui/icons";
 
 /** 5) 네 가지 상세 분석 — 영역별로 펼쳐 보기 */
-export function DetailSections({ report }: { report: FullReport }) {
+export function DetailSections({ report, showChart = true }: { report: FullReport; showChart?: boolean }) {
   const { details } = report;
   const strongest = [...report.temperament]
     .sort((a, b) => Math.abs(b.score - 50) - Math.abs(a.score - 50))
@@ -47,7 +47,7 @@ export function DetailSections({ report }: { report: FullReport }) {
         }
         block={details.saju}
       >
-        <SajuChart saju={saju} />
+        {showChart && <SajuChart saju={saju} />}
       </Detail>
     </div>
   );
@@ -99,7 +99,7 @@ function Detail({
   );
 }
 
-export function SajuChart({ saju }: { saju: SajuSection }) {
+export function SajuChart({ saju, showGlossary = true }: { saju: SajuSection; showGlossary?: boolean }) {
   if (saju.status === "not-connected") {
     return <p className="text-[15px] text-ink-2">만세력 계산 결과가 없는 결과입니다.</p>;
   }
@@ -167,6 +167,7 @@ export function SajuChart({ saju }: { saju: SajuSection }) {
           ))}
         </ul>
       </div>
+      {showGlossary && (
       <details className="border-t border-line pt-3">
         <summary className="cursor-pointer text-[14px] font-medium text-accent">표 읽는 법 · 용어 풀이</summary>
         <dl className="mt-3 space-y-2 text-[14px] leading-relaxed">
@@ -181,6 +182,7 @@ export function SajuChart({ saju }: { saju: SajuSection }) {
           ))}
         </dl>
       </details>
+      )}
       {saju.notes?.length || saju.basis?.length ? (
         <div className="space-y-2 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-3">
           {saju.notes?.map((n) => (

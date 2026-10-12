@@ -12,8 +12,7 @@ import {
   type BasicInfo,
   type BasicInfoErrors,
 } from "@/lib/profile/basic-info";
-import type { FreeSummary } from "@/lib/report/types";
-import type { SajuResult } from "@/lib/saju/engine";
+import type { FreePreview } from "@/lib/report/preview";
 import { BasicInfoStep } from "./basic-info-step";
 import { FreeSummaryView } from "./free-summary";
 import { QuestionStep } from "./question-step";
@@ -21,14 +20,14 @@ import { QuestionStep } from "./question-step";
 const STEPS = [
   { key: "basic", label: "기본 정보" },
   ...ASSESSMENT_MODULES.map((m) => ({ key: m.id, label: m.title })),
-  { key: "summary", label: "무료 요약" },
+  { key: "summary", label: "무료 미리보기" },
 ];
 const SUMMARY_STEP = STEPS.length - 1;
 const LAST_QUESTION_STEP = SUMMARY_STEP - 1;
 const TOTAL_ITEMS = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
 
 /**
- * 기본 정보 → 검사 응답(모듈별) → 무료 요약.
+ * 기본 정보 → 검사 응답(모듈별) → 무료 미리보기.
  * 단계 이동은 브라우저 기록에도 남겨서, 휴대폰의 뒤로 가기로도 이전 단계로 돌아갈 수 있다.
  * 입력값은 이 화면의 메모리에만 있고 저장하지 않는다 (새로고침하면 처음부터).
  */
@@ -38,18 +37,17 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   const [infoErrors, setInfoErrors] = useState<BasicInfoErrors>({});
   const [answers, setAnswers] = useState<Answers>({});
   const [showMissing, setShowMissing] = useState(false);
-  const [summary, setSummary] = useState<FreeSummary | null>(null);
-  const [saju, setSaju] = useState<SajuResult | null>(null);
+  const [preview, setPreview] = useState<FreePreview | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const summaryRef = useRef<FreeSummary | null>(null);
+  const summaryRef = useRef<FreePreview | null>(null);
   const stepRef = useRef(0);
   const firstRender = useRef(true);
 
   useEffect(() => {
-    summaryRef.current = summary;
-  }, [summary]);
+    summaryRef.current = preview;
+  }, [preview]);
 
   useEffect(() => {
     stepRef.current = step;
@@ -118,7 +116,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   function handleAnswer(id: string, value: number) {
     setAnswers((prev) => ({ ...prev, [id]: value }));
     // 답을 고치면 이전 요약은 더 이상 맞지 않으므로 지운다
-    setSummary(null);
+    setPreview(null);
   }
 
   function handleNext() {
@@ -164,9 +162,8 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     startTransition(async () => {
       const result = await scoreDevAnswers({ info, answers });
       if (result.ok) {
-        setSaju(result.saju);
-        setSummary(result.summary);
-        summaryRef.current = result.summary;
+        setPreview(result.preview);
+        summaryRef.current = result.preview;
         pushStep(SUMMARY_STEP);
       } else {
         setServerError(result.message);
@@ -178,7 +175,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     setInfo(EMPTY_BASIC_INFO);
     setInfoErrors({});
     setAnswers({});
-    setSummary(null);
+    setPreview(null);
     summaryRef.current = null;
     pushStep(0);
   }
@@ -233,10 +230,9 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
         </div>
       </div>
 
-      {step === SUMMARY_STEP && summary ? (
+      {step === SUMMARY_STEP && preview ? (
         <FreeSummaryView
-          summary={summary}
-          saju={saju ?? { status: "not-connected" }}
+          preview={preview}
           info={info}
           answers={answers}
           authReady={authReady}
@@ -278,7 +274,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
                 aria-busy={pending}
                 className={`${buttonPrimary} flex-1 disabled:cursor-wait disabled:opacity-70`}
               >
-                {pending ? "채점 중…" : step === LAST_QUESTION_STEP ? "무료 요약 보기" : "다음"}
+                {pending ? "채점 중…" : step === LAST_QUESTION_STEP ? "내 결과 미리보기" : "다음"}
               </button>
             </div>
           </div>

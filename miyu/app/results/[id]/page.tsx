@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
-import { FreeSummaryBody } from "@/components/report/free-summary-body";
+import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { FullReportView } from "@/components/report/full-report-view";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
 import { ContextPanel } from "@/components/results/context-panel";
@@ -11,7 +11,8 @@ import { PurchasePanel } from "@/components/results/purchase-panel";
 import { SourceBadge } from "@/components/ui/source-badge";
 import { buttonSecondary, pageNarrow, pageWide } from "@/components/ui/styles";
 import { isPersonalV2 } from "@/lib/report/generator";
-import { formatAssessmentBirth } from "@/lib/services/assessment-service";
+import { buildFreePreview } from "@/lib/report/preview";
+import { seoulReference } from "@/lib/report/reference";
 import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { readRepository, reportGenerator } from "@/server/services";
@@ -90,20 +91,15 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   }
 
   const payment = paymentConfig();
+  // 잠긴 내용은 서버에서 아예 만들지 않는다 — 전체 요약 · 점수는 구매 후 리포트에만
+  const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
   return (
     <>
-      <ResultHeader title={`${assessment.nickname} 님의 무료 요약`} source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
       <div className={`${pageNarrow} space-y-16 py-10 md:py-14`}>
-        <FreeSummaryBody
-          summary={assessment.summary}
-          idPrefix="r-"
-          knownMbti={assessment.knownMbti}
-          birthText={formatAssessmentBirth(assessment)}
-          region={null /* 지역은 성향 분석과 분리해 보관하고 결과 화면에 다시 보여주지 않는다 */}
-          saju={assessment.saju}
-        />
+        <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
         <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady={false} />
-        <PurchasePanel view={view} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} />
+        <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} />
       </div>
     </>
   );

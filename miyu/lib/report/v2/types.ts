@@ -3,7 +3,8 @@
 
 import type { ContextTopic } from "../../personalization/context.ts";
 import type { Evidence } from "../evidence.ts";
-import type { DataSource, SajuSection } from "../types.ts";
+import type { ReportExtras } from "../extras.ts";
+import type { DataSource, FreeSummary, SajuSection } from "../types.ts";
 
 export type Paragraph = { text: string; evidence: string[] };
 
@@ -35,6 +36,10 @@ export type PersonalReportV2 = ReportDraftV2 & {
   personName: string;
   saju: SajuSection;
   evidence: Evidence[];
+  /** 응답 요약 (대표 경향 · 핵심 요약 · 기질 · 관계 · MBTI) — 구매한 리포트에는 모두 보인다 */
+  base?: FreeSummary;
+  /** 규칙 기반 구성 요소 (원국 쉬운 풀이 · 개인 질문과 답 · 상황별 · 어울리는 관계 조건 · 보완 아이템 · 실천 3가지) */
+  extras?: ReportExtras;
   basis: {
     ruleVersions: string[];
     referenceDate: string;

@@ -99,6 +99,13 @@ function ym(d: { year: number; month: number }) {
 }
 
 /** 원국 · 대운 · 세운 → 근거 목록. reference는 시기 해석의 기준 날짜(한국 날짜) */
+/** 배우자 자리(일지)의 십신과 그룹 — 어울리는 관계 조건 규칙이 쓴다 */
+export function spousePalace(saju: SajuOk): { branch: string; tenGod: string; group: Group } {
+  const dayBranch = saju.pillars.find((p) => p.key === "day")?.branch ?? "";
+  const tenGod = getBranchTenGod(saju.dayMaster.stem as Stem, dayBranch as Branch);
+  return { branch: dayBranch, tenGod, group: GROUP_OF[tenGod] };
+}
+
 export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; month: number }; gender?: "male" | "female" | null }): Evidence[] {
   const out: Evidence[] = [];
   const dm = saju.dayMaster.stem as Stem;

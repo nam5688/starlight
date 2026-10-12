@@ -1,3 +1,6 @@
+// 사용하지 않음 — 무료 화면은 서버가 잠금 처리해 만든 미리보기(lib/report/preview.ts + free-preview-body.tsx)로 바뀌었다.
+// 이 컴포넌트는 요약 · 점수 전체를 보여 주므로 무료 화면에 다시 쓰지 않는다.
+
 import { StatusBadge } from "@/components/ui/source-badge";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
 import type { FreeSummary } from "@/lib/report/types";

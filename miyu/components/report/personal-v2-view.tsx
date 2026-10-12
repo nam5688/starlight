@@ -2,7 +2,9 @@ import type { Evidence } from "@/lib/report/evidence";
 import { SECTION_PLAN, type Paragraph, type PersonalReportV2 } from "@/lib/report/v2/types";
 import { BASE_TERMS, glossaryFor, withHanja } from "@/lib/saju/glossary";
 import { SajuChart } from "./detail-sections";
-import { SectionTitle } from "./summary-blocks";
+import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
+import { ActionList } from "./integrated-view";
+import { CoreSummaryTable, SCORE_NOTE, ScoreGroups, SectionTitle, TendencyBlock } from "./summary-blocks";
 
 const SOURCE_LABEL: Record<Evidence["source"], string> = {
   saju: "사주 계산",
@@ -38,12 +40,21 @@ export function PersonalV2View({
   ].flatMap((p) => p.evidence);
   // 원국 표를 읽는 기본 용어는 원국 표 아래에 있으므로, 여기서는 그 밖의 용어만 풀이한다
   const glossary = glossaryFor(report.evidence, usedIds).filter((g) => !BASE_TERMS.includes(g.term));
+  const base = report.base;
+  const extras = report.extras;
   const toc = [
     { id: id("v2-summary"), label: "핵심 구조" },
+    ...(base ? [{ id: id("v2-tendency"), label: "대표 경향 · 핵심 요약" }] : []),
     ...(focus.length ? [{ id: id("v2-focus"), label: "알려 주신 고민까지 반영한 해석" }] : []),
     { id: id("v2-chart"), label: "사주 원국" },
+    ...(extras?.plain ? [{ id: id("v2-plain"), label: "그래서 어떤 사람일까요" }] : []),
+    ...(extras?.questions.length ? [{ id: id("v2-questions"), label: "내 원국이 던지는 질문과 답" }] : []),
     ...report.sections.map((s) => ({ id: id(`v2-${s.id}`), label: sectionTitle(s.id) })),
+    ...(extras ? [{ id: id("v2-situations"), label: "상황별 잘하는 점 · 주의할 점" }] : []),
     ...(report.timeline.length ? [{ id: id("v2-timeline"), label: "시기의 흐름" }] : []),
+    ...(extras?.partner ? [{ id: id("v2-partner"), label: "어울리는 관계 조건" }] : []),
+    ...(extras?.items ? [{ id: id("v2-items"), label: "보완 아이템" }] : []),
+    ...(base ? [{ id: id("v2-scores"), label: "항목별 점수" }] : []),
     ...(report.differences.length ? [{ id: id("v2-differences"), label: "사주와 응답이 다른 부분" }] : []),
     { id: id("v2-actions"), label: "상황별 실천" },
     { id: id("v2-glossary"), label: "사주 용어 풀이" },
@@ -78,6 +89,13 @@ export function PersonalV2View({
           </div>
         </section>
 
+        {base && (
+          <section aria-labelledby={id("v2-tendency")} className="space-y-8">
+            <TendencyBlock summary={base} headingId={id("v2-tendency")} />
+            <CoreSummaryTable core={base.core} />
+          </section>
+        )}
+
         {focus.length > 0 && (
           <section aria-labelledby={id("v2-focus")} className="border-l-2 border-accent pl-4 md:pl-6">
             <SectionTitle
@@ -105,6 +123,9 @@ export function PersonalV2View({
           <SajuChart saju={report.saju} />
         </section>
 
+        {extras?.plain && <PlainReadingSection plain={extras.plain} id={id("v2-plain")} />}
+        {extras && extras.questions.length > 0 && <QuestionsSection questions={extras.questions} id={id("v2-questions")} />}
+
         {report.sections.map((s) => (
           <section key={s.id} aria-labelledby={id(`v2-${s.id}`)}>
             <SectionTitle id={id(`v2-${s.id}`)}>{sectionTitle(s.id)}</SectionTitle>
@@ -115,6 +136,8 @@ export function PersonalV2View({
             </div>
           </section>
         ))}
+
+        {extras && <SituationsSection situations={extras.situations} id={id("v2-situations")} />}
 
         {report.timeline.length > 0 && (
           <section aria-labelledby={id("v2-timeline")}>
@@ -142,6 +165,18 @@ export function PersonalV2View({
           </section>
         )}
 
+        {extras?.partner && <PartnerSection partner={extras.partner} id={id("v2-partner")} />}
+        {extras?.items && <ItemsSection items={extras.items} id={id("v2-items")} />}
+
+        {base && (
+          <section aria-labelledby={id("v2-scores")}>
+            <SectionTitle id={id("v2-scores")} note={SCORE_NOTE}>
+              항목별 점수
+            </SectionTitle>
+            <ScoreGroups summary={base} />
+          </section>
+        )}
+
         {report.differences.length > 0 && (
           <section aria-labelledby={id("v2-differences")}>
             <SectionTitle id={id("v2-differences")} note="두 결과를 하나로 맞추지 않고, 다르게 나온 부분을 그대로 적었습니다.">
@@ -157,6 +192,12 @@ export function PersonalV2View({
 
         <section aria-labelledby={id("v2-actions")}>
           <SectionTitle id={id("v2-actions")}>상황별 실천</SectionTitle>
+          {extras && extras.starterActions.length > 0 && (
+            <div className="mb-8">
+              <h3 className="mb-2 text-[15px] font-semibold text-ink-2">바로 해볼 3가지</h3>
+              <ActionList actions={extras.starterActions} />
+            </div>
+          )}
           <ol className="divide-y divide-line border-y border-line">
             {report.actions.map((a, i) => (
               <li key={i} className="grid gap-1 py-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-6">

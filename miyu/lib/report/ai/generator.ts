@@ -5,6 +5,7 @@
 
 import { sajuEvidence, SAJU_RULE_VERSION } from "../../saju/interpret/rules.ts";
 import { filledFields, topicLabel } from "../../personalization/context.ts";
+import { buildReportExtras } from "../extras.ts";
 import { describePolicy } from "../../saju/policy.ts";
 import { sajuSection } from "../../saju/display.ts";
 import type { Evidence } from "../evidence.ts";
@@ -107,6 +108,8 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
             personName: input.nickname,
             saju: sajuSection(input.saju),
             evidence,
+            base: input.summary,
+            extras: buildReportExtras({ summary: input.summary, saju: input.saju, reference: ref }),
             basis: {
               ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, PROMPT_VERSION],
               referenceDate: ref.iso,

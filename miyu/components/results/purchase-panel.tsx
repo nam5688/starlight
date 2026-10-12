@@ -8,21 +8,19 @@ import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { nextActionForResult } from "@/lib/growth/next-action";
 import { canRetryReport, type ResultView } from "@/lib/services/report-service";
 
-/** 개인 리포트는 한 번 구매로 완결된다 — 일부를 따로 떼어 추가 결제로 팔지 않는다 */
-const INCLUDED = [
-  "네 가지 상세 분석 — MBTI · 기질 · 애착 · 사주를 근거와 한계와 함께",
-  "통합 해석 — 공통점과 서로 다른 관점",
-  "실천 제안",
-  "MY에서 같은 버전으로 다시보기",
-];
+/** 구매 시 받는 내용은 무료 미리보기의 잠금 목록(lib/report/preview.ts)과 같은 목록을 쓴다 — 한 곳에서만 관리 */
+const ALWAYS_INCLUDED = "MY에서 같은 버전으로 다시보기";
 
 /** 결과 화면의 구매 영역. 다음에 보여줄 행동은 nextActionForResult 규칙으로 고른다. */
 export function PurchasePanel({
   view,
+  included,
   paymentsReady,
   paymentsNote,
 }: {
   view: ResultView;
+  /** 구매하면 더 받는 내용 (미리보기의 잠금 목록 제목) */
+  included: string[];
   paymentsReady: boolean;
   paymentsNote: string | null;
 }) {
@@ -81,13 +79,13 @@ export function PurchasePanel({
           {PERSONAL_REPORT.name}
         </h2>
         <p className="mt-2 text-[16px] leading-relaxed text-ink-2">
-          이 특징이 어떤 상황에서 반복되는지, 네 가지 분석의 근거와 함께 확인하세요.
+          내 결과의 나머지와, 왜 그렇게 읽히는지의 근거를 한 번에 확인하세요.
         </p>
         {action.kind === "refund-info" && (
           <p className="mt-2 text-[15px] text-ink-2">이전 주문은 환불 처리되었습니다.</p>
         )}
         <ul className="mt-4 space-y-2.5">
-          {INCLUDED.map((item) => (
+          {[...included, ALWAYS_INCLUDED].map((item) => (
             <li key={item} className="flex gap-2.5 text-[15px] leading-relaxed">
               <CheckIcon className="mt-0.5 size-5 shrink-0 text-accent" />
               {item}

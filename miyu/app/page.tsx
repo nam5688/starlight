@@ -4,18 +4,8 @@ import { ReportPreview } from "@/components/home/report-preview";
 import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, pageWide } from "@/components/ui/styles";
-import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
-
-const INCLUDED: { name: string; desc: string; free: boolean }[] = [
-  { name: "대표 경향", desc: "지금의 응답에서 가장 두드러진 경향", free: true },
-  { name: "한 줄 요약", desc: "구체적인 행동으로 설명한 한 문장", free: true },
-  { name: "핵심 요약", desc: "편한 환경 · 반복되는 반응 · 스트레스 상황 · 바로 해볼 행동", free: true },
-  { name: "항목별 점수", desc: "기질과 관계 응답을 막대로 비교", free: true },
-  { name: "네 가지 상세 분석", desc: "MBTI · 기질 · 애착 · 사주를 근거와 한계와 함께", free: false },
-  { name: "통합 해석", desc: "공통점과 서로 다른 관점을 나눠 정리", free: false },
-  { name: "실천 제안", desc: "지금 적용할 행동", free: false },
-  { name: "MY 저장 · 다시보기", desc: "구매한 리포트를 같은 버전으로 다시 보기", free: false },
-];
+import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
+import { formatKrw, PERSONAL_REPORT, REPORT_SCOPE } from "@/lib/config/product";
 
 const PERSPECTIVES = [
   {
@@ -40,12 +30,14 @@ const PERSPECTIVES = [
   },
 ];
 
+const QUESTION_COUNT = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
+
 const STEPS = [
   { title: "기본 정보 입력", desc: "닉네임, 생년월일, 출생시간(몰라도 됨)" },
   { title: "검사 응답", desc: "MBTI 성향 · 기질 · 관계 문항. 이전 단계로 돌아가 답을 고칠 수 있습니다." },
-  { title: "무료 요약 확인", desc: "대표 경향, 한 줄 요약, 핵심 요약, 항목별 점수" },
+  { title: "무료 미리보기 확인", desc: "대표 경향 일부, 사주 원국과 오행의 뜻, 내 원국이 던지는 질문" },
   { title: "카카오 로그인", desc: "결과를 회원 정보에 저장" },
-  { title: "개인 통합 리포트 구매", desc: "상세 분석, 통합 해석, 실천 제안" },
+  { title: "개인 통합 리포트 구매", desc: "질문의 답, 상황별 잘하는 점 · 주의할 점, 어울리는 관계 조건, 보완 아이템" },
   { title: "MY에서 다시보기", desc: "저장된 같은 버전을 언제든 다시 확인" },
 ];
 
@@ -57,15 +49,14 @@ export default function Home() {
         <div>
           <p className="text-[15px] font-semibold text-accent">ME:U 개인 통합 리포트</p>
           <h1 className="mt-3 text-[32px] font-bold leading-[1.3] tracking-[-0.02em] md:text-[44px]">
-            나를 설명하는 정보,
-            <br />한 번에 정리하세요.
+            내 사주,
+            <br />쉬운 말로 풀어 드립니다.
           </h1>
           <p className="mt-5 text-[17px] leading-relaxed text-ink-2 md:text-[19px]">
-            <span className="font-semibold text-ink">사주 · MBTI · 기질 · 애착</span>
-            <br />
-            네 가지 관점의 결과와 근거를 한 리포트로 정리합니다.
+            생년월일로 계산한 <span className="font-semibold text-ink">사주 원국</span>에 내 행동 응답을 더해,
+            <br className="hidden md:block" /> 일 · 가까운 사람 · 선택 · 돈 · 갈등에서 어떤 점이 강하고 어떤 점을 조심하면 좋은지 알려 드려요.
           </p>
-          <p className="mt-3 text-[16px] text-ink-3">긴 서론 대신, 필요한 결론부터.</p>
+          <p className="mt-3 text-[15px] text-ink-3">한자는 뜻과 함께, 어려운 용어는 일상의 말로 풀어 씁니다.</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/analyze" className={buttonPrimary}>
               내 분석 시작하기
@@ -75,16 +66,18 @@ export default function Home() {
             </Link>
           </div>
           <p className="mt-4 text-[15px] text-ink-2">
-            기본 요약 무료 · {PERSONAL_REPORT.name} <span className="font-semibold tabular-nums text-ink">{formatKrw(PERSONAL_REPORT.priceKrw)}</span>
+            미리보기 무료 · {PERSONAL_REPORT.name} <span className="font-semibold tabular-nums text-ink">{formatKrw(PERSONAL_REPORT.priceKrw)}</span> · 문항 {QUESTION_COUNT}개
           </p>
-          <ul className="mt-8 grid grid-cols-2 border-t border-line text-[14px] sm:grid-cols-4">
-            {["대표 경향", "한 줄 요약", "항목별 점수", "실천 제안"].map((t) => (
-              <li key={t} className="flex items-center gap-1.5 border-b border-line py-3 text-ink-2">
-                <CheckIcon className="size-4 text-accent" />
-                {t}
-              </li>
-            ))}
-          </ul>
+          <dl className="mt-8 border-t border-line text-[14px]">
+            <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-line py-3">
+              <dt className="font-semibold text-ink-2">무료로 보는 것</dt>
+              <dd className="text-ink-2">원국 표 · 오행이 뜻하는 것 · 쉬운 한 줄 풀이 · 내 원국이 던지는 질문</dd>
+            </div>
+            <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-line py-3">
+              <dt className="font-semibold text-accent">구매하면 더</dt>
+              <dd className="text-ink-2">질문의 답 · 상황별 잘하는 점과 주의할 점 · 어울리는 관계 조건 · 보완 아이템</dd>
+            </div>
+          </dl>
         </div>
         <ReportPreview />
       </section>
@@ -93,7 +86,7 @@ export default function Home() {
       <section className="border-y border-line bg-mist py-14 md:py-20">
         <div className={pageWide}>
           <h2 className="text-[24px] font-bold tracking-tight md:text-[28px]">리포트에 담기는 항목</h2>
-          <p className="mt-2 text-[16px] text-ink-2">검사 후 무료 요약을 먼저 보고, 필요할 때 개인 통합 리포트를 구매합니다.</p>
+          <p className="mt-2 text-[16px] text-ink-2">검사 후 무료 미리보기를 먼저 보고, 필요할 때 개인 통합 리포트를 구매합니다.</p>
 
           <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-14">
             <table className="w-full border-collapse bg-canvas text-left">
@@ -102,27 +95,25 @@ export default function Home() {
                   <th scope="col" className="px-3 py-3 font-semibold md:px-4">
                     항목
                   </th>
-                  <th scope="col" className="w-[72px] px-1 py-3 text-center font-semibold md:w-24">
-                    무료 요약
+                  <th scope="col" className="w-[104px] px-1 py-3 text-center font-semibold md:w-40">
+                    무료 미리보기
                   </th>
-                  <th scope="col" className="w-[72px] px-1 py-3 text-center font-semibold text-accent md:w-24">
+                  <th scope="col" className="w-[104px] px-1 py-3 text-center font-semibold text-accent md:w-40">
                     통합 리포트
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {INCLUDED.map((row) => (
-                  <tr key={row.name} className="border-b border-line">
+                {REPORT_SCOPE.map((row) => (
+                  <tr key={row.name} className="border-b border-line align-top">
                     <th scope="row" className="px-3 py-3.5 font-normal md:px-4">
                       <span className="block text-[15px] font-semibold">{row.name}</span>
                       <span className="mt-0.5 block text-[13px] leading-snug text-ink-3">{row.desc}</span>
                     </th>
-                    <td className="text-center">
-                      {row.free ? <Included /> : <NotIncluded />}
+                    <td className="px-1 py-3.5 text-center text-[13px] leading-snug text-ink-2">
+                      {row.free ?? <NotIncluded />}
                     </td>
-                    <td className="text-center">
-                      <Included />
-                    </td>
+                    <td className="px-1 py-3.5 text-center text-[13px] font-semibold leading-snug text-accent">{row.paid}</td>
                   </tr>
                 ))}
               </tbody>
@@ -168,7 +159,7 @@ export default function Home() {
             </p>
             <p className="mt-1 text-[14px] text-ink-3">단건 구매 · 구독 아님 · 카드 결제</p>
             <ul className="mt-5 space-y-2 border-t border-line pt-5 text-[15px]">
-              {["무료 요약 전체", "네 가지 상세 분석", "통합 해석 · 실천 제안", "MY 저장 · 다시보기"].map((t) => (
+              {REPORT_SCOPE.filter((row) => row.free !== row.paid).map((row) => row.name).map((t) => (
                 <li key={t} className="flex items-center gap-2">
                   <CheckIcon className="size-4 shrink-0 text-accent" />
                   {t}
@@ -190,15 +181,6 @@ export default function Home() {
         </div>
       </section>
     </main>
-  );
-}
-
-function Included() {
-  return (
-    <span className="inline-flex text-accent">
-      <CheckIcon />
-      <span className="sr-only">포함</span>
-    </span>
   );
 }
 

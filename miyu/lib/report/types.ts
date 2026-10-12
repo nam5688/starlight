@@ -2,6 +2,7 @@
 // source로 출처를 항상 표시한다 — 샘플과 실제 결과를 섞지 않기 위해서다.
 
 import type { TendencyId } from "../assessment/dev-rules.ts";
+import type { ReportExtras } from "./extras.ts";
 
 /**
  * - "sample": 리포트 예시용 가상 데이터
@@ -90,4 +91,7 @@ export type FullReport = FreeSummary & {
     different: { point: string; explanation: string }[];
   };
   actions: { title: string; detail: string }[];
+  /** 규칙 기반 구성 요소 (원국 쉬운 풀이 · 개인 질문과 답 · 상황별 잘하는 점/주의할 점 · 어울리는 관계 조건 · 보완 아이템).
+   *  dev-0.2부터 저장 — 이전에 만든 리포트에는 없다 */
+  extras?: ReportExtras;
 };

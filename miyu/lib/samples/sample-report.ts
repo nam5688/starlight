@@ -2,8 +2,20 @@
 // 실제 검사·만세력 계산 결과가 아니다. 운영 데이터와 섞지 않는다.
 
 import { mbtiModule, relationshipModule, temperamentModule } from "../assessment/modules/index.ts";
+import { buildReportExtras } from "../report/extras.ts";
 import { toAxisRows, toScoreRows } from "../report/rows.ts";
 import type { FullReport } from "../report/types.ts";
+import { sajuSection } from "../saju/display.ts";
+import type { SajuOk } from "../saju/engine.ts";
+import { calculateSaju } from "../saju/manseryeok-engine.ts";
+
+// 가상의 인물(서윤)의 생년월일을 실제 만세력 엔진으로 계산한 원국 — 리포트가 어떻게 풀리는지 보여 주는 예시용이다.
+const SAMPLE_CHART = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" }) as SajuOk;
+const COMPUTED = sajuSection(SAMPLE_CHART);
+if (COMPUTED.status === "not-connected") throw new Error("예시 원국을 계산하지 못했습니다.");
+const SAMPLE_SAJU = { ...COMPUTED, status: "sample" as const };
+const SAMPLE_TEMPERAMENT = toScoreRows(temperamentModule, { novelty: 34, caution: 71, sensitivity: 66, persistence: 58 });
+const SAMPLE_RELATIONSHIP = toScoreRows(relationshipModule, { anxiety: 72, avoidance: 28 });
 
 export const sampleReport: FullReport = {
   source: "sample",
@@ -18,13 +30,8 @@ export const sampleReport: FullReport = {
     stressTrigger: "계획이 갑자기 바뀌거나, 분명한 답을 듣지 못한 채 기다려야 할 때",
     tryNow: "불안할 때는 추측을 늘리기보다 확인하고 싶은 것 한 가지를 짧게 묻기",
   },
-  temperament: toScoreRows(temperamentModule, {
-    novelty: 34,
-    caution: 71,
-    sensitivity: 66,
-    persistence: 58,
-  }),
-  relationship: toScoreRows(relationshipModule, { anxiety: 72, avoidance: 28 }),
+  temperament: SAMPLE_TEMPERAMENT,
+  relationship: SAMPLE_RELATIONSHIP,
   mbti: {
     code: "INTJ",
     axes: toAxisRows(mbtiModule, { ei: 68, sn: 59, tf: 38, jp: 31 }),
@@ -60,30 +67,15 @@ export const sampleReport: FullReport = {
         "임상 진단이 아니며, 특정 관계나 시기의 경험에 따라 응답이 달라질 수 있습니다.",
     },
     saju: {
-      basis: "생년월일·출생시간으로 계산한 사주 원국 (이 예시는 가상 원국)",
+      basis: "생년월일·출생시간으로 계산한 사주 원국 (가상 인물 예시)",
       findings: [
-        "일간은 을목입니다. 전통 해석에서는 유연하게 뻗어 나가는 풀이나 덩굴에 비유합니다.",
-        "오행 중 목이 3개로 가장 많고, 금은 없습니다.",
+        "일간은 정화(丁), 음의 화입니다. 전통 해석에서는 촛불에 비유하며, 한곳을 오래 비추는 집중력과 섬세함으로 봅니다.",
+        "원국 글자의 오행은 목 3 · 토 3 · 화 1 · 금 1 · 수 0입니다. 목과 토가 많고 수가 없습니다.",
+        "수(물) 기운이 없어요 — 생각을 멈추고 쉬어 가는 일이 서툴 수 있어요. 쉬는 것도 일처럼 계획해야 마음이 놓일 수 있다고 봅니다.",
       ],
       limits:
-        "사주는 전통 해석 체계이며 과학적으로 검증된 성격 측정이 아닙니다. 심리검사 점수와 합산하지 않습니다. 이 예시의 원국은 만세력으로 계산한 값이 아닙니다.",
-      saju: {
-        status: "sample",
-        pillars: [
-          { position: "시주", stem: "壬", branch: "午" },
-          { position: "일주", stem: "乙", branch: "未" },
-          { position: "월주", stem: "丁", branch: "卯" },
-          { position: "년주", stem: "甲", branch: "戌" },
-        ],
-        dayMaster: "을목(乙木)",
-        elements: [
-          { name: "목", count: 3 },
-          { name: "화", count: 2 },
-          { name: "토", count: 2 },
-          { name: "금", count: 0 },
-          { name: "수", count: 1 },
-        ],
-      },
+        "사주는 전통 해석 체계이며 과학적으로 검증된 성격 측정이 아닙니다. 심리검사 점수와 합산하지 않습니다. 이 예시는 가상 인물의 생년월일을 만세력으로 계산한 것입니다.",
+      saju: SAMPLE_SAJU,
     },
   },
   integrated: {
@@ -111,7 +103,7 @@ export const sampleReport: FullReport = {
       {
         point: "사주 해석과 기질 점수",
         explanation:
-          "사주 예시에서 일간을 ‘유연하게 뻗어 나가는 나무’로 보는 해석은 기질의 높은 신중함과 방향이 다릅니다. 사주는 전통 해석 체계이므로 심리검사 점수에 맞춰 바꾸지 않고 따로 제시합니다.",
+          "사주 예시에서 일간을 ‘한곳을 오래 비추는 촛불’로 보는 해석은 기질의 높은 신중함과 비슷한 방향으로 읽힙니다. 하지만 두 결과는 서로 다른 근거이므로 합치지 않고 따로 제시하며, 사주는 심리검사 점수에 맞춰 바꾸지 않습니다.",
       },
     ],
   },
@@ -129,4 +121,9 @@ export const sampleReport: FullReport = {
       detail: "다른 사람의 반응에 따라 의욕이 흔들릴 때, 스스로 정한 기준으로 진행 상황을 확인합니다.",
     },
   ],
+  extras: buildReportExtras({
+    summary: { temperament: SAMPLE_TEMPERAMENT, relationship: SAMPLE_RELATIONSHIP, tendency: { id: "reassurance", name: "확인추구형" } },
+    saju: SAMPLE_CHART,
+    reference: { year: 2026, month: 10 },
+  }),
 };

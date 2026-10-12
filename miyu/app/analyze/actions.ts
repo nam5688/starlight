@@ -6,8 +6,8 @@ import { parseAnswers, validateAnswers } from "@/lib/assessment/scoring";
 import type { Answers } from "@/lib/assessment/types";
 import { parseBasicInfo, validateBasicInfo, type BasicInfo } from "@/lib/profile/basic-info";
 import { buildDevFreeSummary } from "@/lib/report/build-free-summary";
-import type { FreeSummary } from "@/lib/report/types";
-import type { SajuResult } from "@/lib/saju/engine";
+import { buildFreePreview, type FreePreview } from "@/lib/report/preview";
+import { seoulReference } from "@/lib/report/reference";
 import { birthDateError } from "@/lib/saju/manseryeok-engine";
 import { submitAssessment } from "@/lib/services/assessment-service";
 import { isAuthConfigured } from "@/server/env";
@@ -16,7 +16,8 @@ import { savePendingSubmission } from "@/server/pending-submission";
 import { sajuEngine, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 
-export type ScoreResult = { ok: true; summary: FreeSummary; saju: SajuResult } | { ok: false; message: string };
+/** 브라우저에는 무료로 공개하는 미리보기만 보낸다 — 잠긴 내용(전체 이름 · 나머지 요약 · 점수 · 상세 · 실천 제안)은 여기 없다 */
+export type ScoreResult = { ok: true; preview: FreePreview } | { ok: false; message: string };
 
 function birthInput(info: BasicInfo) {
   return {
@@ -38,7 +39,7 @@ export async function checkBirthAction(input: unknown): Promise<string | null> {
 }
 
 /**
- * 검사 응답을 서버에서 채점하고 사주를 계산해 무료 요약을 돌려준다 (저장하지 않음, 로그에도 남기지 않음).
+ * 검사 응답을 서버에서 채점하고 사주를 계산해 무료 미리보기를 돌려준다 (저장하지 않음, 로그에도 남기지 않음).
  */
 export async function scoreDevAnswers(input: { info: unknown; answers: unknown }): Promise<ScoreResult> {
   const info = parseBasicInfo(input?.info);
@@ -50,7 +51,7 @@ export async function scoreDevAnswers(input: { info: unknown; answers: unknown }
   }
   const saju = await sajuEngine.calculate(birthInput(info));
   if (saju.status === "invalid") return { ok: false, message: saju.message };
-  return { ok: true, summary: buildDevFreeSummary(answers), saju };
+  return { ok: true, preview: buildFreePreview({ summary: buildDevFreeSummary(answers), saju, reference: seoulReference(new Date()) }) };
 }
 
 export type SaveResult = { ok: false; message: string };
