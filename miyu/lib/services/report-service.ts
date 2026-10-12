@@ -5,46 +5,58 @@ import type { ReportGenerator } from "../report/generator.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { AssessmentRecord, MiyuRepository, OrderRecord, ReportRecord } from "./ports.ts";
 
+type ReportDeps = { repo: MiyuRepository; generator: ReportGenerator; now: () => Date };
+
 /**
- * 결제된 주문의 리포트를 준비한다.
- * - 이미 완성됐으면 저장된 것을 그대로 돌려준다 (다시 생성하지 않음)
- * - 다른 요청이 생성 중이면 기다리지 않고 현재 상태를 돌려준다
- * - 실패하면 failed로 남기고, 다시 시도할 수 있다
+ * 1) 대기열에 올린다 — 결제 확인 직후 바로 부른다 (AI를 기다리지 않음).
+ * 이미 리포트 행이 있으면 그대로 돌려준다.
  */
-export async function ensureReport(
-  deps: { repo: MiyuRepository; generator: ReportGenerator; now: () => Date },
-  order: OrderRecord,
-): Promise<ReportRecord | null> {
-  const { repo, generator } = deps;
+export async function queueReport(deps: { repo: MiyuRepository }, order: OrderRecord): Promise<ReportRecord | null> {
   if (order.status !== "paid") return null;
+  const existing = await deps.repo.getReportByOrder(order.id);
+  if (existing) return existing;
+  const inserted = await deps.repo.insertReport({
+    userId: order.userId,
+    orderId: order.id,
+    assessmentId: order.assessmentId,
+    status: "queued",
+    attempts: 0,
+  });
+  return inserted.ok ? inserted.value : deps.repo.getReportByOrder(order.id);
+}
 
-  let report = await repo.getReportByOrder(order.id);
-  if (report?.status === "ready") return report;
+export type ClaimResult = { report: ReportRecord | null; claimed: boolean };
 
-  if (!report) {
-    const inserted = await repo.insertReport({
-      userId: order.userId,
-      orderId: order.id,
-      assessmentId: order.assessmentId,
-      status: "generating",
-      attempts: 1,
-    });
-    if (!inserted.ok) return repo.getReportByOrder(order.id);
-    report = inserted.value;
-  } else {
-    const stale = deps.now().getTime() - new Date(report.updatedAt).getTime() > REPORT_GENERATING_STALE_MS;
-    if (report.status === "generating" && !stale) return report;
-    if (report.attempts >= REPORT_MAX_ATTEMPTS) return report;
-    const taken = await repo.updateReport(
-      report.id,
-      [report.status],
-      { status: "generating", attempts: report.attempts + 1, lastError: null },
-      report.attempts,
-    );
-    if (!taken) return repo.getReportByOrder(order.id);
-    report = taken;
-  }
+/**
+ * 2) 생성할 권리를 가져간다. 동시에 여러 요청이 와도 한 곳만 가져간다 (상태 + 시도 횟수로 확인).
+ * - 대기 중이면 가져간다
+ * - 생성 중인데 멈춘 지 오래되면(서버 재시작 등) 가져간다
+ * - 실패한 리포트는 retryFailed일 때만 (고객의 "다시 만들기")
+ * - 시도 횟수 상한을 넘으면 운영자 확인 대상으로 남긴다
+ */
+export async function claimReport(deps: ReportDeps, order: OrderRecord, opts: { retryFailed?: boolean } = {}): Promise<ClaimResult> {
+  const { repo } = deps;
+  if (order.status !== "paid") return { report: null, claimed: false };
+  const report = (await repo.getReportByOrder(order.id)) ?? (await queueReport(deps, order));
+  if (!report || report.status === "ready") return { report, claimed: false };
+  if (report.attempts >= REPORT_MAX_ATTEMPTS) return { report, claimed: false };
 
+  const stale = deps.now().getTime() - new Date(report.updatedAt).getTime() > REPORT_GENERATING_STALE_MS;
+  if (report.status === "generating" && !stale) return { report, claimed: false };
+  if (report.status === "failed" && !opts.retryFailed) return { report, claimed: false };
+
+  const taken = await repo.updateReport(
+    report.id,
+    [report.status],
+    { status: "generating", attempts: report.attempts + 1, lastError: null },
+    report.attempts,
+  );
+  return taken ? { report: taken, claimed: true } : { report: await repo.getReportByOrder(order.id), claimed: false };
+}
+
+/** 3) 가져간 리포트를 실제로 만든다. 실패하면 failed로 남기고 결제 상태는 건드리지 않는다. */
+export async function completeReport(deps: ReportDeps, order: OrderRecord, report: ReportRecord): Promise<ReportRecord | null> {
+  const { repo, generator } = deps;
   const assessment = await repo.getAssessment(order.assessmentId);
   try {
     if (!assessment) throw new Error("검사 결과를 찾을 수 없습니다.");
@@ -65,6 +77,26 @@ export async function ensureReport(
     return failed ?? repo.getReportByOrder(order.id);
   }
 }
+
+/** 가져가기 + 만들기를 한 번에 (백그라운드 작업에서 쓴다) */
+export async function runReport(deps: ReportDeps, order: OrderRecord, opts: { retryFailed?: boolean } = {}): Promise<ReportRecord | null> {
+  const { report, claimed } = await claimReport(deps, order, opts);
+  return claimed && report ? completeReport(deps, order, report) : report;
+}
+
+/**
+ * 결제된 주문의 리포트를 기다려서 준비한다 (테스트 · 즉시 생성용).
+ * 웹 화면에서는 queueReport → 백그라운드 runReport를 쓴다.
+ * - 이미 완성됐으면 저장된 것을 그대로 돌려준다 (다시 생성하지 않음)
+ * - 실패한 리포트는 다시 시도한다
+ */
+export async function ensureReport(deps: ReportDeps, order: OrderRecord): Promise<ReportRecord | null> {
+  await queueReport(deps, order);
+  return runReport(deps, order, { retryFailed: true });
+}
+
+/** 다시 만들기를 더 할 수 있는지 (상한을 넘으면 운영자 확인) */
+export const canRetryReport = (report: Pick<ReportRecord, "attempts"> | null) => !report || report.attempts < REPORT_MAX_ATTEMPTS;
 
 export function reportInputOf(a: AssessmentRecord) {
   return {

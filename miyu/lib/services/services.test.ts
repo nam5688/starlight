@@ -13,7 +13,7 @@ import { submitAssessment } from "./assessment-service.ts";
 import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "./order-service.ts";
 import type { GatewayResult, PaymentGateway } from "./ports.ts";
 import { getMyPage, traceOrder } from "./my-service.ts";
-import { ensureReport, getResultView, listMyItems } from "./report-service.ts";
+import { canRetryReport, claimReport, completeReport, ensureReport, getResultView, listMyItems, queueReport, runReport } from "./report-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
 const TODAY = new Date("2026-10-11T00:00:00Z");
@@ -382,4 +382,66 @@ test("주문 추적: 주문번호로 승인 기록(상점 ID 포함) · 주문 �
   const notPaid = await traceOrder(mem.repo, mem.repo, { userId: USER, orderNumber: pending.order.orderNumber });
   assert.equal(notPaid?.entitled, false);
   assert.equal(notPaid?.order.statusLabel, "결제 미완료");
+});
+
+async function paidOrder() {
+  const { mem, assessment } = await setup();
+  const started = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id });
+  if (started.kind !== "order") throw new Error();
+  const { gateway } = fakeGateway({ confirm: (i) => ({ ok: true, payment: done(i.orderId, i.amount, i.paymentKey) }) });
+  const paid = await confirmPayment({ repo: mem.repo, gateway }, { userId: USER, orderNumber: started.order.orderNumber, paymentKey: `pk_${Math.random()}`, amount: started.order.amount });
+  if (paid.kind !== "paid") throw new Error(paid.kind);
+  return { mem, order: paid.order };
+}
+
+test("백그라운드 생성: 결제 직후에는 대기열에만 올리고(AI를 기다리지 않음), 한 곳만 생성 권리를 가져간다", async () => {
+  const { mem, order } = await paidOrder();
+  const queued = await queueReport({ repo: mem.repo }, order);
+  assert.equal(queued?.status, "queued");
+  assert.equal(queued?.attempts, 0);
+  assert.equal((await queueReport({ repo: mem.repo }, order))?.id, queued?.id, "두 번 올려도 하나");
+
+  const d = { repo: mem.repo, generator: devReportGenerator, now: () => TODAY };
+  const first = await claimReport(d, order);
+  const second = await claimReport(d, order);
+  assert.equal(first.claimed, true);
+  assert.equal(second.claimed, false, "동시에 와도 한 곳만 생성");
+  assert.equal(first.report?.attempts, 1);
+  const ready = await completeReport(d, order, first.report!);
+  assert.equal(ready?.status, "ready");
+  assert.equal((await runReport(d, order))?.readyAt, ready?.readyAt, "완성 후에는 다시 만들지 않는다");
+});
+
+test("백그라운드 생성: 서버가 멈춰 생성 중으로 남으면 일정 시간 뒤 다시 가져가고, 실패는 고객이 누를 때만 다시 만든다", async () => {
+  const { mem, order } = await paidOrder();
+  let now = TODAY.getTime();
+  const d = { repo: mem.repo, generator: devReportGenerator, now: () => new Date(now) };
+  const abandoned = await claimReport(d, order); // 생성 시작 후 서버가 꺼졌다고 가정 (completeReport 호출 안 함)
+  assert.equal(abandoned.claimed, true);
+  assert.equal((await claimReport(d, order)).claimed, false, "아직 진행 중으로 본다");
+  now += 6 * 60 * 1000; // 5분 넘게 멈춤
+  mem.reports.get(abandoned.report!.id)!.updatedAt = TODAY.toISOString();
+  const resumed = await claimReport(d, order);
+  assert.equal(resumed.claimed, true, "멈춘 작업을 이어받는다");
+  assert.equal(resumed.report?.attempts, 2);
+
+  const broken: ReportGenerator = { name: "broken", version: "0", async generate() { throw new Error("모델 응답 형식 오류"); } };
+  const failed = await completeReport({ ...d, generator: broken }, order, resumed.report!);
+  assert.equal(failed?.status, "failed");
+  assert.equal((await claimReport(d, order)).claimed, false, "실패는 자동으로 반복하지 않는다");
+  const retried = await runReport(d, order, { retryFailed: true });
+  assert.equal(retried?.status, "ready");
+  assert.equal(mem.orders.get(order.id)?.status, "paid", "결제 상태는 그대로");
+});
+
+test("백그라운드 생성: 시도 횟수 상한을 넘으면 더 만들지 않고 운영자 확인 대상으로 남긴다", async () => {
+  const { mem, order } = await paidOrder();
+  const broken: ReportGenerator = { name: "broken", version: "0", async generate() { throw new Error("실패"); } };
+  const d = { repo: mem.repo, generator: broken, now: () => TODAY };
+  await queueReport(d, order);
+  for (let i = 0; i < 5; i++) await runReport(d, order, { retryFailed: true });
+  const report = await mem.repo.getReportByOrder(order.id);
+  assert.equal(report?.attempts, 5);
+  assert.equal(canRetryReport(report), false);
+  assert.equal((await claimReport({ ...d, generator: devReportGenerator }, order, { retryFailed: true })).claimed, false);
 });

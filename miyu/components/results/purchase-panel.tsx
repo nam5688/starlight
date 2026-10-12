@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { retryReportAction, startCheckoutAction } from "@/app/results/[id]/actions";
+import { ReportStatusPoller } from "@/components/results/report-status-poller";
 import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
-import { buttonDisabled, buttonPrimary, buttonSecondary } from "@/components/ui/styles";
+import { buttonDisabled, buttonPrimary } from "@/components/ui/styles";
 import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { nextActionForResult } from "@/lib/growth/next-action";
-import type { ResultView } from "@/lib/services/report-service";
+import { canRetryReport, type ResultView } from "@/lib/services/report-service";
 
 /** 개인 리포트는 한 번 구매로 완결된다 — 일부를 따로 떼어 추가 결제로 팔지 않는다 */
 const INCLUDED = [
@@ -32,22 +34,42 @@ export function PurchasePanel({
 
   if (action.kind === "recover-report" || action.kind === "wait-report") {
     const failed = action.kind === "recover-report";
+    const canRetry = canRetryReport(report);
     return (
       <section aria-labelledby="r-purchase" className="rounded-xl border border-line-strong px-5 py-6 md:px-7">
         <h2 id="r-purchase" className="text-[20px] font-bold tracking-tight">
           결제가 완료되었습니다
         </h2>
-        <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-          {failed
-            ? "리포트를 만들지 못했습니다. 결제는 정상 처리되었으니 다시 결제하지 말고 아래 버튼을 눌러 주세요. 계속 실패하면 재처리 또는 환불해 드립니다."
-            : "리포트를 만들고 있습니다. 잠시 후 새로고침해 주세요."}
-        </p>
-        <form action={retryReportAction.bind(null, assessment.id)} className="mt-5">
-          <button type="submit" className={failed ? buttonPrimary : buttonSecondary}>
-            {failed ? action.label : "새로고침"}
-          </button>
-        </form>
-        {paidOrder && <p className="mt-4 text-[13px] text-ink-3">주문번호 {paidOrder.orderNumber}</p>}
+        <div className="mt-2">
+          {!failed ? (
+            <ReportStatusPoller assessmentId={assessment.id} />
+          ) : canRetry ? (
+            <p className="text-[15px] leading-relaxed text-ink-2">
+              리포트를 만들지 못했습니다. 결제는 정상 처리되었으니 다시 결제하지 말고 아래 버튼을 눌러 주세요. 계속 실패하면 재처리 또는
+              환불해 드립니다.
+            </p>
+          ) : (
+            <p className="text-[15px] leading-relaxed text-ink-2">
+              여러 번 다시 만들어 보았지만 리포트를 만들지 못했습니다. 결제는 정상 처리되어 있으며, 운영자가 확인한 뒤 재처리 또는 환불해
+              드립니다. 문의하실 때 아래 주문번호를 알려 주세요.
+            </p>
+          )}
+        </div>
+        {failed && canRetry && (
+          <form action={retryReportAction.bind(null, assessment.id)} className="mt-5">
+            <button type="submit" className={buttonPrimary}>
+              {action.label}
+            </button>
+          </form>
+        )}
+        {paidOrder && (
+          <p className="mt-4 text-[13px] text-ink-3">
+            주문번호{" "}
+            <Link href={`/my/orders/${paidOrder.orderNumber}`} className="underline underline-offset-2">
+              {paidOrder.orderNumber}
+            </Link>
+          </p>
+        )}
       </section>
     );
   }

@@ -1,9 +1,9 @@
 "use server";
 
 import { confirmPayment, markCheckoutFailed } from "@/lib/services/order-service";
-import { ensureReport } from "@/lib/services/report-service";
 import { paymentConfig } from "@/server/env";
-import { now, paymentGateway, reportGenerator, writeRepository } from "@/server/services";
+import { queueAndScheduleReport } from "@/server/report-jobs";
+import { paymentGateway, writeRepository } from "@/server/services";
 import { getMember } from "@/server/member";
 
 export type ConfirmOutcome =
@@ -30,12 +30,8 @@ export async function confirmPaymentAction(input: { orderId: string; paymentKey:
 
   switch (result.kind) {
     case "paid":
-      try {
-        // 리포트 생성 실패는 결제 결과에 영향을 주지 않는다 (결과 화면에서 다시 만들기 가능)
-        await ensureReport({ repo, generator: reportGenerator, now }, result.order);
-      } catch {
-        /* reports 표에 실패가 남거나, 결과 화면에서 다시 시도한다 */
-      }
+      // 리포트는 백그라운드에서 만든다 — 결제 결과 화면을 기다리게 하지 않고, 실패해도 결제에 영향이 없다
+      await queueAndScheduleReport(result.order);
       return { kind: "paid", assessmentId: result.order.assessmentId };
     case "checking":
       return { kind: "checking", assessmentId: result.order.assessmentId };
