@@ -7,6 +7,8 @@ export type ModelRequest = {
   system: string;
   messages: ModelMessage[];
   maxOutputTokens: number;
+  /** 시간 제한 · 취소 신호 — 제공사 구현체는 가능하면 요청에 연결한다 */
+  signal?: AbortSignal;
 };
 
 export type ModelResult = {

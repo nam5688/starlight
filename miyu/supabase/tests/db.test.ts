@@ -290,9 +290,9 @@ async function newPendingOrder(userId: string) {
 test("실제 DB 동시성: 같은 승인 요청이 6번 동시에 와도 결제 완료 1건 · 결제사 기록 1건 · 리포트 1건, 생성기는 한 번만 실행", async () => {
   const toss = createFakeToss();
   const { repo, order } = await newPendingOrder(B.id);
-  const input = { userId: B.id, orderNumber: order.orderNumber, paymentKey: "pk-race-1", amount: order.amount };
+  const input = { userId: B.id, orderNumber: order.orderNumber, paymentKey: `pk-race-${randomUUID()}`, amount: order.amount };
   const results = await Promise.all(Array.from({ length: 6 }, () => confirmPayment({ repo, gateway: toss.gateway }, input)));
-  assert.ok(results.every((r) => r.kind === "paid"), JSON.stringify(results.map((r) => r.kind)));
+  assert.ok(results.every((r) => r.kind === "paid"), JSON.stringify(results.map((r) => (r.kind === "rejected" ? `${r.code}:${r.message}` : r.kind))));
   assert.equal(toss.byKey.size, 1);
   const rows = await admin.from("orders").select("id, status").eq("order_number", order.orderNumber);
   assert.equal(rows.data?.length, 1);
@@ -313,7 +313,8 @@ test("실제 DB: 승인은 됐는데 응답이 끊긴 주문을 재확인이 주
   const toss = createFakeToss();
   const { repo, order } = await newPendingOrder(B.id);
   toss.state.confirmMode = "approve-then-lost";
-  const first = await confirmPayment({ repo, gateway: toss.gateway }, { userId: B.id, orderNumber: order.orderNumber, paymentKey: "pk-lost-1", amount: order.amount });
+  const lostKey = `pk-lost-${randomUUID()}`;
+  const first = await confirmPayment({ repo, gateway: toss.gateway }, { userId: B.id, orderNumber: order.orderNumber, paymentKey: lostKey, amount: order.amount });
   assert.equal(first.kind, "checking");
   assert.equal((await repo.getOrderByNumber(order.orderNumber))?.status, "pending", "응답을 못 받았다고 실패로 바꾸지 않는다");
 
@@ -323,7 +324,7 @@ test("실제 DB: 승인은 됐는데 응답이 끊긴 주문을 재확인이 주
   const deps = { repo, gateway: toss.gateway, now: () => new Date(), onPaid: async (o: { orderNumber: string }) => void queued.push(o.orderNumber) };
   const r = await reconcileOrder(deps, (await repo.getOrderByNumber(order.orderNumber))!);
   assert.equal(r.kind, "paid");
-  assert.equal((await repo.getOrderByNumber(order.orderNumber))?.paymentKey, "pk-lost-1");
+  assert.equal((await repo.getOrderByNumber(order.orderNumber))?.paymentKey, lostKey);
   for (let i = 0; i < 3; i++) assert.equal((await reconcileOrder(deps, (await repo.getOrderByNumber(order.orderNumber))!)).kind, "ok");
   assert.deepEqual(queued, [order.orderNumber], "리포트 준비는 한 번만");
   const events = await repo.listPaymentEvents((await repo.getOrderByNumber(order.orderNumber))!.id);
@@ -333,13 +334,62 @@ test("실제 DB: 승인은 됐는데 응답이 끊긴 주문을 재확인이 주
 test("실제 DB: 결제사에서 취소된 결제를 재확인이 환불됨으로 맞추고, 같은 검사에 결제 완료 주문이 둘이 되지 않는다", async () => {
   const toss = createFakeToss();
   const { repo, order } = await newPendingOrder(B.id);
-  const input = { userId: B.id, orderNumber: order.orderNumber, paymentKey: "pk-cancel-1", amount: order.amount };
+  const cancelKey = `pk-cancel-${randomUUID()}`;
+  const input = { userId: B.id, orderNumber: order.orderNumber, paymentKey: cancelKey, amount: order.amount };
   assert.equal((await confirmPayment({ repo, gateway: toss.gateway }, input)).kind, "paid");
-  toss.cancel("pk-cancel-1");
+  toss.cancel(cancelKey);
   const deps = { repo, gateway: toss.gateway, now: () => new Date() };
   assert.equal((await reconcileOrder(deps, (await repo.getOrderByNumber(order.orderNumber))!)).kind, "refunded");
   assert.equal((await repo.getOrderByNumber(order.orderNumber))?.status, "refunded");
   const view = await getResultView(repo, { userId: B.id, assessmentId: order.assessmentId });
   assert.equal(view?.paidOrder, null, "환불된 주문은 열람 권한이 없다");
   assert.equal(view?.refunded, true);
+});
+
+
+test("AI 사용 기록(ai_usage): 서버만 쓰고 읽으며, 접근 정책 · 쌓기만 가능 · 비용 합계와 생성 수 집계가 실제 DB에서 동작한다", async () => {
+  const repo = createSupabaseRepository(admin);
+  const reportId = randomUUID();
+  const t0 = new Date(Date.now() - 1000).toISOString();
+  await repo.addAiUsage({ reportId, provider: "fake", model: "m", promptVersion: "p", inputTokens: 100, outputTokens: 200, estCostKrw: 12.3456, latencyMs: 800, outcome: "ok", errorCode: null });
+  await repo.addAiUsage({ reportId, provider: "fake", model: "m", promptVersion: "p", inputTokens: null, outputTokens: null, estCostKrw: null, latencyMs: 30, outcome: "timeout", errorCode: "TIMEOUT" });
+  const rows = (await repo.listAiUsageSince(t0, 50)).filter((r) => r.reportId === reportId);
+  assert.equal(rows.length, 2);
+  assert.equal(rows.find((r) => r.outcome === "ok")?.estCostKrw, 12.3456);
+  assert.equal(rows.find((r) => r.outcome === "timeout")?.inputTokens, null);
+
+  for (const client of [A.client, anon]) {
+    const read = await client.from("ai_usage").select();
+    assert.ok(read.error || read.data?.length === 0, "읽기 거부");
+    const write = await client.from("ai_usage").insert({ provider: "x", model: "x", prompt_version: "x", latency_ms: 1, outcome: "ok" });
+    assert.ok(write.error, "쓰기 거부");
+  }
+  assert.ok((await admin.from("ai_usage").update({ outcome: "error" }).eq("report_id", reportId)).error, "고치기 거부");
+  assert.ok((await admin.from("ai_usage").delete().eq("report_id", reportId)).error, "지우기 거부");
+  const bad = await admin.from("ai_usage").insert({ provider: "x", model: "x", prompt_version: "x", latency_ms: 1, outcome: "weird" });
+  assert.ok(bad.error, "알 수 없는 결과 값 거부");
+});
+
+test("실제 DB: 생성 중 · 대기 중 리포트 수 집계와 하루 검사 수 집계 (멈춘 생성은 제외)", async () => {
+  const repo = createSupabaseRepository(admin);
+  const { order } = await newPendingOrder(B.id);
+  const input = { userId: B.id, orderNumber: order.orderNumber, paymentKey: `pk-cap-${randomUUID()}`, amount: order.amount };
+  const paidResult = await confirmPayment({ repo, gateway: createFakeToss().gateway }, input);
+  if (paidResult.kind !== "paid") throw new Error(paidResult.kind);
+  const staleBefore = () => new Date(Date.now() - 5 * 60_000).toISOString();
+
+  const q0 = await repo.countQueuedReports();
+  const g0 = await repo.countActiveGenerations(staleBefore());
+  const report = await queueReport({ repo }, paidResult.order);
+  assert.ok(report);
+  assert.equal(await repo.countQueuedReports(), q0 + 1);
+  const claimed = await repo.updateReport(report.id, ["queued"], { status: "generating", attempts: 1 }, 0);
+  assert.ok(claimed);
+  assert.equal(await repo.countQueuedReports(), q0);
+  assert.equal(await repo.countActiveGenerations(staleBefore()), g0 + 1);
+  // 기준 시각보다 오래 멈춘 생성은 세지 않는다 (기준을 미래로 두면 지금 생성 중인 것도 "멈춘 것")
+  assert.equal(await repo.countActiveGenerations(new Date(Date.now() + 60_000).toISOString()), 0);
+  await repo.updateReport(report.id, ["generating"], { status: "failed", lastError: "테스트 정리" }); // 생성 중으로 남겨 두지 않는다
+  assert.ok((await repo.countAssessmentsSince(B.id, new Date(Date.now() - 24 * 3600_000).toISOString())) >= 1);
+  assert.equal(await repo.countAssessmentsSince(B.id, new Date(Date.now() + 60_000).toISOString()), 0);
 });

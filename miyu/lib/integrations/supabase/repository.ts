@@ -318,6 +318,62 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       if (error) fail("결제 기록 저장", error);
     },
 
+    async countAssessmentsSince(userId, since) {
+      const { count, error } = await db.from("assessments").select("id", { count: "exact", head: false }).eq("user_id", userId).gte("created_at", since).limit(1);
+      if (error) fail("검사 수 조회", error);
+      return count ?? 0;
+    },
+
+    async addAiUsage(u) {
+      const { error } = await db.from("ai_usage").insert({
+        report_id: u.reportId,
+        provider: u.provider.slice(0, 60),
+        model: u.model.slice(0, 100),
+        prompt_version: u.promptVersion.slice(0, 100),
+        input_tokens: u.inputTokens,
+        output_tokens: u.outputTokens,
+        est_cost_krw: u.estCostKrw,
+        latency_ms: Math.max(0, Math.round(u.latencyMs)),
+        outcome: u.outcome,
+        error_code: u.errorCode?.slice(0, 60) ?? null,
+      });
+      if (error && !isMissingTableError(error)) fail("AI 사용 기록 저장", error);
+    },
+
+    async listAiUsageSince(since, limit) {
+      const { data, error } = await db.from("ai_usage").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("AI 사용 기록 조회", error);
+      }
+      return (data ?? []).map((r) => ({
+        id: r.id as number,
+        createdAt: r.created_at as string,
+        reportId: (r.report_id as string | null) ?? null,
+        provider: r.provider as string,
+        model: r.model as string,
+        promptVersion: r.prompt_version as string,
+        inputTokens: (r.input_tokens as number | null) ?? null,
+        outputTokens: (r.output_tokens as number | null) ?? null,
+        estCostKrw: r.est_cost_krw === null || r.est_cost_krw === undefined ? null : Number(r.est_cost_krw),
+        latencyMs: r.latency_ms as number,
+        outcome: r.outcome as "ok" | "invalid" | "timeout" | "error",
+        errorCode: (r.error_code as string | null) ?? null,
+      }));
+    },
+
+    async countActiveGenerations(staleBefore) {
+      const { count, error } = await db.from("reports").select("id", { count: "exact" }).eq("status", "generating").gte("updated_at", staleBefore).limit(1);
+      if (error) fail("생성 중 리포트 수 조회", error);
+      return count ?? 0;
+    },
+
+    async countQueuedReports() {
+      const { count, error } = await db.from("reports").select("id", { count: "exact" }).eq("status", "queued").limit(1);
+      if (error) fail("대기 중 리포트 수 조회", error);
+      return count ?? 0;
+    },
+
     async addOpsEvent(e) {
       const { error } = await db.from("ops_events").insert({
         kind: e.kind.slice(0, 60),

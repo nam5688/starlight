@@ -300,7 +300,7 @@ test("리포트 v2(AI 모의 모델): 일시 오류가 계속되면 failed, 다�
   assert.equal(failed?.lastError, "모의 일시 오류");
   assert.equal(mem.orders.get(paid.order.id)?.status, "paid");
 
-  const ready = await runReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order, { retryFailed: true });
+  const ready = await runReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order, { retryFailed: true, ignoreCooldown: true });
   assert.equal(ready?.status, "ready");
   assert.equal(ready?.generator, "ai:mock");
   assert.ok(ready?.content && isPersonalV2(ready.content));
@@ -535,7 +535,7 @@ test("백그라운드 생성: 서버가 멈춰 생성 중으로 남으면 일정
   const failed = await completeReport({ ...d, generator: broken }, order, resumed.report!);
   assert.equal(failed?.status, "failed");
   assert.equal((await claimReport(d, order)).claimed, false, "실패는 자동으로 반복하지 않는다");
-  const retried = await runReport(d, order, { retryFailed: true });
+  const retried = await runReport(d, order, { retryFailed: true, ignoreCooldown: true });
   assert.equal(retried?.status, "ready");
   assert.equal(mem.orders.get(order.id)?.status, "paid", "결제 상태는 그대로");
 });
@@ -545,9 +545,9 @@ test("백그라운드 생성: 시도 횟수 상한을 넘으면 더 만들지 �
   const broken: ReportGenerator = { name: "broken", version: "0", async generate() { throw new Error("실패"); } };
   const d = { repo: mem.repo, generator: broken, now: () => TODAY };
   await queueReport(d, order);
-  for (let i = 0; i < 5; i++) await runReport(d, order, { retryFailed: true });
+  for (let i = 0; i < 5; i++) await runReport(d, order, { retryFailed: true, ignoreCooldown: true });
   const report = await mem.repo.getReportByOrder(order.id);
   assert.equal(report?.attempts, 5);
   assert.equal(canRetryReport(report), false);
-  assert.equal((await claimReport({ ...d, generator: devReportGenerator }, order, { retryFailed: true })).claimed, false);
+  assert.equal((await claimReport({ ...d, generator: devReportGenerator }, order, { retryFailed: true, ignoreCooldown: true })).claimed, false);
 });

@@ -9,11 +9,27 @@ import {
   type OrderStatus,
 } from "../commerce/order.ts";
 import { PERSONAL_REPORT } from "../config/product.ts";
+import { salesClosedMessage, type GateReason, type SaleGate } from "./capacity-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
+
+/** 새 구매를 받아도 되는지 확인하는 함수 (용량 · 예산). 확인 자체가 실패하면 판매를 막지 않는다 */
+export type SaleGateCheck = (stage: "start" | "confirm") => Promise<SaleGate>;
+
+async function gateOpen(gate: SaleGateCheck | undefined, stage: "start" | "confirm"): Promise<{ open: true } | { open: false; reason: GateReason | null }> {
+  if (!gate) return { open: true };
+  try {
+    const g = await gate(stage);
+    return g.open ? { open: true } : { open: false, reason: g.reason };
+  } catch {
+    return { open: true };
+  }
+}
 
 export type StartCheckoutResult =
   | { kind: "order"; order: OrderRecord }
   | { kind: "already-paid"; order: OrderRecord }
+  /** 지금은 새 구매를 받지 않음 (리포트 준비 용량 · 하루 예산). 결제는 시작하지 않는다 */
+  | { kind: "sales-closed"; reason: GateReason | null }
   | { kind: "not-found" };
 
 /**
@@ -21,7 +37,7 @@ export type StartCheckoutResult =
  * (같은 검사에 대기 주문은 하나만 — DB 고유 조건으로도 막는다)
  */
 export async function startCheckout(
-  deps: { repo: MiyuRepository; now: () => Date; newOrderNumber?: (now: Date) => string },
+  deps: { repo: MiyuRepository; now: () => Date; newOrderNumber?: (now: Date) => string; gate?: SaleGateCheck },
   input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv },
 ): Promise<StartCheckoutResult> {
   const { repo } = deps;
@@ -31,6 +47,10 @@ export async function startCheckout(
   const orders = await repo.listOrdersForAssessment(assessment.id);
   const paid = orders.find((o) => o.status === "paid" && o.productId === PERSONAL_REPORT.id);
   if (paid) return { kind: "already-paid", order: paid };
+
+  // 용량이나 예산이 찼으면 결제를 시작하지 않는다 (기다리게 하지 않고 바로 알린다). 이미 진행 중인 주문은 건드리지 않는다
+  const sale = await gateOpen(deps.gate, "start");
+  if (!sale.open) return { kind: "sales-closed", reason: sale.reason };
 
   for (const pending of orders.filter((o) => o.status === "pending")) {
     const canceled = await repo.updateOrder(pending.id, ["pending"], {
@@ -74,7 +94,7 @@ export type ConfirmPaymentResult =
 
 /** 결제 성공 주소로 돌아온 뒤 서버에서 승인 */
 export async function confirmPayment(
-  deps: { repo: MiyuRepository; gateway: PaymentGateway },
+  deps: { repo: MiyuRepository; gateway: PaymentGateway; gate?: SaleGateCheck },
   input: { userId: string; orderNumber: string; paymentKey: string; amount: number },
 ): Promise<ConfirmPaymentResult> {
   const { repo, gateway } = deps;
@@ -98,6 +118,14 @@ export async function confirmPayment(
       detail: { requested: input.amount, expected: order.amount },
     });
     return { kind: "rejected", code: "AMOUNT_MISMATCH", message: "결제 금액이 주문 금액과 다릅니다.", order };
+  }
+
+  // 결제사에 승인을 요청하기 직전의 용량 · 예산 확인. 승인을 요청하지 않으면 카드에서 돈이 빠지지 않는다
+  // (결제창에서 인증만 끝난 결제는 승인하지 않으면 시간이 지나 자동으로 만료된다)
+  const sale = await gateOpen(deps.gate, "confirm");
+  if (!sale.open) {
+    await recordPaymentEvent(repo, { orderId: order.id, source: "confirm", status: "SALES_PAUSED", detail: { reason: sale.reason } });
+    return { kind: "rejected", code: "SALES_PAUSED", message: salesClosedMessage(sale.reason), order };
   }
 
   let result = await gateway.confirm({ paymentKey: input.paymentKey, orderId: order.orderNumber, amount: order.amount });

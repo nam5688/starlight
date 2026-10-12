@@ -88,6 +88,22 @@ export type ReportPatch = Partial<
 /** 목록용 — 리포트 본문은 담지 않는다 */
 export type ReportStatusRecord = Pick<ReportRecord, "id" | "orderId" | "assessmentId" | "status">;
 
+/** AI 호출 한 번의 사용 기록 (서버 전용 · 쌓기만 한다). 요청 · 응답 내용은 담지 않는다 */
+export type AiUsageInput = {
+  reportId: string | null;
+  provider: string;
+  model: string;
+  promptVersion: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  /** 단가가 설정돼 있을 때만 (원). 설정 전이면 null */
+  estCostKrw: number | null;
+  latencyMs: number;
+  outcome: "ok" | "invalid" | "timeout" | "error";
+  errorCode: string | null;
+};
+export type AiUsageRecord = AiUsageInput & { id: number; createdAt: string };
+
 export type PaymentEventSource = "confirm" | "webhook" | "fail_redirect" | "checkout" | "reconcile" | "admin";
 
 /** 결제 처리 기록 (주문 상세 · 운영 추적용). detail에는 카드 번호 등 결제수단 상세가 없다 */
@@ -141,6 +157,8 @@ export interface MiyuRepository {
   saveRegion(userId: string, region: { province: string; district: string }): Promise<void>;
 
   insertAssessment(assessment: NewAssessment): Promise<AssessmentRecord>;
+  /** 이 시각 이후 이 회원이 저장한 검사 결과 수 (무료 생성 남용 방지) */
+  countAssessmentsSince(userId: string, since: string): Promise<number>;
   getAssessment(id: string): Promise<AssessmentRecord | null>;
   listAssessments(userId: string): Promise<AssessmentRecord[]>;
 
@@ -177,6 +195,13 @@ export interface MiyuRepository {
   /** 관리자 화면용 */
   listRecentOrders(limit: number): Promise<OrderRecord[]>;
   getOrderById(id: string): Promise<OrderRecord | null>;
+  /** AI 사용 기록 (서버 전용). 테이블이 없으면(DB 변경 7번 전) 쓰기는 건너뛰고 조회는 빈 값 */
+  addAiUsage(usage: AiUsageInput): Promise<void>;
+  listAiUsageSince(since: string, limit: number): Promise<AiUsageRecord[]>;
+  /** 지금 생성 중인 리포트 수 (staleBefore보다 오래 멈춘 것은 제외) */
+  countActiveGenerations(staleBefore: string): Promise<number>;
+  /** 생성 순서를 기다리는 리포트 수 */
+  countQueuedReports(): Promise<number>;
   listProblemReports(opts: { statuses: readonly ReportStatus[]; updatedBefore?: string; limit: number }): Promise<ProblemReport[]>;
   getReportByOrder(orderId: string): Promise<ReportRecord | null>;
   listReportStatuses(userId: string): Promise<ReportStatusRecord[]>;

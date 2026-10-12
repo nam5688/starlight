@@ -39,7 +39,7 @@ export async function adminReconcileOrderAction(formData: FormData) {
 export async function adminRetryReportAction(formData: FormData) {
   const { order } = await adminOrder(formData);
   const result = await adminResetReport(writeRepository(), order);
-  if (result === "reset") await claimAndSchedule(order, { retryFailed: true });
+  if (result === "reset") await claimAndSchedule(order, { retryFailed: true, ignoreCooldown: true });
   await recordOps({ kind: "admin.retry_report", orderNumber: order.orderNumber, message: `운영자가 리포트 재생성 요청: ${result}` });
   back(order.orderNumber, result === "reset" ? "리포트 생성을 다시 시작했습니다." : result === "ready" ? "이미 완성된 리포트입니다 (바꾸지 않았습니다)." : "결제가 확인되지 않은 주문입니다.");
 }

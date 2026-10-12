@@ -14,8 +14,8 @@ export function createMockLocalModel(opts: { baseUrl: string; model?: string; ti
         res = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/v1/complete`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model, ...request }),
-          signal: AbortSignal.timeout(opts.timeoutMs ?? 120_000),
+          body: JSON.stringify({ model, system: request.system, messages: request.messages, maxOutputTokens: request.maxOutputTokens }),
+          signal: request.signal ?? AbortSignal.timeout(opts.timeoutMs ?? 120_000),
         });
       } catch {
         throw new ModelCallError("AI 서버에 연결하지 못했습니다.", { retryable: true, code: "NETWORK_ERROR" });

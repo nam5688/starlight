@@ -5,6 +5,7 @@ import { canTransition } from "../../commerce/order.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
+  AiUsageRecord,
   OpsEventRecord,
   PaymentEventSource,
   AssessmentRecord,
@@ -26,6 +27,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const consents = new Map<string, ConsentRecord[]>();
   const contexts = new Map<string, PersonalContext>();
   const opsEvents: OpsEventRecord[] = [];
+  const aiUsage: AiUsageRecord[] = [];
   let tick = 0;
   const iso = () => now().toISOString();
 
@@ -113,6 +115,21 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async addPaymentEvent(event) {
       events.push({ orderId: event.orderId, source: event.source, status: event.status, detail: event.detail, createdAt: new Date(now().getTime() + ++tick).toISOString() });
+    },
+    async countAssessmentsSince(userId, since) {
+      return [...assessments.values()].filter((a) => a.userId === userId && a.createdAt >= since).length;
+    },
+    async addAiUsage(u) {
+      aiUsage.push({ ...u, id: aiUsage.length + 1, createdAt: new Date(now().getTime() + ++tick).toISOString() });
+    },
+    async listAiUsageSince(since, limit) {
+      return aiUsage.filter((u) => u.createdAt >= since).sort((a, b) => b.id - a.id).slice(0, limit);
+    },
+    async countActiveGenerations(staleBefore) {
+      return [...reports.values()].filter((r) => r.status === "generating" && r.updatedAt >= staleBefore).length;
+    },
+    async countQueuedReports() {
+      return [...reports.values()].filter((r) => r.status === "queued").length;
     },
     async addOpsEvent(e) {
       opsEvents.push({
@@ -210,5 +227,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, opsEvents };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, opsEvents, aiUsage };
 }

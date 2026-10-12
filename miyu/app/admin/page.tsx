@@ -7,7 +7,9 @@ import { adminReconcileOrderAction, adminRetryReportAction, adminRunAllAction, a
 import { buttonPrimary, buttonSecondary, pageWide, textLink } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
 import { getAdminOverview, adminLookup, type AdminReportRow, type OrderTraceForAdmin } from "@/lib/services/admin-service";
+import { costSummary, saleGate, type CapacityConfig, type CostSummary, type SaleGate } from "@/lib/services/capacity-service";
 import type { OpsEventRecord } from "@/lib/services/ports";
+import { capacityConfig } from "@/server/env";
 import { getAdminMember } from "@/server/member";
 import { now, writeRepository } from "@/server/services";
 
@@ -34,7 +36,8 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
   const q = typeof params.q === "string" ? params.q.slice(0, 80) : "";
   const note = typeof params.note === "string" ? params.note.slice(0, 200) : "";
   const repo = writeRepository();
-  const [overview, lookup] = await Promise.all([getAdminOverview(repo, now()), adminLookup(repo, q, now())]);
+  const cfg = capacityConfig();
+  const [overview, lookup, gate, cost] = await Promise.all([getAdminOverview(repo, now()), adminLookup(repo, q, now()), saleGate(repo, cfg, now(), "start"), costSummary(repo, cfg, now())]);
   const { counts } = overview;
 
   return (
@@ -70,6 +73,13 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
             </button>
           </form>
         </div>
+      </section>
+
+      <section aria-labelledby="a-capacity">
+        <h2 id="a-capacity" className="text-[18px] font-bold">
+          생성 용량 · AI 비용
+        </h2>
+        <Capacity gate={gate} cost={cost} cfg={cfg} />
       </section>
 
       <section aria-labelledby="a-find">
@@ -146,6 +156,29 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
         <Events events={overview.events} />
       </section>
     </div>
+  );
+}
+
+const krw = (n: number) => `${n.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원`;
+
+function Capacity({ gate, cost, cfg }: { gate: SaleGate; cost: CostSummary; cfg: CapacityConfig }) {
+  const limit = (n: number, unit = "") => (n > 0 ? `${n.toLocaleString("ko-KR")}${unit}` : "제한 없음");
+  return (
+    <dl className="mt-3 border-y border-line text-[14px]">
+      <Row label="새 구매">
+        <span className={gate.open ? "font-semibold" : "font-semibold text-danger"}>
+          {gate.open ? "받는 중" : gate.reason === "budget" ? "멈춤 (하루 예산)" : "멈춤 (준비가 밀림)"}
+        </span>
+      </Row>
+      <Row label="대기 · 생성 중">
+        {gate.queued}건 · {gate.generating}건 (동시 생성 한도 {limit(cfg.maxConcurrent)} · 새 구매 중단 기준 {limit(cfg.saleQueueLimit, "건")})
+      </Row>
+      <Row label="오늘 AI 호출">
+        {cost.callsToday}회 (실패 {cost.failedCallsToday}회)
+      </Row>
+      <Row label="오늘 예상 비용">{cost.pricingConfigured ? `${krw(cost.todayKrw)} (하루 예산 ${limit(cfg.dailyBudgetKrw, "원")}${gate.budgetUsedPct !== null ? ` · 예약 포함 ${gate.budgetUsedPct}%` : ""})` : "토큰 단가 설정 전 — 호출 수만 기록 중"}</Row>
+      <Row label="최근 7일">{cost.pricingConfigured ? `${krw(cost.weekKrw)} · 리포트 ${cost.reportsWeek}건 · 한 건당 평균 ${cost.avgPerReportKrw === null ? "-" : krw(cost.avgPerReportKrw)}` : `리포트 ${cost.reportsWeek}건에 AI 호출 기록`}</Row>
+    </dl>
   );
 }
 

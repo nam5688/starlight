@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonDisabled, buttonPrimary } from "@/components/ui/styles";
 import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { nextActionForResult } from "@/lib/growth/next-action";
+import { salesClosedMessage, type GateReason } from "@/lib/services/capacity-service";
 import { canRetryReport, type ResultView } from "@/lib/services/report-service";
 
 /** 구매 시 받는 내용은 무료 미리보기의 잠금 목록(lib/report/preview.ts)과 같은 목록을 쓴다 — 한 곳에서만 관리 */
@@ -17,12 +18,15 @@ export function PurchasePanel({
   included,
   paymentsReady,
   paymentsNote,
+  salesClosedReason = null,
 }: {
   view: ResultView;
   /** 구매하면 더 받는 내용 (미리보기의 잠금 목록 제목) */
   included: string[];
   paymentsReady: boolean;
   paymentsNote: string | null;
+  /** 지금 새 구매를 받지 않는 경우(리포트 준비 용량 · 하루 예산) — 결제를 시작하지 않고 이유를 알린다 */
+  salesClosedReason?: { reason: GateReason | null } | null;
 }) {
   const { paidOrder, report, refunded, assessment } = view;
   const action = nextActionForResult({
@@ -44,7 +48,7 @@ export function PurchasePanel({
           ) : canRetry ? (
             <p className="text-[15px] leading-relaxed text-ink-2">
               리포트를 만들지 못했습니다. 결제는 정상 처리되었으니 다시 결제하지 말고 아래 버튼을 눌러 주세요. 계속 실패하면 재처리 또는
-              환불해 드립니다.
+              환불해 드립니다. 다시 만들기는 1분에 한 번만 누를 수 있습니다.
             </p>
           ) : (
             <p className="text-[15px] leading-relaxed text-ink-2">
@@ -100,7 +104,16 @@ export function PurchasePanel({
         </p>
       </div>
       <div className="border-t border-line px-5 py-5 md:px-7">
-        {paymentsReady ? (
+        {salesClosedReason ? (
+          <div>
+            <button type="button" disabled className={buttonDisabled}>
+              지금은 새 구매를 받지 않습니다
+            </button>
+            <p role="status" className="mt-3 text-[14px] leading-relaxed text-ink-2">
+              {salesClosedMessage(salesClosedReason.reason)}
+            </p>
+          </div>
+        ) : paymentsReady ? (
           <form action={startCheckoutAction.bind(null, assessment.id)}>
             <button type="submit" className={`${buttonPrimary} w-full sm:w-auto`}>
               {PERSONAL_REPORT.name} 전체 보기 · {formatKrw(PERSONAL_REPORT.priceKrw)}

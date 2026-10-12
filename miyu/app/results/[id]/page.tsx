@@ -15,6 +15,7 @@ import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
+import { currentSaleGate } from "@/server/capacity";
 import { readRepository, reportGenerator } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
@@ -94,6 +95,8 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   }
 
   const payment = paymentConfig();
+  // 지금 새 구매를 받는 중인지 (리포트 준비가 밀렸거나 하루 예산에 가까우면 닫힘). 확인이 실패하면 막지 않는다
+  const gate = await currentSaleGate().catch(() => null);
   // 잠긴 내용은 서버에서 아예 만들지 않는다 — 전체 요약 · 점수는 구매 후 리포트에만
   const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
   return (
@@ -102,7 +105,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
       <div className={`${pageNarrow} space-y-16 py-10 md:py-14`}>
         <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
         <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady={false} />
-        <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} />
+        <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null} />
       </div>
     </>
   );

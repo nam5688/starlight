@@ -5,6 +5,7 @@ import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
 import { validateAnswers } from "../assessment/scoring.ts";
 import type { Answers } from "../assessment/types.ts";
 import { MBTI_TYPES, PROVINCES, validateBasicInfo, type BasicInfo } from "../profile/basic-info.ts";
+import { ASSESSMENT_DAILY_LIMIT } from "../commerce/report.ts";
 import { buildDevFreeSummary } from "../report/build-free-summary.ts";
 import type { SajuEngine } from "../saju/engine.ts";
 import type { AssessmentRecord, Channel, MiyuRepository } from "./ports.ts";
@@ -32,6 +33,12 @@ export async function submitAssessment(
   const year = Number(info.birthYear);
   const month = Number(info.birthMonth);
   const day = Number(info.birthDay);
+
+  // 하루에 저장할 수 있는 검사 수 제한 (무료 생성 남용 방지) — 한도 안에서는 영향이 없다
+  const recent = await deps.repo.countAssessmentsSince(input.userId, new Date(input.today.getTime() - 24 * 3600_000).toISOString());
+  if (recent >= ASSESSMENT_DAILY_LIMIT) {
+    return { ok: false, message: `하루에 저장할 수 있는 검사는 ${ASSESSMENT_DAILY_LIMIT}개까지입니다. MY에서 저장한 결과를 확인하거나 내일 다시 시도해 주세요.` };
+  }
 
   const summary = buildDevFreeSummary(answers);
   const saju = await deps.saju.calculate({ year, month, day, calendar: info.calendar, isLeapMonth, birthTime });

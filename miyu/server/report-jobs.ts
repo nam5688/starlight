@@ -2,12 +2,16 @@ import "server-only";
 import { after } from "next/server";
 import type { OrderRecord } from "@/lib/services/ports";
 import { claimReport, completeReport, queueReport, runReport } from "@/lib/services/report-service";
+import { capacityConfig } from "./env";
 import { now, reportGenerator, writeRepository } from "./services";
 
 // 리포트 생성은 응답을 보낸 뒤 백그라운드에서 한다 (AI 생성이 길어도 결제 화면이 멈추지 않게).
 // 서버가 중간에 꺼지면 결과 화면의 상태 확인이 멈춘 작업을 이어받는다 (report-service의 claimReport).
 
-const deps = () => ({ repo: writeRepository(), generator: reportGenerator(), now });
+const deps = () => {
+  const capacity = capacityConfig();
+  return { repo: writeRepository(), generator: reportGenerator(), now, capacity, ...(capacity.generationTimeoutMs > 0 ? { timeoutMs: capacity.generationTimeoutMs } : {}) };
+};
 
 function log(where: string, e: unknown) {
   // 리포트 내용 · 개인정보는 남기지 않는다
@@ -35,9 +39,9 @@ export async function queueAndScheduleReport(order: OrderRecord) {
  * - retryFailed: 고객이 "다시 만들기"를 눌렀을 때
  * - 그 밖: 대기 중이거나 멈춘 작업만 이어받는다
  */
-export async function claimAndSchedule(order: OrderRecord, opts: { retryFailed?: boolean } = {}) {
+export async function claimAndSchedule(order: OrderRecord, opts: { retryFailed?: boolean; ignoreCooldown?: boolean } = {}) {
   const d = deps();
-  const { report, claimed } = await claimReport(d, order, opts);
+  const { report, claimed, waiting } = await claimReport(d, order, opts);
   if (claimed && report) {
     after(async () => {
       try {
@@ -47,7 +51,7 @@ export async function claimAndSchedule(order: OrderRecord, opts: { retryFailed?:
       }
     });
   }
-  return report;
+  return { report, waiting };
 }
 
 /**

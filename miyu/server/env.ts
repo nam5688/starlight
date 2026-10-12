@@ -1,4 +1,5 @@
 import "server-only";
+import type { CapacityConfig } from "@/lib/services/capacity-service";
 import type { PaymentEnv } from "@/lib/services/ports";
 import { isTossDocsKey } from "./setup-checks";
 
@@ -105,4 +106,41 @@ export function aiConfig(): AiConfig {
     return { kind: "mock-local", baseUrl };
   }
   return { kind: "invalid", reason: `AI 제공사 ${provider}는 아직 연결하지 않았습니다 (선택 · 승인 후 추가)` };
+}
+
+function readInt(name: string, fallback: number): number {
+  const raw = read(name);
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+function readPrice(name: string): number | null {
+  const raw = read(name);
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/**
+ * 생성 용량 · 비용 한도 (lib/services/capacity-service.ts).
+ * AI를 연결하기 전(개발용 규칙 생성기)에는 한도를 걸지 않는다. AI를 연결하면 기본값이 적용되고 환경변수로 조절한다.
+ * - AI_MAX_CONCURRENT: 동시에 생성하는 최대 수 (기본 3)
+ * - AI_SALE_QUEUE_LIMIT: 대기 + 생성 중인 리포트가 이 수 이상이면 새 결제를 시작하지 못하게 함 (기본 10)
+ * - AI_DAILY_BUDGET_KRW: 하루 AI 예산(원). 0 또는 비움 = 제한 없음
+ * - AI_EST_COST_KRW_PER_REPORT: 리포트 한 건의 예상 비용(원) — 대기 중인 건을 예산에 미리 반영
+ * - AI_GENERATION_TIMEOUT_SECONDS: 리포트 한 번의 생성 시도에 허용하는 시간(초, 기본 240). 생성 중 상태가 멈춘 것으로 보는 300초보다 짧게만 설정할 수 있다
+ * - AI_PRICE_INPUT_KRW_PER_MTOK · AI_PRICE_OUTPUT_KRW_PER_MTOK: 토큰 단가(원 / 100만 토큰). 제공사를 정한 뒤 공식 가격표 값을 넣는다
+ */
+export function capacityConfig(): CapacityConfig {
+  const connected = aiConfig().kind === "mock-local";
+  return {
+    maxConcurrent: connected ? readInt("AI_MAX_CONCURRENT", 3) : readInt("AI_MAX_CONCURRENT", 0),
+    saleQueueLimit: connected ? readInt("AI_SALE_QUEUE_LIMIT", 10) : readInt("AI_SALE_QUEUE_LIMIT", 0),
+    dailyBudgetKrw: readInt("AI_DAILY_BUDGET_KRW", 0),
+    estCostKrwPerReport: readInt("AI_EST_COST_KRW_PER_REPORT", 0),
+    priceInputKrwPerMTok: readPrice("AI_PRICE_INPUT_KRW_PER_MTOK"),
+    priceOutputKrwPerMTok: readPrice("AI_PRICE_OUTPUT_KRW_PER_MTOK"),
+    // 0이면 기본값. 멈춤 판단(300초)보다 짧게만 허용한다 (그래야 시간 초과가 먼저 실패로 기록된다)
+    generationTimeoutMs: Math.min(readInt("AI_GENERATION_TIMEOUT_SECONDS", 0), 280) * 1000,
+  };
 }

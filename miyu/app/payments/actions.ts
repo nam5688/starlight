@@ -3,6 +3,7 @@
 import { newErrorId, safeErrorMessage } from "@/lib/ops/redact";
 import { confirmPayment, markCheckoutFailed } from "@/lib/services/order-service";
 import { paymentConfig } from "@/server/env";
+import { saleGateCheck } from "@/server/capacity";
 import { alert, logError } from "@/server/ops";
 import { queueAndScheduleReport } from "@/server/report-jobs";
 import { paymentGateway, writeRepository } from "@/server/services";
@@ -33,7 +34,7 @@ export async function confirmPaymentAction(input: { orderId: string; paymentKey:
   try {
     const repo = writeRepository();
     const result = await confirmPayment(
-      { repo, gateway: paymentGateway() },
+      { repo, gateway: paymentGateway(), gate: saleGateCheck },
       { userId, orderNumber: input.orderId, paymentKey: input.paymentKey.slice(0, 200), amount: input.amount },
     );
 

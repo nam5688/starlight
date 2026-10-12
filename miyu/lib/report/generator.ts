@@ -27,11 +27,31 @@ export type ReportContent = FullReport | PersonalReportV2;
 
 export const isPersonalV2 = (c: ReportContent): c is PersonalReportV2 => "kind" in c && c.kind === "personal-v2";
 
+/** AI 호출 한 번의 사용 기록 — 비용 계산과 운영 점검에 쓴다. 입력 · 출력 내용은 담지 않는다 */
+export type AiUsageSample = {
+  provider: string;
+  model: string;
+  promptVersion: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  latencyMs: number;
+  /** ok: 형식 검사 통과 · invalid: 응답은 왔지만 형식 검사 실패 · timeout: 시간 초과 · error: 그 밖의 호출 오류 */
+  outcome: "ok" | "invalid" | "timeout" | "error";
+  errorCode: string | null;
+};
+
+/** 생성 한 번에 딸려 가는 값 — 중단 신호와 사용 기록 수신 */
+export type GenerateContext = {
+  /** 시간 제한 등으로 생성을 그만둬야 할 때 신호가 켜진다 (남은 AI 호출을 멈춘다) */
+  signal?: AbortSignal;
+  onUsage?: (usage: AiUsageSample) => void;
+};
+
 export interface ReportGenerator {
   /** 저장할 때 함께 기록하는 생성기 이름과 버전 */
   readonly name: string;
   readonly version: string;
   /** 나를 더 반영하기 내용을 해석에 반영하는지 (개발용 규칙 생성기는 반영하지 않는다) */
   readonly usesContext?: boolean;
-  generate(input: ReportInput): Promise<ReportContent>;
+  generate(input: ReportInput, ctx?: GenerateContext): Promise<ReportContent>;
 }

@@ -1,12 +1,21 @@
 // 리포트 생성과 조회. 결제가 확인된 주문에만 만들고, 완성된 리포트는 다시 만들지 않는다.
 
-import { REPORT_GENERATING_STALE_MS, REPORT_MAX_ATTEMPTS } from "../commerce/report.ts";
-import type { ReportGenerator, ReportInput } from "../report/generator.ts";
+import { REPORT_GENERATING_STALE_MS, REPORT_GENERATION_TIMEOUT_MS, REPORT_MAX_ATTEMPTS, REPORT_RETRY_COOLDOWN_MS } from "../commerce/report.ts";
+import type { AiUsageSample, ReportGenerator, ReportInput } from "../report/generator.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { PersonalContext } from "../personalization/context.ts";
+import { estimateCostKrw, type CapacityConfig } from "./capacity-service.ts";
 import type { AssessmentRecord, MiyuRepository, OrderRecord, ReportRecord } from "./ports.ts";
 
-type ReportDeps = { repo: MiyuRepository; generator: ReportGenerator; now: () => Date };
+type ReportDeps = {
+  repo: MiyuRepository;
+  generator: ReportGenerator;
+  now: () => Date;
+  /** 동시 생성 수 · 단가 설정 (없으면 제한 없음 · 비용 계산 없음) */
+  capacity?: CapacityConfig;
+  /** 한 번의 생성 시도에 허용하는 시간 (기본 REPORT_GENERATION_TIMEOUT_MS) */
+  timeoutMs?: number;
+};
 
 /**
  * 1) 대기열에 올린다 — 결제 확인 직후 바로 부른다 (AI를 기다리지 않음).
@@ -26,7 +35,12 @@ export async function queueReport(deps: { repo: MiyuRepository }, order: OrderRe
   return inserted.ok ? inserted.value : deps.repo.getReportByOrder(order.id);
 }
 
-export type ClaimResult = { report: ReportRecord | null; claimed: boolean };
+export type ClaimResult = {
+  report: ReportRecord | null;
+  claimed: boolean;
+  /** 가져가지 못한 이유 (고객 안내용) — capacity: 동시 생성 한도 · cooldown: 다시 만들기 간격 */
+  waiting?: "capacity" | "cooldown";
+};
 
 /**
  * 2) 생성할 권리를 가져간다. 동시에 여러 요청이 와도 한 곳만 가져간다 (상태 + 시도 횟수로 확인).
@@ -34,8 +48,10 @@ export type ClaimResult = { report: ReportRecord | null; claimed: boolean };
  * - 생성 중인데 멈춘 지 오래되면(서버 재시작 등) 가져간다
  * - 실패한 리포트는 retryFailed일 때만 (고객의 "다시 만들기")
  * - 시도 횟수 상한을 넘으면 운영자 확인 대상으로 남긴다
+ * - 동시에 생성하는 수가 한도(capacity.maxConcurrent)에 차 있으면 대기열에 둔다 (이미 결제한 고객의 리포트를 취소하지 않는다)
+ * - 고객의 "다시 만들기"는 마지막 시도 후 REPORT_RETRY_COOLDOWN_MS가 지나야 한다 (운영자 · 테스트는 ignoreCooldown)
  */
-export async function claimReport(deps: ReportDeps, order: OrderRecord, opts: { retryFailed?: boolean } = {}): Promise<ClaimResult> {
+export async function claimReport(deps: ReportDeps, order: OrderRecord, opts: { retryFailed?: boolean; ignoreCooldown?: boolean } = {}): Promise<ClaimResult> {
   const { repo } = deps;
   if (order.status !== "paid") return { report: null, claimed: false };
   const report = (await repo.getReportByOrder(order.id)) ?? (await queueReport(deps, order));
@@ -45,6 +61,14 @@ export async function claimReport(deps: ReportDeps, order: OrderRecord, opts: { 
   const stale = deps.now().getTime() - new Date(report.updatedAt).getTime() > REPORT_GENERATING_STALE_MS;
   if (report.status === "generating" && !stale) return { report, claimed: false };
   if (report.status === "failed" && !opts.retryFailed) return { report, claimed: false };
+  if (report.status === "failed" && !opts.ignoreCooldown && deps.now().getTime() - new Date(report.updatedAt).getTime() < REPORT_RETRY_COOLDOWN_MS) {
+    return { report, claimed: false, waiting: "cooldown" };
+  }
+  const max = deps.capacity?.maxConcurrent ?? 0;
+  if (max > 0) {
+    const staleBefore = new Date(deps.now().getTime() - REPORT_GENERATING_STALE_MS).toISOString();
+    if ((await repo.countActiveGenerations(staleBefore)) >= max) return { report, claimed: false, waiting: "capacity" };
+  }
 
   const taken = await repo.updateReport(
     report.id,
@@ -55,15 +79,45 @@ export async function claimReport(deps: ReportDeps, order: OrderRecord, opts: { 
   return taken ? { report: taken, claimed: true } : { report: await repo.getReportByOrder(order.id), claimed: false };
 }
 
-/** 3) 가져간 리포트를 실제로 만든다. 실패하면 failed로 남기고 결제 상태는 건드리지 않는다. */
+/** 3) 가져간 리포트를 실제로 만든다. 실패하면 failed로 남기고 결제 상태는 건드리지 않는다. 시간 초과도 완성으로 저장하지 않는다. */
 export async function completeReport(deps: ReportDeps, order: OrderRecord, report: ReportRecord): Promise<ReportRecord | null> {
   const { repo, generator } = deps;
   const assessment = await repo.getAssessment(order.assessmentId);
+  const limit = deps.timeoutMs ?? REPORT_GENERATION_TIMEOUT_MS;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // AI 호출 기록은 쌓는 동안 생성 흐름을 막지 않는다 (기록 실패가 리포트 제공을 막지 않게)
+  const pending: Promise<void>[] = [];
+  const onUsage = (u: AiUsageSample) => {
+    pending.push(
+      repo
+        .addAiUsage({
+          reportId: report.id,
+          provider: u.provider,
+          model: u.model,
+          promptVersion: u.promptVersion,
+          inputTokens: u.inputTokens,
+          outputTokens: u.outputTokens,
+          estCostKrw: deps.capacity ? estimateCostKrw(deps.capacity, u) : null,
+          latencyMs: u.latencyMs,
+          outcome: u.outcome,
+          errorCode: u.errorCode,
+        })
+        .catch(() => {}),
+    );
+  };
   try {
     if (!assessment) throw new Error("검사 결과를 찾을 수 없습니다.");
     // 나를 더 반영하기: 생성을 시작하는 시점의 내용을 쓴다 (반영하는 생성기일 때만 읽는다)
     const context = generator.usesContext ? await repo.getContext(assessment.id) : null;
-    const content = await generator.generate(reportInputOf(assessment, context));
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        // 실패 사유를 먼저 확정하고(경쟁에서 이기도록) 그다음 남은 AI 호출을 멈춘다
+        reject(new Error(`리포트 생성 시간 초과 (제한 ${Math.max(1, Math.round(limit / 1000))}초) — 중단했습니다.`));
+        controller.abort();
+      }, limit);
+    });
+    const content = await Promise.race([generator.generate(reportInputOf(assessment, context), { signal: controller.signal, onUsage }), timeout]);
     const ready = await repo.updateReport(report.id, ["generating"], {
       status: "ready",
       content,
@@ -73,16 +127,20 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
     });
     return ready ?? repo.getReportByOrder(order.id);
   } catch (error) {
+    controller.abort();
     const failed = await repo.updateReport(report.id, ["generating"], {
       status: "failed",
       lastError: (error instanceof Error ? error.message : String(error)).slice(0, 500),
     });
     return failed ?? repo.getReportByOrder(order.id);
+  } finally {
+    if (timer) clearTimeout(timer);
+    await Promise.allSettled(pending);
   }
 }
 
 /** 가져가기 + 만들기를 한 번에 (백그라운드 작업에서 쓴다) */
-export async function runReport(deps: ReportDeps, order: OrderRecord, opts: { retryFailed?: boolean } = {}): Promise<ReportRecord | null> {
+export async function runReport(deps: ReportDeps, order: OrderRecord, opts: { retryFailed?: boolean; ignoreCooldown?: boolean } = {}): Promise<ReportRecord | null> {
   const { report, claimed } = await claimReport(deps, order, opts);
   return claimed && report ? completeReport(deps, order, report) : report;
 }
@@ -95,7 +153,7 @@ export async function runReport(deps: ReportDeps, order: OrderRecord, opts: { re
  */
 export async function ensureReport(deps: ReportDeps, order: OrderRecord): Promise<ReportRecord | null> {
   await queueReport(deps, order);
-  return runReport(deps, order, { retryFailed: true });
+  return runReport(deps, order, { retryFailed: true, ignoreCooldown: true });
 }
 
 /** 다시 만들기를 더 할 수 있는지 (상한을 넘으면 운영자 확인) */

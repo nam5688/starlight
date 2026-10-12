@@ -9,7 +9,7 @@ import { buildReportExtras } from "../extras.ts";
 import { describePolicy } from "../../saju/policy.ts";
 import { sajuSection } from "../../saju/display.ts";
 import type { Evidence } from "../evidence.ts";
-import type { ReportGenerator, ReportInput } from "../generator.ts";
+import type { GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
 import { buildRepairMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from "../v2/prompt.ts";
 import type { PersonalReportV2, ReportDraftV2 } from "../v2/types.ts";
@@ -24,6 +24,8 @@ export type AiGeneratorOptions = {
   maxRetries?: number;
   sleep?: (ms: number) => Promise<void>;
   maxOutputTokens?: number;
+  /** 모델 호출 한 번의 제한 시간 (넘으면 일시 오류로 보고 다시 시도) */
+  callTimeoutMs?: number;
 };
 
 /** 모델 응답에서 JSON 객체를 꺼낸다 (앞뒤 설명 · 코드 블록이 붙어도) */
@@ -65,16 +67,45 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
   const maxRepairs = opts.maxRepairs ?? 1;
   const maxRetries = opts.maxRetries ?? 2;
 
-  async function call(messages: ModelMessage[]) {
+  /** 호출 한 번. 일시 오류는 다시 부르고, 호출마다 사용 기록을 남긴다 (실패한 호출도 — 비용과 장애를 보기 위해) */
+  async function call(messages: ModelMessage[], ctx: GenerateContext) {
+    const sample = (extra: { outcome: "ok" | "invalid" | "timeout" | "error"; errorCode: string | null; started: number; usage?: { inputTokens: number; outputTokens: number } }) =>
+      ctx.onUsage?.({
+        provider: model.provider,
+        model: model.model,
+        promptVersion: PROMPT_VERSION,
+        inputTokens: extra.usage?.inputTokens ?? null,
+        outputTokens: extra.usage?.outputTokens ?? null,
+        latencyMs: Date.now() - extra.started,
+        outcome: extra.outcome,
+        errorCode: extra.errorCode,
+      });
     for (let attempt = 0; ; attempt++) {
+      if (ctx.signal?.aborted) throw new ModelCallError("생성 시간이 초과되어 중단했습니다.", { retryable: false, code: "ABORTED" });
+      const started = Date.now();
+      // 호출 한 번의 제한 시간 + 바깥에서 오는 중단 신호를 합친다
+      const own = new AbortController();
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        own.abort();
+      }, opts.callTimeoutMs ?? 120_000);
+      const signal = ctx.signal ? AbortSignal.any([own.signal, ctx.signal]) : own.signal;
       try {
-        return await model.complete({ system: SYSTEM_PROMPT, messages, maxOutputTokens: opts.maxOutputTokens ?? 16000 });
-      } catch (e) {
-        if (e instanceof ModelCallError && e.retryable && attempt < maxRetries) {
+        const result = await model.complete({ system: SYSTEM_PROMPT, messages, maxOutputTokens: opts.maxOutputTokens ?? 16000, signal });
+        return { result, started };
+      } catch (raw) {
+        const aborted = ctx.signal?.aborted === true;
+        const timeout = timedOut && !aborted;
+        const e = raw instanceof ModelCallError ? raw : new ModelCallError(timeout ? "AI 응답 시간이 초과되었습니다." : aborted ? "생성 시간이 초과되어 중단했습니다." : "AI 호출 오류", { retryable: timeout, code: timeout ? "TIMEOUT" : aborted ? "ABORTED" : "UNKNOWN" });
+        sample({ outcome: timeout || aborted ? "timeout" : "error", errorCode: timeout ? "TIMEOUT" : e.code, started });
+        if (e.retryable && !aborted && attempt < maxRetries) {
           await sleep(2000 * 3 ** attempt);
           continue;
         }
         throw e;
+      } finally {
+        clearTimeout(timer);
       }
     }
   }
@@ -83,7 +114,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
     name: `ai:${model.provider}`,
     version: `${model.model}|${PROMPT_VERSION}|${SAJU_RULE_VERSION}`,
     usesContext: true,
-    async generate(input) {
+    async generate(input, ctx = {}) {
       const ref = seoulYm(now());
       const evidence = buildEvidence(input, ref);
       const context = input.context;
@@ -91,16 +122,20 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
 
       let lastErrors: string[] = [];
       for (let round = 0; round <= maxRepairs; round++) {
-        const result = await call(messages);
+        const { result, started } = await call(messages, ctx);
+        const done = (outcome: "ok" | "invalid") =>
+          ctx.onUsage?.({ provider: model.provider, model: model.model, promptVersion: PROMPT_VERSION, inputTokens: result.usage?.inputTokens ?? null, outputTokens: result.usage?.outputTokens ?? null, latencyMs: Date.now() - started, outcome, errorCode: outcome === "ok" ? null : "VALIDATION" });
         let parsed: unknown;
         try {
           parsed = extractJson(result.text);
         } catch {
+          done("invalid");
           lastErrors = ["JSON 형식이 아닙니다. JSON 객체 하나만 출력해 주세요."];
           messages.push({ role: "assistant", content: result.text.slice(0, 20000) }, { role: "user", content: buildRepairMessage(lastErrors) });
           continue;
         }
         const checked = validateDraft(parsed, evidence, { hasContext: Boolean(context) });
+        done(checked.ok ? "ok" : "invalid");
         if (checked.ok) {
           const report: PersonalReportV2 = {
             kind: "personal-v2",
