@@ -3,6 +3,7 @@ import { mbtiModule, relationshipModule, temperamentModule } from "../assessment
 import { bipolarCode, scoreModule, toScoreMap } from "../assessment/scoring.ts";
 import type { Answers } from "../assessment/types.ts";
 import { DEV_SUMMARY_TEMPLATES } from "./dev-summary-templates.ts";
+import { buildFreeInsight } from "./free-insight.ts";
 import { toAxisRows, toScoreRows } from "./rows.ts";
 import type { FreeSummary } from "./types.ts";
 
@@ -14,6 +15,7 @@ export function buildDevFreeSummary(answers: Answers): FreeSummary {
   const tendency = classifyTendency(temperament, relationship);
   const template = DEV_SUMMARY_TEMPLATES[tendency.id];
 
+  const insight = buildFreeInsight(answers, tendency.id);
   return {
     source: "dev-scoring",
     contentVersion: [mbtiModule, temperamentModule, relationshipModule]
@@ -21,6 +23,7 @@ export function buildDevFreeSummary(answers: Answers): FreeSummary {
       .join(" "),
     tendency: { id: tendency.id, name: TENDENCY_NAMES[tendency.id] },
     oneLiner: template.oneLiner,
+    ...(insight ? { insight } : {}),
     core: template.core,
     temperament: toScoreRows(temperamentModule, temperament),
     relationship: toScoreRows(relationshipModule, relationship),

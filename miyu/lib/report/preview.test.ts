@@ -40,6 +40,12 @@ test("잠금: 미리보기에는 전체 이름 · 나머지 요약 · 점수 · 
 
     assert.ok(!json.includes(inp.summary.tendency.name), "전체 대표 경향 이름");
     assert.ok(!json.includes(inp.summary.oneLiner), "전체 한 줄 요약");
+    for (const b of inp.summary.insight?.basis ?? []) assert.ok(!json.includes(b.text) && !json.includes(b.itemId), "그렇게 읽은 이유(근거 문항 · 응답)는 구매 후");
+    if (extras.plain) {
+      for (const e of extras.plain.elements) {
+        if (e.domains) assert.ok(!json.includes(e.domains.relation) && !json.includes(e.domains.work) && !json.includes(e.domains.choice), `오행 ${e.element}의 관계 · 일 · 선택 풀이`);
+      }
+    }
     assert.ok(!json.includes(inp.summary.core.stressTrigger) && !json.includes(inp.summary.core.tryNow), "잠긴 핵심 요약 2개");
     for (const r of [...inp.summary.temperament, ...inp.summary.relationship]) {
       assert.ok(!json.includes(r.highMeaning) && !json.includes(r.lowMeaning), `기질 · 관계 설명 ${r.id}`);
@@ -50,6 +56,7 @@ test("잠금: 미리보기에는 전체 이름 · 나머지 요약 · 점수 · 
       assert.ok(!json.includes(s.strength) && !json.includes(s.caution) && !json.includes(s.scenario) && !json.includes(s.tip), `상황 설명 ${s.id}`);
     }
     for (const s of extras.situations.slice(1)) assert.ok(!json.includes(s.strengthLabel) && !json.includes(s.cautionLabel), "첫 상황 외 라벨");
+    for (const c of preview.core.locked) assert.ok(c.question.endsWith("?"), "잠긴 핵심 요약은 문장 대신 질문");
     for (const q of extras.questions) assert.ok(!json.includes(q.answer), "질문의 답");
     for (const q of extras.questions.slice(2)) assert.ok(!json.includes(q.question), "공개하지 않는 질문");
     if (extras.plain) {
@@ -64,6 +71,7 @@ test("잠금: 미리보기에는 전체 이름 · 나머지 요약 · 점수 · 
 test("공개 범위: 핵심 요약 2개, 질문 2개, 실천 1개, 첫 상황 라벨만, MBTI 성향과 사주 표 · 오행 뜻은 보인다", () => {
   const inp = input(PATTERNS[0]);
   const p = buildFreePreview({ summary: inp.summary, saju: inp.saju, reference: REF });
+  assert.equal(p.lead.kind, "insight", "응답이 뒷받침하면 해석 문단은 전체를 보여 준다");
   assert.equal(p.core.shown.length, 2);
   assert.deepEqual(p.core.shown.map((r) => r.label), ["내가 편한 환경", "자주 반복되는 반응"]);
   assert.equal(p.core.locked.length, 2);
@@ -77,6 +85,7 @@ test("공개 범위: 핵심 요약 2개, 질문 2개, 실천 1개, 첫 상황 �
   assert.equal(p.saju.elements.length, 5);
   assert.ok(p.saju.elements.every((e) => e.force.length > 8));
   assert.ok(p.saju.everyday.shown);
+  assert.ok(p.saju.elements.every((e) => e.keywords.includes("·")), "오행 키워드");
   assert.match(p.saju.headline, /촛불처럼/, "정화 일간 — 쉬운 한 줄");
 });
 
@@ -97,7 +106,12 @@ test("일관성: 미리보기에 보이는 모든 것이 구매한 리포트(개
       ] as const) {
         assert.ok(base && extras, `${label}: 요약과 구성 요소가 저장된다`);
         assert.ok(base.tendency.name.startsWith(preview.tendency.head) && base.tendency.name.endsWith(preview.tendency.tail), `${label}: 이름`);
-        assert.ok(base.oneLiner.startsWith(preview.oneLiner.shown), `${label}: 한 줄 요약`);
+        if (preview.lead.kind === "insight") {
+          assert.equal(base.insight?.text, preview.lead.text, `${label}: 응답에서 읽은 문단이 그대로 들어 있다`);
+          assert.ok(base.insight && base.insight.basis.length > 0, `${label}: 그렇게 읽은 이유(근거 응답)가 들어 있다`);
+        } else {
+          assert.ok(base.oneLiner.startsWith(preview.lead.shown), `${label}: 한 줄 요약`);
+        }
         assert.deepEqual(preview.core.shown, [
           { label: "내가 편한 환경", text: base.core.comfortableEnvironment },
           { label: "자주 반복되는 반응", text: base.core.repeatedReaction },
@@ -112,6 +126,14 @@ test("일관성: 미리보기에 보이는 모든 것이 구매한 리포트(개
         assert.equal(preview.situations[0].strengthLabel, extras.situations[0].strengthLabel);
         assert.equal(preview.situations[0].cautionLabel, extras.situations[0].cautionLabel);
         assert.equal(extras.situations.length, preview.situations.length);
+        for (const a of preview.answers) {
+          // 답을 약속한 질문마다 구매한 리포트에 그 답이 되는 부분이 실제로 있어야 한다
+          if (a.id === "partner" || a.id === "years") assert.ok(extras.partner && (a.id === "partner" ? extras.partner.fits.length > 0 : true), `${label}: ${a.id}`);
+          if (a.id === "elements") assert.ok(extras.plain && extras.plain.elements.some((e) => e.domains), `${label}: 오행별 관계 · 일 · 선택 풀이`);
+          if (a.id === "work" || a.id === "close" || a.id === "repeat") assert.ok(extras.situations.length === 5 && extras.situations.every((s) => s.tip.length > 0), `${label}: 상황별`);
+          if (a.id === "stress") assert.ok(base.core.stressTrigger.length > 0);
+          if (a.id === "actions") assert.equal(extras.starterActions.length, 3);
+        }
         for (const f of preview.locked) {
           if (f.id === "questions") assert.ok(extras.questions.length > 0);
           if (f.id === "partner") assert.ok(extras.partner);

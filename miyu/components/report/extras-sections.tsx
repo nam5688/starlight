@@ -20,16 +20,19 @@ export function PlainReadingSection({ plain, id }: { plain: NonNullable<ReportEx
           <dd className="text-[16px] leading-relaxed">{plain.dayMaster.trait}</dd>
         </div>
         <div className="grid gap-1 py-4 md:grid-cols-[132px_minmax(0,1fr)] md:gap-4">
-          <dt className="text-[14px] font-semibold text-ink-2">잘하는 점</dt>
+          <dt className="text-[14px] font-semibold text-ink-2">잘 발휘될 때</dt>
           <dd className="text-[16px] leading-relaxed">{plain.dayMaster.goodAt}</dd>
         </div>
         <div className="grid gap-1 py-4 md:grid-cols-[132px_minmax(0,1fr)] md:gap-4">
-          <dt className="text-[14px] font-semibold text-ink-2">주의할 점</dt>
+          <dt className="text-[14px] font-semibold text-ink-2">과해질 때 주의할 점</dt>
           <dd className="text-[16px] leading-relaxed">{plain.dayMaster.watchOut}</dd>
         </div>
       </dl>
 
       <h3 className="mt-8 text-[15px] font-semibold text-ink-2">오행별로 풀어 보면</h3>
+      <p className="mt-1 text-[13px] leading-relaxed text-ink-3">
+        많거나 적은 기운이 관계 · 일 · 선택에서 어떻게 나타날 수 있는지 풀었습니다. 개수만으로 성격을 정하지 않고, “이런 모습으로 나타날 수 있다”는 전통 해석의 방향입니다.
+      </p>
       <ul className="mt-2 divide-y divide-line border-y border-line">
         {plain.elements.map((e) => (
           <li key={e.element} className="py-4">
@@ -37,7 +40,7 @@ export function PlainReadingSection({ plain, id }: { plain: NonNullable<ReportEx
               <p className="text-[16px] font-semibold">
                 {e.element}
                 <span className="ml-1.5 text-[13px] font-normal text-ink-3">
-                  {e.hanja} · {e.image} — {e.force}
+                  {e.hanja} · {e.image} — {e.keywords}
                 </span>
               </p>
               <p className={`text-[14px] tabular-nums ${e.level === "many" || e.level === "none" ? "font-semibold text-accent" : "text-ink-3"}`}>
@@ -45,6 +48,24 @@ export function PlainReadingSection({ plain, id }: { plain: NonNullable<ReportEx
               </p>
             </div>
             {e.plain && <p className="mt-1.5 text-[15px] leading-relaxed text-ink-2">{e.plain}</p>}
+            {e.domains ? (
+              <dl className="mt-3 space-y-2 text-[15px] leading-relaxed">
+                {(
+                  [
+                    ["관계에서", e.domains.relation],
+                    ["일에서", e.domains.work],
+                    ["선택에서", e.domains.choice],
+                  ] as const
+                ).map(([label, text]) => (
+                  <div key={label} className="grid gap-0.5 sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-3">
+                    <dt className="font-semibold text-ink-2">{label}</dt>
+                    <dd>{text}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="mt-1.5 text-[14px] text-ink-3">고르게 들어 있어 한쪽으로 크게 치우치지 않은 기운입니다.</p>
+            )}
           </li>
         ))}
       </ul>
@@ -83,28 +104,31 @@ export function QuestionsSection({ questions, id }: { questions: ReportExtras["q
 export function SituationsSection({ situations, id }: { situations: ReportExtras["situations"]; id: string }) {
   return (
     <section aria-labelledby={id}>
-      <SectionTitle id={id} note="응답에서 나타난 경향을 생활 속 다섯 가지 상황으로 풀었습니다. ‘~라면 이 경향 때문일 수 있어요’라는 뜻이며 단정이 아닙니다.">
+      <SectionTitle id={id} note="응답에서 나타난 경향을 일 · 가까운 관계 · 선택 · 돈 · 갈등의 다섯 상황으로 풀었습니다. 상황마다 이런 모습 → 잘 발휘될 때 → 과해질 때 → 해볼 선택 순서로 읽습니다. ‘~라면 이 경향 때문일 수 있어요’라는 뜻이며 단정이 아닙니다.">
         상황별 잘하는 점 · 주의할 점
       </SectionTitle>
       <div className="divide-y divide-line border-y border-line">
         {situations.map((s) => (
           <article key={s.id} className="py-6">
             <h3 className="text-[18px] font-bold">{s.title}</h3>
-            <p className="mt-2 text-[15px] leading-relaxed text-ink-3">{s.scenario}</p>
-            <dl className="mt-4 grid gap-4 md:grid-cols-2 md:gap-8">
-              <div>
-                <dt className="text-[14px] font-semibold text-accent">잘하는 점 · {s.strengthLabel}</dt>
-                <dd className="mt-1.5 text-[16px] leading-relaxed">{s.strength}</dd>
-              </div>
-              <div>
-                <dt className="text-[14px] font-semibold text-ink-2">주의할 점 · {s.cautionLabel}</dt>
-                <dd className="mt-1.5 text-[16px] leading-relaxed">{s.caution}</dd>
-              </div>
-            </dl>
-            <p className="mt-4 rounded bg-accent-soft px-3 py-2.5 text-[15px] leading-relaxed">
-              <span className="font-semibold text-accent">바로 해볼 것 </span>
-              {s.tip}
-            </p>
+            <ol className="mt-3 space-y-4">
+              <li>
+                <p className="text-[13px] font-semibold text-ink-3">1 · 이런 모습이라면</p>
+                <p className="mt-1 text-[16px] leading-relaxed text-ink-2">{s.scenario}</p>
+              </li>
+              <li>
+                <p className="text-[13px] font-semibold text-accent">2 · 잘 발휘될 때 — {s.strengthLabel}</p>
+                <p className="mt-1 text-[16px] leading-relaxed">{s.strength}</p>
+              </li>
+              <li>
+                <p className="text-[13px] font-semibold text-ink-2">3 · 과해질 때 — {s.cautionLabel}</p>
+                <p className="mt-1 text-[16px] leading-relaxed">{s.caution}</p>
+              </li>
+              <li className="rounded bg-accent-soft px-3 py-2.5">
+                <p className="text-[13px] font-semibold text-accent">4 · 해볼 선택</p>
+                <p className="mt-1 text-[15px] leading-relaxed">{s.tip}</p>
+              </li>
+            </ol>
           </article>
         ))}
       </div>
@@ -119,6 +143,9 @@ export function PartnerSection({ partner, id }: { partner: NonNullable<ReportExt
       <SectionTitle id={id} note={partner.intro}>
         어울리는 관계 조건
       </SectionTitle>
+      <p className="-mt-2 mb-6 text-[14px] leading-relaxed text-ink-2">
+        상대 없이 나만 보는 “잘 맞는 관계 스타일”입니다. 특정한 사람과의 궁합이나 상대의 나이 · 직업 · 만나는 날짜는 이 리포트에 포함되지 않습니다.
+      </p>
       <div className="grid gap-8 md:grid-cols-2">
         <div>
           <h3 className="border-b border-ink pb-2 text-[17px] font-bold">편안하기 쉬운 상대의 모습</h3>

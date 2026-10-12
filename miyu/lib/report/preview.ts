@@ -11,18 +11,28 @@ import { buildReportExtras } from "./extras.ts";
 import { sajuSection } from "../saju/display.ts";
 import type { DataSource, FreeSummary, SajuSection } from "./types.ts";
 
-export const PREVIEW_VERSION = "preview-1";
+export const PREVIEW_VERSION = "preview-2";
 
 export type LockedFeature = { id: string; title: string; teaser: string };
+
+/**
+ * 구매하면 답을 주는 질문 — 숨긴 문장 대신 "무엇을 알게 되는지"를 보여 준다.
+ * 질문은 모두에게 같은 안내 문구이고(개인 내용이 아님), 구매한 리포트에 답이 되는 부분이 실제로 있는 것만 넣는다 (preview.test.ts가 확인).
+ */
+export type LockedAnswer = { id: string; question: string; where: string };
 
 export type FreePreview = {
   version: string;
   source: DataSource;
   /** 대표 경향 이름의 앞부분만 (예: "확인" + 가림 + "형") — 가려진 글자는 담지 않는다 */
   tendency: { head: string; tail: string };
-  /** 한 줄 요약의 앞부분만 */
-  oneLiner: { shown: string };
-  core: { shown: { label: string; text: string }[]; locked: { label: string }[] };
+  /**
+   * 대표 경향 아래의 해석 — 응답이 뒷받침하는 문단이 있으면 전체를 보여 주고(근거 문항 번호는 보내지 않는다),
+   * 없으면 일반 한 줄 요약의 앞부분만 보여 준다.
+   */
+  lead: { kind: "insight"; text: string; basisNote: string } | { kind: "oneLiner"; shown: string };
+  /** 잠긴 핵심 요약 2가지 — 문장 대신 "무엇에 답하는지"(질문)만 */
+  core: { shown: { label: string; text: string }[]; locked: { label: string; question: string }[] };
   mbti: FreeSummary["mbti"];
   saju:
     | {
@@ -31,16 +41,20 @@ export type FreePreview = {
         chartLine: string | null;
         headline: string;
         dayMaster: { label: string; image: string; trait: string };
-        elements: Pick<ElementReading, "element" | "hanja" | "image" | "count" | "level" | "levelLabel" | "force">[];
+        elements: Pick<ElementReading, "element" | "hanja" | "image" | "count" | "level" | "levelLabel" | "force" | "keywords">[];
         /** 일상에서 이렇게 나타날 수 있어요 — 첫 번째만 */
         everyday: { shown: string | null; lockedCount: number };
         notes: string[];
       }
     | { status: "not-ready"; message: string };
   questions: { shown: string[]; lockedCount: number };
-  situations: { title: string; strengthLabel: string | null; cautionLabel: string | null }[];
+  /** 기질 · 관계(애착) 점수 — 점수 대신 "알 수 있는 것"(질문)만 */
+  scoreQuestions: { title: string; question: string }[];
+  situations: { title: string; strengthLabel: string | null; cautionLabel: string | null; question: string | null }[];
   action: { shown: { title: string; detail: string } | null; lockedCount: number };
   locked: LockedFeature[];
+  /** 구매하면 답을 주는 질문 목록 */
+  answers: LockedAnswer[];
   /** "분석에 사용한 정보" 표 */
   basis: { mbtiItems: number; temperamentItems: number; relationshipItems: number };
 };
@@ -59,6 +73,24 @@ export function maskOneLiner(text: string): string {
   return i > 0 ? text.slice(0, i + 1) : Array.from(text).slice(0, 8).join("");
 }
 
+const CORE_QUESTIONS: Record<string, string> = {
+  "스트레스를 받기 쉬운 상황": "나는 어떤 상황에서 가장 쉽게 지칠까?",
+  "바로 적용해볼 행동": "오늘 바로 써 볼 수 있는 한 가지는 무엇일까?",
+};
+
+const SITUATION_QUESTIONS: Record<string, string> = {
+  work: "일할 때 내가 힘이 나는 순간과 막히는 순간은?",
+  close: "가까운 사람 사이에서 내 방식이 상대에게 부담이 되는 순간은?",
+  decision: "새로운 선택 앞에서 나는 어떤 기준으로 정하게 될까?",
+  money: "돈을 쓰고 모을 때 내가 반복하는 습관은?",
+  conflict: "갈등이 올 때 나는 어떻게 반응하고, 어떻게 바꿔 볼 수 있을까?",
+};
+
+const SCORE_QUESTIONS = [
+  { title: "기질", question: "새로운 일 앞에서 나는 먼저 해 보는 편일까, 따져 보는 편일까? 다른 사람의 반응은 내 의욕에 얼마나 영향을 줄까?" },
+  { title: "관계(애착)", question: "가까운 관계에서 확인하고 싶은 마음과 혼자 있고 싶은 마음 중 어느 쪽이 더 크게 나타날까?" },
+];
+
 const itemCount = (id: string) => ASSESSMENT_MODULES.find((m) => m.id === id)?.items.length ?? 0;
 
 export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult; reference: { year: number; month: number } }): FreePreview {
@@ -68,7 +100,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     { label: "내가 편한 환경", text: summary.core.comfortableEnvironment },
     { label: "자주 반복되는 반응", text: summary.core.repeatedReaction },
   ];
-  const lockedCore = [{ label: "스트레스를 받기 쉬운 상황" }, { label: "바로 적용해볼 행동" }];
+  const lockedCore = Object.entries(CORE_QUESTIONS).map(([label, question]) => ({ label, question }));
 
   const qs = extras.questions;
   const shownQuestions = qs.slice(0, 2).map((q) => q.question);
@@ -82,7 +114,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
           chartLine: pillarsLine(saju),
           headline: plain.headline,
           dayMaster: { label: plain.dayMaster.label, image: plain.dayMaster.image, trait: plain.dayMaster.trait },
-          elements: plain.elements.map(({ element, hanja, image, count, level, levelLabel, force }) => ({ element, hanja, image, count, level, levelLabel, force })),
+          elements: plain.elements.map(({ element, hanja, image, count, level, levelLabel, force, keywords }) => ({ element, hanja, image, count, level, levelLabel, force, keywords })),
           everyday: { shown: plain.everyday[0] ?? null, lockedCount: Math.max(plain.everyday.length - 1, 0) },
           notes: saju.notes.filter((n) => n.kind !== "hour-unknown").map((n) => n.message),
         }
@@ -100,22 +132,45 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     { id: "actions", title: "실천 제안 3가지 전체", teaser: "지금은 1가지만 보입니다" },
   ];
 
+  const answers: LockedAnswer[] = [
+    { id: "close", question: SITUATION_QUESTIONS.close, where: "상황별 · 가까운 사람과 지낼 때" },
+    ...(extras.partner ? [{ id: "partner", question: "나는 어떤 상대에게 편안함을 느끼고, 어떤 상대는 맞추기 어려울까?", where: "어울리는 관계 조건" }] : []),
+    { id: "repeat", question: "가까운 관계에서 반복하는 반응과, 그것을 바꿔 보는 방법은?", where: "상황별 · 바로 해볼 것" },
+    ...(extras.partner ? [{ id: "years", question: "가까운 3년 중 관계 주제가 두드러질 수 있는 해는 언제일까?", where: "어울리는 관계 조건 · 관계 주제가 두드러질 수 있는 해" }] : []),
+    { id: "work", question: SITUATION_QUESTIONS.work, where: "상황별 · 일하고 공부할 때" },
+    { id: "stress", question: CORE_QUESTIONS["스트레스를 받기 쉬운 상황"], where: "핵심 요약" },
+    ...(plain && plain.everyday.length > 1 ? [{ id: "elements", question: "내 원국에서 많거나 없는 기운은 관계 · 일 · 선택에서 어떻게 나타날까?", where: "오행별 풀이" }] : []),
+    { id: "actions", question: "오늘부터 해 볼 수 있는 나머지 실천 2가지는?", where: "바로 해볼 실천 제안" },
+  ];
+
+  const insight = summary.insight;
+  const lead: FreePreview["lead"] = insight
+    ? {
+        kind: "insight",
+        text: insight.text,
+        basisNote: `${insight.basisModule === "relationship" ? "관계(애착)" : "기질"} 문항에 답하신 내용 중 ${insight.basis.length}개가 이 문단의 근거입니다. 모든 사람에게 같은 문장이 나오지 않고, 응답이 뒷받침할 때만 들어갑니다.`,
+      }
+    : { kind: "oneLiner", shown: maskOneLiner(summary.oneLiner) };
+
   return {
     version: PREVIEW_VERSION,
     source: summary.source,
     tendency: maskTendencyName(summary.tendency.name),
-    oneLiner: { shown: maskOneLiner(summary.oneLiner) },
+    lead,
     core: { shown: rows, locked: lockedCore },
     mbti: summary.mbti,
     saju: sajuPart,
     questions: { shown: shownQuestions, lockedCount: Math.max(qs.length - shownQuestions.length, 0) },
+    scoreQuestions: SCORE_QUESTIONS,
     situations: extras.situations.map((s, i) => ({
       title: s.title,
       strengthLabel: i === 0 ? s.strengthLabel : null,
       cautionLabel: i === 0 ? s.cautionLabel : null,
+      question: i === 0 ? null : (SITUATION_QUESTIONS[s.id] ?? null),
     })),
     action: { shown: extras.starterActions[0] ?? null, lockedCount: Math.max(extras.starterActions.length - 1, 0) },
     locked,
+    answers,
     basis: { mbtiItems: itemCount("mbti"), temperamentItems: itemCount("temperament"), relationshipItems: itemCount("relationship") },
   };
 }

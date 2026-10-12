@@ -31,9 +31,13 @@ export function ReportPreview() {
           <LockedMask chars={2} />
           {mask.tail}
         </p>
-        <p className="mt-3 border-l-[3px] border-accent pl-3 text-[17px] font-semibold leading-snug">
-          {maskOneLiner(r.oneLiner)} <LockedText chars={16} />
-        </p>
+        {r.insight ? (
+          <p className="mt-3 border-l-[3px] border-accent pl-3 text-[16px] font-semibold leading-relaxed">{r.insight.text}</p>
+        ) : (
+          <p className="mt-3 border-l-[3px] border-accent pl-3 text-[17px] font-semibold leading-snug">
+            {maskOneLiner(r.oneLiner)} <LockedText chars={16} />
+          </p>
+        )}
 
         {section.status !== "not-connected" && plain && (
           <div className="mt-6 border-t border-line pt-5">
@@ -56,9 +60,7 @@ export function ReportPreview() {
           <div className="mt-5 border-t border-line pt-5">
             <p className="text-[13px] font-semibold text-ink-2">내 원국이 던지는 질문</p>
             <p className="mt-1 text-[15px] font-semibold leading-snug">{question.question}</p>
-            <p className="mt-1.5 text-[14px] leading-relaxed text-ink-3">
-              <LockedText chars={52} />
-            </p>
+            <p className="mt-1.5 text-[14px] leading-relaxed text-ink-3">답은 구매 후 쉬운 말로 풀어 드립니다.</p>
           </div>
         )}
       </div>

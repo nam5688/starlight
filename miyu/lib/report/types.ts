@@ -3,6 +3,7 @@
 
 import type { TendencyId } from "../assessment/dev-rules.ts";
 import type { ReportExtras } from "./extras.ts";
+import type { FreeInsight } from "./free-insight.ts";
 
 /**
  * - "sample": 리포트 예시용 가상 데이터
@@ -40,6 +41,8 @@ export type FreeSummary = {
   contentVersion: string;
   tendency: { id: TendencyId; name: string };
   oneLiner: string;
+  /** 응답이 뒷받침하는 문장으로 만든 문단 — 근거가 없으면 없다. 이전에 저장된 결과에도 없다 */
+  insight?: FreeInsight;
   core: CoreSummary;
   temperament: ScoreRow[];
   relationship: ScoreRow[];

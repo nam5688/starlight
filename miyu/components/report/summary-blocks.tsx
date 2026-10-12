@@ -1,4 +1,5 @@
 import type { CoreSummary, FreeSummary } from "@/lib/report/types";
+import { ANSWER_LABEL } from "@/lib/report/free-insight";
 import { AxisBar, ScoreBar } from "./score-bar";
 
 export function SectionTitle({ id, children, note }: { id?: string; children: React.ReactNode; note?: React.ReactNode }) {
@@ -17,9 +18,10 @@ export function TendencyBlock({
   summary,
   headingId = "tendency",
 }: {
-  summary: Pick<FreeSummary, "tendency" | "oneLiner">;
+  summary: Pick<FreeSummary, "tendency" | "oneLiner" | "insight">;
   headingId?: string;
 }) {
+  const insight = summary.insight;
   return (
     <div>
       <h2 id={headingId} className="text-[15px] font-semibold text-accent">
@@ -34,6 +36,25 @@ export function TendencyBlock({
       <p className="mt-2 border-l-[3px] border-accent pl-4 text-[19px] font-semibold leading-snug md:text-[21px]">
         {summary.oneLiner}
       </p>
+
+      {insight && (
+        <>
+          <h3 className="mt-8 text-[15px] font-semibold text-ink-2">내 응답에서 읽은 것</h3>
+          <p className="mt-2 text-[17px] leading-[1.8]">{insight.text}</p>
+          <h3 className="mt-6 text-[15px] font-semibold text-ink-2">이렇게 읽은 이유</h3>
+          <p className="mt-1 text-[13px] leading-relaxed text-ink-3">
+            아래 응답이 이 문단의 근거입니다. 이 문단에는 응답만 쓰였고, 사주와 합산하지 않았습니다.
+          </p>
+          <ul className="mt-2 divide-y divide-line border-y border-line">
+            {insight.basis.map((b) => (
+              <li key={b.itemId} className="grid gap-1 py-3 md:grid-cols-[minmax(0,1fr)_140px] md:gap-4">
+                <p className="text-[15px] leading-relaxed">“{b.text}”</p>
+                <p className="text-[14px] font-semibold text-accent md:text-right">내 응답 · {ANSWER_LABEL[b.answer] ?? b.answer}</p>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

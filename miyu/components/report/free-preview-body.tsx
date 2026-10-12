@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LockIcon } from "@/components/ui/icons";
+import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { StatusBadge } from "@/components/ui/source-badge";
 import type { FreePreview } from "@/lib/report/preview";
 import { SajuChart } from "./detail-sections";
@@ -13,9 +14,12 @@ const cta = "inline-flex items-center gap-1.5 text-[14px] font-semibold text-acc
  * 무료 미리보기 본문. 공개 범위만 보여 주고, 잠긴 자리는 "무엇이 있는지"만 알려 준다.
  * ctaHref: 잠긴 자리에서 "전체 보기"로 이동할 곳 (결과 화면은 구매 영역, 검사 직후 화면은 저장 영역)
  */
-export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매하고 전체 보기" }: { preview: FreePreview; idPrefix: string; ctaHref: string; ctaLabel?: string }) {
+export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { preview: FreePreview; idPrefix: string; ctaHref: string; ctaLabel?: string }) {
   const id = (name: string) => `${idPrefix}${name}`;
-  const { tendency, oneLiner, core, saju, questions, situations, action } = preview;
+  const { tendency, lead, core, saju, questions, situations, action } = preview;
+  // 실제로 제공하는 내용만 약속한다 — 어울리는 관계 조건이 있는 결과에서만 그 문구를 쓴다
+  const hasPartner = preview.answers.some((a) => a.id === "partner");
+  const primaryLabel = ctaLabel ?? (hasPartner ? "내 관계 패턴과 잘 맞는 상대 확인하기" : "구매하고 전체 보기");
 
   return (
     <div className="space-y-16">
@@ -30,10 +34,20 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
           {tendency.tail}
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-ink-3">후보 유형 · 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아닙니다.</p>
-        <h3 className="mt-8 text-[15px] font-semibold text-ink-2">한 줄 요약</h3>
-        <p className="mt-2 border-l-[3px] border-accent pl-4 text-[19px] font-semibold leading-snug md:text-[21px]">
-          {oneLiner.shown} <LockedText chars={16} />
-        </p>
+        {lead.kind === "insight" ? (
+          <>
+            <h3 className="mt-8 text-[15px] font-semibold text-ink-2">내 응답에서 읽은 것</h3>
+            <p className="mt-2 border-l-[3px] border-accent pl-4 text-[18px] font-semibold leading-relaxed md:text-[20px]">{lead.text}</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-ink-3">{lead.basisNote}</p>
+          </>
+        ) : (
+          <>
+            <h3 className="mt-8 text-[15px] font-semibold text-ink-2">한 줄 요약</h3>
+            <p className="mt-2 border-l-[3px] border-accent pl-4 text-[19px] font-semibold leading-snug md:text-[21px]">
+              {lead.shown} <LockedText chars={16} />
+            </p>
+          </>
+        )}
       </section>
 
       {/* 2. 핵심 요약 — 4개 중 2개 */}
@@ -54,8 +68,9 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
                 <LockIcon className="size-3.5 text-ink-3" />
                 {r.label}
               </dt>
-              <dd className="text-[16px] leading-relaxed text-ink-3">
-                <LockedText chars={58} />
+              <dd className="text-[16px] leading-relaxed">
+                <span className="font-semibold">{r.question}</span>
+                <span className="mt-0.5 block text-[14px] text-ink-3">답은 구매 후 리포트에 있습니다.</span>
               </dd>
             </div>
           ))}
@@ -95,7 +110,10 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
                         {e.hanja} · {e.image}
                       </span>
                     </p>
-                    <p className="col-span-1 text-[15px] leading-relaxed text-ink-2 sm:col-span-1">{e.force}</p>
+                    <p className="col-span-1 text-[15px] leading-relaxed text-ink-2 sm:col-span-1">
+                      <span className="font-semibold text-ink">{e.keywords}</span>
+                      <span className="block text-[14px] text-ink-3">{e.force}</span>
+                    </p>
                     <p className={`col-start-2 text-[14px] sm:col-start-3 sm:text-right ${e.level === "many" || e.level === "none" ? "font-semibold text-accent" : "text-ink-3"}`}>
                       {e.count}개 · {e.levelLabel}
                     </p>
@@ -109,17 +127,15 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
               <h3 className="text-[15px] font-semibold text-ink-2">일상에서는 이렇게 나타날 수 있어요</h3>
               <ul className="mt-2 divide-y divide-line border-y border-line">
                 {saju.everyday.shown && <li className="py-3.5 text-[16px] leading-relaxed">{saju.everyday.shown}</li>}
-                {Array.from({ length: Math.min(saju.everyday.lockedCount, 2) }, (_, i) => (
-                  <li key={i} className="flex items-start gap-2 bg-mist/60 py-3.5 text-[16px] leading-relaxed text-ink-3">
-                    <LockIcon className="mt-1.5 size-3.5 shrink-0" />
-                    <span>
-                      <LockedText chars={50} />
-                    </span>
+                {saju.everyday.lockedCount > 0 && (
+                  <li className="flex items-start gap-2 bg-mist/60 py-3.5 text-[15px] leading-relaxed text-ink-2">
+                    <LockIcon className="mt-1 size-3.5 shrink-0 text-ink-3" />
+                    <span>이 밖에 내 원국의 기운이 일상에서 나타나는 모습 {saju.everyday.lockedCount}가지가 더 있습니다.</span>
                   </li>
-                ))}
+                )}
               </ul>
               <p className="mt-2 text-[14px] text-ink-3">
-                일간의 잘하는 점 · 주의할 점과 오행별 풀이 전체는 구매 후 리포트에 있습니다.{" "}
+                일간의 잘하는 점 · 주의할 점과, 각 기운이 관계 · 일 · 선택에서 어떻게 나타나는지는 구매 후 리포트에 있습니다.{" "}
                 <Link href={ctaHref} className={cta}>
                   보기
                 </Link>
@@ -152,11 +168,9 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
                   <span className="w-5 shrink-0 text-[17px] font-bold tabular-nums text-accent">{i + 1}</span>
                   <div>
                     <p className="text-[16px] font-semibold leading-snug">{q}</p>
-                    <p className="mt-1.5 flex items-start gap-1.5 text-[15px] leading-relaxed text-ink-3">
-                      <LockIcon className="mt-1 size-3.5 shrink-0" />
-                      <span>
-                        <LockedText chars={50} />
-                      </span>
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[14px] leading-relaxed text-ink-3">
+                      <LockIcon className="mt-0.5 size-3.5 shrink-0" />
+                      <span>답은 구매 후 쉬운 말로 풀어 드립니다.</span>
                     </p>
                   </div>
                 </div>
@@ -181,7 +195,7 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
 
       {/* 5. 상황별 잘하는 점 · 주의할 점 */}
       <section aria-labelledby={id("situations")}>
-        <SectionTitle id={id("situations")} note="첫 번째 상황만 짧게 보여 드립니다. 나머지와 자세한 설명은 구매 후 공개됩니다.">
+        <SectionTitle id={id("situations")} note="첫 번째 상황의 한 줄만 보여 드립니다. 나머지 상황은 어떤 질문에 답하는지 알려 드리고, 자세한 설명은 구매 후 공개됩니다.">
           상황별 잘하는 점 · 주의할 점
         </SectionTitle>
         <table className="w-full table-fixed border-collapse text-left">
@@ -210,14 +224,12 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
                     <td className="py-3.5 text-[14px] leading-snug">{s.cautionLabel}</td>
                   </>
                 ) : (
-                  <>
-                    <td className="py-3.5 pr-2 text-[14px] leading-snug text-ink-3">
-                      <LockedText chars={14} />
-                    </td>
-                    <td className="py-3.5 text-[14px] leading-snug text-ink-3">
-                      <LockedText chars={14} />
-                    </td>
-                  </>
+                  <td colSpan={2} className="py-3.5 text-[14px] leading-snug">
+                    <span className="flex items-start gap-1.5">
+                      <LockIcon className="mt-0.5 size-3.5 shrink-0 text-ink-3" />
+                      <span>{s.question}</span>
+                    </span>
+                  </td>
                 )}
               </tr>
             ))}
@@ -236,16 +248,14 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
           항목별 점수
         </SectionTitle>
         <div className="space-y-10">
-          {["기질", "관계(애착)"].map((title) => (
+          {preview.scoreQuestions.map(({ title, question }) => (
             <div key={title}>
               <div className="flex items-baseline justify-between gap-3 border-b border-ink pb-2">
                 <h3 className="text-[17px] font-bold">{title}</h3>
                 <LockTag />
               </div>
-              <p className="py-4 text-[15px] leading-relaxed text-ink-3">
-                <LockedText chars={64} />
-              </p>
-              <p className="text-[14px] leading-relaxed text-ink-2">
+              <p className="pt-4 text-[16px] font-semibold leading-relaxed">{question}</p>
+              <p className="mt-1 text-[14px] leading-relaxed text-ink-3">
                 {title === "기질" ? "새로움 추구 · 신중함 · 타인 반응 민감도 · 지속성" : "관계 불안 · 거리 두기"}의 점수와 그 의미를 구매 후 리포트에서 보여 드립니다.
               </p>
             </div>
@@ -279,44 +289,52 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel = "구매
               </div>
             </li>
           )}
-          {Array.from({ length: action.lockedCount }, (_, i) => (
-            <li key={i} className="flex gap-4 border-b border-line bg-mist/60 py-4">
-              <span className="w-6 shrink-0 text-[17px] font-bold tabular-nums text-ink-3">{i + 2}</span>
-              <div>
-                <p className="flex items-center gap-1.5 text-[16px] font-semibold leading-snug text-ink-3">
-                  <LockIcon className="size-3.5 shrink-0" />
-                  <LockedText chars={26} />
-                </p>
-                <p className="mt-1 text-[15px] leading-relaxed text-ink-3">
-                  <LockedText chars={40} />
-                </p>
-              </div>
+          {action.lockedCount > 0 && (
+            <li className="flex gap-4 border-b border-line bg-mist/60 py-4">
+              <span className="w-6 shrink-0 text-[17px] font-bold tabular-nums text-ink-3">2~{action.lockedCount + 1}</span>
+              <p className="flex items-start gap-1.5 text-[15px] leading-relaxed text-ink-2">
+                <LockIcon className="mt-1 size-3.5 shrink-0 text-ink-3" />
+                <span>나머지 {action.lockedCount}가지는 상황별로 바로 써 보는 방법과 함께 구매 후 공개됩니다.</span>
+              </p>
             </li>
-          ))}
+          )}
         </ol>
       </section>
 
-      {/* 8. 구매 후 내용 목록 */}
+      {/* 8. 구매하면 답해 드리는 질문 + 구매 안내 */}
       <section aria-labelledby={id("locked")}>
-        <SectionTitle id={id("locked")} note="구매한 리포트에 들어 있는 내용입니다.">
-          구매하면 더 볼 수 있는 내용
+        <SectionTitle id={id("locked")} note="구매한 리포트에는 아래 질문에 대한 답이 실제로 들어 있습니다. 샘플 리포트에서 가상 인물의 완성된 문단을 먼저 읽어 볼 수 있습니다.">
+          구매하면 답해 드리는 질문
         </SectionTitle>
         <ul className="divide-y divide-line border-y border-line">
-          {preview.locked.map((f) => (
-            <li key={f.id} className="flex items-start gap-3 py-3.5">
+          {preview.answers.map((a) => (
+            <li key={a.id} className="flex items-start gap-3 py-3.5">
               <LockIcon className="mt-1 size-4 shrink-0 text-ink-3" />
               <div>
-                <p className="text-[16px] font-semibold leading-snug">{f.title}</p>
-                <p className="mt-0.5 text-[14px] leading-relaxed text-ink-3">{f.teaser}</p>
+                <p className="text-[16px] font-semibold leading-snug">{a.question}</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-ink-3">리포트의 “{a.where}”에서 답합니다</p>
               </div>
             </li>
           ))}
         </ul>
-        <p className="mt-4">
-          <Link href={ctaHref} className={cta}>
-            {ctaLabel}
+        <div className="mt-5 flex flex-col gap-2">
+          <Link href={ctaHref} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-accent px-6 py-2 text-center text-[16px] font-semibold text-white hover:bg-accent-strong sm:self-start">
+            {primaryLabel}
           </Link>
-        </p>
+          <p className="text-[14px] leading-relaxed text-ink-2">
+            {PERSONAL_REPORT.name} · <span className="font-semibold tabular-nums text-ink">{formatKrw(PERSONAL_REPORT.priceKrw)}</span> ·{" "}
+            <Link href={ctaHref} className={cta}>
+              포함 내용 보기
+            </Link>{" "}
+            ·{" "}
+            <Link href="/report/sample" className={cta}>
+              샘플 리포트 읽어 보기
+            </Link>
+          </p>
+          <p className="text-[13px] leading-relaxed text-ink-3">
+            {hasPartner ? "상대의 나이 · 직업 · 만나는 날짜를 맞히는 서비스가 아닙니다. 나에게 편안한 관계의 조건과 확인해 볼 행동을 알려 드립니다." : "점이나 사건을 맞히는 서비스가 아닙니다."}
+          </p>
+        </div>
       </section>
 
       <section aria-labelledby={id("status")}>

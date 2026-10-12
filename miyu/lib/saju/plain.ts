@@ -6,41 +6,62 @@ import { FIVE_ELEMENTS, type FiveElement, type SajuOk } from "./engine.ts";
 
 export type ElementLevel = "none" | "few" | "balanced" | "many";
 
-export const ELEMENT_INFO: Record<FiveElement, { hanja: string; image: string; force: string; many: string; few: string }> = {
+/** 이 기운이 많거나 적을 때 관계 · 일 · 선택에서 나타날 수 있는 모습 (유료 리포트에서만 보여 준다) */
+export type ElementDomains = { relation: string; work: string; choice: string };
+
+export const ELEMENT_INFO: Record<
+  FiveElement,
+  { hanja: string; image: string; force: string; keywords: string; many: string; few: string; manyDomains: ElementDomains; fewDomains: ElementDomains }
+> = {
   목: {
     hanja: "木",
     image: "나무",
     force: "자라고, 계획하고, 새로 시작하려는 힘",
+    keywords: "시작 · 성장 · 확장",
     many: "시작하고 키우는 일에 마음이 많이 쓰여요. 하고 싶은 일과 계획이 계속 생기지만, 벌려 놓은 일이 늘어 지칠 수 있어요.",
     few: "새로 시작하는 일에 시동이 천천히 걸리거나, 계획을 세우기보다 흐름을 따르는 편일 수 있어요.",
+    manyDomains: { relation: "새로운 사람을 만나고 관계를 넓히는 데 마음이 열려 있어요. 여러 관계를 함께 키우다 한 사람에게 쏟는 시간이 줄 수 있어요.", work: "새 일을 시작하고 키우는 데서 힘이 나요. 다만 벌려 놓은 일이 늘면 마무리가 뒤로 밀릴 수 있어요.", choice: "가능성이 보이면 먼저 움직이는 편이에요. 하나를 정하기 전에 선택지가 계속 늘어날 수 있어요." },
+    fewDomains: { relation: "관계를 먼저 넓히기보다 이미 가까운 사람과 천천히 깊어지는 쪽이 편할 수 있어요.", work: "새 일의 시작에는 시동이 천천히 걸리고, 시작하면 정해진 틀 안에서 안정적으로 해 나갈 수 있어요.", choice: "먼저 나서서 정하기보다 상황이 정리된 뒤에 고르는 편일 수 있어요." },
   },
   화: {
     hanja: "火",
     image: "불",
     force: "드러내고, 표현하고, 열정을 내는 힘",
+    keywords: "표현 · 열정 · 교류",
     many: "표현하고 드러내는 힘이 강해요. 열정이 빠르게 붙는 대신 마음이 급해지거나 감정의 높낮이가 커질 수 있어요.",
     few: "감정이나 열정을 겉으로 크게 드러내지 않고 차분한 편일 수 있어요. 마음을 말로 꺼내는 연습이 도움이 된다고 봅니다.",
+    manyDomains: { relation: "감정 표현이 솔직하고 분위기를 살리는 힘이 있어요. 마음이 앞서 말이 빨라지면 감정의 높낮이가 상대에게 크게 느껴질 수 있어요.", work: "사람들 앞에서 설명하고 이끄는 일에서 힘이 나요. 열정이 식으면 오래 이어 가기 어렵게 느낄 수 있어요.", choice: "마음이 끌리는 쪽으로 빠르게 정하는 편이에요. 감정이 가라앉은 뒤에 다시 보면 달라 보일 수 있어요." },
+    fewDomains: { relation: "마음을 겉으로 크게 드러내지 않아 상대가 내 마음을 짐작해야 할 때가 있을 수 있어요.", work: "눈에 띄는 역할보다 조용히 해내는 역할이 편할 수 있어요. 성과를 알리는 일은 따로 챙기면 좋아요.", choice: "분위기에 이끌려 정하기보다 차분히 따져서 정하는 편일 수 있어요." },
   },
   토: {
     hanja: "土",
     image: "흙",
     force: "지키고, 중재하고, 안정시키는 힘",
+    keywords: "안정 · 조율 · 유지",
     many: "지키고 버티는 힘이 강해요. 믿음직하고 안정적이지만, 변화에 느리거나 고집으로 보일 때가 있을 수 있어요.",
     few: "한곳에 오래 머무르기보다 옮겨 다니는 편이고, 기준이 흔들린다고 느낄 때가 있을 수 있어요.",
+    manyDomains: { relation: "한번 맺은 관계를 오래 지키고 중재하는 역할을 맡기 쉬워요. 내 마음보다 주변을 먼저 살피다 지칠 수 있어요.", work: "꾸준히 유지하고 조율하는 일에서 신뢰를 얻어요. 갑작스러운 변화나 속도를 요구받으면 부담스러울 수 있어요.", choice: "안전하고 검증된 쪽을 고르는 편이에요. 바꿔야 할 시점에 결정이 늦어질 수 있어요." },
+    fewDomains: { relation: "한 관계에 오래 머무르기보다 상황에 따라 거리를 옮기는 편일 수 있어요.", work: "한 자리에서 오래 유지하는 일보다 변화가 있는 일에서 흥미가 이어질 수 있어요.", choice: "기준이 흔들린다고 느낄 때가 있어, 선택 기준을 미리 적어 두면 도움이 될 수 있어요." },
   },
   금: {
     hanja: "金",
     image: "쇠",
     force: "정리하고, 판단하고, 기준을 세우는 힘",
+    keywords: "기준 · 정리 · 결단",
     many: "기준과 원칙이 분명하고 결단이 빨라요. 정리와 판단은 빠른 대신 말이 날카롭게 들릴 수 있어요.",
     few: "딱 잘라 결정하거나 거절하는 일이 어렵게 느껴질 수 있어요. 기준을 미리 적어 두면 편하다고 봅니다.",
+    manyDomains: { relation: "기준과 약속이 분명한 관계에서 편안해해요. 옳고 그름을 분명히 말하다 상대에게 날카롭게 들릴 수 있어요.", work: "정리하고 판단하고 마무리하는 일에서 힘이 나요. 기준에 못 미치는 결과에는 스스로에게도 엄격할 수 있어요.", choice: "결단이 빠르고 미루지 않는 편이에요. 한번 정한 뒤에는 다른 의견을 받아들이기 어려울 수 있어요." },
+    fewDomains: { relation: "부탁이나 요구를 딱 잘라 거절하기 어려워 속으로 쌓아 둘 수 있어요.", work: "기준을 세우고 정리하는 일은 의식적으로 틀을 만들어 두면 편해져요.", choice: "결정을 미루거나 주변 의견을 오래 듣게 될 수 있어요. 기한을 정해 두면 좋아요." },
   },
   수: {
     hanja: "水",
     image: "물",
     force: "생각하고, 유연하게 흐르고, 쉬어 가는 힘",
+    keywords: "관찰 · 사고 · 유연함",
     many: "생각과 감정이 깊고 상황에 맞춰 유연하게 흘러요. 다만 생각이 많아 결정을 미루거나 방향이 흩어질 수 있어요.",
     few: "생각을 멈추고 쉬어 가는 일이 서툴 수 있어요. 쉬는 것도 일처럼 계획해야 마음이 놓일 수 있다고 봅니다.",
+    manyDomains: { relation: "상대의 마음을 깊이 헤아리고 맞춰 주는 편이에요. 생각이 많아 혼자 여러 가능성을 떠올리다 표현이 늦어질 수 있어요.", work: "정보를 모으고 분석하고 흐름을 읽는 일에서 힘이 나요. 생각이 길어져 시작이 늦어질 수 있어요.", choice: "여러 가능성을 열어 두고 신중히 고르는 편이에요. 결정을 계속 미루게 될 수 있어요." },
+    fewDomains: { relation: "관계에서도 쉬어 가는 여백 없이 계속 맞춰 가다 지칠 수 있어요.", work: "일을 멈추고 쉬는 시간을 따로 두지 않으면 몰아서 지칠 수 있어요.", choice: "충분히 생각하기 전에 정하는 일이 있을 수 있어요. 하루 두고 보는 규칙이 도움이 될 수 있어요." },
   },
 };
 
@@ -53,6 +74,10 @@ export type ElementReading = {
   levelLabel: string;
   /** 이 기운이 무엇인지 */
   force: string;
+  /** 한눈에 보는 키워드 (예: 시작 · 성장 · 확장) */
+  keywords: string;
+  /** 이 수준(많음 · 적음 · 없음)일 때 관계 · 일 · 선택에서 나타날 수 있는 모습 — 보통이면 null (유료 리포트에서만) */
+  domains: ElementDomains | null;
   /** 내 원국에서 이 수준이 일상에서 어떻게 나타날 수 있는지 (보통이면 빈 문자열) */
   plain: string;
 };
@@ -125,6 +150,8 @@ export function plainSajuReading(saju: SajuOk): PlainReading {
       level,
       levelLabel: LEVEL_LABEL[level],
       force: e.force,
+      keywords: e.keywords,
+      domains: level === "many" ? e.manyDomains : level === "none" || level === "few" ? e.fewDomains : null,
       plain: level === "many" ? e.many : level === "none" || level === "few" ? e.few : "",
     };
   });
@@ -155,6 +182,6 @@ export function plainSajuReading(saju: SajuOk): PlainReading {
     elements,
     everyday,
     limits:
-      "전통 해석을 쉬운 말로 옮긴 것으로, 성격을 확정하지 않습니다. 오행 개수는 원국의 천간 · 지지 글자 기준이며(지장간 제외) 실제 모습은 환경과 시기에 따라 달라집니다.",
+      "전통 해석을 쉬운 말로 옮긴 것으로, 성격을 확정하지 않습니다. 오행 개수는 해석의 한 요소일 뿐이고(원국의 천간 · 지지 글자 기준, 지장간 제외) 개수만 보고 성격을 정하지 않습니다. 실제 모습은 환경과 시기에 따라 달라지며, 응답이나 알려 주신 고민으로 원국 계산을 바꾸지 않습니다.",
   };
 }

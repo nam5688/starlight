@@ -3,6 +3,7 @@
 
 import { mbtiModule, relationshipModule, temperamentModule } from "../assessment/modules/index.ts";
 import { buildReportExtras } from "../report/extras.ts";
+import { buildFreeInsight } from "../report/free-insight.ts";
 import { toAxisRows, toScoreRows } from "../report/rows.ts";
 import type { FullReport } from "../report/types.ts";
 import { sajuSection } from "../saju/display.ts";
@@ -24,6 +25,8 @@ export const sampleReport: FullReport = {
   knownMbti: "INFJ",
   tendency: { id: "reassurance", name: "확인추구형" },
   oneLiner: "관계가 불확실할 때, 상대의 반응을 확인하려는 편입니다.",
+  // 가상 인물의 가상 응답(연락 · 마음 확인 문항에 '그렇다', 작은 오해 문항에 '아니다')으로 같은 규칙을 거쳐 만든 문단
+  insight: buildFreeInsight({ r1: 5, r2: 4, r3: 2 }, "reassurance") ?? undefined,
   core: {
     comfortableEnvironment: "기대하는 것과 일정이 미리 공유되고, 연락 주기가 일정한 관계와 환경",
     repeatedReaction: "상대의 답이 늦거나 반응이 달라지면 이유를 여러 가지로 추측하고 다시 확인하려 합니다.",
