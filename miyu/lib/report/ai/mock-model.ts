@@ -44,13 +44,28 @@ export function composeMockDraft(userMessage: string): ReportDraftV2 {
       ],
     };
   });
-  const timeline = periods.map((p) => ({
-    period: p.period!.label,
-    theme: `[모의 생성] ${p.period!.label}의 주제 — ${p.cue}`,
-    opportunity: `${p.period!.label}에 살릴 점을 실제 AI가 근거로 정리합니다.`,
-    caution: `${p.period!.label}에 살펴볼 점을 실제 AI가 근거로 정리합니다.`,
-    evidence: [p.id],
-  }));
+  // 형식 검사는 같은 문장의 반복을 막는다. 시기마다 설명(cue)에 같은 문장이 들어 있을 수 있으므로, 이미 쓴 문장은 빼고 붙인다
+  const seenSentences = new Set<string>();
+  const freshCue = (cue: string) =>
+    cue
+      .split(/(?<=[.!?])\s+/)
+      .filter((sentence) => {
+        const key = sentence.replace(/[^\p{L}\p{N}]/gu, "");
+        if (seenSentences.has(key)) return false;
+        seenSentences.add(key);
+        return true;
+      })
+      .join(" ");
+  const timeline = periods.map((p) => {
+    const cue = freshCue(p.cue);
+    return {
+      period: p.period!.label,
+      theme: cue ? `[모의 생성] ${p.period!.label}의 주제 — ${cue}` : `[모의 생성] ${p.period!.label}의 주제를 실제 AI가 근거로 정리합니다.`,
+      opportunity: `${p.period!.label}에 살릴 점을 실제 AI가 근거로 정리합니다.`,
+      caution: `${p.period!.label}에 살펴볼 점을 실제 AI가 근거로 정리합니다.`,
+      evidence: [p.id],
+    };
+  });
   const differences =
     survey.length && saju.length
       ? [{ text: `[모의 생성] 원국의 ${saju[saju.length - 1].fact}와 응답의 ${survey[survey.length - 1].fact}가 상황에 따라 다르게 나타날 수 있습니다.`, evidence: [saju[saju.length - 1].id, survey[survey.length - 1].id] }]

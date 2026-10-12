@@ -3,6 +3,7 @@
 // 실행: node scripts/render-assessment-draft.ts   (miyu 폴더에서)
 import { writeFileSync } from "node:fs";
 import { DOMAIN_LABEL, DRAFT_CONTENT_VERSION, DRAFT_ITEMS, DRAFT_SCORING_VERSION, indicatorCounts, MANY_SKIPPED, MIN_INDICATORS, NA_OPTION_TEXT, PERSPECTIVES, PERSPECTIVE_IDS, type Domain, type PerspectiveId, type Weights } from "../lib/assessment/drafts/situational-draft.ts";
+import { summarizeReliability } from "../lib/assessment/drafts/reliability-summary.ts";
 
 const SHORT: Record<PerspectiveId, string> = { T1: "새로움", T2: "대비", T3: "감정 크기", T4: "주변 반응", T5: "꾸준함", C1: "방향", C2: "조절", C3: "맞춤", C4: "의미", R1: "확인", R2: "혼자 시간", R3: "말 꺼내는 속도", R4: "표현" };
 const ARROW: Record<string, string> = { "2": "↑↑", "1": "↑", "-1": "↓", "-2": "↓↓" };
@@ -42,10 +43,17 @@ ${rows}
 `;
 }).join("\n");
 
+const sim = summarizeReliability();
+const pctOf = (x: number) => `${Math.round(x * 100)}%`;
+const simMid = sim.levels.find((l) => l.name === "보통")!.report;
+const simHigh = sim.levels.find((l) => l.name === "높음")!.report;
+
 const doc = `# 미유 자체 성향 질문 설계 v1 (초안 — 검토 전)
 
 - 상태: **초안 ${DRAFT_CONTENT_VERSION}** · 채점 규칙 ${DRAFT_SCORING_VERSION}. **실제 검사 화면에는 적용하지 않았다.** 이 문서를 검토한 뒤 적용한다.
 - 코드: \`lib/assessment/drafts/situational-draft.ts\`(문항 · 점수 방향 · 채점) · \`situational-draft.test.ts\`(구조 · 균형 · 채점 검사). 이 문서의 표는 \`node scripts/render-assessment-draft.ts\`로 코드에서 만든다.
+- **검토 화면:** 이 문서를 읽는 대신 \`docs/assessment-review.html\`을 열면 30문항 · 선택지 · 선택지별 점수 방향 · 채점 예시 · 부족한 점을 한 화면에서 보고 문항마다 표시할 수 있다 (\`node scripts/render-assessment-review.ts\`로 코드에서 만든다).
+- **한계 점검:** \`docs/assessment-reliability-sim.md\` — 30문항 · 13관점이 얼마나 안정적으로 읽히는지 가상 응답으로 계산했다 (실제 사람의 응답이 아니다). 결론: **관점별 방향과 정도만 읽는다.** 12유형 이름 · 점수의 작은 차이 · "상황에 따라 다름" 판정은 쓰지 않는다.
 - 이름: 화면에서는 **"미유 성향 질문"**이라고 부른다. 공식 MBTI · TCI · 애착검사나 임상 · 정신건강 검사가 아니며, 그렇게 소개하지 않는다. 검증된 심리검사라고 쓰지 않는다.
 
 ## 0. 먼저 알아둘 것
@@ -118,6 +126,7 @@ ${itemBlocks}
 
 - \`docs/tendency-types-v2.md\`의 12유형은 **후보**다. 이 질문 초안은 그 12유형이 쓰는 7개 관점에 각각 4~6개 지표를 준다. 그래도 실제로 구분되는지는 시범 응답으로 확인하기 전에는 알 수 없다.
 - 시범 응답에서 확인할 것 (\`tendency-v2.md\` 8-3): 유형별 3~15% · 쏠림 없음 15% 이하 · 경계 30% 이하 · 2주 뒤 재응답에서 주된 · 보조 유형 안에 다시 나오는 비율 · 같은 유형 두 사람의 리포트 문장 겹침.
+- **가상 응답 점검 결과 (\`assessment-reliability-sim.md\`):** 7개 관점의 높음/낮음이 두 번 모두 같게 나오는 사람은 응답 일관성이 보통일 때 약 ${pctOf(simMid.sevenSignAll)}, 높을 때 약 ${pctOf(simHigh.sevenSignAll)}뿐이다. 이름 하나로 요약하면 같은 사람이 다시 답했을 때 다른 이름이 나올 가능성이 크므로, 12유형은 이 문항으로 확정하지 않는다. 억지로 맞추지 않고, 쓰더라도 주된 유형 + 보조 경향으로 둔다.
 - 기준에 못 미치는 유형은 합치거나 따로 두지 않는다 (예: 준비탐색형이 3% 미만이면 11개로).
 - 점수가 비슷하면 어느 유형도 우선하지 않고 **경계(혼합 경향)**로 보여 준다.
 
@@ -126,7 +135,7 @@ ${itemBlocks}
 | 경우 | 처리 |
 | --- | --- |
 | 그런 경험이 없다 | "해당 없음" — 점수에 넣지 않는다. 관점의 응답이 ${MIN_INDICATORS}개 미만이 되면 그 관점은 판단 보류 |
-| 상황에 따라 너무 다르다 | 같은 선택지를 쓴다. 그런 문항이 여럿이면 "상황에 따라 달라지는 편"으로 표시된다 |
+| 상황에 따라 너무 다르다 | 같은 선택지를 쓴다. **"상황에 따라 다름"을 사람마다 판정하지 않는다** — 가상 응답 점검에서 지금 규칙은 한결같은 응답자의 ${pctOf(sim.situational[0].falseFlag)}에도 붙고 상황에 따라 달라지는 응답자는 ${pctOf(sim.situational[0].detected)}만 잡아내 소음과 구분되지 않았다. 대신 리포트는 본인이 서로 다른 상황에서 다르게 답한 문항을 그대로 보여 준다 |
 | 어느 것도 아니다 | 가장 가까운 것을 고르게 하고, 시범 테스트에서 "어느 것도 아니었던 문항"을 따로 물어 문항을 고친다 |
 | 한쪽으로만 답함 | 같은 선택지 위치만 고르는 응답(예: 모두 첫 번째)을 시범 단계에서 따로 표시해 분석에서 제외 여부를 판단한다 |
 
@@ -160,7 +169,8 @@ ${itemBlocks}
 
 ## 10. 검토 요청
 
-1. **관점 13개가 적당한가** — 줄이고 싶은 관점이 있는지 (예: 표현 · 조절을 다른 관점에 합칠지).
+0. **검토 방법:** \`docs/assessment-review.html\`을 열어 문항마다 괜찮음 · 고쳐야 함 · 빼기를 표시하고 "검토 메모" 탭의 글을 복사해 전달한다.
+1. **관점 13개가 적당한가** — 줄이고 싶은 관점이 있는지 (예: 표현 · 조절을 다른 관점에 합칠지). 한계 점검 결과 읽는 범위를 정해 달라: **A. 30문항 유지 + 관점별 방향 · 정도만 읽고 시범 응답부터(추천)** · B. 36~40문항으로 늘림 · C. 관점을 9~10개로 줄임 (\`assessment-reliability-sim.md\` 4장).
 2. **문항 문장 · 선택지** — 어색하거나 내 상황과 맞지 않는 문항, 선택지에 없는 답.
 3. **예상 소요 시간 8~10분이 괜찮은지** — 길면 24문항으로 줄이고 관점당 지표 4개를 유지하도록 다시 배분한다.
 4. 승인 후 적용 순서: 검사 화면에 새 문항 연결 → 시범 응답 수집(200명 이상 권장) → 기준값 조정 → 무료 요약 · 리포트 근거 연결 → 12유형 확정.

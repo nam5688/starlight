@@ -444,6 +444,21 @@ export const CLEAR_DISTANCE = 20;
 export const SLIGHT_DISTANCE = 10;
 /** 문항별 기여값의 표준편차가 이 값 이상이고 양쪽 방향이 모두 뚜렷하면 "상황에 따라 다름" */
 export const SITUATIONAL_SPREAD = 0.7;
+/** 위 · 아래 방향(±0.5 이상)이 각각 이 수 이상 있어야 한다 */
+export const SITUATIONAL_MIN_EACH = 1;
+
+export type SituationalRule = { spread: number; minEach: number };
+export const SITUATIONAL_RULE: SituationalRule = { spread: SITUATIONAL_SPREAD, minEach: SITUATIONAL_MIN_EACH };
+
+/** 문항별 기여값이 양쪽으로 크게 갈렸는가. 규칙은 시범 응답으로 다시 맞춘다 (reliability-sim.ts: 지금 규칙은 소음에도 자주 켜진다) */
+export function isSituational(values: number[], rule: SituationalRule = SITUATIONAL_RULE): boolean {
+  if (values.length === 0) return false;
+  const mean = values.reduce((n, v) => n + v, 0) / values.length;
+  const sd = Math.sqrt(values.reduce((n, v) => n + (v - mean) ** 2, 0) / values.length);
+  const strongUp = values.filter((v) => v >= 0.5).length;
+  const strongDown = values.filter((v) => v <= -0.5).length;
+  return sd >= rule.spread && strongUp >= rule.minEach && strongDown >= rule.minEach;
+}
 
 /**
  * 문항 하나가 한 관점에 주는 기여값(−1~1). 그 문항의 선택지 네 개를 같은 확률로 고르는 사람이 0이 되도록 맞춘다
@@ -476,18 +491,15 @@ export function scoreDraft(answers: DraftAnswers): { perspectives: Record<Perspe
       continue;
     }
     const mean = values.reduce((n, v) => n + v, 0) / values.length;
-    const sd = Math.sqrt(values.reduce((n, v) => n + (v - mean) ** 2, 0) / values.length);
     const score = Math.round(50 + 50 * mean);
     const distance = Math.abs(score - 50);
     const strength: Strength = distance >= CLEAR_DISTANCE ? "clear" : distance >= SLIGHT_DISTANCE ? "slight" : "even";
-    const strongUp = values.filter((v) => v >= 0.5).length;
-    const strongDown = values.filter((v) => v <= -0.5).length;
     perspectives[p] = {
       status: "ok",
       score,
       strength,
       direction: strength === "even" ? "even" : score > 50 ? "high" : "low",
-      situational: sd >= SITUATIONAL_SPREAD && strongUp >= 1 && strongDown >= 1,
+      situational: isSituational(values),
       answered: values.length,
     };
   }

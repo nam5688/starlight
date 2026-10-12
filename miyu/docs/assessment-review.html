@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>미유 성향 질문 검토</title>
+<style>
+:root{--bg:#ffffff;--mist:#f5f6f8;--line:#e2e5e9;--line-strong:#c9ced5;--ink:#1d2125;--ink-2:#464d55;--ink-3:#5f666e;--accent:#1e4b8f;--accent-strong:#163a70;--accent-soft:#edf2f9;--danger:#b3261e;--danger-soft:#fbeeed;--font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--mist:#1b1f24;--line:#2b3138;--line-strong:#3c444d;--ink:#e8eaed;--ink-2:#c3c8ce;--ink-3:#9aa1a9;--accent:#8fb3e6;--accent-strong:#b3cdf0;--accent-soft:#1c2736;--danger:#f0988f;--danger-soft:#33201f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171a;--mist:#1b1f24;--line:#2b3138;--line-strong:#3c444d;--ink:#e8eaed;--ink-2:#c3c8ce;--ink-3:#9aa1a9;--accent:#8fb3e6;--accent-strong:#b3cdf0;--accent-soft:#1c2736;--danger:#f0988f;--danger-soft:#33201f;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:4.5rem}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.65;word-break:keep-all;overflow-wrap:break-word}
+[hidden]{display:none!important}
+.wrap{max-width:62rem;margin-inline:auto;padding-inline:16px;padding-block:20px 56px}
+h1{font-size:1.5rem;line-height:1.3;margin:0 0 6px;text-wrap:balance}
+h2{font-size:1.15rem;line-height:1.4;margin:32px 0 10px;padding-top:18px;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-size:1rem;margin:0 0 8px}
+p,li{text-wrap:pretty}
+.sub{margin:0;color:var(--ink-2)}
+.status{margin:12px 0 0;padding:10px 12px;background:var(--mist);border-left:3px solid var(--accent);color:var(--ink-2);font-size:.9rem}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;gap:2px;margin:18px -16px 0;padding:0 16px;background:var(--bg);border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{appearance:none;border:0;background:none;color:var(--ink-3);font:inherit;font-weight:600;padding:12px 12px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{padding-top:4px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;margin-top:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{appearance:none;border:1px solid var(--line-strong);background:var(--bg);color:var(--ink-2);font:inherit;font-size:.88rem;padding:5px 12px;border-radius:4px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.switch{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--ink-2);cursor:pointer}
+.hint{margin:12px 0 0;color:var(--ink-2);font-size:.92rem}
+.group>h2 .count{font-weight:400;color:var(--ink-3);font-size:.9rem;margin-left:6px}
+.item{padding:18px 0;border-bottom:1px solid var(--line)}
+.item[data-mark="ok"]{box-shadow:inset 3px 0 0 var(--accent);padding-left:12px}
+.item[data-mark="fix"]{box-shadow:inset 3px 0 0 var(--danger);padding-left:12px}
+.item[data-mark="drop"]{box-shadow:inset 3px 0 0 var(--ink-3);padding-left:12px}
+.item-head{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.qid{font-weight:700;font-variant-numeric:tabular-nums}
+.topic{color:var(--ink-2)}
+.dom{font-size:.8rem;color:var(--ink-3);border:1px solid var(--line-strong);padding:0 6px;border-radius:3px}
+.touch{margin-left:auto;font-size:.82rem;color:var(--ink-3)}
+.pid{display:inline-block;min-width:1.9em;text-align:center;font-size:.78rem;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:0 5px;border-radius:3px;margin-right:4px;font-variant-numeric:tabular-nums}
+.stem{font-size:1.02rem;font-weight:600;margin:10px 0 6px}
+.purpose{margin:0 0 10px;font-size:.88rem;color:var(--ink-3)}
+.purpose b{color:var(--ink-2);margin-right:6px}
+.opts{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.opt{display:grid;grid-template-columns:1.8rem minmax(0,1fr);gap:8px;padding:10px 12px;background:var(--mist);border-radius:4px}
+.opt.na{background:none;border:1px dashed var(--line-strong)}
+.letter{font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
+.opt-text{margin:0}
+.na-note{margin:2px 0 0;font-size:.82rem;color:var(--ink-3)}
+.reading{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.reading li{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-size:.84rem;color:var(--ink-3)}
+.pname{color:var(--ink-2);font-weight:600}
+.side{font-weight:700}
+.side.up{color:var(--accent)}
+.side.down{color:var(--ink-2)}
+.sidetext{order:3;flex-basis:100%;padding-left:2.4em}
+.contrib{margin-left:auto;font-variant-numeric:tabular-nums;order:2}
+.review{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:12px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:4px;overflow:hidden}
+.seg button{appearance:none;border:0;border-right:1px solid var(--line-strong);background:var(--bg);color:var(--ink-2);font:inherit;font-size:.88rem;padding:6px 12px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"][data-mark="ok"]{background:var(--accent);color:var(--bg)}
+.seg button[aria-pressed="true"][data-mark="fix"]{background:var(--danger);color:var(--bg)}
+.seg button[aria-pressed="true"][data-mark="drop"]{background:var(--ink-3);color:var(--bg)}
+.note-label{font-size:.84rem;color:var(--ink-3)}
+.note{flex:1 1 14rem;min-width:0;font:inherit;font-size:.9rem;padding:6px 8px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink)}
+textarea{width:100%;font:inherit;font-size:.9rem;padding:8px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);resize:vertical}
+body.respondent .analyst{display:none}
+.tablewrap{overflow-x:auto;margin:8px 0}
+.tablewrap.narrow{max-width:30rem}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-size:.82rem;color:var(--ink-3);font-weight:600;border-bottom:1px solid var(--line-strong);background:var(--mist)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.sum td{border-top:1px solid var(--line-strong);font-weight:600}
+tr.rec td{background:var(--accent-soft)}
+table.views{min-width:44rem}
+table.choices{min-width:40rem}
+.small{font-size:.84rem;color:var(--ink-3)}
+.lead{font-size:1.05rem;margin:6px 0}
+.notice{margin:16px 0 0;padding:12px 14px;border:1px solid var(--danger);background:var(--danger-soft);border-radius:4px;font-size:.92rem}
+.steps,.rules{margin:8px 0;padding-left:1.3rem;display:grid;gap:8px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:18px}
+details{margin:8px 0}
+summary{cursor:pointer;color:var(--accent);font-weight:600;padding:4px 0}
+code{font-size:.85em;background:var(--mist);padding:1px 5px;border-radius:3px}
+.summary{margin:12px 0;padding:12px 14px;background:var(--mist);border-radius:4px;font-size:.92rem}
+.summary p{margin:2px 0}
+fieldset.choice{margin:14px 0;padding:10px 12px;border:1px solid var(--line-strong);border-radius:4px;display:grid;gap:6px}
+fieldset.choice legend{font-size:.84rem;color:var(--ink-3);padding:0 6px}
+fieldset.choice label{display:flex;gap:8px;align-items:flex-start;font-size:.92rem}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:12px 0}
+.actions button{appearance:none;font:inherit;font-size:.92rem;padding:8px 16px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink-2);cursor:pointer}
+.actions button.primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:700}
+@media (min-width:900px){
+  .opt{grid-template-columns:1.8rem minmax(0,1fr)}
+  .opt-body{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:6px 18px;align-items:start}
+  .reading{margin:0}
+  .na-note{margin:0}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>미유 성향 질문 검토</h1>
+  <p class="sub">기질 · 성격 · 가까운 관계를 영역별로 따로 보는 상황형 30문항 (초안)</p>
+  <p class="status"><b>초안 · 검토 전 · 검사 화면에 적용하지 않았습니다.</b> 공식 MBTI · TCI · 애착검사의 문항을 가져오지 않고 새로 썼습니다. 결과는 "지금 응답에서 나타난 경향"이며 진단이나 평생 유형이 아닙니다. 문항 situational-0.1-draft · 채점 situational-scoring-0.1-draft</p>
+</header>
+<nav class="tabs" role="tablist" aria-label="검토 화면">
+  <button type="button" class="tab" role="tab" data-tab="items" aria-selected="true">문항 30개</button>
+  <button type="button" class="tab" role="tab" data-tab="scoring" aria-selected="false">채점 방식</button>
+  <button type="button" class="tab" role="tab" data-tab="views" aria-selected="false">관점 13개</button>
+  <button type="button" class="tab" role="tab" data-tab="limits" aria-selected="false">부족한 점</button>
+  <button type="button" class="tab" role="tab" data-tab="memo" aria-selected="false">검토 메모</button>
+</nav>
+<section class="panel" id="panel-items"><div class="toolbar">
+  <div class="chips" role="group" aria-label="영역 보기">
+    <button type="button" class="chip" data-filter="all" aria-pressed="true">전체 30</button>
+    <button type="button" class="chip" data-filter="temperament" aria-pressed="false">기질 11</button><button type="button" class="chip" data-filter="character" aria-pressed="false">성격 10</button><button type="button" class="chip" data-filter="relation" aria-pressed="false">관계 9</button>
+    <button type="button" class="chip" data-filter="todo" aria-pressed="false">안 본 것 <span id="todo-count">30</span></button>
+    <button type="button" class="chip" data-filter="flag" aria-pressed="false">고칠 것 · 뺄 것 <span id="flag-count">0</span></button>
+  </div>
+  <label class="switch"><input type="checkbox" id="respondent-view"> <span>응답자 화면처럼 보기 (점수 방향 숨김)</span></label>
+</div>
+<p class="hint">각 문항을 읽고 <b>괜찮음 · 고쳐야 함 · 빼기</b> 중 하나를 누르고, 필요하면 한 줄 메모를 적어 주세요. 표시는 이 브라우저에만 저장되고, <b>검토 메모</b> 탭에서 글로 모아 채팅에 붙여넣을 수 있습니다. 선택지 아래의 <b>점수 방향</b>은 운영자 설명용이며 응답자에게는 보이지 않습니다.</p>
+<section class="group" data-group="temperament"><h2>기질적 경향 <span class="count">11문항</span></h2><article class="item" id="item-Q01" data-id="Q01" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q01</span><span class="topic">즉흥 제안</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="새로움에 끌리는 정도">T1</span><span class="pid" title="불확실함에 대비하는 정도">T2</span></span></header>
+  <p class="stem">금요일 저녁, 친구가 &quot;내일 처음 가 보는 곳으로 당일치기 어때?&quot;라고 합니다. 가장 먼저 하는 행동에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 새로운 제안에 먼저 끌리는지, 준비부터 하는지 (새로움 · 대비)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">일단 가자고 하고, 세부 계획은 가면서 정한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">일단 부딪혀 보고 생기면 대처한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">가고 싶긴 한데 교통 · 날씨 · 비용부터 찾아본다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">이번엔 쉬고 싶다고 하고, 다음에 평소 가던 곳을 제안한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">하루 일정이 어떻게 되는지 먼저 물어보고, 정해진 만큼만 간다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.33</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q01 검토">
+    <div class="seg" data-id="Q01">
+      <button type="button" data-mark="ok" id="mark-Q01-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q01-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q01-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q01">한 줄 메모</label>
+    <input class="note" id="note-Q01" data-id="Q01" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q02" data-id="Q02" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q02</span><span class="topic">새 도구 도입</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="새로움에 끌리는 정도">T1</span><span class="pid" title="불확실함에 대비하는 정도">T2</span></span></header>
+  <p class="stem">팀에서 쓰던 업무 도구를 바꿀 수 있다고 합니다. 새 도구는 평이 좋지만 아직 아무도 써 보지 않았습니다. 먼저 떠오르는 생각은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 변화 앞의 첫 판단 (새로움 · 대비)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">나 혼자 시범으로 써 보고 괜찮으면 팀에 알린다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">지금 도구로 불편한 점이 구체적으로 무엇인지부터 따진다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">쓰던 걸로 충분하다. 바꾸는 데 드는 시간이 아깝다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">써 보면서 맞는지 보자. 안 맞으면 되돌리면 된다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">일단 부딪혀 보고 생기면 대처한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q02 검토">
+    <div class="seg" data-id="Q02">
+      <button type="button" data-mark="ok" id="mark-Q02-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q02-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q02-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q02">한 줄 메모</label>
+    <input class="note" id="note-Q02" data-id="Q02" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q03" data-id="Q03" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q03</span><span class="topic">반응 없는 장기 프로젝트</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="주변 반응에 움직이는 정도">T4</span><span class="pid" title="끝까지 이어가는 정도">T5</span></span></header>
+  <p class="stem">6개월 걸리는 개인 프로젝트를 시작했는데 3개월째 주변 반응이 거의 없습니다. 이때 가장 가까운 모습은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 동기가 안에서 오는지 밖에서 오는지, 반응 없이 이어 가는지 (꾸준함 · 주변 반응)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">방식을 바꾸거나 일부를 덜어 내서라도 계속 이어 간다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">재미가 줄어도 정한 것을 이어 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.33</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">흥미가 줄면 잠시 두고 다른 일을 하다가, 마음이 돌아오면 다시 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">흥미가 식으면 멈추거나 옮긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">반응과 상관없이 정한 분량을 계속 채운다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">재미가 줄어도 정한 것을 이어 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.78</span></li><li><span class="pid">T4</span><span class="pname">주변 반응에 움직이는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">주변 반응과 상관없이 내 속도로 한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.71</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">누군가에게 중간 결과를 보여 주고 반응을 받으면 속도가 붙는다</p><div class="analyst"><ul class="reading"><li><span class="pid">T4</span><span class="pname">주변 반응에 움직이는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">주변의 반응 · 인정이 의욕과 방향을 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q03 검토">
+    <div class="seg" data-id="Q03">
+      <button type="button" data-mark="ok" id="mark-Q03-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q03-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q03-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q03">한 줄 메모</label>
+    <input class="note" id="note-Q03" data-id="Q03" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q04" data-id="Q04" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q04</span><span class="topic">약속 장소가 닫힘</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="감정이 올라오는 크기">T3</span><span class="pid" title="상대에게 맞추는 정도">C3</span></span></header>
+  <p class="stem">중요한 약속 당일, 예약한 곳이 갑자기 문을 닫았다는 연락을 받았습니다. 첫 몇 분 동안 가장 가까운 상태는?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 계획이 어긋났을 때 감정이 움직이는 모양 (감정 반응 · 상대 맞춤)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">일단 상대에게 상황을 알리고 같이 정하자고 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">당황스럽고 마음이 한동안 가라앉지 않는다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">잠깐 짜증이 나지만 곧 다른 곳을 찾기 시작한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">별로 흔들리지 않고 바로 대안을 정한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q04 검토">
+    <div class="seg" data-id="Q04">
+      <button type="button" data-mark="ok" id="mark-Q04-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q04-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q04-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q04">한 줄 메모</label>
+    <input class="note" id="note-Q04" data-id="Q04" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q05" data-id="Q05" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q05</span><span class="topic">낯선 사람이 많은 모임</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="새로움에 끌리는 정도">T1</span><span class="pid" title="불확실함에 대비하는 정도">T2</span></span></header>
+  <p class="stem">아는 사람이 거의 없는 모임에 초대받았습니다. 가기 전 마음에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 낯선 자리에 대한 첫 반응 (새로움 · 대비)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">새로운 사람을 만날 수 있어 기대된다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">일단 부딪혀 보고 생기면 대처한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">누가 오는지, 어떤 분위기인지 먼저 알아보고 간다</p><div class="analyst"><ul class="reading"><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">아는 사람 한 명이라도 같이 갈 수 있으면 가겠다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.33</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.33</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">꼭 가야 하는 자리가 아니라면 빠지는 편이다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.78</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q05 검토">
+    <div class="seg" data-id="Q05">
+      <button type="button" data-mark="ok" id="mark-Q05-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q05-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q05-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q05">한 줄 메모</label>
+    <input class="note" id="note-Q05" data-id="Q05" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q06" data-id="Q06" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q06</span><span class="topic">사람들 앞에서 받은 지적</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="감정이 올라오는 크기">T3</span><span class="pid" title="주변 반응에 움직이는 정도">T4</span><span class="pid" title="행동을 늦춰 고르는 정도">C2</span></span></header>
+  <p class="stem">내가 한 일에 대해 동료가 여러 사람 앞에서 아쉬운 점을 지적했습니다. 그날 저녁의 모습에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 비판 앞에서 감정과 행동이 나오는 모양 (감정 반응 · 주변 반응 · 행동 조절)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">다음에는 인정받을 수 있게 어떻게 고칠지부터 생각한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T4</span><span class="pname">주변 반응에 움직이는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">주변의 반응 · 인정이 의욕과 방향을 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">맞는 지적인지 내용만 따져 보고, 감정은 금세 지나간다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">T4</span><span class="pname">주변 반응에 움직이는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">주변 반응과 상관없이 내 속도로 한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.71</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">그 자리에서 바로 맞받아 말했고, 나중에 말이 지나쳤나 생각한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.33</span></li><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">느끼는 즉시 말하고 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">계속 곱씹으며 그때 한 말과 표정이 떠오른다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.78</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q06 검토">
+    <div class="seg" data-id="Q06">
+      <button type="button" data-mark="ok" id="mark-Q06-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q06-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q06-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q06">한 줄 메모</label>
+    <input class="note" id="note-Q06" data-id="Q06" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q07" data-id="Q07" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q07</span><span class="topic">지루한 반복 업무</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="끝까지 이어가는 정도">T5</span><span class="pid" title="행동을 늦춰 고르는 정도">C2</span></span></header>
+  <p class="stem">사흘 동안 같은 형식의 문서를 100건 정리해야 하는 일을 맡았습니다. 일하는 방식에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 지루함을 견디는 방식 (꾸준함 · 행동 조절)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">더 쉬운 방법이나 자동화할 길이 없는지 찾는 데 먼저 시간을 쓴다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">흥미가 식으면 멈추거나 옮긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">마감 전날까지 미루다가 몰아서 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">느끼는 즉시 말하고 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">하루 분량을 정해 두고 순서대로 끝까지 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">재미가 줄어도 정한 것을 이어 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">느낀 즉시 움직이지 않고 한 박자 쉰 뒤 고른다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">지루해서 중간에 다른 일을 끼워 가며 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">흥미가 식으면 멈추거나 옮긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">느끼는 즉시 말하고 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.33</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q07 검토">
+    <div class="seg" data-id="Q07">
+      <button type="button" data-mark="ok" id="mark-Q07-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q07-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q07-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q07">한 줄 메모</label>
+    <input class="note" id="note-Q07" data-id="Q07" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q08" data-id="Q08" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q08</span><span class="topic">큰 구매 전</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불확실함에 대비하는 정도">T2</span><span class="pid" title="주변 반응에 움직이는 정도">T4</span></span></header>
+  <p class="stem">150만 원쯤 하는 물건을 사기로 마음먹었습니다. 결정하기까지의 모습에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 큰 결정 앞의 준비 방식과 기준 (대비 · 주변 반응)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">주변 사람들이 쓰는 것, 평이 좋은 것을 따라 산다</p><div class="analyst"><ul class="reading"><li><span class="pid">T4</span><span class="pname">주변 반응에 움직이는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">주변의 반응 · 인정이 의욕과 방향을 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">일단 부딪혀 보고 생기면 대처한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">후기와 가격 비교를 오래 하고, 그래도 불안해서 한 번 더 확인한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">필요한 기능만 정리해 두세 개로 좁히고 그날 정한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">내 마음에 들면 남들이 잘 안 쓰는 것도 바로 산다</p><div class="analyst"><ul class="reading"><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">일단 부딪혀 보고 생기면 대처한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">T4</span><span class="pname">주변 반응에 움직이는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">주변 반응과 상관없이 내 속도로 한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.71</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q08 검토">
+    <div class="seg" data-id="Q08">
+      <button type="button" data-mark="ok" id="mark-Q08-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q08-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q08-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q08">한 줄 메모</label>
+    <input class="note" id="note-Q08" data-id="Q08" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q09" data-id="Q09" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q09</span><span class="topic">사소한 일이 연달아 어긋난 아침</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="감정이 올라오는 크기">T3</span></span></header>
+  <p class="stem">출근길에 버스를 놓치고 커피를 쏟는 등 사소한 일이 연달아 어긋났습니다. 그날 기분은 어떻게 흘러가는 편인가요?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 사소한 어긋남이 하루 감정에 미치는 영향 (감정 반응)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">오전 내내 기분이 가라앉고 다른 일에도 영향이 간다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">속상하지만 점심쯤이면 많이 풀린다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">그런 일이 있었구나 하고 금방 잊는다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">기분은 괜찮은데 몸이 피곤해져 일찍 쉬고 싶어진다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q09 검토">
+    <div class="seg" data-id="Q09">
+      <button type="button" data-mark="ok" id="mark-Q09-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q09-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q09-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q09">한 줄 메모</label>
+    <input class="note" id="note-Q09" data-id="Q09" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q10" data-id="Q10" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q10</span><span class="topic">새 취미의 흥미가 식음</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="새로움에 끌리는 정도">T1</span><span class="pid" title="끝까지 이어가는 정도">T5</span></span></header>
+  <p class="stem">한 달 전에 시작한 새 취미가 요즘 처음만큼 재미있지 않습니다. 앞으로의 모습에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 흥미가 식을 때 이어 가는지 옮기는지 (꾸준함 · 새로움)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">방법이나 도구를 바꿔서 흥미를 되살려 본다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">재미가 줄어도 정한 것을 이어 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">흥미가 식었으니 접고, 다른 새로운 것을 찾아본다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">흥미가 식으면 멈추거나 옮긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">가끔 생각날 때만 하고, 억지로 이어 가지는 않는다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">흥미가 식으면 멈추거나 옮긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">재미가 없어도 일정 수준까지는 계속해 본다</p><div class="analyst"><ul class="reading"><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">재미가 줄어도 정한 것을 이어 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q10 검토">
+    <div class="seg" data-id="Q10">
+      <button type="button" data-mark="ok" id="mark-Q10-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q10-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q10-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q10">한 줄 메모</label>
+    <input class="note" id="note-Q10" data-id="Q10" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q11" data-id="Q11" data-domain="temperament">
+  <header class="item-head"><span class="qid">Q11</span><span class="topic">위험이 있는 제안</span><span class="dom dom-temperament">기질</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="새로움에 끌리는 정도">T1</span><span class="pid" title="불확실함에 대비하는 정도">T2</span><span class="pid" title="의미 · 이유를 기준으로 고르는 정도">C4</span></span></header>
+  <p class="stem">아는 사람이 &quot;성공하면 크지만 실패할 수도 있는&quot; 새 사업을 같이 하자고 합니다. 먼저 하는 행동에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 위험이 있는 제안 앞의 첫 판단 (새로움 · 대비 · 의미)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">내가 잘 아는 분야가 아니면 정중히 거절한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">익숙한 방식 · 검증된 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.71</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.33</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">돈보다, 그 일이 내가 하고 싶은 일인지부터 따져 본다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">납득되는 이유 · 의미 · 가치가 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">성공했을 때의 모습을 먼저 그려 보고 관심이 커진다</p><div class="analyst"><ul class="reading"><li><span class="pid">T1</span><span class="pname">새로움에 끌리는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">새로운 것 · 낯선 것에 먼저 끌린다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">일단 부딪혀 보고 생기면 대처한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">최악의 경우 얼마를 잃는지부터 계산한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q11 검토">
+    <div class="seg" data-id="Q11">
+      <button type="button" data-mark="ok" id="mark-Q11-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q11-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q11-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q11">한 줄 메모</label>
+    <input class="note" id="note-Q11" data-id="Q11" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article></section><section class="group" data-group="character"><h2>성격적 경향 <span class="count">10문항</span></h2><article class="item" id="item-Q12" data-id="Q12" data-domain="character">
+  <header class="item-head"><span class="qid">Q12</span><span class="topic">모임 장소 정하기</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="스스로 방향을 세우는 정도">C1</span><span class="pid" title="상대에게 맞추는 정도">C3</span></span></header>
+  <p class="stem">친구 다섯 명이 모이는데 장소를 아직 못 정했습니다. 단체 대화방이 조용합니다. 가장 가까운 행동은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 방향을 정하는 쪽인지 따르는 쪽인지, 내 의견과 상대 의견의 균형 (방향 · 상대 맞춤)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">다들 편한 곳이 어디인지 한 명씩 물어본다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">상황 · 다른 사람이 정하는 쪽에 맞춰 흘러간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">내가 후보 두 곳을 정해 올리고 의견을 모은다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">누가 정하겠지 하고 기다렸다가, 정해지면 맞춘다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">상황 · 다른 사람이 정하는 쪽에 맞춰 흘러간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">가고 싶은 곳이 있으면 분명히 말해서 그쪽으로 가자고 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q12 검토">
+    <div class="seg" data-id="Q12">
+      <button type="button" data-mark="ok" id="mark-Q12-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q12-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q12-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q12">한 줄 메모</label>
+    <input class="note" id="note-Q12" data-id="Q12" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q13" data-id="Q13" data-domain="character">
+  <header class="item-head"><span class="qid">Q13</span><span class="topic">회의에서 의견이 반박당함</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="주변 반응에 움직이는 정도">T4</span><span class="pid" title="스스로 방향을 세우는 정도">C1</span><span class="pid" title="상대에게 맞추는 정도">C3</span></span></header>
+  <p class="stem">회의에서 내가 낸 의견을 두 사람이 정면으로 반박했습니다. 그 뒤의 행동에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 반박 앞에서 방향을 지키는지 조정하는지 (방향 · 상대 맞춤 · 주변 반응)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">근거를 더 모아서 다음 회의에서 다시 이야기한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.78</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">반박한 사람과 따로 이야기해 접점을 찾는다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.33</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">다른 사람들이 어떻게 받아들였는지가 신경 쓰여 분위기를 살핀다</p><div class="analyst"><ul class="reading"><li><span class="pid">T4</span><span class="pname">주변 반응에 움직이는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">주변의 반응 · 인정이 의욕과 방향을 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">내 의견을 접고 다수 의견에 맞춘다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">상황 · 다른 사람이 정하는 쪽에 맞춰 흘러간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q13 검토">
+    <div class="seg" data-id="Q13">
+      <button type="button" data-mark="ok" id="mark-Q13-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q13-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q13-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q13">한 줄 메모</label>
+    <input class="note" id="note-Q13" data-id="Q13" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q14" data-id="Q14" data-domain="character">
+  <header class="item-head"><span class="qid">Q14</span><span class="topic">마감 앞의 충동</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="스스로 방향을 세우는 정도">C1</span><span class="pid" title="행동을 늦춰 고르는 정도">C2</span></span></header>
+  <p class="stem">내일 마감인 일이 남았는데, 갑자기 오래 미뤄 둔 방 정리가 하고 싶어졌습니다. 어떻게 하는 편인가요?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 하고 싶은 마음과 해야 하는 일 사이의 조절 (행동 조절 · 방향)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">하고 싶을 때 하는 게 효율적이라 정리부터 하고, 밤에 일을 몰아서 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">느끼는 즉시 말하고 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">정리를 20분만 하고 일로 돌아오기로 정해 두고 시작한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">느낀 즉시 움직이지 않고 한 박자 쉰 뒤 고른다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">마음이 안 잡히니 오늘은 정리로 보내고, 마감은 양해를 구한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">느끼는 즉시 말하고 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">상황 · 다른 사람이 정하는 쪽에 맞춰 흘러간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">일부터 끝내고 정리는 그 뒤로 미룬다</p><div class="analyst"><ul class="reading"><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">느낀 즉시 움직이지 않고 한 박자 쉰 뒤 고른다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q14 검토">
+    <div class="seg" data-id="Q14">
+      <button type="button" data-mark="ok" id="mark-Q14-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q14-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q14-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q14">한 줄 메모</label>
+    <input class="note" id="note-Q14" data-id="Q14" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q15" data-id="Q15" data-domain="character">
+  <header class="item-head"><span class="qid">Q15</span><span class="topic">새해 목표</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="끝까지 이어가는 정도">T5</span><span class="pid" title="스스로 방향을 세우는 정도">C1</span></span></header>
+  <p class="stem">새해를 맞아 올해 이루고 싶은 것을 정하려고 합니다. 가장 가까운 방식은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 목표를 세우고 이어 가는 방식 (방향 · 꾸준함)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">정해도 어차피 바뀌니 생기는 일에 맞춰 흘러가는 편이다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">상황 · 다른 사람이 정하는 쪽에 맞춰 흘러간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">정해도 두세 달이면 흐지부지돼서 크게 기대하지 않는다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">상황 · 다른 사람이 정하는 쪽에 맞춰 흘러간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">흥미가 식으면 멈추거나 옮긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">구체적인 목표와 단계, 날짜까지 적어 둔다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">재미가 줄어도 정한 것을 이어 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">큰 방향만 정하고, 세부는 상황을 보며 정한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C1</span><span class="pname">스스로 방향을 세우는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">목표와 계획을 스스로 세우고 끌고 간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">T5</span><span class="pname">끝까지 이어가는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">흥미가 식으면 멈추거나 옮긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.33</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q15 검토">
+    <div class="seg" data-id="Q15">
+      <button type="button" data-mark="ok" id="mark-Q15-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q15-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q15-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q15">한 줄 메모</label>
+    <input class="note" id="note-Q15" data-id="Q15" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q16" data-id="Q16" data-domain="character">
+  <header class="item-head"><span class="qid">Q16</span><span class="topic">화가 나는 메시지</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="감정이 올라오는 크기">T3</span><span class="pid" title="행동을 늦춰 고르는 정도">C2</span></span></header>
+  <p class="stem">퇴근 후 업무 메시지가 왔는데 나를 탓하는 듯한 말투입니다. 마음이 확 올라온 상태에서 가장 가까운 행동은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 감정이 올라올 때 행동이 나오는 속도 (행동 조절 · 감정 반응)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">별일 아니라고 생각하고 내일 출근해서 천천히 확인한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">느낀 즉시 움직이지 않고 한 박자 쉰 뒤 고른다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.33</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">바로 답장해서 내 입장을 분명하게 말한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">느끼는 즉시 말하고 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">답장을 쓰다가 지우고, 한참 지난 뒤 정리해서 보낸다</p><div class="analyst"><ul class="reading"><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">느낀 즉시 움직이지 않고 한 박자 쉰 뒤 고른다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.78</span></li><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">읽고 넘기려 하지만 계속 신경이 쓰여 잠을 설친다</p><div class="analyst"><ul class="reading"><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q16 검토">
+    <div class="seg" data-id="Q16">
+      <button type="button" data-mark="ok" id="mark-Q16-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q16-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q16-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q16">한 줄 메모</label>
+    <input class="note" id="note-Q16" data-id="Q16" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q17" data-id="Q17" data-domain="character">
+  <header class="item-head"><span class="qid">Q17</span><span class="topic">두 곳의 이직 제안</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="의미 · 이유를 기준으로 고르는 정도">C4</span></span></header>
+  <p class="stem">이직 제안이 두 곳에서 왔습니다. A는 보수가 높고 하는 일이 평범합니다. B는 보수가 낮지만 하는 일이 의미 있게 느껴집니다. 먼저 드는 생각은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 선택 기준이 의미인지 현실 조건인지 (의미 · 쓸모)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">생활이 안정돼야 다른 것도 할 수 있으니 A쪽이다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">쓸모 · 결과 · 현실 조건이 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">일이 납득돼야 오래 할 수 있으니 B쪽이다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">납득되는 이유 · 의미 · 가치가 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">B가 맞는 것 같지만 생활비 계산이 서야 정한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">납득되는 이유 · 의미 · 가치가 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">A에서 경력을 쌓은 뒤 의미 있는 일로 옮길지 정한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">쓸모 · 결과 · 현실 조건이 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q17 검토">
+    <div class="seg" data-id="Q17">
+      <button type="button" data-mark="ok" id="mark-Q17-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q17-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q17-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q17">한 줄 메모</label>
+    <input class="note" id="note-Q17" data-id="Q17" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q18" data-id="Q18" data-domain="character">
+  <header class="item-head"><span class="qid">Q18</span><span class="topic">뜻밖의 100만 원</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불확실함에 대비하는 정도">T2</span><span class="pid" title="행동을 늦춰 고르는 정도">C2</span><span class="pid" title="의미 · 이유를 기준으로 고르는 정도">C4</span></span></header>
+  <p class="stem">예상하지 못한 100만 원이 생겼습니다. 먼저 떠오르는 쓰임은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 돈을 어디에 쓰는가로 보는 가치 기준 (의미 · 대비 · 행동 조절)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">저축하거나 불릴 방법을 찾는다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">쓸모 · 결과 · 현실 조건이 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.78</span></li><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">필요했던 물건을 바로 산다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">쓸모 · 결과 · 현실 조건이 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.33</span></li><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">느끼는 즉시 말하고 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">당장 쓸 곳이 떠오르지 않아 일단 두고 생각한다</p><div class="analyst"><ul class="reading"><li><span class="pid">T2</span><span class="pname">불확실함에 대비하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">미리 알아보고 대비한 뒤 움직인다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">C2</span><span class="pname">행동을 늦춰 고르는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">느낀 즉시 움직이지 않고 한 박자 쉰 뒤 고른다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">배우고 싶던 것이나 의미 있게 느껴지는 곳에 쓴다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">납득되는 이유 · 의미 · 가치가 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q18 검토">
+    <div class="seg" data-id="Q18">
+      <button type="button" data-mark="ok" id="mark-Q18-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q18-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q18-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q18">한 줄 메모</label>
+    <input class="note" id="note-Q18" data-id="Q18" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q19" data-id="Q19" data-domain="character">
+  <header class="item-head"><span class="qid">Q19</span><span class="topic">불공평한 일 분담</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="상대에게 맞추는 정도">C3</span><span class="pid" title="불편할 때 말을 꺼내는 속도">R3</span></span></header>
+  <p class="stem">팀 프로젝트에서 내 몫이 다른 사람보다 눈에 띄게 많아졌습니다. 가장 가까운 대응은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 내 필요와 팀의 필요가 부딪힐 때 (상대 맞춤 · 갈등 때 말 꺼내는 속도)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">팀이 잘 돌아가는 게 우선이라 내가 더 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">내 몫은 정해진 만큼만 하고 더는 맡지 않는다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">불편하면 바로 이야기한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">내 일이 줄어들도록 분담을 다시 정하자고 말한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">불편하면 바로 이야기한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">당장은 말없이 하고, 끝난 뒤에 정리해서 이야기한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q19 검토">
+    <div class="seg" data-id="Q19">
+      <button type="button" data-mark="ok" id="mark-Q19-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q19-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q19-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q19">한 줄 메모</label>
+    <input class="note" id="note-Q19" data-id="Q19" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q20" data-id="Q20" data-domain="character">
+  <header class="item-head"><span class="qid">Q20</span><span class="topic">급한 날의 부탁</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="상대에게 맞추는 정도">C3</span><span class="pid" title="마음을 말로 표현하는 정도">R4</span></span></header>
+  <p class="stem">내 일이 급한 날, 동료가 &quot;잠깐만 도와줄 수 있어?&quot;라고 합니다. 가까운 반응은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 부탁을 받을 때 내 사정과 상대 사정의 균형 (상대 맞춤 · 마음 표현)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">어렵다고만 말하고 이유는 길게 설명하지 않는다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">행동 · 분위기로 드러내거나 삼킨다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">내 일이 급하다고 솔직하게 말하고, 나중에 돕겠다고 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">일단 도와주고, 내 일은 늦게까지 해서 맞춘다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">부탁하는 사정을 먼저 물어보고, 정말 급하면 돕는다</p><div class="analyst"><ul class="reading"><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q20 검토">
+    <div class="seg" data-id="Q20">
+      <button type="button" data-mark="ok" id="mark-Q20-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q20-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q20-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q20">한 줄 메모</label>
+    <input class="note" id="note-Q20" data-id="Q20" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q21" data-id="Q21" data-domain="character">
+  <header class="item-head"><span class="qid">Q21</span><span class="topic">가치와 어긋나는 지시</span><span class="dom dom-character">성격</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="상대에게 맞추는 정도">C3</span><span class="pid" title="의미 · 이유를 기준으로 고르는 정도">C4</span></span></header>
+  <p class="stem">회사 방침이 내가 중요하게 여기는 가치와 어긋나는 일을 하라고 합니다. 먼저 하는 생각은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 가치와 조직 · 관계의 요구가 부딪힐 때 (의미 · 상대 맞춤)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">내 기준에 맞지 않으면 의견을 내고, 필요하면 거절한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">납득되는 이유 · 의미 · 가치가 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">조직의 결정이니 따르되, 마음속으로 정리한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">쓸모 · 결과 · 현실 조건이 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">어디까지 양보할 수 있는지 선을 정하고 그 안에서 협의한다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">납득되는 이유 · 의미 · 가치가 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">내 일이 아니라고 보고 크게 신경 쓰지 않는다</p><div class="analyst"><ul class="reading"><li><span class="pid">C4</span><span class="pname">의미 · 이유를 기준으로 고르는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">쓸모 · 결과 · 현실 조건이 우선이다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q21 검토">
+    <div class="seg" data-id="Q21">
+      <button type="button" data-mark="ok" id="mark-Q21-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q21-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q21-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q21">한 줄 메모</label>
+    <input class="note" id="note-Q21" data-id="Q21" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article></section><section class="group" data-group="relation"><h2>가까운 관계 패턴 <span class="count">9문항</span></h2><article class="item" id="item-Q22" data-id="Q22" data-domain="relation">
+  <header class="item-head"><span class="qid">Q22</span><span class="topic">연락이 뜸해짐</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불확실할 때 확인하고 싶은 마음">R1</span><span class="pid" title="가까울수록 혼자 시간이 필요한 마음">R2</span></span></header>
+  <p class="stem">가까운 사람이 평소와 달리 이틀째 연락이 뜸합니다. 먼저 하는 행동에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 상대의 반응이 불확실할 때의 첫 행동 (확인 마음 · 혼자 시간)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">무슨 일 있는지 직접 물어본다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">내 일을 하며 연락을 기다린다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">확인하지 않고 기다리거나 각자 둔다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">나도 연락을 줄이고, 상대가 먼저 연락하는지 본다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">최근에 바쁜 일이 있었는지 떠올리며 가볍게 안부 한 줄을 보낸다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">자주 함께 있고 공유하는 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q22 검토">
+    <div class="seg" data-id="Q22">
+      <button type="button" data-mark="ok" id="mark-Q22-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q22-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q22-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q22">한 줄 메모</label>
+    <input class="note" id="note-Q22" data-id="Q22" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q23" data-id="Q23" data-domain="relation">
+  <header class="item-head"><span class="qid">Q23</span><span class="topic">이틀을 함께 보낸 뒤</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불확실할 때 확인하고 싶은 마음">R1</span><span class="pid" title="가까울수록 혼자 시간이 필요한 마음">R2</span></span></header>
+  <p class="stem">연인이나 아주 친한 친구와 주말 이틀을 내내 함께 보냈습니다. 일요일 저녁의 마음은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 함께 있은 뒤 필요한 것 — 더 함께인가, 혼자인가 (혼자 시간 · 확인 마음)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">좋았다. 다음 약속을 바로 잡고 싶다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">자주 함께 있고 공유하는 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">중간에 혼자 있는 시간이 있었으면 더 좋았을 것 같다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">더 같이 있고 싶고 헤어지는 게 아쉽다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">자주 함께 있고 공유하는 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">즐거웠지만 이제 혼자 쉬는 시간이 필요하다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q23 검토">
+    <div class="seg" data-id="Q23">
+      <button type="button" data-mark="ok" id="mark-Q23-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q23-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q23-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q23">한 줄 메모</label>
+    <input class="note" id="note-Q23" data-id="Q23" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q24" data-id="Q24" data-domain="relation">
+  <header class="item-head"><span class="qid">Q24</span><span class="topic">사과 없이 늦은 약속</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불편할 때 말을 꺼내는 속도">R3</span><span class="pid" title="마음을 말로 표현하는 정도">R4</span></span></header>
+  <p class="stem">가까운 사람이 약속 시간에 30분 늦으면서 별다른 사과를 하지 않았습니다. 서운한 마음이 들었을 때 가장 가까운 행동은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 서운함을 말하는 시점과 방식 (말 꺼내는 속도 · 마음 표현)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">별일 아니라고 넘기고, 같은 일이 반복되면 그때 말한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.60</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">행동 · 분위기로 드러내거나 삼킨다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">그 자리에서 서운하다고 바로 말한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">불편하면 바로 이야기한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">그 자리에서는 웃고, 며칠 뒤에 정리해서 이야기한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.20</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">표정이나 말투가 조금 차가워지고, 상대가 알아채기를 기다린다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.20</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">행동 · 분위기로 드러내거나 삼킨다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q24 검토">
+    <div class="seg" data-id="Q24">
+      <button type="button" data-mark="ok" id="mark-Q24-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q24-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q24-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q24">한 줄 메모</label>
+    <input class="note" id="note-Q24" data-id="Q24" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q25" data-id="Q25" data-domain="relation">
+  <header class="item-head"><span class="qid">Q25</span><span class="topic">위치 · 일정 공유 제안</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불확실할 때 확인하고 싶은 마음">R1</span><span class="pid" title="가까울수록 혼자 시간이 필요한 마음">R2</span></span></header>
+  <p class="stem">연인이 &quot;서로 위치나 일정을 앱으로 공유하면 편할 것 같아&quot;라고 제안합니다. 마음에 가까운 것은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 공유와 개인 영역의 균형 (혼자 시간 · 확인 마음)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">좋다. 서로 어디 있는지 알면 안심이 된다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">자주 함께 있고 공유하는 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">필요한 일정만 공유하면 좋겠다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">편하긴 하겠지만 내 시간을 들여다보는 느낌이 들어 부담스럽다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">서로 편한 쪽이면 괜찮다. 크게 상관없다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">자주 함께 있고 공유하는 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q25 검토">
+    <div class="seg" data-id="Q25">
+      <button type="button" data-mark="ok" id="mark-Q25-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q25-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q25-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q25">한 줄 메모</label>
+    <input class="note" id="note-Q25" data-id="Q25" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q26" data-id="Q26" data-domain="relation">
+  <header class="item-head"><span class="qid">Q26</span><span class="topic">말수가 줄어든 상대</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불확실할 때 확인하고 싶은 마음">R1</span><span class="pid" title="마음을 말로 표현하는 정도">R4</span></span></header>
+  <p class="stem">함께 있는 사람이 평소보다 말수가 줄었습니다. 이유는 모르겠습니다. 어떻게 하나요?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 상대의 기분이 불확실할 때 확인하는 방식 (확인 마음 · 마음 표현)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">&quot;무슨 일 있어?&quot; 하고 바로 물어본다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">말하고 싶으면 하겠지 하고 평소처럼 대한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">확인하지 않고 기다리거나 각자 둔다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">행동 · 분위기로 드러내거나 삼킨다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">분위기를 풀어 보려고 가벼운 이야기를 꺼낸다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.20</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">행동 · 분위기로 드러내거나 삼킨다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">혹시 내가 한 일 때문인지 되짚어 보고, 조심스럽게 물어본다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.60</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q26 검토">
+    <div class="seg" data-id="Q26">
+      <button type="button" data-mark="ok" id="mark-Q26-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q26-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q26-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q26">한 줄 메모</label>
+    <input class="note" id="note-Q26" data-id="Q26" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q27" data-id="Q27" data-domain="relation">
+  <header class="item-head"><span class="qid">Q27</span><span class="topic">관계의 앞날을 이야기할 때</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="불편할 때 말을 꺼내는 속도">R3</span><span class="pid" title="마음을 말로 표현하는 정도">R4</span></span></header>
+  <p class="stem">연인이나 가까운 사람과 앞으로의 일(이사, 동거, 진로 등)에 대해 이야기해야 할 때가 왔습니다. 가장 가까운 모습은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 중요한 이야기를 꺼내는 시점과 방식 (말 꺼내는 속도 · 마음 표현)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">상대가 먼저 말을 꺼내기를 기다린다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">행동 · 분위기로 드러내거나 삼킨다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">자연스러운 대화 중에 슬쩍 운을 띄우며 반응을 본다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">불편하면 바로 이야기한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">행동 · 분위기로 드러내거나 삼킨다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">내가 먼저 꺼내서 생각을 이야기한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">불편하면 바로 이야기한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">내 마음이 정리될 때까지 기다렸다가 말한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q27 검토">
+    <div class="seg" data-id="Q27">
+      <button type="button" data-mark="ok" id="mark-Q27-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q27-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q27-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q27">한 줄 메모</label>
+    <input class="note" id="note-Q27" data-id="Q27" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q28" data-id="Q28" data-domain="relation">
+  <header class="item-head"><span class="qid">Q28</span><span class="topic">함께 사는 저녁</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="가까울수록 혼자 시간이 필요한 마음">R2</span><span class="pid" title="마음을 말로 표현하는 정도">R4</span></span></header>
+  <p class="stem">연인이나 가족과 함께 사는데, 퇴근 후 저녁을 어떻게 보내는 것이 가장 편한가요?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 일상 속 친밀감과 개인 시간 (혼자 시간 · 마음 표현)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">함께 외출이나 활동을 하는 편이 편하다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">자주 함께 있고 공유하는 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">같이 밥 먹고 하루 이야기를 나누는 시간이 있어야 편하다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">자주 함께 있고 공유하는 것이 편하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">R4</span><span class="pname">마음을 말로 표현하는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">마음 · 필요를 말로 직접 표현한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">같이 있되 각자 할 일을 하는 편이 편하다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">잠깐 혼자만의 시간을 갖고 나서 같이 시간을 보낸다</p><div class="analyst"><ul class="reading"><li><span class="pid">R2</span><span class="pname">가까울수록 혼자 시간이 필요한 마음</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">가까울수록 혼자 있는 시간 · 거리가 필요하다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q28 검토">
+    <div class="seg" data-id="Q28">
+      <button type="button" data-mark="ok" id="mark-Q28-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q28-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q28-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q28">한 줄 메모</label>
+    <input class="note" id="note-Q28" data-id="Q28" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q29" data-id="Q29" data-domain="relation">
+  <header class="item-head"><span class="qid">Q29</span><span class="topic">말다툼 뒤의 어색한 하루</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="상대에게 맞추는 정도">C3</span><span class="pid" title="불편할 때 말을 꺼내는 속도">R3</span></span></header>
+  <p class="stem">가까운 사람과 말다툼을 한 뒤 어색한 하루가 지났습니다. 가장 가까운 행동은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 갈등 뒤 관계를 풀어 가는 방식 (말 꺼내는 속도 · 상대 맞춤)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">먼저 다가가 이야기를 꺼내 풀려고 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">불편하면 바로 이야기한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.14</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">상대가 풀 때까지 시간을 두고 기다린다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">내 기준 · 필요를 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">내가 잘못한 부분만 먼저 사과하고, 나머지는 나중에 이야기한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">불편하면 바로 이야기한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.71</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">분위기를 가볍게 만들며 자연스럽게 풀리게 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R3</span><span class="pname">불편할 때 말을 꺼내는 속도</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">시간을 두고 정리한 뒤 이야기하거나 넘긴다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li><li><span class="pid">C3</span><span class="pname">상대에게 맞추는 정도</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">상대의 입장 · 필요에 맞추고 협력을 앞세운다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.14</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q29 검토">
+    <div class="seg" data-id="Q29">
+      <button type="button" data-mark="ok" id="mark-Q29-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q29-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q29-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q29">한 줄 메모</label>
+    <input class="note" id="note-Q29" data-id="Q29" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article><article class="item" id="item-Q30" data-id="Q30" data-domain="relation">
+  <header class="item-head"><span class="qid">Q30</span><span class="topic">알게 된 지 한 달, 늦어진 답장</span><span class="dom dom-relation">관계</span><span class="touch analyst">영향을 주는 관점 <span class="pid" title="감정이 올라오는 크기">T3</span><span class="pid" title="불확실할 때 확인하고 싶은 마음">R1</span></span></header>
+  <p class="stem">알게 된 지 한 달 된 사람에게 호감이 생겼습니다. 상대의 답장이 오전엔 빠르다가 이틀째 늦습니다. 이때 가까운 마음은?</p>
+  <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> 관계 초기에 반응이 느려질 때의 마음 (확인 마음 · 감정 반응)</p>
+  <ol class="opts"><li class="opt"><span class="letter">A</span><div class="opt-body"><p class="opt-text">바쁜가 보다 하고 내 일을 한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side down">낮은 쪽 · 크게</span><span class="sidetext">확인하지 않고 기다리거나 각자 둔다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -1.00</span></li><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">B</span><div class="opt-body"><p class="opt-text">나도 비슷한 속도로 답한다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">확인하지 않고 기다리거나 각자 둔다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">C</span><div class="opt-body"><p class="opt-text">궁금하면 바로 한 번 더 연락해 본다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side down">낮은 쪽 · 조금</span><span class="sidetext">감정이 덜 흔들리고 금세 지나간다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 -0.50</span></li></ul></div></div></li><li class="opt"><span class="letter">D</span><div class="opt-body"><p class="opt-text">자꾸 생각이 나서 다른 일에 집중이 안 된다</p><div class="analyst"><ul class="reading"><li><span class="pid">R1</span><span class="pname">불확실할 때 확인하고 싶은 마음</span><span class="side up">높은 쪽 · 조금</span><span class="sidetext">확인 · 연락 · 대화로 안심을 구한다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +0.50</span></li><li><span class="pid">T3</span><span class="pname">감정이 올라오는 크기</span><span class="side up">높은 쪽 · 크게</span><span class="sidetext">감정이 크게 올라오고 오래 남는다</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 +1.00</span></li></ul></div></div></li><li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">겪어 본 적이 없거나, 상황에 따라 너무 달라서 고르기 어려워요</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
+  <div class="review" role="group" aria-label="Q30 검토">
+    <div class="seg" data-id="Q30">
+      <button type="button" data-mark="ok" id="mark-Q30-ok" aria-pressed="false">괜찮음</button>
+      <button type="button" data-mark="fix" id="mark-Q30-fix" aria-pressed="false">고쳐야 함</button>
+      <button type="button" data-mark="drop" id="mark-Q30-drop" aria-pressed="false">빼기</button>
+    </div>
+    <label class="note-label" for="note-Q30">한 줄 메모</label>
+    <input class="note" id="note-Q30" data-id="Q30" type="text" maxlength="200" placeholder="예: 선택지 B가 너무 길어요" autocomplete="off">
+  </div>
+</article></section></section>
+<section class="panel" id="panel-scoring" hidden><h2>답이 점수가 되는 과정</h2>
+<ol class="steps">
+  <li><b>선택지마다 방향이 정해져 있습니다.</b> 한 선택지는 최대 2개 관점에 "높은 쪽 / 낮은 쪽"과 세기(조금=1, 크게=2)를 줍니다. 문항 탭의 점수 방향이 이 표입니다.</li>
+  <li><b>문항마다 가운데를 맞춥니다.</b> 그 문항의 선택지 네 개를 같은 확률로 고르는 사람이 0이 되도록 빼고, 가장 먼 선택지가 ±1이 되게 맞춥니다. 선택지가 한쪽으로 치우쳐 쓰인 문항도 점수를 한쪽으로 끌지 않게 하기 위해서입니다. 이 값이 <b>기여값</b>(−1~+1)입니다.</li>
+  <li><b>관점마다 평균을 냅니다.</b> 그 관점에 점수를 주는 문항 중 <b>답한 문항</b>의 기여값 평균을 0~100으로 옮깁니다 (50이 가운데). <b>"해당 없음"은 평균에 넣지 않습니다.</b></li>
+  <li><b>정도를 세 칸으로 나눕니다.</b> 가운데(50)에서 20 이상 떨어지면 <b>뚜렷</b>, 10~20는 <b>약간</b>, 10 미만은 <b>고르게</b>(어느 쪽으로도 기울지 않음)입니다.</li>
+  <li><b>답한 문항이 3개 미만이면 그 관점은 판단을 보류합니다.</b> 억지로 분류하지 않습니다. 건너뛴 문항이 6개 이상이면 해석을 줄이고 다시 답하기를 권합니다.</li>
+</ol>
+
+<h2>예시 1 — 한 문항이 만드는 기여값 (Q02 · 새로움에 끌리는 정도)</h2>
+<div class="tablewrap"><table><thead><tr><th>선택지</th><th>응답자가 보는 문장</th><th class="num">정해 둔 방향</th><th class="num">기여값</th></tr></thead><tbody><tr><td>A</td><td>나 혼자 시범으로 써 보고 괜찮으면 팀에 알린다</td><td class="num">+1</td><td class="num">+0.50</td></tr><tr><td>B</td><td>지금 도구로 불편한 점이 구체적으로 무엇인지부터 따진다</td><td class="num">-1</td><td class="num">-0.50</td></tr><tr><td>C</td><td>쓰던 걸로 충분하다. 바꾸는 데 드는 시간이 아깝다</td><td class="num">-2</td><td class="num">-1.00</td></tr><tr><td>D</td><td>써 보면서 맞는지 보자. 안 맞으면 되돌리면 된다</td><td class="num">+2</td><td class="num">+1.00</td></tr></tbody></table></div>
+<p class="small">정해 둔 방향이 +1인 선택지도, 같은 문항의 다른 선택지가 +2이면 기여값은 +0.5로 낮아집니다. 선택지끼리의 차이를 보는 방식이기 때문입니다.</p>
+
+<h2>예시 2 — 가상 응답자 한 명의 "새로움에 끌리는 정도" 점수</h2>
+<p class="small">실제 응답이 아니라 설명을 위해 고른 가상의 응답입니다. 새로움(T1)에 점수를 주는 문항 5개에 아래처럼 답했다고 합니다.</p>
+<div class="tablewrap"><table><thead><tr><th>문항</th><th>고른 선택지</th><th class="num">기여값</th></tr></thead><tbody><tr><td>Q01 즉흥 제안</td><td>A</td><td class="num">+1.00</td></tr><tr><td>Q02 새 도구 도입</td><td>D</td><td class="num">+1.00</td></tr><tr><td>Q05 낯선 사람이 많은 모임</td><td>B</td><td class="num">+0.11</td></tr><tr><td>Q10 새 취미의 흥미가 식음</td><td>A</td><td class="num">+0.60</td></tr><tr><td>Q11 위험이 있는 제안</td><td>D</td><td class="num">-0.14</td></tr><tr class="sum"><td colspan="2">평균 +0.51 → 0~100으로 옮기면</td><td class="num"><b>76</b></td></tr></tbody></table></div>
+<p>가운데(50)에서 26 떨어져 있어 <b>뚜렷</b> 칸입니다. 리포트에서는 숫자보다 <b>"새로운 것 · 낯선 것에 먼저 끌린다 쪽으로 뚜렷하게 가까운 편"</b>처럼 방향과 정도로 씁니다. 이 점수는 응답에서 나온 환산값이고, 백분위나 정확도가 아니며, 높고 낮음이 좋고 나쁨도 아닙니다.</p>
+
+<h2>점수를 읽을 때 지키는 규칙</h2>
+<ul class="rules">
+  <li>기질 · 성격 · 가까운 관계를 <b>영역별로 따로</b> 보여 주고, 하나의 점수나 이름으로 합치지 않습니다.</li>
+  <li>사주와 응답을 합산하지 않습니다. 응답 때문에 사주 원국이나 운의 시기를 바꾸지 않고, 둘이 다르면 상황별 차이로 설명합니다.</li>
+  <li>공식 MBTI · TCI · 애착검사의 문항을 가져오지 않았고, 그 점수나 유형으로 환산하지 않습니다. 이 질문의 이름은 "미유 성향 질문"입니다.</li>
+  <li>"상황에 따라 다름"을 사람마다 판정하지 않습니다 (부족한 점 탭 참고). 상황 차이는 본인이 문항별로 다르게 답한 내용을 그대로 보여 주는 방식으로 설명합니다.</li>
+  <li>문항 · 채점 규칙에는 버전을 붙입니다. 지금 초안은 문항 <code>situational-0.1-draft</code> · 채점 <code>situational-scoring-0.1-draft</code>이고, 실제 검사 화면에는 연결하지 않았습니다.</li>
+</ul></section>
+<section class="panel" id="panel-views" hidden><h2>기질적 경향</h2><div class="tablewrap"><table class="views"><thead><tr><th></th><th>관점과 쓰임</th><th>높은 쪽</th><th>낮은 쪽</th><th class="num">지표 수</th><th>점수를 주는 문항</th></tr></thead><tbody><tr><td><span class="pid">T1</span></td><td><b>새로움에 끌리는 정도</b><br><span class="small">시작 · 변화 · 낯선 사람 앞에서의 첫 반응</span></td><td>새로운 것 · 낯선 것에 먼저 끌린다</td><td>익숙한 방식 · 검증된 것이 편하다</td><td class="num">5</td><td class="small">Q01 Q02 Q05 Q10 Q11<br>자기 영역 5개</td></tr><tr><td><span class="pid">T2</span></td><td><b>불확실함에 대비하는 정도</b><br><span class="small">결정 속도 · 준비 방식 · 위험을 대하는 태도</span></td><td>미리 알아보고 대비한 뒤 움직인다</td><td>일단 부딪혀 보고 생기면 대처한다</td><td class="num">6</td><td class="small">Q01 Q02 Q05 Q08 Q11 Q18<br>자기 영역 5개</td></tr><tr><td><span class="pid">T3</span></td><td><b>감정이 올라오는 크기</b><br><span class="small">예상 밖 · 비판 · 어긋남 앞에서 감정이 움직이는 모양 (좋고 나쁨 아님)</span></td><td>감정이 크게 올라오고 오래 남는다</td><td>감정이 덜 흔들리고 금세 지나간다</td><td class="num">5</td><td class="small">Q04 Q06 Q09 Q16 Q30<br>자기 영역 3개</td></tr><tr><td><span class="pid">T4</span></td><td><b>주변 반응에 움직이는 정도</b><br><span class="small">동기가 어디서 오는지 — 일 · 학업 · 관계에서의 에너지 원천</span></td><td>주변의 반응 · 인정이 의욕과 방향을 움직인다</td><td>주변 반응과 상관없이 내 속도로 한다</td><td class="num">4</td><td class="small">Q03 Q06 Q08 Q13<br>자기 영역 3개</td></tr><tr><td><span class="pid">T5</span></td><td><b>끝까지 이어가는 정도</b><br><span class="small">지속 · 마무리 · 루틴 — 장기 목표의 모양</span></td><td>재미가 줄어도 정한 것을 이어 간다</td><td>흥미가 식으면 멈추거나 옮긴다</td><td class="num">4</td><td class="small">Q03 Q07 Q10 Q15<br>자기 영역 3개</td></tr></tbody></table></div><h2>성격적 경향</h2><div class="tablewrap"><table class="views"><thead><tr><th></th><th>관점과 쓰임</th><th>높은 쪽</th><th>낮은 쪽</th><th class="num">지표 수</th><th>점수를 주는 문항</th></tr></thead><tbody><tr><td><span class="pid">C1</span></td><td><b>스스로 방향을 세우는 정도</b><br><span class="small">목표를 정하고 실행하는 방식 · 책임을 지는 방식</span></td><td>목표와 계획을 스스로 세우고 끌고 간다</td><td>상황 · 다른 사람이 정하는 쪽에 맞춰 흘러간다</td><td class="num">4</td><td class="small">Q12 Q13 Q14 Q15<br>자기 영역 4개</td></tr><tr><td><span class="pid">C2</span></td><td><b>행동을 늦춰 고르는 정도</b><br><span class="small">자기조절 — 충동 · 감정이 올라올 때 행동이 나오는 속도</span></td><td>느낀 즉시 움직이지 않고 한 박자 쉰 뒤 고른다</td><td>느끼는 즉시 말하고 움직인다</td><td class="num">5</td><td class="small">Q06 Q07 Q14 Q16 Q18<br>자기 영역 3개</td></tr><tr><td><span class="pid">C3</span></td><td><b>상대에게 맞추는 정도</b><br><span class="small">협력 · 양보 · 자기 주장의 균형</span></td><td>상대의 입장 · 필요에 맞추고 협력을 앞세운다</td><td>내 기준 · 필요를 앞세운다</td><td class="num">7</td><td class="small">Q04 Q12 Q13 Q19 Q20 Q21 Q29<br>자기 영역 5개</td></tr><tr><td><span class="pid">C4</span></td><td><b>의미 · 이유를 기준으로 고르는 정도</b><br><span class="small">가치관과 선택 — 무엇에 돈 · 시간 · 에너지를 쓰는가</span></td><td>납득되는 이유 · 의미 · 가치가 우선이다</td><td>쓸모 · 결과 · 현실 조건이 우선이다</td><td class="num">4</td><td class="small">Q11 Q17 Q18 Q21<br>자기 영역 3개</td></tr></tbody></table></div><h2>가까운 관계 패턴</h2><div class="tablewrap"><table class="views"><thead><tr><th></th><th>관점과 쓰임</th><th>높은 쪽</th><th>낮은 쪽</th><th class="num">지표 수</th><th>점수를 주는 문항</th></tr></thead><tbody><tr><td><span class="pid">R1</span></td><td><b>불확실할 때 확인하고 싶은 마음</b><br><span class="small">가까운 사람의 반응이 불확실할 때의 첫 행동</span></td><td>확인 · 연락 · 대화로 안심을 구한다</td><td>확인하지 않고 기다리거나 각자 둔다</td><td class="num">5</td><td class="small">Q22 Q23 Q25 Q26 Q30<br>자기 영역 5개</td></tr><tr><td><span class="pid">R2</span></td><td><b>가까울수록 혼자 시간이 필요한 마음</b><br><span class="small">친밀감과 개인 시간의 균형</span></td><td>가까울수록 혼자 있는 시간 · 거리가 필요하다</td><td>자주 함께 있고 공유하는 것이 편하다</td><td class="num">4</td><td class="small">Q22 Q23 Q25 Q28<br>자기 영역 4개</td></tr><tr><td><span class="pid">R3</span></td><td><b>불편할 때 말을 꺼내는 속도</b><br><span class="small">갈등 해결 — 말을 꺼내는 시점</span></td><td>불편하면 바로 이야기한다</td><td>시간을 두고 정리한 뒤 이야기하거나 넘긴다</td><td class="num">4</td><td class="small">Q19 Q24 Q27 Q29<br>자기 영역 3개</td></tr><tr><td><span class="pid">R4</span></td><td><b>마음을 말로 표현하는 정도</b><br><span class="small">연락과 표현 방식 — 말과 행동 중 무엇으로 전하는가</span></td><td>마음 · 필요를 말로 직접 표현한다</td><td>행동 · 분위기로 드러내거나 삼킨다</td><td class="num">5</td><td class="small">Q20 Q24 Q26 Q27 Q28<br>자기 영역 4개</td></tr></tbody></table></div><p class="small">지표 수는 그 관점에 점수를 주는 문항의 수입니다 (한 문항이 선택지에 따라 1~2개 관점에 점수를 줍니다). 높은 쪽 · 낮은 쪽은 좋고 나쁨이 아니라 방향입니다. 대표 경향 12유형 설계가 쓰는 7개 관점은 T1 · T2 · T4 · T5 · C1 · C3 · C4입니다.</p></section>
+<section class="panel" id="panel-limits" hidden><div class="notice"><b>이 탭의 숫자는 실제 사람의 응답이 아닙니다.</b> 가상 응답자 4,000명이 "자기 성향대로 얼마나 일관되게 고르는가(응답 일관성)"를 낮음 · 보통 · 높음으로 가정하고 답한 결과입니다 (해당 없음 5%). 같은 사람이 같은 성향으로 다시 답한다고 두었으므로 <b>실제 재응답 일치는 이보다 낮을 가능성이 큽니다.</b> "30문항이 정확하다"는 증거가 아니라 <b>문항 구조가 허용하는 한계</b>입니다. 실제 신뢰도는 시범 응답으로만 알 수 있습니다.</div>
+
+<h2>한 줄 결론</h2>
+<p class="lead">30문항 · 13관점(지표 62개)으로 <b>관점별 "어느 쪽에 가까운가"와 정도</b>는 읽을 수 있습니다. <b>12유형 같은 이름 하나, 점수의 작은 차이, "상황에 따라 다름" 판정</b>은 읽을 수 없습니다. 12유형을 맞추려고 억지로 분류하지 않습니다.</p>
+
+<h2>응답 일관성별로 본 13개 관점</h2>
+<div class="tablewrap"><table><thead><tr><th>응답 일관성(가정)</th><th class="num">재응답 점수 상관</th><th class="num">방향 일치</th><th class="num">세 구분 일치</th><th class="num">7개 관점의 높음/낮음이 모두 같음</th></tr></thead><tbody><tr><td>낮음<br><span class="small">자기 성향과 상관없이 고르는 일이 많다</span></td><td class="num">0.48~0.67</td><td class="num">80%~90%</td><td class="num">50%~60%</td><td class="num">8%</td></tr><tr><td>보통<br><span class="small">대체로 자기 성향에 맞게 고른다</span></td><td class="num">0.73~0.84</td><td class="num">91%~96%</td><td class="num">65%~74%</td><td class="num">21%</td></tr><tr><td>높음<br><span class="small">자기 성향대로 꾸준히 고른다</span></td><td class="num">0.87~0.92</td><td class="num">96%~99%</td><td class="num">76%~85%</td><td class="num">39%</td></tr></tbody></table></div>
+<p class="small">범위는 13개 관점 중 가장 낮은 값~가장 높은 값입니다. <b>재응답 점수 상관</b>은 같은 사람이 두 번 답한 점수끼리의 상관(1에 가까울수록 같음), <b>방향 일치</b>는 두 번 모두 높음/낮음이 나온 사람 중 같은 방향인 몫, <b>세 구분 일치</b>는 높음 · 고르게 · 낮음이 두 번 같은 몫, 마지막 열은 대표 경향 12유형이 쓰는 7개 관점의 방향이 모두 같은 사람의 몫입니다.</p>
+
+<h2>읽어도 되는 것 · 읽으면 안 되는 것</h2>
+<div class="two">
+  <div><h3>읽어도 되는 것</h3><ul class="rules">
+    <li><b>관점별 방향 (높은 쪽 / 낮은 쪽).</b> 응답 일관성이 보통이면 방향이 나온 사람의 91%~96%가 다시 답해도 같은 방향입니다.</li>
+    <li>기질 · 성격 · 관계를 <b>영역별로 따로</b> 보여 주는 설계.</li>
+  </ul></div>
+  <div><h3>읽으면 안 되는 것</h3><ol class="rules">
+    <li><b>점수의 작은 차이</b> (58과 62). 보통일 때 재응답 점수 상관 0.73~0.84, 낮으면 0.48~0.67입니다.</li>
+    <li><b>"약간"과 "고르게"의 경계.</b> 세 구분이 두 번 같은 몫이 보통일 때 65%~74%뿐입니다.</li>
+    <li><b>12유형 이름.</b> 7개 관점의 높음/낮음이 모두 같게 나오는 사람이 보통일 때 21%, 높아도 39%입니다. 같은 사람이 다시 답하면 다른 이름이 나올 가능성이 더 큽니다.</li>
+    <li><b>"상황에 따라 다름" 판정.</b> 지금 규칙은 한결같은 가상 응답자의 18%(관점에 따라 최대 41%)에도 붙고, 정말 상황에 따라 달라지는 가상 응답자에는 29%에만 붙습니다. 엄격하게(0.8 · 2) 하면 오탐은 3%지만 탐지도 6%로 무너집니다. 그래서 판정에 쓰지 않고, 본인이 문항별로 다르게 답한 내용을 그대로 보여 줍니다.</li>
+  </ol></div>
+</div>
+
+<h2>30문항으로 부족한 부분</h2>
+<ol class="rules">
+  <li><b>재응답이 가장 흔들리는 관점.</b> 응답 일관성이 낮을 때 가장 낮은 세 관점은 T4 주변 반응에 움직이는 정도(0.48) · R1 불확실할 때 확인하고 싶은 마음(0.54) · C2 행동을 늦춰 고르는 정도(0.56)입니다. 지표 수가 적다고 항상 더 흔들리는 것은 아닙니다 (지표가 가장 적은 관점은 T4 · T5 · C1 · C4 · R2 · R3로 4개). 이 관점들이 문항을 고치거나 더하는 우선순위입니다.</li>
+  <li><b>응답 일관성이 낮으면 지금 지표 수로는 부족합니다.</b> 재응답 상관 0.7에 관점당 6~10개, 0.8에 10~17개가 필요합니다 (지금 4~7개). 보통이면 대체로 충분합니다. 결국 <b>사람들이 얼마나 일관되게 답하는지는 시범 응답으로만 알 수 있습니다.</b></li>
+  <li><b>13개 관점은 30문항에 비해 많습니다.</b> 한 문항이 두 관점에 함께 점수를 주기 때문에, 성향이 서로 독립인 가상 응답자에서도 관점끼리 점수가 같이 움직입니다 (평균 0.06, 가장 큰 쌍 T1–T2 -0.44). 새로움(T1)과 대비(T2)는 12유형 설계가 "실제로 반대로 움직인다"고 가정한 값(−0.4)과 같은 크기라서, 시범 응답에서 이 상관이 나와도 사람의 특성인지 문항 구조 때문인지 구분할 수 없습니다.</li>
+  <li><b>해당 없음이 많아지면 관점이 보류됩니다.</b> 응답한 지표가 3개 미만이면 보류하기 때문입니다.</li>
+</ol>
+<div class="tablewrap narrow"><table><thead><tr><th class="num">해당 없음 비율(가정)</th><th class="num">보류되는 관점의 평균</th><th class="num">가장 많이 보류되는 관점</th></tr></thead><tbody><tr><td class="num">5%</td><td class="num">1%</td><td class="num">2%</td></tr><tr><td class="num">10%</td><td class="num">3%</td><td class="num">6%</td></tr><tr><td class="num">20%</td><td class="num">11%</td><td class="num">19%</td></tr><tr><td class="num">30%</td><td class="num">23%</td><td class="num">36%</td></tr></tbody></table></div>
+
+<h2>어느 관점이 얼마나 흔들리나</h2>
+<details><summary>13개 관점 표 펼치기</summary>
+<div class="tablewrap"><table><thead><tr><th>관점</th><th class="num">지표 수</th><th class="num">재응답 상관 (일관성 낮음)</th><th class="num">재응답 상관 (보통)</th><th class="num">방향 일치 (보통)</th></tr></thead><tbody><tr><td><span class="pid">T1</span> 새로움에 끌리는 정도</td><td class="num">5</td><td class="num">0.63</td><td class="num">0.82</td><td class="num">93%</td></tr><tr><td><span class="pid">T2</span> 불확실함에 대비하는 정도</td><td class="num">6</td><td class="num">0.58</td><td class="num">0.81</td><td class="num">93%</td></tr><tr><td><span class="pid">T3</span> 감정이 올라오는 크기</td><td class="num">5</td><td class="num">0.67</td><td class="num">0.84</td><td class="num">94%</td></tr><tr><td><span class="pid">T4</span> 주변 반응에 움직이는 정도</td><td class="num">4</td><td class="num">0.48</td><td class="num">0.73</td><td class="num">91%</td></tr><tr><td><span class="pid">T5</span> 끝까지 이어가는 정도</td><td class="num">4</td><td class="num">0.58</td><td class="num">0.80</td><td class="num">92%</td></tr><tr><td><span class="pid">C1</span> 스스로 방향을 세우는 정도</td><td class="num">4</td><td class="num">0.61</td><td class="num">0.81</td><td class="num">93%</td></tr><tr><td><span class="pid">C2</span> 행동을 늦춰 고르는 정도</td><td class="num">5</td><td class="num">0.56</td><td class="num">0.78</td><td class="num">94%</td></tr><tr><td><span class="pid">C3</span> 상대에게 맞추는 정도</td><td class="num">7</td><td class="num">0.61</td><td class="num">0.82</td><td class="num">96%</td></tr><tr><td><span class="pid">C4</span> 의미 · 이유를 기준으로 고르는 정도</td><td class="num">4</td><td class="num">0.60</td><td class="num">0.80</td><td class="num">93%</td></tr><tr><td><span class="pid">R1</span> 불확실할 때 확인하고 싶은 마음</td><td class="num">5</td><td class="num">0.54</td><td class="num">0.76</td><td class="num">94%</td></tr><tr><td><span class="pid">R2</span> 가까울수록 혼자 시간이 필요한 마음</td><td class="num">4</td><td class="num">0.61</td><td class="num">0.82</td><td class="num">92%</td></tr><tr><td><span class="pid">R3</span> 불편할 때 말을 꺼내는 속도</td><td class="num">4</td><td class="num">0.58</td><td class="num">0.80</td><td class="num">92%</td></tr><tr><td><span class="pid">R4</span> 마음을 말로 표현하는 정도</td><td class="num">5</td><td class="num">0.58</td><td class="num">0.78</td><td class="num">93%</td></tr></tbody></table></div></details>
+
+<h2>정해 주실 것</h2>
+<div class="tablewrap"><table class="choices"><thead><tr><th>선택</th><th>내용</th><th>장점</th><th>단점</th></tr></thead><tbody>
+<tr class="rec"><td><b>A. 30문항 유지 + 읽는 범위를 좁힘 (추천)</b></td><td>관점별 방향과 정도(뚜렷 · 약간 · 고르게)만 리포트에 씁니다. 12유형 이름 · 점수의 작은 차이 · 상황 판정은 쓰지 않습니다. 실제 사람 응답으로 시범 후 결정합니다.</td><td>바로 시범 가능, 문항 수 부담 없음</td><td>"나는 이런 유형"이라는 짧은 이름은 줄 수 없음</td></tr>
+<tr><td><b>B. 36~40문항으로 늘림</b></td><td>지표가 적거나 흔들리는 관점에 문항을 더해 관점당 5~6개 이상으로 맞춥니다.</td><td>방향 · 정도의 안정이 올라감</td><td>응답 시간이 늘고 끝까지 답하는 사람이 줄 수 있음</td></tr>
+<tr><td><b>C. 관점을 9~10개로 줄임</b></td><td>비슷한 관점을 합치거나 우선순위가 낮은 관점을 뺍니다.</td><td>같은 문항 수로 관점당 지표가 늘어남</td><td>설명 폭이 줄고 관점의 뜻이 뭉개질 수 있음</td></tr>
+</tbody></table></div>
+<p class="small">시범에서 확인할 것: ① 같은 사람의 재응답 일치 ② 관점 간 상관(위 가상 값보다 큰지) ③ 문항별 해당 없음 비율 ④ 끝까지 답한 비율. 이 결과를 보기 전에는 12유형을 화면에 연결하지 않습니다. 이 계산이 정하지 못하는 것: 문항이 정말 그 성향을 재는지(타당도), 같은 문장을 사람마다 다르게 읽는 정도.</p></section>
+<section class="panel" id="panel-memo" hidden><h2>검토 메모</h2>
+<p class="hint">문항 탭에서 누른 표시와 한 줄 메모가 아래에 모입니다. <b>복사</b>를 눌러 채팅에 붙여넣으면 제가 그대로 읽고 문항을 고칩니다. 이 표시는 이 브라우저에만 저장됩니다 (다른 기기와 공유되지 않음).</p>
+<div class="summary" id="memo-summary" aria-live="polite"></div>
+<fieldset class="choice"><legend>전체 방향 (부족한 점 탭의 선택)</legend>
+  <label><input type="radio" name="dir" value="A" id="dir-a"> A. 30문항 유지, 읽는 범위를 좁히고 시범 응답부터</label>
+  <label><input type="radio" name="dir" value="B" id="dir-b"> B. 36~40문항으로 늘림</label>
+  <label><input type="radio" name="dir" value="C" id="dir-c"> C. 관점을 9~10개로 줄임</label>
+  <label><input type="radio" name="dir" value="" id="dir-none" checked> 아직 정하지 않음</label>
+</fieldset>
+<label class="note-label" for="overall">전체 의견 (선택)</label>
+<textarea id="overall" rows="4" maxlength="1500" placeholder="예: 관계 영역 문항이 연애 상황에만 치우친 것 같아요."></textarea>
+<div class="actions"><button type="button" class="primary" id="copy-btn">검토 내용 복사</button><button type="button" id="clear-btn">표시 모두 지우기</button><span id="copy-status" class="small" role="status"></span></div>
+<label class="note-label" for="memo-text">복사될 글</label>
+<textarea id="memo-text" rows="14" readonly></textarea></section>
+</div>
+<script>
+(function(){
+  var KEY='miyu-assessment-review-v1';
+  var ITEMS=[{"id":"Q01","topic":"즉흥 제안","domain":"temperament"},{"id":"Q02","topic":"새 도구 도입","domain":"temperament"},{"id":"Q03","topic":"반응 없는 장기 프로젝트","domain":"temperament"},{"id":"Q04","topic":"약속 장소가 닫힘","domain":"temperament"},{"id":"Q05","topic":"낯선 사람이 많은 모임","domain":"temperament"},{"id":"Q06","topic":"사람들 앞에서 받은 지적","domain":"temperament"},{"id":"Q07","topic":"지루한 반복 업무","domain":"temperament"},{"id":"Q08","topic":"큰 구매 전","domain":"temperament"},{"id":"Q09","topic":"사소한 일이 연달아 어긋난 아침","domain":"temperament"},{"id":"Q10","topic":"새 취미의 흥미가 식음","domain":"temperament"},{"id":"Q11","topic":"위험이 있는 제안","domain":"temperament"},{"id":"Q12","topic":"모임 장소 정하기","domain":"character"},{"id":"Q13","topic":"회의에서 의견이 반박당함","domain":"character"},{"id":"Q14","topic":"마감 앞의 충동","domain":"character"},{"id":"Q15","topic":"새해 목표","domain":"character"},{"id":"Q16","topic":"화가 나는 메시지","domain":"character"},{"id":"Q17","topic":"두 곳의 이직 제안","domain":"character"},{"id":"Q18","topic":"뜻밖의 100만 원","domain":"character"},{"id":"Q19","topic":"불공평한 일 분담","domain":"character"},{"id":"Q20","topic":"급한 날의 부탁","domain":"character"},{"id":"Q21","topic":"가치와 어긋나는 지시","domain":"character"},{"id":"Q22","topic":"연락이 뜸해짐","domain":"relation"},{"id":"Q23","topic":"이틀을 함께 보낸 뒤","domain":"relation"},{"id":"Q24","topic":"사과 없이 늦은 약속","domain":"relation"},{"id":"Q25","topic":"위치 · 일정 공유 제안","domain":"relation"},{"id":"Q26","topic":"말수가 줄어든 상대","domain":"relation"},{"id":"Q27","topic":"관계의 앞날을 이야기할 때","domain":"relation"},{"id":"Q28","topic":"함께 사는 저녁","domain":"relation"},{"id":"Q29","topic":"말다툼 뒤의 어색한 하루","domain":"relation"},{"id":"Q30","topic":"알게 된 지 한 달, 늦어진 답장","domain":"relation"}];
+  var state={marks:{},notes:{},overall:'',dir:''};
+  try{var raw=localStorage.getItem(KEY);if(raw){var p=JSON.parse(raw);if(p&&typeof p==='object'){state.marks=p.marks||{};state.notes=p.notes||{};state.overall=p.overall||'';state.dir=p.dir||'';}}}catch(e){}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+  var LABEL={ok:'괜찮음',fix:'고쳐야 함',drop:'빼기'};
+  var filter='all';
+
+  // 탭
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var panels=[].slice.call(document.querySelectorAll('.panel'));
+  function showTab(id){
+    tabs.forEach(function(t){t.setAttribute('aria-selected',String(t.getAttribute('data-tab')===id));});
+    panels.forEach(function(p){p.hidden=p.id!=='panel-'+id;});
+    if(id==='memo')renderMemo();
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(){showTab(t.getAttribute('data-tab'));window.scrollTo(0,0);});});
+  var h=(location.hash||'').replace('#','');
+  showTab(['items','scoring','views','limits','memo'].indexOf(h)>=0?h:'items');
+
+  // 표시
+  function applyMarks(){
+    ITEMS.forEach(function(it){
+      var el=document.getElementById('item-'+it.id);
+      var m=state.marks[it.id]||'';
+      if(m)el.setAttribute('data-mark',m);else el.removeAttribute('data-mark');
+      ['ok','fix','drop'].forEach(function(k){
+        var b=document.getElementById('mark-'+it.id+'-'+k);
+        if(b)b.setAttribute('aria-pressed',String(m===k));
+      });
+      var n=document.getElementById('note-'+it.id);
+      if(n&&n!==document.activeElement)n.value=state.notes[it.id]||'';
+    });
+    var todo=ITEMS.filter(function(i){return !state.marks[i.id];}).length;
+    var flag=ITEMS.filter(function(i){return state.marks[i.id]==='fix'||state.marks[i.id]==='drop';}).length;
+    document.getElementById('todo-count').textContent=String(todo);
+    document.getElementById('flag-count').textContent=String(flag);
+    applyFilter();
+  }
+  function applyFilter(){
+    ITEMS.forEach(function(it){
+      var el=document.getElementById('item-'+it.id);
+      var m=state.marks[it.id]||'';
+      var show=filter==='all'||filter===it.domain||(filter==='todo'&&!m)||(filter==='flag'&&(m==='fix'||m==='drop'));
+      el.hidden=!show;
+    });
+    [].slice.call(document.querySelectorAll('.group')).forEach(function(g){
+      var any=[].slice.call(g.querySelectorAll('.item')).some(function(e){return !e.hidden;});
+      g.hidden=!any;
+    });
+  }
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('.seg button');
+    if(b){
+      var id=b.parentNode.getAttribute('data-id');
+      var mk=b.getAttribute('data-mark');
+      if(state.marks[id]===mk)delete state.marks[id];else state.marks[id]=mk;
+      save();applyMarks();return;
+    }
+    var c=e.target.closest&&e.target.closest('.chip');
+    if(c){
+      filter=c.getAttribute('data-filter');
+      [].slice.call(document.querySelectorAll('.chip')).forEach(function(x){x.setAttribute('aria-pressed',String(x===c));});
+      applyFilter();
+    }
+  });
+  document.addEventListener('input',function(e){
+    var t=e.target;
+    if(t.classList&&t.classList.contains('note')){var id=t.getAttribute('data-id');if(t.value)state.notes[id]=t.value;else delete state.notes[id];save();}
+  });
+  document.getElementById('respondent-view').addEventListener('change',function(e){document.body.classList.toggle('respondent',e.target.checked);});
+
+  // 메모
+  function memoText(){
+    var lines=['[미유 성향 질문 검토 · 문항 situational-0.1-draft]'];
+    var dirName={A:'A. 30문항 유지, 읽는 범위를 좁히고 시범 응답부터',B:'B. 36~40문항으로 늘림',C:'C. 관점을 9~10개로 줄임'};
+    lines.push('전체 방향: '+(state.dir?dirName[state.dir]:'아직 정하지 않음'));
+    ['fix','drop','ok'].forEach(function(k){
+      var list=ITEMS.filter(function(i){return state.marks[i.id]===k;});
+      lines.push('');
+      lines.push(LABEL[k]+' ('+list.length+')');
+      list.forEach(function(i){lines.push('- '+i.id+' '+i.topic+(state.notes[i.id]?' — '+state.notes[i.id]:''));});
+    });
+    var rest=ITEMS.filter(function(i){return !state.marks[i.id];});
+    lines.push('');
+    lines.push('아직 안 본 것 ('+rest.length+'): '+(rest.map(function(i){return i.id;}).join(', ')||'없음'));
+    var withNote=rest.filter(function(i){return state.notes[i.id];});
+    withNote.forEach(function(i){lines.push('- '+i.id+' 메모: '+state.notes[i.id]);});
+    if(state.overall){lines.push('');lines.push('전체 의견: '+state.overall);}
+    return lines.join('\n');
+  }
+  function renderMemo(){
+    var c={ok:0,fix:0,drop:0};
+    ITEMS.forEach(function(i){var m=state.marks[i.id];if(m)c[m]++;});
+    var rest=ITEMS.length-c.ok-c.fix-c.drop;
+    document.getElementById('memo-summary').innerHTML='<p><b>괜찮음 '+c.ok+'</b> · <b>고쳐야 함 '+c.fix+'</b> · <b>빼기 '+c.drop+'</b> · 아직 안 본 것 '+rest+' (전체 '+ITEMS.length+'문항)</p>';
+    document.getElementById('memo-text').value=memoText();
+    document.getElementById('overall').value=state.overall;
+    ['a','b','c'].forEach(function(k){document.getElementById('dir-'+k).checked=state.dir===k.toUpperCase();});
+    document.getElementById('dir-none').checked=!state.dir;
+  }
+  document.getElementById('overall').addEventListener('input',function(e){state.overall=e.target.value;save();document.getElementById('memo-text').value=memoText();});
+  [].slice.call(document.querySelectorAll('input[name=dir]')).forEach(function(r){r.addEventListener('change',function(){state.dir=r.value;save();document.getElementById('memo-text').value=memoText();});});
+  document.getElementById('copy-btn').addEventListener('click',function(){
+    var ta=document.getElementById('memo-text');
+    var st=document.getElementById('copy-status');
+    ta.value=memoText();
+    function fallback(){ta.focus();ta.select();st.textContent='글을 선택해 두었어요. 직접 복사(Ctrl+C)해 주세요.';}
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(ta.value).then(function(){st.textContent='복사했어요. 채팅에 붙여넣어 주세요.';},fallback);}
+      else fallback();
+    }catch(e){fallback();}
+  });
+  document.getElementById('clear-btn').addEventListener('click',function(){
+    var b=document.getElementById('clear-btn');
+    if(b.getAttribute('data-armed')!=='1'){b.setAttribute('data-armed','1');b.textContent='한 번 더 누르면 모두 지웁니다';return;}
+    state={marks:{},notes:{},overall:'',dir:''};save();applyMarks();renderMemo();
+    ITEMS.forEach(function(i){var n=document.getElementById('note-'+i.id);if(n)n.value='';});
+    b.removeAttribute('data-armed');b.textContent='표시 모두 지우기';
+  });
+  applyMarks();
+})();
+</script>
+</body>
+</html>
