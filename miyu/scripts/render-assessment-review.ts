@@ -189,19 +189,19 @@ function limitsTab() {
   return `<div class="notice"><b>이 탭의 숫자는 실제 사람의 응답이 아닙니다.</b> 가상 응답자 ${SIM_PEOPLE.toLocaleString("ko-KR")}명이 "자기 성향대로 얼마나 일관되게 고르는가(응답 일관성)"를 낮음 · 보통 · 높음으로 가정하고 답한 결과입니다 (해당 없음 ${pct(SIM_NA_RATE)}). 같은 사람이 같은 성향으로 다시 답한다고 두었으므로 <b>실제 재응답 일치는 이보다 낮을 가능성이 큽니다.</b> "30문항이 정확하다"는 증거가 아니라 <b>문항 구조가 허용하는 한계</b>입니다. 실제 신뢰도는 시범 응답으로만 알 수 있습니다.</div>
 
 <h2>한 줄 결론</h2>
-<p class="lead">30문항 · 13관점(지표 ${totalIndicators}개)으로 <b>관점별 "어느 쪽에 가까운가"와 정도</b>는 읽을 수 있습니다. <b>12유형 같은 이름 하나, 점수의 작은 차이, "상황에 따라 다름" 판정</b>은 읽을 수 없습니다. 12유형을 맞추려고 억지로 분류하지 않습니다.</p>
+<p class="lead">30문항 · 13관점(지표 ${totalIndicators}개)으로는 <b>관점별 "어느 쪽에 가까운가"와 정도</b>까지만 읽기로 합니다. <b>12유형 같은 이름 하나, 점수의 작은 차이, "상황에 따라 다름" 판정</b>은 읽지 않습니다. 12유형을 맞추려고 억지로 분류하지 않습니다. 아래 숫자는 가상 응답으로 계산한 문항 구조의 한계이며, 이 질문의 실제 신뢰도나 정확도가 아닙니다. 실제 값은 시범 응답으로 확인합니다.</p>
 
 <h2>응답 일관성별로 본 13개 관점</h2>
 <div class="tablewrap"><table><thead><tr><th>응답 일관성(가정)</th><th class="num">재응답 점수 상관</th><th class="num">방향 일치</th><th class="num">세 구분 일치</th><th class="num">7개 관점의 높음/낮음이 모두 같음</th></tr></thead><tbody>${summaryRows}</tbody></table></div>
 <p class="small">범위는 13개 관점 중 가장 낮은 값~가장 높은 값입니다. <b>재응답 점수 상관</b>은 같은 사람이 두 번 답한 점수끼리의 상관(1에 가까울수록 같음), <b>방향 일치</b>는 두 번 모두 높음/낮음이 나온 사람 중 같은 방향인 몫, <b>세 구분 일치</b>는 높음 · 고르게 · 낮음이 두 번 같은 몫, 마지막 열은 대표 경향 12유형이 쓰는 7개 관점의 방향이 모두 같은 사람의 몫입니다.</p>
 
-<h2>읽어도 되는 것 · 읽으면 안 되는 것</h2>
+<h2>읽기로 하는 것 · 읽지 않기로 하는 것</h2>
 <div class="two">
-  <div><h3>읽어도 되는 것</h3><ul class="rules">
-    <li><b>관점별 방향 (높은 쪽 / 낮은 쪽).</b> 응답 일관성이 보통이면 방향이 나온 사람의 ${range(mid.perspectives.map((p) => p.directionAgree), pct)}가 다시 답해도 같은 방향입니다.</li>
+  <div><h3>읽기로 하는 것</h3><ul class="rules">
+    <li><b>관점별 방향 (높은 쪽 / 낮은 쪽).</b> 가상 응답에서 응답 일관성을 보통으로 가정하면 방향이 나온 사람의 ${range(mid.perspectives.map((p) => p.directionAgree), pct)}가 다시 답해도 같은 방향이었습니다. 실제 사람의 재응답 일치가 아니며, 실제로는 이보다 낮을 수 있습니다.</li>
     <li>기질 · 성격 · 관계를 <b>영역별로 따로</b> 보여 주는 설계.</li>
   </ul></div>
-  <div><h3>읽으면 안 되는 것</h3><ol class="rules">
+  <div><h3>읽지 않기로 하는 것</h3><ol class="rules">
     <li><b>점수의 작은 차이</b> (58과 62). 보통일 때 재응답 점수 상관 ${range(mid.perspectives.map((p) => p.retestCorrelation), f2)}, 낮으면 ${range(low.perspectives.map((p) => p.retestCorrelation), f2)}입니다.</li>
     <li><b>"약간"과 "고르게"의 경계.</b> 세 구분이 두 번 같은 몫이 보통일 때 ${range(mid.perspectives.map((p) => p.classAgree), pct)}뿐입니다.</li>
     <li><b>12유형 이름.</b> 7개 관점의 높음/낮음이 모두 같게 나오는 사람이 보통일 때 ${pct(mid.sevenSignAll)}, 높아도 ${pct(high.sevenSignAll)}입니다. 같은 사람이 다시 답하면 다른 이름이 나올 가능성이 더 큽니다.</li>
@@ -222,11 +222,11 @@ function limitsTab() {
 <details><summary>13개 관점 표 펼치기</summary>
 <div class="tablewrap"><table><thead><tr><th>관점</th><th class="num">지표 수</th><th class="num">재응답 상관 (일관성 낮음)</th><th class="num">재응답 상관 (보통)</th><th class="num">방향 일치 (보통)</th></tr></thead><tbody>${perspRows}</tbody></table></div></details>
 
-<h2>정해 주실 것</h2>
+<h2>읽는 범위 — A안으로 진행 (운영자 결정)</h2>
 <div class="tablewrap"><table class="choices"><thead><tr><th>선택</th><th>내용</th><th>장점</th><th>단점</th></tr></thead><tbody>
-<tr class="rec"><td><b>A. 30문항 유지 + 읽는 범위를 좁힘 (추천)</b></td><td>관점별 방향과 정도(뚜렷 · 약간 · 고르게)만 리포트에 씁니다. 12유형 이름 · 점수의 작은 차이 · 상황 판정은 쓰지 않습니다. 실제 사람 응답으로 시범 후 결정합니다.</td><td>바로 시범 가능, 문항 수 부담 없음</td><td>"나는 이런 유형"이라는 짧은 이름은 줄 수 없음</td></tr>
-<tr><td><b>B. 36~40문항으로 늘림</b></td><td>지표가 적거나 흔들리는 관점에 문항을 더해 관점당 5~6개 이상으로 맞춥니다.</td><td>방향 · 정도의 안정이 올라감</td><td>응답 시간이 늘고 끝까지 답하는 사람이 줄 수 있음</td></tr>
-<tr><td><b>C. 관점을 9~10개로 줄임</b></td><td>비슷한 관점을 합치거나 우선순위가 낮은 관점을 뺍니다.</td><td>같은 문항 수로 관점당 지표가 늘어남</td><td>설명 폭이 줄고 관점의 뜻이 뭉개질 수 있음</td></tr>
+<tr class="rec"><td><b>A. 30문항 유지 + 읽는 범위를 좁힘 (결정됨)</b></td><td>관점별 방향과 정도(뚜렷 · 약간 · 고르게)만 리포트에 씁니다. 12유형 이름 · 점수의 작은 차이 · 상황 판정은 쓰지 않습니다. 실제 사람 응답으로 시범 후 결정합니다.</td><td>바로 시범 가능, 문항 수 부담 없음</td><td>"나는 이런 유형"이라는 짧은 이름은 줄 수 없음</td></tr>
+<tr><td><b>B. 36~40문항으로 늘림 (지금은 하지 않음)</b></td><td>지표가 적거나 흔들리는 관점에 문항을 더해 관점당 5~6개 이상으로 맞춥니다.</td><td>방향 · 정도의 안정이 올라감</td><td>응답 시간이 늘고 끝까지 답하는 사람이 줄 수 있음</td></tr>
+<tr><td><b>C. 관점을 9~10개로 줄임 (지금은 하지 않음)</b></td><td>비슷한 관점을 합치거나 우선순위가 낮은 관점을 뺍니다.</td><td>같은 문항 수로 관점당 지표가 늘어남</td><td>설명 폭이 줄고 관점의 뜻이 뭉개질 수 있음</td></tr>
 </tbody></table></div>
 <p class="small">시범에서 확인할 것: ① 같은 사람의 재응답 일치 ② 관점 간 상관(위 가상 값보다 큰지) ③ 문항별 해당 없음 비율 ④ 끝까지 답한 비율. 이 결과를 보기 전에는 12유형을 화면에 연결하지 않습니다. 이 계산이 정하지 못하는 것: 문항이 정말 그 성향을 재는지(타당도), 같은 문장을 사람마다 다르게 읽는 정도.</p>`;
 }
@@ -237,12 +237,7 @@ function memoTab() {
   return `<h2>검토 메모</h2>
 <p class="hint">문항 탭에서 누른 표시와 한 줄 메모가 아래에 모입니다. <b>복사</b>를 눌러 채팅에 붙여넣으면 제가 그대로 읽고 문항을 고칩니다. 이 표시는 이 브라우저에만 저장됩니다 (다른 기기와 공유되지 않음).</p>
 <div class="summary" id="memo-summary" aria-live="polite"></div>
-<fieldset class="choice"><legend>전체 방향 (부족한 점 탭의 선택)</legend>
-  <label><input type="radio" name="dir" value="A" id="dir-a"> A. 30문항 유지, 읽는 범위를 좁히고 시범 응답부터</label>
-  <label><input type="radio" name="dir" value="B" id="dir-b"> B. 36~40문항으로 늘림</label>
-  <label><input type="radio" name="dir" value="C" id="dir-c"> C. 관점을 9~10개로 줄임</label>
-  <label><input type="radio" name="dir" value="" id="dir-none" checked> 아직 정하지 않음</label>
-</fieldset>
+<p class="small">읽는 범위는 A안(30문항 유지, 방향 · 정도만 읽기, 13관점과 12유형은 실제 시범 응답을 보고 조정)으로 정해졌습니다. 기질 · 성격 · 가까운 관계 영역은 모두 유지합니다.</p>
 <label class="note-label" for="overall">전체 의견 (선택)</label>
 <textarea id="overall" rows="4" maxlength="1500" placeholder="예: 관계 영역 문항이 연애 상황에만 치우친 것 같아요."></textarea>
 <div class="actions"><button type="button" class="primary" id="copy-btn">검토 내용 복사</button><button type="button" id="clear-btn">표시 모두 지우기</button><span id="copy-status" class="small" role="status"></span></div>
@@ -430,8 +425,7 @@ const SCRIPT = `
   // 메모
   function memoText(){
     var lines=['[미유 성향 질문 검토 · 문항 ${DRAFT_CONTENT_VERSION}]'];
-    var dirName={A:'A. 30문항 유지, 읽는 범위를 좁히고 시범 응답부터',B:'B. 36~40문항으로 늘림',C:'C. 관점을 9~10개로 줄임'};
-    lines.push('전체 방향: '+(state.dir?dirName[state.dir]:'아직 정하지 않음'));
+    lines.push('방향: A안 (30문항 유지, 13관점 · 12유형은 시범 응답을 보고 조정). 채점 방향을 본 뒤의 두 번째 검토입니다.');
     ['fix','drop','ok'].forEach(function(k){
       var list=ITEMS.filter(function(i){return state.marks[i.id]===k;});
       lines.push('');
@@ -453,11 +447,8 @@ const SCRIPT = `
     document.getElementById('memo-summary').innerHTML='<p><b>괜찮음 '+c.ok+'</b> · <b>고쳐야 함 '+c.fix+'</b> · <b>빼기 '+c.drop+'</b> · 아직 안 본 것 '+rest+' (전체 '+ITEMS.length+'문항)</p>';
     document.getElementById('memo-text').value=memoText();
     document.getElementById('overall').value=state.overall;
-    ['a','b','c'].forEach(function(k){document.getElementById('dir-'+k).checked=state.dir===k.toUpperCase();});
-    document.getElementById('dir-none').checked=!state.dir;
   }
   document.getElementById('overall').addEventListener('input',function(e){state.overall=e.target.value;save();document.getElementById('memo-text').value=memoText();});
-  [].slice.call(document.querySelectorAll('input[name=dir]')).forEach(function(r){r.addEventListener('change',function(){state.dir=r.value;save();document.getElementById('memo-text').value=memoText();});});
   document.getElementById('copy-btn').addEventListener('click',function(){
     var ta=document.getElementById('memo-text');
     var st=document.getElementById('copy-status');
@@ -479,11 +470,17 @@ const SCRIPT = `
 })();
 `;
 
+const args = process.argv.slice(2);
+const takeIdx = args.indexOf("--take-url");
+/** 풀어보기 화면 주소 — 단독 파일은 같은 폴더의 파일, 게시본은 --take-url로 준 주소 */
+const takeUrl = takeIdx >= 0 ? args[takeIdx + 1] : "assessment-take.html";
+
 const BODY = `<div class="wrap">
 <header>
   <h1>미유 성향 질문 검토</h1>
   <p class="sub">기질 · 성격 · 가까운 관계를 영역별로 따로 보는 상황형 ${DRAFT_ITEMS.length}문항 (초안)</p>
   <p class="status"><b>초안 · 검토 전 · 검사 화면에 적용하지 않았습니다.</b> 공식 MBTI · TCI · 애착검사의 문항을 가져오지 않고 새로 썼습니다. 결과는 "지금 응답에서 나타난 경향"이며 진단이나 평생 유형이 아닙니다. 문항 ${DRAFT_CONTENT_VERSION} · 채점 ${DRAFT_SCORING_VERSION}</p>
+  <p class="status"><b>이 화면에는 점수 방향이 그대로 보입니다.</b> 처음 풀어 볼 때는 답이 유도되지 않도록 채점 방향과 운영자 설명이 없는 <a href="${takeUrl}" target="_blank" rel="noopener">풀어보기 화면</a>을 먼저 하고, 이 화면은 그 다음 두 번째 검토에 쓰세요.</p>
 </header>
 <nav class="tabs" role="tablist" aria-label="검토 화면">
   <button type="button" class="tab" role="tab" data-tab="items" aria-selected="true">문항 ${DRAFT_ITEMS.length}개</button>
@@ -503,7 +500,6 @@ const TITLE = "미유 성향 질문 검토";
 const fragment = `<title>${TITLE}</title>\n<style>${CSS}</style>\n${BODY}\n<script>${SCRIPT}</script>\n`;
 const standalone = `<!doctype html>\n<html lang="ko">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<meta name="robots" content="noindex">\n<title>${TITLE}</title>\n<style>${CSS}</style>\n</head>\n<body>\n${BODY}\n<script>${SCRIPT}</script>\n</body>\n</html>\n`;
 
-const args = process.argv.slice(2);
 const fragIdx = args.indexOf("--fragment");
 if (fragIdx >= 0) {
   writeFileSync(args[fragIdx + 1], fragment);
