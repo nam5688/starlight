@@ -16,6 +16,7 @@ import {
 import type { FiveElement, LuckInfo, PillarKey, SajuEngine, SajuInput, SajuNote, SajuOk, SajuOptions, SajuPillarData, SajuResult, YinYang } from "./engine.ts";
 import { FIVE_ELEMENTS, PILLAR_LABEL } from "./engine.ts";
 import { BOUNDARY_MARGIN_MINUTES, SAJU_POLICY } from "./policy.ts";
+import { iga } from "./josa.ts";
 
 export const ENGINE_INFO = { name: "manseryeok", version: "2.0.0" } as const;
 
@@ -194,7 +195,7 @@ export function calculateSaju(input: SajuInput, options: SajuOptions = SAJU_POLI
         notes.push({
           kind: "near-boundary",
           pillars: KEYS.filter((k) => near[k]),
-          message: `${jeolgi ? "절기가 바뀌는 시각" : "시주가 바뀌는 시각"}과 ${BOUNDARY_MARGIN_MINUTES}분 이내라, 출생시간이 조금만 달라도 ${listPillars(near)}이 될 수 있습니다.`,
+          message: `${jeolgi ? "절기가 바뀌는 시각" : "시주가 바뀌는 시각"}과 ${BOUNDARY_MARGIN_MINUTES}분 이내라, 출생시간이 조금만 달라도 ${iga(listPillars(near))} 될 수 있습니다.`,
           alternative: near,
         });
       }

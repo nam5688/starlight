@@ -82,6 +82,7 @@ test("경계 근처: 몇 분 차이로 시주가 바뀌면 안내한다", () => 
   assert.ok(near);
   assert.deepEqual(near.pillars, ["hour"]);
   assert.equal(near.alternative?.hour, "기묘");
+  assert.match(near.message, /시주 기묘가 될 수 있습니다/, "받침 없는 간지 뒤에는 '가'");
   const calm = ok(calculateSaju(solar(2000, 6, 1, "08:30")));
   assert.ok(!calm.notes.some((n) => n.kind === "near-boundary"));
 });

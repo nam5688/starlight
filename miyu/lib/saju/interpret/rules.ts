@@ -6,6 +6,7 @@ import { getBranchTenGod, getTenGod } from "manseryeok";
 import type { Evidence, Topic } from "../../report/evidence.ts";
 import type { FiveElement, PillarKey, SajuOk } from "../engine.ts";
 import { PILLAR_LABEL } from "../engine.ts";
+import { iga, wagwa } from "../josa.ts";
 import { yearGanji } from "../yearly.ts";
 import { branchRelations, stemRelation, type Relation } from "./relations.ts";
 
@@ -131,7 +132,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         source: "saju",
         topics: ["personality"],
         strength: "moderate",
-        fact: `원국 글자에 ${el}이 없음 (지장간 제외)`,
+        fact: `원국 글자에 ${iga(el)} 없음 (지장간 제외)`,
         cue: `전통 해석에서는 ${el} 기운(${ELEMENT_MEANING[el]})을 생활에서 의식적으로 채우는 쪽을 권하는 경우가 많습니다. 없다는 것이 결함이라는 뜻은 아닙니다.`,
       });
     }
@@ -316,7 +317,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
           source: "saju",
           topics: ["timing"],
           strength: "weak",
-          fact: `${label} 지지 ${p.branch}와 원국 ${PILLAR_LABEL[key]}의 ${r.kind}${ELEMENT_OF_RELATION(r)}`,
+          fact: `${label} 지지 ${wagwa(p.branch)} 원국 ${PILLAR_LABEL[key]}의 ${r.kind}${ELEMENT_OF_RELATION(r)}`,
           cue: `${RELATION_CUE[r.kind]} (${PILLAR_AREA[key]} 영역)`,
           period: { from: p.from, to: p.to, label: `${label} ${p.stem}${p.branch}` },
         });
@@ -346,7 +347,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         source: "saju",
         topics: ["timing"],
         strength: "weak",
-        fact: `${year}년 세운 지지 ${g.branch}와 원국 ${PILLAR_LABEL[key]}의 ${r.kind}${ELEMENT_OF_RELATION(r)}`,
+        fact: `${year}년 세운 지지 ${wagwa(g.branch)} 원국 ${PILLAR_LABEL[key]}의 ${r.kind}${ELEMENT_OF_RELATION(r)}`,
         cue: `${RELATION_CUE[r.kind]} (${PILLAR_AREA[key]} 영역)`,
         period,
       });

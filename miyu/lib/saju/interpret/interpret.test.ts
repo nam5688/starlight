@@ -69,3 +69,12 @@ test("성별이 없으면 대운 · 배우자 별 근거를 만들지 않는다"
   assert.ok(!list.some((e) => e.id === "saju.spouse-star"));
   assert.ok(list.some((e) => e.id === "saju.seun.2026"), "세운은 성별 없이도");
 });
+
+test("근거 문장의 조사는 받침에 맞춘다 (수가 없음 · 인과 원국)", () => {
+  assert.equal(byId("saju.element.수.none")!.fact, "원국 글자에 수가 없음 (지장간 제외)");
+  const b = calculateSaju({ year: 1992, month: 6, day: 21, calendar: "solar", isLeapMonth: false, birthTime: "15:10", gender: "female" }) as SajuOk;
+  const list = sajuEvidence(b, { reference: { year: 2026, month: 10 }, gender: "female" });
+  assert.match(list.find((e) => e.id === "saju.daeun.next.year.충")!.fact, /지지 인과 원국 년주의 충/);
+  assert.match(list.find((e) => e.id === "saju.element.목.none")!.fact, /목이 없음/);
+  for (const e of [...items, ...list]) assert.doesNotMatch(e.fact, /(수|화|토|오|묘|사|미|유|해|자)이 없음|(인|진|신|술|축)와 /, e.id);
+});
