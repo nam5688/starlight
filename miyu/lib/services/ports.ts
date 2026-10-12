@@ -5,7 +5,8 @@ import type { Answers } from "../assessment/types.ts";
 import type { GatewayPayment, OrderStatus } from "../commerce/order.ts";
 import type { ReportStatus } from "../commerce/report.ts";
 import type { ConsentRecord, ConsentType } from "../membership/terms.ts";
-import type { DataSource, FreeSummary, FullReport } from "../report/types.ts";
+import type { ReportContent } from "../report/generator.ts";
+import type { DataSource, FreeSummary } from "../report/types.ts";
 import type { SajuResult } from "../saju/engine.ts";
 
 export type Channel = "web";
@@ -69,7 +70,8 @@ export type ReportRecord = {
   orderId: string;
   assessmentId: string;
   status: ReportStatus;
-  content: FullReport | null;
+  /** v1(FullReport, 개발용 규칙) 또는 v2(PersonalReportV2, AI 서술 + 근거) */
+  content: ReportContent | null;
   generator: string | null;
   generatorVersion: string | null;
   attempts: number;

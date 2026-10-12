@@ -1,7 +1,7 @@
 // 리포트 생성과 조회. 결제가 확인된 주문에만 만들고, 완성된 리포트는 다시 만들지 않는다.
 
 import { REPORT_GENERATING_STALE_MS, REPORT_MAX_ATTEMPTS } from "../commerce/report.ts";
-import type { ReportGenerator } from "../report/generator.ts";
+import type { ReportGenerator, ReportInput } from "../report/generator.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { AssessmentRecord, MiyuRepository, OrderRecord, ReportRecord } from "./ports.ts";
 
@@ -98,13 +98,14 @@ export async function ensureReport(deps: ReportDeps, order: OrderRecord): Promis
 /** 다시 만들기를 더 할 수 있는지 (상한을 넘으면 운영자 확인) */
 export const canRetryReport = (report: Pick<ReportRecord, "attempts"> | null) => !report || report.attempts < REPORT_MAX_ATTEMPTS;
 
-export function reportInputOf(a: AssessmentRecord) {
+export function reportInputOf(a: AssessmentRecord): ReportInput {
   return {
     nickname: a.nickname,
     knownMbti: a.knownMbti,
     birthText: formatAssessmentBirth(a),
     summary: a.summary,
     saju: a.saju,
+    gender: null,
   };
 }
 

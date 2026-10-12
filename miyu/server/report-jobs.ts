@@ -7,7 +7,7 @@ import { now, reportGenerator, writeRepository } from "./services";
 // 리포트 생성은 응답을 보낸 뒤 백그라운드에서 한다 (AI 생성이 길어도 결제 화면이 멈추지 않게).
 // 서버가 중간에 꺼지면 결과 화면의 상태 확인이 멈춘 작업을 이어받는다 (report-service의 claimReport).
 
-const deps = () => ({ repo: writeRepository(), generator: reportGenerator, now });
+const deps = () => ({ repo: writeRepository(), generator: reportGenerator(), now });
 
 function log(where: string, e: unknown) {
   // 리포트 내용 · 개인정보는 남기지 않는다

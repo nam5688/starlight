@@ -60,3 +60,29 @@ export function paymentEnvOf(config: Extract<PaymentConfig, { ok: true }>): Paym
   if (config.liveMode) return "live";
   return isTossDocsKey(config.clientKey) || isTossDocsKey(config.secretKey) ? "test-docs" : "test";
 }
+
+export type AiConfig =
+  /** AI 연결 전 — 개발용 규칙 생성기를 쓴다 */
+  | { kind: "none" }
+  /** 로컬 검증용 가짜 AI 서버 (127.0.0.1 / localhost만) — 비용 없음 */
+  | { kind: "mock-local"; baseUrl: string }
+  /** 설정에 이름은 있지만 아직 만들지 않은 제공사 · 잘못된 값 — 개발용 생성기로 두고 /setup에 이유를 보여준다 */
+  | { kind: "invalid"; reason: string };
+
+/**
+ * 리포트 AI 설정. 실제 유료 제공사(Anthropic · OpenAI · Google 등)는 운영자가 고른 뒤에 추가한다.
+ * - AI_PROVIDER 비움 → 개발용 규칙 생성기
+ * - AI_PROVIDER=mock-local + AI_MOCK_URL=http://127.0.0.1:포트 → 로컬 가짜 AI 서버로 v2 리포트 흐름 검증
+ */
+export function aiConfig(): AiConfig {
+  const provider = read("AI_PROVIDER");
+  if (!provider) return { kind: "none" };
+  if (provider === "mock-local") {
+    const baseUrl = read("AI_MOCK_URL");
+    if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?$/.test(baseUrl)) {
+      return { kind: "invalid", reason: "AI_MOCK_URL은 로컬 주소(http://127.0.0.1:포트)만 쓸 수 있습니다" };
+    }
+    return { kind: "mock-local", baseUrl };
+  }
+  return { kind: "invalid", reason: `AI 제공사 ${provider}는 아직 연결하지 않았습니다 (선택 · 승인 후 추가)` };
+}

@@ -98,7 +98,7 @@ function Detail({
   );
 }
 
-function SajuChart({ saju }: { saju: SajuSection }) {
+export function SajuChart({ saju }: { saju: SajuSection }) {
   if (saju.status === "not-connected") {
     return <p className="text-[15px] text-ink-2">만세력 계산 결과가 없는 결과입니다.</p>;
   }

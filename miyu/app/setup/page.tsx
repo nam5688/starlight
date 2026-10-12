@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
+import { aiConfig } from "@/server/env";
 import { getSiteUrl } from "@/server/session";
 import { CONNECTION_TEXT, currentStep, TABLE_STATE_TEXT, type FieldState, type StepState } from "@/server/setup-checks";
 import { getSetupStatus } from "@/server/setup-status";
@@ -40,6 +41,7 @@ export default function SetupPage() {
 async function SetupContent() {
   await connection(); // 열 때마다 현재 설정을 다시 확인한다
   const [status, siteUrl] = await Promise.all([getSetupStatus(), getSiteUrl()]);
+  const ai = aiConfig();
   const now = currentStep(status.steps);
   const nowIndex = now ? status.steps.indexOf(now) + 1 : null;
 
@@ -160,6 +162,12 @@ async function SetupContent() {
           ) : (
             <span className={status.connection === "ok" ? "text-accent" : "text-danger"}>{CONNECTION_TEXT[status.connection]}</span>
           )}
+        </p>
+        <p className="mt-2 text-[14px] leading-relaxed">
+          <span className="font-semibold">리포트 생성기</span>{" "}
+          {ai.kind === "none" && <span className="text-ink-2">개발용 규칙 생성기 (AI 연결 전 · 비용 없음)</span>}
+          {ai.kind === "mock-local" && <span className="text-accent">로컬 모의 AI — 새 리포트 흐름 검증용 (실제 AI 아님 · 비용 없음)</span>}
+          {ai.kind === "invalid" && <span className="text-danger">{ai.reason}. 지금은 개발용 규칙 생성기로 만듭니다.</span>}
         </p>
       </section>
 

@@ -52,7 +52,7 @@ test("개발용 리포트: 모든 영역을 채우고, 괄호 바로 뒤에 조�
       ASSESSMENT_MODULES.flatMap((m) => m.items.map((item, i) => [item.id, ((v + i) % 5) + 1])),
     );
     const summary = buildDevFreeSummary(answers);
-    const report = buildDevReport({ nickname: "지민", knownMbti: "INFJ", birthText: "1995년 4월 12일 (양력) · 출생시간 모름", summary, saju: { status: "not-connected" } });
+    const report = buildDevReport({ nickname: "지민", knownMbti: "INFJ", birthText: "1995년 4월 12일 (양력) · 출생시간 모름", summary, saju: { status: "not-connected" }, gender: null });
     assert.equal(report.source, "dev-scoring");
     assert.ok(report.details.mbti.findings.length >= 4);
     assert.ok(report.integrated.common.length >= 1);

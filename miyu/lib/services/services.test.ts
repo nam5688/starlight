@@ -6,8 +6,10 @@ import type { GatewayPayment } from "../commerce/order.ts";
 import { isValidOrderNumber } from "../commerce/order.ts";
 import { PERSONAL_REPORT } from "../config/product.ts";
 import { EMPTY_BASIC_INFO, type BasicInfo } from "../profile/basic-info.ts";
+import { createAiReportGenerator } from "../report/ai/generator.ts";
+import { createMockModel } from "../report/ai/mock-model.ts";
 import { devReportGenerator } from "../report/generate-dev-report.ts";
-import type { ReportGenerator } from "../report/generator.ts";
+import { isPersonalV2, type ReportGenerator } from "../report/generator.ts";
 import { manseryeokEngine as sajuEngine } from "../saju/manseryeok-engine.ts";
 import { submitAssessment } from "./assessment-service.ts";
 import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "./order-service.ts";
@@ -277,6 +279,33 @@ test("리포트: 생성에 실패하면 failed로 남기고 다시 시도할 수
   const retried = await ensureReport({ repo: mem.repo, generator: devReportGenerator, now: () => TODAY }, paid.order);
   assert.equal(retried?.status, "ready");
   assert.equal(retried?.attempts, 2);
+});
+
+test("리포트 v2(AI 모의 모델): 일시 오류가 계속되면 failed, 다시 만들기로 완성하고 이후에는 다시 부르지 않는다", async () => {
+  const { mem, assessment } = await setup();
+  const started = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id });
+  if (started.kind !== "order") throw new Error();
+  const { gateway } = fakeGateway({ confirm: (i) => ({ ok: true, payment: done(i.orderId, i.amount, i.paymentKey) }) });
+  const paid = await confirmPayment({ repo: mem.repo, gateway }, { userId: USER, orderNumber: started.order.orderNumber, paymentKey: "pk_ai", amount: started.order.amount });
+  if (paid.kind !== "paid") throw new Error();
+
+  const model = createMockModel({ failTimes: 3 });
+  const generator = createAiReportGenerator({ model, now: () => TODAY, sleep: async () => {} });
+  const failed = await runReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order);
+  assert.equal(failed?.status, "failed");
+  assert.equal(failed?.lastError, "모의 일시 오류");
+  assert.equal(mem.orders.get(paid.order.id)?.status, "paid");
+
+  const ready = await runReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order, { retryFailed: true });
+  assert.equal(ready?.status, "ready");
+  assert.equal(ready?.generator, "ai:mock");
+  assert.ok(ready?.content && isPersonalV2(ready.content));
+  assert.equal(ready.content.personName, "지민");
+
+  const callsBefore = model.calls;
+  const again = await ensureReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order);
+  assert.equal(model.calls, callsBefore, "완성된 리포트는 다시 보기만 한다 (AI 비용 없음)");
+  assert.deepEqual(again?.content, ready.content);
 });
 
 test("가입 동의: 필수 항목이 빠지면 기록하지 않고, 모두 동의하면 이용 가능", async () => {

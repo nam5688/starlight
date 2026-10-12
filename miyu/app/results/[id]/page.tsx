@@ -5,9 +5,11 @@ import { Suspense } from "react";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
 import { FreeSummaryBody } from "@/components/report/free-summary-body";
 import { FullReportView } from "@/components/report/full-report-view";
+import { PersonalV2View } from "@/components/report/personal-v2-view";
 import { PurchasePanel } from "@/components/results/purchase-panel";
 import { SourceBadge } from "@/components/ui/source-badge";
 import { buttonSecondary, pageNarrow, pageWide } from "@/components/ui/styles";
+import { isPersonalV2 } from "@/lib/report/generator";
 import { formatAssessmentBirth } from "@/lib/services/assessment-service";
 import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
@@ -56,27 +58,30 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
 
   if (view.paidOrder && report?.status === "ready" && report.content) {
+    const content = report.content;
+    const footer = (
+      <div className="space-y-4">
+        <p className="text-[13px] text-ink-3">
+          주문번호 {view.paidOrder.orderNumber} · 생성 {report.generator} {report.generatorVersion}
+        </p>
+        <Link href="/my" className={buttonSecondary}>
+          MY로 가기
+        </Link>
+      </div>
+    );
     return (
       <>
         <ResultHeader
-          title={`${assessment.nickname} 님의 개인 통합 리포트`}
-          source={report.content.source}
+          title={isPersonalV2(content) ? `${assessment.nickname} 님의 개인 종합 사주 리포트` : `${assessment.nickname} 님의 개인 통합 리포트`}
+          subtitle={isPersonalV2(content) ? "사주 원국 · 대운 · 세운 중심, 성향 응답은 보조 근거" : undefined}
+          source={content.source}
           meta={`검사일 ${created} · 저장된 리포트`}
         />
-        <FullReportView
-          report={report.content}
-          idPrefix="r-"
-          footer={
-            <div className="space-y-4">
-              <p className="text-[13px] text-ink-3">
-                주문번호 {view.paidOrder.orderNumber} · 생성 {report.generator} {report.generatorVersion}
-              </p>
-              <Link href="/my" className={buttonSecondary}>
-                MY로 가기
-              </Link>
-            </div>
-          }
-        />
+        {isPersonalV2(content) ? (
+          <PersonalV2View report={content} idPrefix="r-" footer={footer} />
+        ) : (
+          <FullReportView report={content} idPrefix="r-" footer={footer} />
+        )}
       </>
     );
   }
@@ -100,7 +105,17 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   );
 }
 
-function ResultHeader({ title, source, meta }: { title: string; source: "sample" | "dev-scoring"; meta: string }) {
+function ResultHeader({
+  title,
+  subtitle = "사주 · MBTI · 기질 · 애착",
+  source,
+  meta,
+}: {
+  title: string;
+  subtitle?: string;
+  source: "sample" | "dev-scoring";
+  meta: string;
+}) {
   return (
     <div className="border-b border-line bg-mist">
       <div className={`${pageWide} py-7 md:py-9`}>
@@ -109,7 +124,7 @@ function ResultHeader({ title, source, meta }: { title: string; source: "sample"
           <span className="text-[13px] text-ink-3">{meta}</span>
         </div>
         <h1 className="mt-3 text-[26px] font-bold tracking-tight md:text-[32px]">{title}</h1>
-        <p className="mt-1 text-[16px] text-ink-2">사주 · MBTI · 기질 · 애착</p>
+        <p className="mt-1 text-[16px] text-ink-2">{subtitle}</p>
       </div>
     </div>
   );

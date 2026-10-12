@@ -1,9 +1,12 @@
 import "server-only";
 import { createTossPaymentGateway } from "@/lib/integrations/tosspayments/gateway";
 import { createSupabaseRepository } from "@/lib/integrations/supabase/repository";
+import { createMockLocalModel } from "@/lib/integrations/ai/mock-local";
+import { createAiReportGenerator } from "@/lib/report/ai/generator";
 import { devReportGenerator } from "@/lib/report/generate-dev-report";
+import type { ReportGenerator } from "@/lib/report/generator";
 import { manseryeokEngine } from "@/lib/saju/manseryeok-engine";
-import { paymentConfig } from "./env";
+import { aiConfig, paymentConfig } from "./env";
 import { createAdminSupabase, createServerSupabase } from "./supabase";
 
 // 웹 채널에서 쓰는 구현체 묶음. 다른 채널은 같은 서비스(lib/services)에 다른 구현체를 넘긴다.
@@ -24,8 +27,15 @@ export function paymentGateway() {
   return createTossPaymentGateway({ secretKey: config.secretKey, baseUrl: config.apiBaseUrl });
 }
 
-/** 리포트 생성기 — AI 해석이 연결되면 여기서 바꾼다 */
-export const reportGenerator = devReportGenerator;
+/**
+ * 리포트 생성기 — AI 설정(server/env.ts aiConfig)에 따라 고른다.
+ * 어떤 생성기로 만들었는지는 리포트에 이름 · 버전으로 함께 저장된다.
+ */
+export function reportGenerator(): ReportGenerator {
+  const ai = aiConfig();
+  if (ai.kind === "mock-local") return createAiReportGenerator({ model: createMockLocalModel({ baseUrl: ai.baseUrl }) });
+  return devReportGenerator;
+}
 
 /** 사주 계산 엔진 (manseryeok, 계산 기준은 lib/saju/policy.ts) */
 export const sajuEngine = manseryeokEngine;
