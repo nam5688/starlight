@@ -24,7 +24,7 @@ start() {
   mkdir -p "$WORK_DIR/pg"
   [ "$(id -u)" = "0" ] && chown postgres "$WORK_DIR/pg" && chmod 755 "$WORK_DIR"
   if [ ! -f "$WORK_DIR/pg/PG_VERSION" ]; then
-    as_pg "$PG_BIN/initdb" -D "$WORK_DIR/pg" -U postgres --auth=trust >/dev/null
+    as_pg "$PG_BIN/initdb" -D "$WORK_DIR/pg" -U postgres --auth=trust -E UTF8 --locale=C.UTF-8 >/dev/null
   fi
   as_pg "$PG_BIN/pg_ctl" -D "$WORK_DIR/pg" -o "-p $PG_PORT -k /tmp -c listen_addresses=127.0.0.1" -l "$WORK_DIR/pg/pg.log" start </dev/null >/dev/null 2>&1
   until "$PG_BIN/pg_isready" -h 127.0.0.1 -p "$PG_PORT" >/dev/null 2>&1; do sleep 0.3; done

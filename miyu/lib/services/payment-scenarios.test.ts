@@ -300,3 +300,42 @@ test("같은 주문에 다른 결제키의 두 번째 승인이 들어옴(동시
   assert.equal((await s.fresh()).paymentKey, "pk_1", "원래 결제키를 바꾸지 않는다");
   assert.ok((await s.mem.repo.listPaymentEvents((await s.fresh()).id)).some((e) => e.status === "DUPLICATE_PAYMENT"));
 });
+
+test("승인 완료 · 환불 알림의 기준: 서버가 주문을 실제로 바꾼 한 번만 '전이'로 알려 주고, 다시 열기 · 중복 알림 · 재확인은 전이가 아니다", async () => {
+  const s = await setup();
+  // 결제창에서 돌아왔다는 것만으로는 전이가 아니다: 결제사가 승인하지 않았으면 paid가 아니다
+  s.toss.state.confirmMode = "reject";
+  const rejected = await s.confirm();
+  assert.equal(rejected.kind, "rejected");
+
+  const s2 = await setup();
+  const first = await s2.confirm();
+  assert.equal(first.kind === "paid" && first.transitioned, true, "처음 승인된 요청만 전이");
+  const again = await s2.confirm(); // 결과 주소를 새로고침 · 다시 열기
+  assert.equal(again.kind, "paid");
+  assert.equal(again.kind === "paid" && again.transitioned, undefined, "이미 결제 완료인 주문을 다시 열면 전이가 아니다");
+
+  // 결제사 알림(웹훅)이 같은 결제를 다시 알려도 전이가 아니다
+  const sync = await syncPayment({ repo: s2.mem.repo, gateway: s2.toss.gateway }, { paymentKey: "pk_1" });
+  assert.equal(sync.kind, "unchanged");
+  // 재확인도 이미 맞으면 전이가 아니다
+  const ok = await reconcileOrder(s2.deps, await s2.fresh());
+  assert.equal(ok.kind, "ok");
+
+  // 환불은 결제사 취소를 확인해 주문이 바뀐 한 번만 전이
+  s2.toss.cancel("pk_1");
+  const refunded = await syncPayment({ repo: s2.mem.repo, gateway: s2.toss.gateway }, { paymentKey: "pk_1" });
+  assert.equal(refunded.kind === "updated" && refunded.to, "refunded");
+  const refundedAgain = await syncPayment({ repo: s2.mem.repo, gateway: s2.toss.gateway }, { paymentKey: "pk_1" });
+  assert.equal(refundedAgain.kind, "unchanged");
+
+  // 응답 유실 뒤 재확인이 결제 완료로 맞춘 경우도 한 번만 전이
+  const s3 = await setup();
+  s3.toss.state.confirmMode = "approve-then-lost";
+  assert.equal((await s3.confirm()).kind, "checking");
+  s3.advance(5 * MIN);
+  const rec = await reconcileOrder(s3.deps, await s3.fresh());
+  assert.equal(rec.kind === "paid" && rec.transitioned, true);
+  const rec2 = await reconcileOrder(s3.deps, await s3.fresh());
+  assert.equal(rec2.kind, "ok");
+});

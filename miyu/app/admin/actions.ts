@@ -4,12 +4,12 @@ import { redirect } from "next/navigation";
 import { adminResetReport } from "@/lib/services/admin-service";
 import { isValidOrderNumber } from "@/lib/commerce/order";
 import { getAdminMember } from "@/server/member";
-import { alert, recordOps } from "@/server/ops";
+import { recordOps, testTelegram } from "@/server/ops";
 import { reconcileAllNow, reconcileOneNow } from "@/server/reconcile";
 import { claimAndSchedule } from "@/server/report-jobs";
 import { sweepReports } from "@/server/report-sweep";
 import { writeRepository } from "@/server/services";
-import { paymentConfig, telegramEnv } from "@/server/env";
+import { paymentConfig } from "@/server/env";
 
 // 관리자 동작은 모두 서버에서 관리자 여부를 다시 확인하고, 운영 기록(ops_events)에 남긴다.
 // 환불 실행 기능은 없다 — 환불은 토스페이먼츠 관리자에서 직접 한다.
@@ -54,10 +54,18 @@ export async function adminRunAllAction() {
   redirect(`/admin?note=${encodeURIComponent(`점검 완료: 주문 ${summary.checked}건 확인 (반영 ${summary.counts.paid + summary.counts.refunded + summary.counts.closed}, 확인 필요 ${summary.counts.anomaly}, 조회 실패 ${summary.counts.error})`)}`);
 }
 
-/** 알림이 실제로 가는지 시험한다 (고객 정보 없음) */
+/**
+ * 알림이 실제로 가는지 시험한다 (고객 정보 없음). 종류별 시험 메시지 5건을 텔레그램으로 직접 보내고,
+ * 텔레그램이 받았는지를 서버 로그와 구분해서 알려 준다 — 텔레그램 키가 없으면 "연결 안 됨"이라고 분명히 말한다.
+ */
 export async function adminTestAlertAction() {
   const admin = await getAdminMember();
   if (!admin) redirect("/");
-  const result = await alert({ kind: "admin.test_alert", severity: "warn", title: "알림 시험입니다 (조치 필요 없음)", dedupeKey: `admin-test:${Date.now()}` });
-  redirect(`/admin?note=${encodeURIComponent(`알림 시험 결과: ${result === "sent" ? `보냄 (${telegramEnv() ? "텔레그램 + 서버 로그" : "서버 로그만 — 텔레그램 미연결"})` : result === "failed" ? "실패 (서버 로그 확인)" : "중복으로 건너뜀"}`)}`);
+  const result = await testTelegram();
+  const note = !result.configured
+    ? "텔레그램이 연결되어 있지 않습니다 (TELEGRAM_BOT_TOKEN · TELEGRAM_CHAT_ID 없음). 지금은 알림이 서버 로그에만 남습니다."
+    : result.failed
+      ? `텔레그램 전송 실패 (${result.sent}건 보낸 뒤): ${result.failed.help}`
+      : `텔레그램이 시험 메시지 ${result.sent}건을 받았습니다. 내 텔레그램에 [미유·테스트]로 시작하는 메시지가 도착했는지 확인하세요.`;
+  redirect(`/admin?note=${encodeURIComponent(note)}`);
 }

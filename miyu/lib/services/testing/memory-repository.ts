@@ -52,6 +52,42 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       profiles.set(userId, p);
       return p;
     },
+    async withdrawMemberData(userId) {
+      if (!profiles.has(userId)) return { ok: false, reason: "not-found" };
+      const mine = (o: OrderRecord) => o.userId === userId;
+      if ([...orders.values()].some((o) => mine(o) && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)) return { ok: false, reason: "pending-order" };
+      if ([...reports.values()].some((r) => r.userId === userId && (r.status === "queued" || r.status === "generating"))) return { ok: false, reason: "report-in-progress" };
+      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, feedback: 0, regions: 0 };
+      for (const [k, f] of [...feedback]) {
+        if (f.userId !== userId) continue;
+        feedback.delete(k);
+        counts.feedback++;
+      }
+      for (const [k, c] of [...contexts]) {
+        if (c.userId !== userId) continue;
+        contexts.delete(k);
+        counts.personal_contexts++;
+      }
+      for (const [k, r] of [...reports]) {
+        if (r.userId !== userId) continue;
+        reports.delete(k);
+        counts.reports++;
+      }
+      if (regions.delete(userId)) counts.regions++;
+      const ordered = new Set([...orders.values()].filter(mine).map((o) => o.assessmentId));
+      for (const [k, a] of [...assessments]) {
+        if (a.userId !== userId) continue;
+        if (!ordered.has(a.id)) {
+          assessments.delete(k);
+          counts.assessments_deleted++;
+        } else if (a.nickname !== "탈퇴") {
+          assessments.set(k, { ...a, nickname: "탈퇴", knownMbti: null, answers: {}, summary: {} as AssessmentRecord["summary"], saju: {} as AssessmentRecord["saju"], contentVersion: "withdrawn" });
+          counts.assessments_emptied++;
+        }
+      }
+      profiles.set(userId, { ...profiles.get(userId)!, nickname: null });
+      return { ok: true, counts };
+    },
     async updateProfileNickname(userId, nickname) {
       const p = profiles.get(userId) ?? { userId, nickname: null, paymentCustomerKey: `ck-${userId}` };
       profiles.set(userId, { ...p, nickname });

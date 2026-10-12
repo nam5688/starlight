@@ -4,7 +4,7 @@ import { newErrorId } from "@/lib/ops/redact";
 import type { OrderRecord } from "@/lib/services/ports";
 import { reconcileBatch, reconcileOrder, type ReconcileOptions, type ReconcileOutcome, type ReconcileSummary } from "@/lib/services/reconcile-service";
 import { paymentConfig } from "./env";
-import { alert, logError, recordOps } from "./ops";
+import { alert, logError, notifyOrderEvent, recordOps } from "./ops";
 import { queueAndScheduleReport, runReportInline } from "./report-jobs";
 import { now, paymentGateway, writeRepository } from "./services";
 
@@ -37,9 +37,11 @@ async function report(outcome: ReconcileOutcome): Promise<void> {
   switch (outcome.kind) {
     case "paid":
       await recordOps({ kind: "reconcile.paid", severity: "warn", orderNumber: o.orderNumber, message: "결제사 승인 기록을 확인해 주문을 결제 완료로 맞췄습니다 (리포트 준비 시작)" });
+      if (outcome.transitioned !== false) await notifyOrderEvent("paid", o);
       return;
     case "refunded":
       await recordOps({ kind: "reconcile.refunded", severity: "warn", orderNumber: o.orderNumber, message: "결제사에서 취소된 결제를 확인해 주문을 환불됨으로 맞췄습니다 (열람 권한 회수)" });
+      await notifyOrderEvent("refunded", o);
       return;
     case "closed":
       await recordOps({ kind: "reconcile.closed", severity: "info", orderNumber: o.orderNumber, message: `결제가 끝나지 않은 주문을 정리했습니다 (${outcome.reason})` });
@@ -49,7 +51,7 @@ async function report(outcome: ReconcileOutcome): Promise<void> {
       await alert({
         kind: "reconcile.anomaly",
         severity: outcome.code === "DUPLICATE_PAYMENT" || outcome.code === "PAID_BUT_NOT_AT_GATEWAY" ? "error" : "warn",
-        title: `결제 확인이 필요합니다 (${outcome.code})`,
+        title: `결제 기록 불일치 — 확인 필요 (${outcome.code})`,
         orderNumber: o.orderNumber,
         errorId,
         dedupeKey: `anomaly:${o.orderNumber}:${outcome.code}`,

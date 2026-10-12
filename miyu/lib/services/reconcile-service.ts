@@ -30,7 +30,7 @@ export type ReconcileOptions = Partial<typeof RECONCILE_DEFAULTS>;
 
 export type ReconcileOutcome =
   /** 결제사는 승인했는데 우리 주문이 대기였음 → 결제 완료로 맞춤 (리포트 준비 필요) */
-  | { kind: "paid"; order: OrderRecord }
+  | { kind: "paid"; order: OrderRecord; transitioned?: boolean }
   /** 결제사에서 취소됨 → 주문을 환불됨으로 맞춤 (열람 권한 회수) */
   | { kind: "refunded"; order: OrderRecord }
   /** 결제가 끝나지 않은 채 정리됨 */
@@ -104,7 +104,7 @@ export async function reconcileOrder(deps: Deps, order: OrderRecord, options: Re
       } catch {
         // 리포트 준비는 결과 화면의 상태 확인이 이어받는다
       }
-      return { kind: "paid", order: applied.order };
+      return { kind: "paid", order: applied.order, transitioned: applied.transitioned };
     }
     if (applied.kind === "updated") {
       return applied.order.status === "refunded" ? { kind: "refunded", order: applied.order } : { kind: "closed", order: applied.order, reason: payment.status };

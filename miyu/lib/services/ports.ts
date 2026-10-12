@@ -64,6 +64,10 @@ export type OrderRecord = {
 export type PaymentEnv = "test" | "test-docs" | "live";
 /** 처음 들어온 출처 (광고 · 채널 비교용). 값이 없으면 null */
 export type Acquisition = { source: string | null; medium: string | null; campaign: string | null };
+export type WithdrawDataResult =
+  | { ok: true; counts: Record<string, number> }
+  | { ok: false; reason: "pending-order" | "report-in-progress" | "not-found" };
+
 export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv"> & { acquisition?: Acquisition | null };
 export type OrderPatch = Partial<
   Pick<OrderRecord, "status" | "paymentKey" | "method" | "approvedAt" | "failureCode" | "failureMessage">
@@ -169,6 +173,11 @@ export interface MiyuRepository {
   getProfile(userId: string): Promise<ProfileRecord | null>;
   /** 프로필이 없으면 만들고(이미 있으면 그대로) 돌려준다 — 테이블보다 먼저 가입한 회원 보완용 */
   ensureProfile(userId: string): Promise<ProfileRecord>;
+  /**
+   * 회원 탈퇴 — 그 회원의 개인정보를 삭제하고 주문 · 결제 기록만 남긴다 (한 번에 처리, 여러 번 불러도 같은 결과).
+   * 진행 중인 결제 · 리포트 생성이 있으면 처리하지 않는다. 로그인 연결(Auth)은 이 함수가 다루지 않는다.
+   */
+  withdrawMemberData(userId: string): Promise<WithdrawDataResult>;
   updateProfileNickname(userId: string, nickname: string): Promise<void>;
   saveRegion(userId: string, region: { province: string; district: string }): Promise<void>;
 

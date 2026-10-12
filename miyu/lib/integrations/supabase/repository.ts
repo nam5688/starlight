@@ -221,6 +221,21 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       return created;
     },
 
+    async withdrawMemberData(userId) {
+      const { data, error } = await db.rpc("withdraw_member_data", { p_user_id: userId });
+      if (error) {
+        const msg = error.message ?? "";
+        if (msg.includes("withdraw_blocked_pending_order")) return { ok: false, reason: "pending-order" };
+        if (msg.includes("withdraw_blocked_report_in_progress")) return { ok: false, reason: "report-in-progress" };
+        if (msg.includes("withdraw_not_found")) return { ok: false, reason: "not-found" };
+        if (["PGRST202", "42883"].includes(error.code ?? "")) throw new Error("회원 탈퇴 처리 실패: DB 변경 10번(회원 탈퇴)을 먼저 적용해야 합니다.");
+        fail("회원 탈퇴 처리", error);
+      }
+      const counts: Record<string, number> = {};
+      for (const [k, v] of Object.entries((data ?? {}) as Record<string, unknown>)) counts[k] = Number(v) || 0;
+      return { ok: true, counts };
+    },
+
     async updateProfileNickname(userId, nickname) {
       const { error } = await db.from("profiles").update({ nickname }).eq("id", userId);
       if (error) fail("닉네임 저장", error);

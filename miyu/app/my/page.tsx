@@ -150,6 +150,11 @@ async function MyContent() {
             개인정보 처리방침
           </Link>
         </p>
+        <p className="mt-2 text-[13px] text-ink-3">
+          <Link href="/my/withdraw" className={textLink}>
+            회원 탈퇴
+          </Link>
+        </p>
       </section>
       <Actions signedIn />
     </>

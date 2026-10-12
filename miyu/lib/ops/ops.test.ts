@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createMemoryRepository } from "../services/testing/memory-repository.ts";
-import { ALERT_DEDUPE_MS, alertText, raiseAlert, type Notifier } from "./alerts.ts";
+import { ALERT_DEDUPE_MS, ALERT_ONCE_MS, alertText, raiseAlert, type Alert, type Notifier } from "./alerts.ts";
 import { ERROR_ID_PATTERN, newErrorId, redactSecrets, safeErrorMessage, safePath } from "./redact.ts";
 
 test("가림 처리: 비밀키 · 결제 키 · JWT · Bearer · 쿠키 · 봇 토큰 · 주소의 토큰", () => {
@@ -79,4 +79,32 @@ test("오류 식별번호: 같은 digest는 항상 같은 번호이고 조회 �
   assert.equal(a, errorIdFromDigest("1234567890"));
   assert.match(a, ERROR_ID_PATTERN);
   assert.notEqual(a, errorIdFromDigest("1234567891"));
+});
+
+test("알림 표시: 실결제가 아닌 환경은 [미유·테스트]로 시작해 실제 운영 알림과 섞이지 않고, 정보 알림은 오류 · 주의 표시가 없다", () => {
+  const paid: Alert = { kind: "payment.approved", severity: "info", title: "결제 승인 완료 · 개인 통합 리포트 9,900원", orderNumber: "MEU-20261012-ABCDEFGHJK", dedupeKey: "k", lines: ["결제 환경 테스트"] };
+  assert.match(alertText(paid, { test: true }), /^\[미유·테스트\] 결제 승인 완료/);
+  assert.match(alertText(paid), /^\[미유\] 결제 승인 완료/);
+  const err: Alert = { kind: "reconcile.anomaly", severity: "error", title: "결제 기록 불일치 — 확인 필요 (DUPLICATE_PAYMENT)", dedupeKey: "k" };
+  assert.match(alertText(err, { test: true }), /^\[미유·테스트\] 오류 · 결제 기록 불일치/);
+  assert.match(alertText(err), /^\[미유 오류\]/);
+  // 알림에는 고객 정보 자리가 없다: 주문번호 · 금액 · 상품 이름뿐
+  assert.doesNotMatch(alertText(paid, { test: true }), /이름|생년월일|답변|고민/);
+});
+
+test("주문당 한 번만 보내는 알림(승인 완료 · 환불 완료): 같은 주문으로 다시 불러도 보내지 않는다", async () => {
+  const t = new Date("2026-10-12T00:00:00Z").getTime();
+  let now = () => new Date(t);
+  const mem = createMemoryRepository(now);
+  const sent: string[] = [];
+  const notifier: Notifier = { send: async (text) => (sent.push(text), true) };
+  const paid: Alert = { kind: "payment.approved", severity: "info", title: "결제 승인 완료", orderNumber: "MEU-20261012-AAAAAAAAAA", dedupeKey: "payment.approved:MEU-20261012-AAAAAAAAAA", dedupeMs: ALERT_ONCE_MS };
+  assert.equal(await raiseAlert({ repo: mem.repo, notifier, now, test: true }, paid), "sent");
+  // 몇 달 뒤에 같은 주문으로 다시 불러도 보내지 않는다
+  now = () => new Date(t + 200 * 24 * 3600_000);
+  assert.equal(await raiseAlert({ repo: mem.repo, notifier, now, test: true }, paid), "deduped");
+  // 다른 주문 · 환불은 따로 보낸다
+  assert.equal(await raiseAlert({ repo: mem.repo, notifier, now }, { ...paid, kind: "payment.refunded", title: "환불 완료", dedupeKey: "payment.refunded:MEU-20261012-AAAAAAAAAA" }), "sent");
+  assert.equal(await raiseAlert({ repo: mem.repo, notifier, now }, { ...paid, orderNumber: "MEU-20261012-BBBBBBBBBB", dedupeKey: "payment.approved:MEU-20261012-BBBBBBBBBB" }), "sent");
+  assert.equal(sent.length, 3);
 });

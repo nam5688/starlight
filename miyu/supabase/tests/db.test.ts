@@ -505,3 +505,98 @@ test("Supabase 1,000행 제한: 집계용 목록은 나눠서 모두 가져오�
   }
   assert.ok(Math.abs((await repo.sumAiCostSince(t0)) - 12.5) < 0.001);
 });
+
+test("회원 탈퇴(10번 마이그레이션): 서버만 부를 수 있고, 그 회원의 개인정보만 지우며 주문 · 결제 기록은 남기고, 진행 중이면 막고, 여러 번 해도 같다", async () => {
+  const W = await makeUser();
+  const O = await makeUser(); // 다른 회원 — 영향받지 않아야 한다
+  const repo = createSupabaseRepository(admin);
+  const deps = () => ({ repo, saju: sajuEngine });
+  const save = async (userId: string, nickname: string) => {
+    const r = await submitAssessment(deps(), { userId, channel: "web", info: { ...info, nickname }, answers, today: new Date() });
+    assert.ok(r.ok);
+    return r.ok ? r.assessment : (null as never);
+  };
+  await repo.ensureProfile(W.id);
+  await repo.ensureProfile(O.id);
+  const paid = await save(W.id, "탈퇴검사");
+  const free = await save(W.id, "무료검사");
+  const others = await save(O.id, "남의검사");
+
+  // 결제 → 리포트 완성 → 고민 입력 → 만족도
+  const started = await startCheckout({ repo, now: () => new Date() }, { userId: W.id, assessmentId: paid.id });
+  assert.equal(started.kind, "order");
+  const order = started.kind === "order" ? started.order : (null as never);
+  const confirmed = await confirmPayment({ repo, gateway }, { userId: W.id, orderNumber: order.orderNumber, paymentKey: `pk-wd-${randomUUID()}`, amount: order.amount });
+  assert.equal(confirmed.kind, "paid");
+  const paidOrder = confirmed.kind === "paid" ? confirmed.order : (null as never);
+  await queueReport({ repo }, paidOrder);
+  await runReport({ repo, generator: devReportGenerator, now: () => new Date() }, paidOrder);
+  await repo.upsertContext({ assessmentId: paid.id, userId: W.id, topic: "work", question: "이직할까", situation: "", matched: "", differed: "", excerpt: "", agreedAt: new Date().toISOString() });
+  await admin.from("user_regions").upsert({ user_id: W.id, province: "서울", district: "마포구" });
+  const report = await repo.getReportByOrder(order.id);
+  assert.equal(report?.status, "ready");
+  await admin.from("report_feedback").insert({ report_id: report!.id, user_id: W.id, rating: 5 });
+
+  // 권한: 브라우저(로그인 회원 · 비로그인)는 이 함수를 부를 수 없다
+  const asUser = await W.client.rpc("withdraw_member_data", { p_user_id: W.id });
+  assert.ok(asUser.error, "로그인 회원이 직접 부를 수 없다");
+  const asAnon = await anon.rpc("withdraw_member_data", { p_user_id: W.id });
+  assert.ok(asAnon.error, "비로그인이 부를 수 없다");
+  assert.equal((await repo.getReportByOrder(order.id))?.status, "ready", "거부된 호출은 아무것도 바꾸지 않았다");
+
+  // 진행 중인 결제가 있으면 막는다 (방금 시작한 대기 주문)
+  const second = await save(W.id, "새검사");
+  const pending = await startCheckout({ repo, now: () => new Date() }, { userId: W.id, assessmentId: second.id });
+  assert.equal(pending.kind, "order");
+  const blocked = await repo.withdrawMemberData(W.id);
+  assert.deepEqual(blocked, { ok: false, reason: "pending-order" });
+  assert.ok((await repo.getAssessment(paid.id))?.nickname === "탈퇴검사", "막히면 아무것도 지우지 않는다");
+  // 대기 주문을 정리(취소)한 뒤 탈퇴
+  await repo.updateOrder(pending.kind === "order" ? pending.order.id : "", ["pending"], { status: "canceled", failureCode: "TEST" });
+
+  const done = await repo.withdrawMemberData(W.id);
+  assert.equal(done.ok, true);
+  assert.ok(done.ok && done.counts.reports === 1 && done.counts.personal_contexts === 1 && done.counts.feedback === 1 && done.counts.regions === 1);
+
+  // 지워진 것
+  assert.equal(await repo.getAssessment(free.id), null, "주문 없는 검사는 삭제");
+  assert.equal((await repo.listReportStatuses(W.id)).length, 0, "리포트 삭제");
+  assert.equal(await repo.getContext(paid.id), null, "고민 입력 삭제");
+  const feedbackLeft = await admin.from("report_feedback").select("id").eq("user_id", W.id);
+  assert.equal(feedbackLeft.data?.length, 0);
+  const regionLeft = await admin.from("user_regions").select("user_id").eq("user_id", W.id);
+  assert.equal(regionLeft.data?.length, 0);
+  // 비워진 것: 주문이 가리키는 검사는 내용이 없다
+  const shell = await admin.from("assessments").select("*").eq("id", paid.id).single();
+  assert.equal(shell.data?.nickname, "탈퇴");
+  assert.equal(shell.data?.known_mbti, null);
+  assert.deepEqual(shell.data?.answers, {});
+  assert.deepEqual(shell.data?.saju, {});
+  assert.ok(shell.data?.withdrawn_at);
+  assert.doesNotMatch(JSON.stringify(shell.data), /탈퇴검사|1990/);
+  const profile = await admin.from("profiles").select("nickname, withdrawn_at").eq("id", W.id).single();
+  assert.equal(profile.data?.nickname, null);
+  assert.ok(profile.data?.withdrawn_at);
+
+  // 남은 것: 주문 · 결제 처리 기록 · 가입 동의 기록
+  const keptOrder = await repo.getOrderByNumber(order.orderNumber);
+  assert.equal(keptOrder?.status, "paid");
+  assert.equal(keptOrder?.amount, 9900);
+  assert.ok((await repo.listPaymentEvents(order.id)).length >= 1, "결제 처리 기록 보관");
+
+  // 다른 회원은 그대로
+  assert.equal((await repo.getAssessment(others.id))?.nickname, "남의검사");
+
+  // 여러 번 해도 같은 결과
+  const again = await repo.withdrawMemberData(W.id);
+  assert.ok(again.ok && again.counts.reports === 0 && again.counts.assessments_emptied === 0);
+  // 존재하지 않는 회원
+  assert.deepEqual(await repo.withdrawMemberData(randomUUID()), { ok: false, reason: "not-found" });
+
+  // 로그인 연결 삭제(탈퇴 처리): 주문이 가리키는 회원 행은 남고 카카오 식별 정보는 지워진다
+  const del = await admin.auth.admin.deleteUser(W.id, true);
+  assert.equal(del.error, null);
+  const authRow = execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-tAc", `select deleted_at is not null, raw_user_meta_data::text from auth.users where id='${W.id}'`], { encoding: "utf8" }).trim();
+  assert.match(authRow, /^t\|\{\}$/);
+  assert.equal((await repo.getOrderByNumber(order.orderNumber))?.status, "paid", "회원 계정 행이 남아 주문 기록은 그대로");
+});

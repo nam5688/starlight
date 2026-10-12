@@ -4,7 +4,7 @@ import { newErrorId, safeErrorMessage } from "@/lib/ops/redact";
 import { confirmPayment, markCheckoutFailed } from "@/lib/services/order-service";
 import { paymentConfig } from "@/server/env";
 import { saleGateCheck } from "@/server/capacity";
-import { alert, logError } from "@/server/ops";
+import { alert, logError, notifyOrderEvent } from "@/server/ops";
 import { queueAndScheduleReport } from "@/server/report-jobs";
 import { paymentGateway, writeRepository } from "@/server/services";
 import { getMember } from "@/server/member";
@@ -42,6 +42,8 @@ export async function confirmPaymentAction(input: { orderId: string; paymentKey:
       case "paid":
         // 리포트는 백그라운드에서 만든다 — 결제 결과 화면을 기다리게 하지 않고, 실패해도 결제에 영향이 없다
         await queueAndScheduleReport(result.order);
+        // 서버가 결제를 확인해 주문을 결제 완료로 바꾼 요청에서만 알린다 (이미 완료된 주문을 다시 열 때는 알리지 않는다)
+        if (result.transitioned) await notifyOrderEvent("paid", result.order);
         return { kind: "paid", assessmentId: result.order.assessmentId };
       case "checking": {
         let errorId: string | null = null;

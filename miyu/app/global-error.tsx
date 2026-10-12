@@ -1,13 +1,13 @@
 "use client";
 
-import "./fonts/pretendard-subset.css";
+import { miyuFontVariables } from "./fonts/miyu-fonts";
 import "./globals.css";
 import { errorIdFromDigest } from "@/lib/ops/redact";
 
 /** 최상위 화면 자체가 깨졌을 때의 안내 — 자체 html · body를 가진다. 링크는 일반 주소 이동으로 전체를 다시 불러온다 */
 export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   return (
-    <html lang="ko">
+    <html lang="ko" className={miyuFontVariables}>
       <body className="text-[16px] leading-relaxed">
         <title>일시적인 문제 · ME:U 미유</title>
         <main className="mx-auto w-full max-w-2xl px-5 py-16 md:px-8 md:py-24">

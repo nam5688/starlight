@@ -62,11 +62,22 @@ export function paymentEnvOf(config: Extract<PaymentConfig, { ok: true }>): Paym
   return isTossDocsKey(config.clientKey) || isTossDocsKey(config.secretKey) ? "test-docs" : "test";
 }
 
-/** 운영 알림용 텔레그램 값 — 둘 다 있을 때만 보낸다 (없으면 서버 로그에만 남긴다) */
-export function telegramEnv(): { botToken: string; chatId: string } | null {
+/**
+ * 운영 알림용 텔레그램 값 — 둘 다 있을 때만 보낸다 (없으면 서버 로그에만 남긴다).
+ * TELEGRAM_API_BASE_URL은 로컬 검증용 가짜 텔레그램 서버(127.0.0.1 / localhost)에만 쓸 수 있고, 그 밖의 주소는 무시한다.
+ */
+export function telegramEnv(): { botToken: string; chatId: string; apiBase?: string } | null {
   const botToken = read("TELEGRAM_BOT_TOKEN");
   const chatId = read("TELEGRAM_CHAT_ID");
-  return botToken && chatId ? { botToken, chatId } : null;
+  if (!botToken || !chatId) return null;
+  const override = read("TELEGRAM_API_BASE_URL");
+  try {
+    const url = override ? new URL(override) : null;
+    if (url && (url.hostname === "127.0.0.1" || url.hostname === "localhost")) return { botToken, chatId, apiBase: url.origin };
+  } catch {
+    // 잘못된 값은 무시하고 실제 텔레그램 주소를 쓴다
+  }
+  return { botToken, chatId };
 }
 
 /** 관리자 화면에 들어갈 수 있는 회원번호(Supabase user id) 목록 — 비어 있으면 관리자 화면은 열리지 않는다 */

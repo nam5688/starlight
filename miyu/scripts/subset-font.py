@@ -3,7 +3,9 @@
 본문 글꼴(Pretendard, OFL-1.1) 줄이기 — npm 패키지의 가변 글꼴에서 필요한 글자만 남겨 woff2 두 개로 만든다.
 - Pretendard-core.woff2: 화면 문구에 실제로 쓰인 글자 + 기본 라틴 + 기호 (첫 화면에서 받는 파일)
 - Pretendard-rest.woff2: 사용자 입력 · AI 문장에 나올 수 있는 한글 2,350자(KS X 1001) 중 core에 없는 글자 (필요한 화면에서만 받는다)
-- pretendard-subset.css: 위 두 파일의 @font-face (unicode-range로 나눠 받는다). 글꼴 이름은 라이선스(OFL 예약 이름)에 맞춰 "Miyu Sans"로 바꾼다
+- miyu-fonts.ts: 두 파일을 next/font/local로 불러오는 설정(글자 범위 unicode-range 포함). app/layout.tsx · global-error.tsx가 쓴다
+  (next/font가 첫 화면 글꼴을 미리 받아 두고, core는 font-display: optional이라 늦게 도착해도 화면이 흔들리지 않는다)
+글꼴 이름은 라이선스(OFL 예약 이름)에 맞춰 파일 안에서 "Miyu Sans"로 바꾼다
 실행(개발자 PC, 한 번): python3 -m venv /tmp/fontenv && /tmp/fontenv/bin/pip install fonttools brotli && /tmp/fontenv/bin/python scripts/subset-font.py
 화면 문구에 새 글자가 많이 늘면 다시 실행한다 (core에 없는 글자는 rest에서 받으므로 빠뜨려도 깨지지는 않는다).
 """
@@ -84,23 +86,7 @@ def build(chars, name):
 
 build(core, "Pretendard-core.woff2")
 build(rest, "Pretendard-rest.woff2")
-css = f"""/* scripts/subset-font.py가 만든 파일 — 직접 고치지 않는다 (글꼴 라이선스: app/fonts/LICENSE-Pretendard.txt) */
-@font-face {{
-  font-family: "Miyu Sans";
-  src: url("./Pretendard-core.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: {ranges(core)};
-}}
-@font-face {{
-  font-family: "Miyu Sans";
-  src: url("./Pretendard-rest.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: {ranges(rest)};
-}}
-"""
-open(os.path.join(OUT, "pretendard-subset.css"), "w", encoding="utf-8").write(css)
-print("css", len(css), "bytes")
+TEMPLATE = '// scripts/subset-font.py가 만든 파일 — 직접 고치지 않는다 (글꼴 라이선스: app/fonts/LICENSE-Pretendard.txt)\n// 본문 글꼴: Pretendard를 이 사이트에 쓰는 글자만 남긴 파일 두 개.\n// core: 화면 문구에 쓰인 글자. 첫 화면과 함께 미리 받고(preload), 늦게 도착하면 그 화면에서는 시스템 글꼴을 그대로 써서\n//       글자가 바뀌며 화면이 흔들리는 일(레이아웃 이동)이 없다 (font-display: optional). 한 번 받으면 다음 화면부터 계속 쓴다.\n// rest: 사용자 입력 · AI 문장에만 나오는 나머지 한글. 필요한 화면에서만 받는다.\n// next/font는 설정값을 파일 안에 직접 적은 글자(리터럴)로만 받으므로 글자 범위(unicode-range)가 아래에 그대로 들어 있다.\nimport localFont from "next/font/local";\n\nexport const miyuCore = localFont({\n  src: [{ path: "./Pretendard-core.woff2", weight: "400 700", style: "normal" }],\n  display: "optional",\n  variable: "--font-miyu-core",\n  adjustFontFallback: false,\n  declarations: [{ prop: "unicode-range", value: "@@CORE@@" }],\n});\n\nexport const miyuRest = localFont({\n  src: [{ path: "./Pretendard-rest.woff2", weight: "400 700", style: "normal" }],\n  display: "swap",\n  preload: false,\n  variable: "--font-miyu-rest",\n  adjustFontFallback: false,\n  declarations: [{ prop: "unicode-range", value: "@@REST@@" }],\n});\n\n/** <html>에 붙이는 클래스 — 글꼴 변수(--font-miyu-core · --font-miyu-rest)를 정의한다 */\nexport const miyuFontVariables = `${miyuCore.variable} ${miyuRest.variable}`;\n'
+ts = TEMPLATE.replace("@@CORE@@", ranges(core)).replace("@@REST@@", ranges(rest))
+open(os.path.join(OUT, "miyu-fonts.ts"), "w", encoding="utf-8").write(ts)
+print("miyu-fonts.ts", len(ts), "bytes")

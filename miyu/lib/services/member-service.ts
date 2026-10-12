@@ -7,6 +7,7 @@ import {
   TERMS_VERSION,
   type ConsentType,
 } from "../membership/terms.ts";
+import type { WithdrawalBlocker } from "../membership/withdrawal.ts";
 import type { MiyuRepository } from "./ports.ts";
 
 export type MemberStatus = {
@@ -55,4 +56,28 @@ export async function setMarketingConsent(repo: MiyuRepository, userId: string, 
 export async function canRemoveOnDecline(repo: MiyuRepository, userId: string): Promise<boolean> {
   const [assessments, orders] = await Promise.all([repo.listAssessments(userId), repo.listOrdersForUser(userId)]);
   return assessments.length === 0 && orders.length === 0;
+}
+
+/** 탈퇴를 막는 상태 (진행 중인 결제 확인 · 리포트 생성) — 화면에서 미리 알려 주기 위한 확인. 실제 판단은 DB 함수가 다시 한다 */
+export async function withdrawalBlockers(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<WithdrawalBlocker[]> {
+  const [orders, reports] = await Promise.all([repo.listOrdersForUser(userId), repo.listReportStatuses(userId)]);
+  const blockers: WithdrawalBlocker[] = [];
+  if (orders.some((o) => o.userId === userId && o.status === "pending" && now.getTime() - new Date(o.createdAt).getTime() < 3600_000)) blockers.push("pending-order");
+  if (reports.some((r) => r.status === "queued" || r.status === "generating")) blockers.push("report-in-progress");
+  return blockers;
+}
+
+export type WithdrawResult =
+  | { kind: "done"; counts: Record<string, number> }
+  | { kind: "blocked"; reason: WithdrawalBlocker }
+  | { kind: "not-found" };
+
+/**
+ * 회원 탈퇴의 데이터 처리 (개인정보 삭제 + 거래 기록 분리 보관). 로그인 연결 삭제는 호출한 쪽(서버)이 이어서 한다.
+ * 여러 번 불러도 같은 결과이므로, 뒤 단계가 실패했을 때 다시 시도해도 된다.
+ */
+export async function withdrawMember(repo: MiyuRepository, userId: string): Promise<WithdrawResult> {
+  const result = await repo.withdrawMemberData(userId);
+  if (result.ok) return { kind: "done", counts: result.counts };
+  return result.reason === "not-found" ? { kind: "not-found" } : { kind: "blocked", reason: result.reason };
 }

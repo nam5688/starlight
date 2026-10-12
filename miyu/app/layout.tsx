@@ -5,7 +5,7 @@ import { PreviewNotice } from "@/components/site/preview-notice";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
 import { siteUrl } from "@/server/env";
-import "./fonts/pretendard-subset.css";
+import { miyuFontVariables } from "./fonts/miyu-fonts";
 import "./globals.css";
 
 const TITLE = "ME:U 미유 · 개인 통합 분석 리포트";
@@ -28,7 +28,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className="h-full antialiased">
+    <html lang="ko" className={`${miyuFontVariables} h-full antialiased`}>
       <body className="flex min-h-full flex-col text-[16px] leading-relaxed">
         <a
           href="#main"

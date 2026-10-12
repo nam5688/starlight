@@ -21,3 +21,21 @@ test("텔레그램: 메시지 형식, 시간 초과 · 오류 응답은 false, �
   assert.equal(await both.send("a\nb"), true);
   assert.deepEqual(lines, ["[alert] a | b"]);
 });
+
+test("텔레그램 연결 시험: 실패 이유를 구분하고(토큰 · 채팅 번호 · 차단 · 접속), 값은 결과에 담지 않는다", async () => {
+  const reply = (status: number, description = "") => (async () => new Response(JSON.stringify({ ok: status === 200, description }), { status })) as unknown as typeof fetch;
+  const make = (f: typeof fetch) => createTelegramNotifier({ botToken: "123456:SECRET-TOKEN", chatId: "99887766", fetch: f });
+  assert.deepEqual(await make(reply(200)).check("x"), { ok: true });
+  assert.deepEqual(await make(reply(401, "Unauthorized")).check("x"), { ok: false, reason: "bad_token", status: 401 });
+  assert.deepEqual(await make(reply(404, "Not Found")).check("x"), { ok: false, reason: "bad_token", status: 404 });
+  assert.deepEqual(await make(reply(400, "Bad Request: chat not found")).check("x"), { ok: false, reason: "chat_not_found", status: 400 });
+  assert.deepEqual(await make(reply(403, "Forbidden: bot was blocked by the user")).check("x"), { ok: false, reason: "blocked", status: 403 });
+  assert.deepEqual(await make(reply(429, "Too Many Requests")).check("x"), { ok: false, reason: "rate_limited", status: 429 });
+  assert.deepEqual(await make((async () => { throw new Error("offline"); }) as unknown as typeof fetch).check("x"), { ok: false, reason: "network" });
+  // 결과 어디에도 토큰 · 채팅 번호가 없다
+  const failure = JSON.stringify(await make(reply(401, "Unauthorized")).check("x"));
+  assert.doesNotMatch(failure, /SECRET-TOKEN|99887766/);
+  // send()는 던지지 않고 성공 여부만 돌려준다
+  assert.equal(await make(reply(401)).send("x"), false);
+  assert.equal(await make(reply(200)).send("x"), true);
+});

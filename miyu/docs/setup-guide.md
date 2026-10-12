@@ -80,9 +80,9 @@ SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
    - 이미 실행한 파일을 다시 실행하면 "already exists" 오류가 납니다. 표가 모두 "있음"이면 그대로 두면 됩니다.
    - 첫 번째 파일 실행 중 오류가 났다면, 두 번째 파일로 넘어가지 말고 오류 문구를 알려주세요 (키 값은 보내지 않습니다).
 
-### 2단계 추가 — 나중에 생긴 DB 변경 (3~9번)
+### 2단계 추가 — 나중에 생긴 DB 변경 (3~10번)
 
-기능이 추가되면서 SQL 파일이 더 생겼습니다. **이미 적용한 파일은 다시 실행하지 않고, 아직 안 한 것만 번호 순서대로 한 번씩** 실행합니다. 방법은 위와 같습니다 (New query → 아래 명령으로 복사 → 붙여넣기 → Run → `Success`).
+기능이 추가되면서 SQL 파일이 더 생겼습니다. **어디까지 적용했는지 먼저 확인하세요 — `supabase/check-migrations.sql`을 SQL Editor에서 실행하면 번호별 "적용됨 / 아직 안 함 / 일부만"이 나옵니다 (읽기 전용, 자세한 순서는 [`update-guide.md`](./update-guide.md) 2장).** **이미 적용한 파일은 다시 실행하지 않고, 아직 안 한 것만 번호 순서대로 한 번씩** 실행합니다. 방법은 위와 같습니다 (New query → 아래 명령으로 복사 → 붙여넣기 → Run → `Success`).
 기존 회원 · 검사 · 주문 데이터는 지우거나 바꾸지 않습니다. 파일을 고쳐서 다시 실행하라는 안내는 하지 않습니다. 바뀐 내용은 항상 새 파일로 추가됩니다.
 
 | 번호 | 파일 | 하는 일 |
@@ -94,6 +94,7 @@ SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
 | 7 | `20261017000000_ai_usage.sql` | AI 호출 기록(횟수 · 토큰 · 예상 비용) 표와 색인을 만듭니다. 고객 정보는 담지 않습니다 |
 | 8 | `20261018000000_funnel_feedback.sql` | 방문 단계 기록 · 구매 후 만족도 표와, 주문에 유입 출처를 적을 칸을 추가합니다 |
 | 9 | `20261019000000_performance.sql` | 하루 AI 비용 합계 함수와 결제 재확인용 색인을 더합니다 |
+| 10 | `20261020000000_account_withdrawal.sql` | 회원 탈퇴(개인정보 삭제 + 주문 · 결제 기록만 분리 보관)를 처리하는 DB 함수를 더합니다. 실행만으로는 아무 데이터도 바뀌지 않습니다 |
 
 ```powershell
 Get-Content supabase\migrations\20261013000000_profile_backfill.sql -Raw -Encoding UTF8 | Set-Clipboard
@@ -103,11 +104,12 @@ Get-Content supabase\migrations\20261016000000_ops_events.sql -Raw -Encoding UTF
 Get-Content supabase\migrations\20261017000000_ai_usage.sql -Raw -Encoding UTF8 | Set-Clipboard
 Get-Content supabase\migrations\20261018000000_funnel_feedback.sql -Raw -Encoding UTF8 | Set-Clipboard
 Get-Content supabase\migrations\20261019000000_performance.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261020000000_account_withdrawal.sql -Raw -Encoding UTF8 | Set-Clipboard
 ```
 
 (여러 줄을 한꺼번에 붙여넣지 말고, **한 줄 실행 → SQL Editor에서 Run → 다음 줄** 순서로 합니다.)
 
-- 6~9번을 아직 안 했어도 결제 · 리포트 · MY는 그대로 동작합니다 (코드가 먼저 올라가고 DB 변경이 늦어도 주문 생성이 막히지 않도록 확인했습니다). 해당 번호를 적용하기 전에는 운영 기록 · AI 사용 기록 · 방문 단계 · 만족도가 쌓이지 않거나 집계가 비어 보일 뿐입니다. `/setup`의 DB 상태에서 `ops_events` 등으로 확인합니다.
+- 6~10번을 아직 안 했어도 결제 · 리포트 · MY는 그대로 동작합니다 (코드가 먼저 올라가고 DB 변경이 늦어도 주문 생성이 막히지 않도록 확인했습니다). 해당 번호를 적용하기 전에는 운영 기록 · AI 사용 기록 · 방문 단계 · 만족도가 쌓이지 않거나 집계가 비어 보일 뿐입니다. `/setup`의 DB 상태에서 `ops_events` 등으로 확인합니다.
 - 5번을 아직 안 했어도 다른 화면은 그대로 동작합니다. 다만 ‘나를 더 반영하기’ 저장이 "DB 변경 5번을 먼저 적용해야 합니다"라고 안내합니다. `/setup`의 DB 상태에서 `personal_contexts` 상태로도 확인할 수 있습니다.
 
 ## 3단계. 카카오 로그인 켜기

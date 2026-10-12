@@ -1,5 +1,6 @@
 import { syncPayment } from "@/lib/services/order-service";
 import { paymentConfig } from "@/server/env";
+import { notifyOrderEvent } from "@/server/ops";
 import { queueAndScheduleReport } from "@/server/report-jobs";
 import { paymentGateway, writeRepository } from "@/server/services";
 
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
       // 승인 응답이 유실돼 웹훅으로 결제가 확인된 경우에도 리포트를 준비한다 (응답 뒤 백그라운드 — 10초 제한 안에 응답)
       await queueAndScheduleReport(result.order);
     }
+    if (result.kind === "updated" && (result.to === "paid" || result.to === "refunded")) await notifyOrderEvent(result.to, result.order);
     return Response.json({ ok: true, result: result.kind });
   } catch {
     return new Response("retry", { status: 500 });

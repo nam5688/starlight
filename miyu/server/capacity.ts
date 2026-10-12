@@ -31,12 +31,12 @@ async function notifyClosed(gate: SaleGate, stage: "start" | "confirm") {
   await alert({
     kind: "sales.paused",
     severity: "warn",
-    title: gate.reason === "budget" ? "하루 AI 예산에 가까워 새 구매를 멈췄습니다" : "리포트 준비가 밀려 새 구매를 멈췄습니다",
+    title: gate.reason === "budget" ? "AI 예산 한도 — 하루 예산에 가까워 새 구매를 멈췄습니다" : "리포트 준비 대기 한도 — 준비가 밀려 새 구매를 멈췄습니다",
     dedupeKey: `sales-paused:${gate.reason}:${stage}`,
     lines: [`대기 ${gate.queued}건 · 생성 중 ${gate.generating}건 · 오늘 예상 비용 ${gate.todayCostKrw}원`, "이미 결제한 고객의 리포트는 계속 준비됩니다"],
   });
 }
 
 async function notifyBudget(gate: SaleGate) {
-  await alert({ kind: "budget.warn", severity: "warn", title: `하루 AI 예산의 ${gate.budgetUsedPct}%를 쓰거나 예약했습니다`, dedupeKey: `budget-warn:${new Date().toISOString().slice(0, 10)}` });
+  await alert({ kind: "budget.warn", severity: "warn", title: `AI 예산 ${gate.budgetUsedPct}% 도달 — 하루 예산을 쓰거나 예약했습니다`, dedupeKey: `budget-warn:${new Date().toISOString().slice(0, 10)}` });
 }

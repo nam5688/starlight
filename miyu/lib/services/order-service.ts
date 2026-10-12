@@ -83,7 +83,8 @@ export async function startCheckout(
 }
 
 export type ConfirmPaymentResult =
-  | { kind: "paid"; order: OrderRecord }
+  /** transitioned: 이번 요청이 주문을 결제 완료로 바꾼 경우만 true (이미 결제 완료였거나 동시에 다른 요청이 먼저 바꿨으면 false) — 승인 완료 알림은 이때만 보낸다 */
+  | { kind: "paid"; order: OrderRecord; transitioned?: boolean }
   /**
    * 결제 결과를 아직 모름 — 주문은 대기 상태로 두고 재확인(결제사 주문번호 조회)으로 맞춘다. 고객에게는 다시 결제하라고 하지 않는다.
    * - gateway-unreachable: 결제사 응답을 받지 못함 (승인됐을 수도 있다)
@@ -180,7 +181,8 @@ export async function markCheckoutFailed(
 }
 
 export type SyncResult =
-  | { kind: "updated"; order: OrderRecord }
+  /** to: 이번 알림 처리로 주문이 바뀐 상태 */
+  | { kind: "updated"; order: OrderRecord; to?: "paid" | "refunded" | "failed" }
   | { kind: "unchanged"; order: OrderRecord }
   | { kind: "ignored"; reason: string };
 
@@ -202,8 +204,8 @@ export async function syncPayment(
   if (!order) return { kind: "ignored", reason: "UNKNOWN_ORDER" };
 
   const applied = await applyPayment(deps.repo, order, result.payment, "webhook");
-  if (applied.kind === "paid") return { kind: order.status === "paid" ? "unchanged" : "updated", order: applied.order };
-  if (applied.kind === "updated") return { kind: "updated", order: applied.order };
+  if (applied.kind === "paid") return applied.transitioned ? { kind: "updated", order: applied.order, to: "paid" } : { kind: "unchanged", order: applied.order };
+  if (applied.kind === "updated") return { kind: "updated", order: applied.order, to: applied.to };
   return { kind: "unchanged", order: applied.order };
 }
 
@@ -217,8 +219,9 @@ async function recordPaymentEvent(repo: MiyuRepository, event: Parameters<MiyuRe
 }
 
 export type ApplyResult =
-  | { kind: "paid"; order: OrderRecord }
-  | { kind: "updated"; order: OrderRecord }
+  /** transitioned: 이 호출이 주문을 결제 완료로 바꿨다 (이미 결제 완료였거나 동시에 다른 요청이 먼저 바꾼 경우는 false) */
+  | { kind: "paid"; order: OrderRecord; transitioned?: boolean }
+  | { kind: "updated"; order: OrderRecord; to: "refunded" | "failed" }
   | { kind: "unchanged"; order: OrderRecord; code: string; message: string };
 
 /** 결제사 기록을 주문에 반영한다. 같은 내용을 여러 번 반영해도 결과가 같다. */
@@ -260,7 +263,7 @@ export async function applyPayment(
       if ((error as { code?: string } | null)?.code !== "23505") throw error;
       return duplicate();
     }
-    if (updated) return { kind: "paid", order: updated };
+    if (updated) return { kind: "paid", order: updated, transitioned: true };
     const fresh = (await repo.getOrderByNumber(order.orderNumber)) ?? order;
     if (fresh.status === "paid") {
       // 동시에 들어온 다른 요청이 먼저 반영한 경우: 같은 결제키면 같은 결제, 다르면 두 번 승인된 것
@@ -270,11 +273,11 @@ export async function applyPayment(
   }
   if (target === "refunded") {
     const updated = await repo.updateOrder(order.id, ["paid"], { status: "refunded" });
-    return updated ? { kind: "updated", order: updated } : { kind: "unchanged", order, code: "NO_CHANGE", message: "" };
+    return updated ? { kind: "updated", order: updated, to: "refunded" } : { kind: "unchanged", order, code: "NO_CHANGE", message: "" };
   }
   if (target === "failed") {
     const updated = await repo.updateOrder(order.id, ["pending"], { status: "failed", failureCode: payment.status });
-    return updated ? { kind: "updated", order: updated } : { kind: "unchanged", order, code: "NO_CHANGE", message: "" };
+    return updated ? { kind: "updated", order: updated, to: "failed" } : { kind: "unchanged", order, code: "NO_CHANGE", message: "" };
   }
   return { kind: "unchanged", order, code: "NO_CHANGE", message: "" };
 }

@@ -6,6 +6,8 @@
 키를 넣기 전에는 로그인 · 결제가 "설정 전"으로 표시되고, 나머지 화면은 그대로 볼 수 있습니다.
 
 - 외부 서비스 연결 순서: [`docs/setup-guide.md`](docs/setup-guide.md) — 개발 서버를 켜고 http://localhost:3000/setup 에서 진행 상황 확인
+- **최신 버전 적용 · DB 적용 이력 확인 · 기존 결제 대조 · 관리자 · 텔레그램 연결:** [`docs/update-guide.md`](docs/update-guide.md) (ZIP으로 받아 쓰는 경우 이 문서부터)
+- 운영자 판단 자료: [`docs/operator-decisions.md`](docs/operator-decisions.md) · 자체 성향 질문 설계(초안): [`docs/assessment-design-v1.md`](docs/assessment-design-v1.md) · AI 품질 확인 계획: [`docs/ai-quality-comparison-plan.md`](docs/ai-quality-comparison-plan.md)
 - 진행 단계: [`docs/roadmap.md`](docs/roadmap.md) · 상세 기획: [`docs/product-spec.md`](docs/product-spec.md) · 사업 설계: [`docs/business-plan.md`](docs/business-plan.md)
 
 ---
@@ -128,5 +130,5 @@ miyu/
 ├── scripts/              글꼴 줄이기 · 의존성 점검
 ├── instrumentation.ts    서버 오류를 운영 기록 · 알림으로 남김
 ├── proxy.ts              로그인 세션 갱신
-└── docs/                 기획서 · 진행 단계 · 연결 안내 · 출시 점검표 · 운영 매뉴얼 · 유지보수
+└── docs/                 기획서 · 진행 단계 · 연결 안내 · 적용 안내 · 출시 점검표 · 운영 매뉴얼 · 유지보수 · 문항 설계 · 판단 자료
 ```

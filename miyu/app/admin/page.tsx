@@ -9,7 +9,8 @@ import { formatKrw } from "@/lib/config/product";
 import { getAdminOverview, adminLookup, type AdminReportRow, type OrderTraceForAdmin } from "@/lib/services/admin-service";
 import { costSummary, saleGate, type CapacityConfig, type CostSummary, type SaleGate } from "@/lib/services/capacity-service";
 import type { OpsEventRecord } from "@/lib/services/ports";
-import { capacityConfig } from "@/server/env";
+import { capacityConfig, telegramEnv } from "@/server/env";
+import { isTestEnvironment } from "@/server/ops";
 import { getAdminMember } from "@/server/member";
 import { now, writeRepository } from "@/server/services";
 import { PageFallback } from "@/components/ui/page-fallback";
@@ -70,10 +71,15 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
           </form>
           <form action={adminTestAlertAction}>
             <button type="submit" className={buttonSecondary}>
-              알림 시험
+              텔레그램 알림 시험 (종류별 5건)
             </button>
           </form>
         </div>
+        <p className="mt-3 text-[14px] leading-relaxed text-ink-3">
+          알림 연결: {telegramEnv() ? "텔레그램 설정이 있습니다 (시험 버튼으로 실제 도착을 확인하세요)" : "텔레그램이 연결되지 않았습니다 — 알림은 서버 로그에만 남습니다"}
+          {" · "}
+          알림 표시: {isTestEnvironment() ? "[미유·테스트] (실결제 모드 아님)" : "[미유] (실결제 모드)"}
+        </p>
       </section>
 
       <p className="text-[14px]">

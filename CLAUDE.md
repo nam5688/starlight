@@ -12,6 +12,11 @@
 - 운영 매뉴얼(문의별 대응 · 알림 종류 · 정기 점검 · 백업과 복구 · 되돌리기 · 키 노출 대응): `miyu/docs/runbook.md`
 - 유지보수 안내(가격 · 범위 · 문구를 어디서 고치나 · 버전 규칙 · DB 변경 규칙 · 의존성 점검): `miyu/docs/maintenance.md`
 - 실행 방법: `miyu/README.md`
+- 최신 버전 적용 · DB 적용 이력 확인 · 기존 결제 대조 · 관리자 · 텔레그램 연결(한 단계씩): `miyu/docs/update-guide.md`
+- 운영자 판단용 자료(12유형 표 · 자시 · 출생지 · 대운 선택의 쉬운 설명과 추천): `miyu/docs/operator-decisions.md`
+- 미유 자체 성향 질문 설계(영역 · 문항 배분표 · 문항 초안 30개 · 채점 설계 · 시범 테스트): `miyu/docs/assessment-design-v1.md` — **초안, 검토 전. 검사 화면에는 적용하지 않았다**
+- 실제 AI 품질 확인 계획(후보 2개 · 비용 · 평가 방법 · 예산 승인 요청): `miyu/docs/ai-quality-comparison-plan.md` · 무료/유료 샘플 나란히: `miyu/docs/report-quality-samples.md`
+- 회원 탈퇴 동작과 정책 결정 항목: `miyu/docs/withdrawal-policy.md`
 - 외부 서비스 연결 순서: `miyu/docs/setup-guide.md` (개발 서버의 `/setup` 화면이 같은 순서로 진행 상황을 보여준다)
 
 @miyu/AGENTS.md
@@ -23,6 +28,8 @@ npm run dev        # http://localhost:3000
 npm run check      # 타입 검사 + 린트 + 단위 테스트 + 빌드
 npm run test:db    # DB·접근 정책 검사 (Linux 개발 환경에서 supabase/tests/local-stack.sh start 후)
 npm run deps       # 운영 패키지 라이선스 · 보안 취약점 · 새 버전 점검 (한 달에 한 번)
+node scripts/render-assessment-draft.ts   # 자체 문항 초안 → docs/assessment-design-v1.md
+node scripts/render-quality-sample.ts     # 무료/유료 샘플 문서 만들기
 ```
 
 사용자는 Windows를 쓰는 비개발자다. 설명은 한국어로, 사용자가 직접 칠 명령은 PowerShell 기준으로 안내한다.
@@ -46,6 +53,7 @@ npm run deps       # 운영 패키지 라이선스 · 보안 취약점 · 새 �
 - 샘플·개발용 결과에는 출처(`source`)를 표시하고 운영 데이터와 섞지 않는다.
 - AI가 생년월일만 보고 사주 원국을 지어내지 않는다. 원국은 `lib/saju/engine.ts` 엔진 결과만 쓴다.
 - AI 리포트는 `lib/saju/interpret/` · `lib/report/survey-evidence.ts`가 만든 근거 목록 안에서만 쓰고, 문단마다 근거 ID를 단다. `lib/report/v2/validate.ts` 검사를 통과한 것만 저장한다. AI에는 이름 · 생년월일 원문을 보내지 않는다. 실제 AI 제공사 연결 · 유료 호출은 운영자 승인 후.
+- **자체 성향 질문**: 화면 이름은 "미유 성향 질문"이다. 공식 MBTI · TCI · 애착검사 · 임상 검사의 문항을 가져오거나 표현만 바꾸지 않고, 그 이름으로 소개하지 않는다. 기질 · 성격 · 가까운 관계를 **영역별로 따로** 설명하고 하나의 점수로 합치지 않는다. 해당 없음 · 상황에 따라 다름을 고를 수 있어야 하고, 한두 문항으로 유형을 정하지 않으며, 점수가 비슷하면 혼합 경향으로 표현한다. 자체 응답으로 공식 검사 점수 · MBTI를 환산하지 않는다. 초안은 `lib/assessment/drafts/`에 있고 화면에는 연결하지 않았다 — 검토 후 적용하며, 문항 · 채점 · 유형 규칙에 버전을 붙인다.
 - **나를 더 반영하기**(선택 입력)는 사주 계산을 바꾸지 않고 해석의 초점과 예시만 고른다. 근거가 아니므로 문단 근거 ID는 여전히 사주 · 응답이다. 리포트에는 "알려 주신 고민까지 반영한 해석"으로 표시하고, 알려 준 이야기를 사주로 알아맞힌 것처럼 쓰지 않는다. 전체 대화 대신 짧은 요약만 받고(항목별 글자 수 제한), 연락처 · 이메일 · 주민번호 · 카드번호는 저장할 때 가린다. 고객이 직접 보고 · 고치고 · 지울 수 있고, 리포트 저장본에는 주제와 적은 항목 이름만 남긴다(내용 없음). 광고 · 분석 도구로 보내지 않는다.
 - 사주 용어는 한자 · 한자 뜻 · 쉬운 말을 함께 풀어 쓴다(`lib/saju/glossary.ts`). 한자만 나열하지 않는다.
 - **무료 미리보기**는 서버에서 공개할 범위만 만든다(`lib/report/preview.ts`). 잠긴 내용(대표 이름 뒷부분, 핵심 요약 나머지 2개, 기질 · 관계 점수, 상세 분석, 질문의 답, 상황별 설명, 실천 제안 나머지, 관계 조건, 보완 아이템)은 CSS로 가리지 않고 브라우저로 보내지 않는다 — 흐린 글자는 항상 같은 자리 채움 문구다. 구매 영역의 안내 목록은 이 미리보기의 잠금 목록과 같은 출처를 쓰고, 목록에 적힌 것은 개발용 · AI 리포트 어느 쪽에도 실제로 들어 있어야 한다(`preview.test.ts`).
@@ -70,7 +78,7 @@ npm run deps       # 운영 패키지 라이선스 · 보안 취약점 · 새 �
 ## 디자인 원칙
 
 - 화이트·밝은 회색 바탕, 차콜 글자, 포인트는 딥블루 하나. 색은 `miyu/app/globals.css` 토큰만 쓴다. (예외: 카카오 로그인 버튼은 카카오 가이드 색)
-- Pretendard 고딕만 사용(이 사이트에 쓰는 글자만 남겨 줄인 `Miyu Sans`, `miyu/app/fonts/`, OFL 고지 포함). 표·구분선·점수 막대·요약 영역을 조합하고 카드 반복을 피한다.
+- Pretendard 고딕만 사용(이 사이트에 쓰는 글자만 남겨 줄인 파일, `miyu/app/fonts/`, OFL 고지 포함). 핵심 글꼴은 `next/font/local`로 미리 받고 `font-display: optional`이라 늦게 도착해도 글자가 바뀌며 화면이 흔들리지 않는다 (`app/fonts/miyu-fonts.ts`는 `scripts/subset-font.py`가 만든다). 표·구분선·점수 막대·요약 영역을 조합하고 카드 반복을 피한다.
 - 피할 것: 보라 그라데이션, 네온·발광, 파스텔 카드, 의미 없는 원·궤도·반짝이, 이모지 아이콘, 대문자 영어 소제목, 긴 감성 도입부.
 - 모바일 390px · PC 1440px에서 가로 넘침, 글자 잘림, 버튼 겹침이 없어야 한다. 괄호 바로 뒤 조사("(I)으로")처럼 어색하게 줄이 바뀌는 문장을 피한다.
 
@@ -84,6 +92,9 @@ npm run deps       # 운영 패키지 라이선스 · 보안 취약점 · 새 �
 - 쓰기는 서버 비밀키 저장소(`writeRepository`)로, 화면 조회는 로그인 사용자 저장소(`readRepository`, RLS 적용)로 한다. 비밀키 저장소를 쓰기 전에 서비스에서 소유자를 확인한다.
 - 실결제는 `PAYMENTS_LIVE_MODE=true` + live 키가 있어야 켜진다. 운영자 승인 없이 바꾸지 않는다.
 - **결제 상태의 기준은 결제사의 실제 기록뿐이다.** 성공 주소로 이동했다는 것, 리포트가 표시됐다는 것, 고객의 말은 결제 성공의 근거가 아니다. 주문을 손으로 "결제 완료"로 바꾸는 기능을 만들지 않고, 결제 대조(`lib/services/reconcile-service.ts`)는 결제사 조회 결과로만 주문을 맞춘다. 금액 불일치 · 중복 승인은 자동으로 고치지 않고 운영자에게 알린다. 환불은 미유가 실행하지 않는다(운영자가 토스 관리자에서 취소 → 미유가 "환불됨"으로 맞춤).
+- **알림은 코드가 있다고 연결된 것이 아니다.** 텔레그램은 `/admin`의 "텔레그램 알림 시험"으로 실제 도착을 확인해야 연결 완료다 (서버 로그에만 남는 것과 구분해 보여 준다). 결제 승인 완료 · 환불 완료 알림은 **서버가 결제사 확인으로 주문을 실제로 바꾼 순간에만, 주문당 한 번** 보낸다 (결제창에서 돌아온 것만으로 보내지 않는다). 실결제 모드가 아닌 환경의 알림은 `[미유·테스트]`로 시작한다. 알림에는 주문번호 · 금액 · 상품 이름 · 오류번호 · 종류만 넣는다.
+- **회원 탈퇴**는 DB 함수(`withdraw_member_data`)가 개인정보(검사 · 리포트 · 고민 · 닉네임)를 지우고 주문 · 결제 기록만 남기며, 이어서 서버가 Supabase Auth의 탈퇴 처리로 로그인 연결을 지운다. 진행 중인 결제 · 생성이 있으면 막는다. 보관 기간 · 항목은 정책 확정 전 초안이다 (`docs/withdrawal-policy.md`). 처리 범위를 바꿀 때는 새 마이그레이션 + DB 테스트.
+- 실제 AI 제공사 호출 · 유료 API 비교 생성은 운영자가 한도 금액을 승인한 뒤에만 한다. 비교는 가상 인물로만 하고(실제 고객 정보 금지), API 키는 `.env.local` · 환경 비밀값에만 둔다.
 - **비공개 화면**(결과 · MY · 결제 · 관리자 · 가입)은 `Cache-Control: private, no-store` + 검색 제외 헤더를 유지한다. 검색 제외(noindex)는 비공개 장치가 아니다 — 접근 제어는 로그인 확인 + RLS다.
 - 서버 로그 · 운영 기록(`ops_events`) · 알림에는 `lib/ops/redact.ts`를 거친 값만 남긴다(키 · 토큰 · 이메일 · 전화번호 · DB 오류의 행 내용 가림). 고객 고민 · 대화 · 응답은 어떤 기록에도 넣지 않는다. 고객에게는 오류번호(`ERR-XXXXXXXX`)만 보여 준다.
 - **DB 변경 규칙**: 마이그레이션은 새 파일로만 추가하고(이미 적용한 파일을 고치지 않는다), 더하기만 한다. 되돌리는 마이그레이션은 만들지 않고 새 마이그레이션으로 고친다. 기존 검사 · 회원 · 주문 · 결제 데이터를 지우거나 초기화하지 않는다. 코드를 먼저 배포해도 깨지지 않게 새 표 · 열이 없을 때를 견디게 쓴다. 코드 되돌리기와 DB 되돌리기는 따로 판단한다(`docs/runbook.md`).
@@ -95,21 +106,21 @@ npm run deps       # 운영 패키지 라이선스 · 보안 취약점 · 새 �
 
 | 경로 | 내용 |
 | --- | --- |
-| `miyu/lib/assessment/` | 검사 모듈(문항), 채점, 대표 경향 임시 규칙(4유형) · `tendency-v2.ts`(12유형 설계 초안, 화면 미연결) |
+| `miyu/lib/assessment/` | 검사 모듈(문항), 채점, 대표 경향 임시 규칙(4유형) · `tendency-v2.ts`(12유형 설계 초안, 화면 미연결) · `drafts/`(**미유 자체 성향 질문 초안 30문항 · 채점 규칙 · 검사**, 화면 미연결) |
 | `miyu/lib/report/` | 리포트 타입, 무료 요약 생성, 개발용 생성기 · `evidence.ts`(해석 근거) · `v2/`(개인 종합 리포트 v2 타입 · 지시문 · 형식 검사) · `ai/`(제공사 무관 AI 생성기 · 모의 모델) |
 | `miyu/lib/commerce/` | 주문번호, 주문·리포트 상태 규칙 |
 | `miyu/lib/services/` | 저장·주문·승인·리포트·회원 동의 흐름 (저장소·결제사·생성기는 `ports.ts` 약속으로만) · `reconcile-service.ts`(결제사 기록으로 주문 맞추기) · `capacity-service.ts`(AI 용량 · 비용 · 판매 문) · `metrics-service.ts`(사업 지표) · `admin-service.ts`(관리자 자료) · `testing/`(가짜 결제사 · 메모리 저장소) |
 | `miyu/lib/ops/` | 운영 기록 · 알림 규칙: 비밀값 가리기(`redact.ts`) · 오류번호 · 알림 중복 억제(`alerts.ts`) |
-| `miyu/lib/membership/` · `lib/growth/` | 가입 동의 항목 · 약관 버전 · 다음 행동 규칙 |
+| `miyu/lib/membership/` · `lib/growth/` | 가입 동의 항목 · 약관 버전 · 다음 행동 규칙 · `withdrawal.ts`(탈퇴 안내 문구 · 보관 기간) |
 | `miyu/lib/personalization/` | 나를 더 반영하기 입력 규칙 · 개인정보 가리기 · AI 전달 형식 |
 | `miyu/lib/integrations/` | Supabase 저장소, 토스페이먼츠 승인·조회 구현체, AI 연결(지금은 로컬 모의 서버 `ai/mock-local.ts`만) |
 | `miyu/lib/samples/` · `lib/config/` · `lib/saju/` | 예시 데이터 · 상품·가격 · 만세력 엔진(manseryeok)과 `interpret/`(해석 근거 규칙 초안) |
 | `miyu/server/` | 웹 채널 서버 코드 (환경변수, Supabase 클라이언트, 세션 · 회원 상태, 로그인 전 결과 보관 쿠키, 설정 점검) · `ops.ts`(운영 기록 · 알림) · `reconcile.ts` · `report-sweep.ts` · `report-jobs.ts`(백그라운드 생성) · `capacity.ts`(판매 문) · `acquisition.ts`(최초 방문 출처) · `request-error.ts`(처리 못 한 오류) |
-| `miyu/app/` | 화면과 서버 함수: `/` `/analyze` `/results/[id]` `/checkout/[orderNumber]` `/payments/*` `/my` `/auth/*`(로그인 완료 · 가입 동의) `/terms` `/privacy` `/report/sample`(가상 인물의 완성 리포트 예시) `/setup`(개발용) `/admin`(운영자) `/admin/metrics`(사업 지표) `/api/webhooks/toss` `/api/cron/reconcile`(정기 점검) · `app/error.tsx` · `global-error.tsx` · `track/`(익명 방문 단계 기록) · `fonts/` · `robots.ts` · `sitemap.ts` |
+| `miyu/app/` | 화면과 서버 함수: `/` `/analyze` `/results/[id]` `/checkout/[orderNumber]` `/payments/*` `/my` `/auth/*`(로그인 완료 · 가입 동의) `/terms` `/privacy` `/report/sample`(가상 인물의 완성 리포트 예시) `/setup`(개발용) `/my/withdraw`(회원 탈퇴) `/withdrawn` `/admin`(운영자) `/admin/metrics`(사업 지표) `/api/webhooks/toss` `/api/cron/reconcile`(정기 점검) · `app/error.tsx` · `global-error.tsx` · `track/`(익명 방문 단계 기록) · `fonts/` · `robots.ts` · `sitemap.ts` |
 | `miyu/instrumentation.ts` | 처리하지 못한 서버 오류를 운영 기록으로 남김 |
 | `miyu/proxy.ts` | 로그인 세션 갱신 |
-| `miyu/supabase/` | DB 마이그레이션, 로컬 검증 스크립트·DB 테스트 |
-| `miyu/scripts/` | `check-deps.mjs`(의존성 점검) · `subset-font.py`(글꼴 줄이기) |
+| `miyu/supabase/` | DB 마이그레이션, 로컬 검증 스크립트·DB 테스트(로컬 DB는 UTF-8) · `check-migrations.sql`(적용 이력 읽기 전용 확인) · `check-payments.sql` · `check-payment-detail.sql`(주문 대조, 읽기 전용) |
+| `miyu/scripts/` | `check-deps.mjs`(의존성 점검) · `subset-font.py`(글꼴 줄이기) · `render-assessment-draft.ts` · `render-quality-sample.ts`(검토 문서 만들기) |
 | `miyu/docs/` | 기획 · 점검표 · 운영 매뉴얼 · 유지보수 안내 (위 목록) |
 
 Next.js 16은 다른 화면으로 이동해도 이전 화면을 숨긴 채 DOM에 남겨둔다. 화면마다 HTML id가 겹치지 않게 한다 (`idPrefix`).

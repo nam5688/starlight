@@ -71,4 +71,4 @@
 
 ## 6. 글꼴
 
-본문 글꼴은 Pretendard(OFL-1.1)를 이 사이트에 쓰는 글자만 남겨 줄인 파일이다 (`app/fonts/`, 사이트 안의 이름은 `Miyu Sans`). 화면 문구에 새 한글이 많이 늘면 `scripts/subset-font.py`를 다시 실행한다 (실행법은 파일 맨 위). 빠진 글자는 `Pretendard-rest.woff2`(필요한 화면에서만 받음)와 기본 글꼴로 대체되므로 글자가 깨지지는 않는다.
+본문 글꼴은 Pretendard(OFL-1.1)를 이 사이트에 쓰는 글자만 남겨 줄인 파일 두 개다 (`app/fonts/`). `next/font/local`로 불러오며(설정은 `app/fonts/miyu-fonts.ts` — `scripts/subset-font.py`가 만든다), 핵심 파일은 첫 화면과 함께 미리 받고 `font-display: optional`이라 늦게 도착해도 글자가 바뀌며 화면이 흔들리지 않는다. 화면 문구에 새 한글이 많이 늘면 `scripts/subset-font.py`를 다시 실행한다 (실행법은 파일 맨 위, 글꼴 도구 `fonttools`는 개발 PC에만 필요). 빠진 글자는 나머지 파일(필요한 화면에서만 받음)과 기본 글꼴로 대체되므로 글자가 깨지지는 않는다. 화면 스타일이 바뀌지 않는 것 같으면 `.next` 폴더(빌드 캐시)를 지우고 다시 빌드한다.
