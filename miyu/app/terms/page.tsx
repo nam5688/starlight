@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/membership/legal-document";
 
-export const metadata: Metadata = { title: "이용약관 · ME:U 미유" };
+export const metadata: Metadata = { title: "이용약관 · ME:U 미유", description: "ME:U 미유 이용약관 (초안)", alternates: { canonical: "/terms" } };
 
 export default function TermsPage() {
   return (

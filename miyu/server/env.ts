@@ -144,3 +144,9 @@ export function capacityConfig(): CapacityConfig {
     generationTimeoutMs: Math.min(readInt("AI_GENERATION_TIMEOUT_SECONDS", 0), 280) * 1000,
   };
 }
+
+/** 공개 주소 — 검색 · 공유용 주소(sitemap · robots · 공유 이미지)의 기준. 배포 전에는 로컬 주소 */
+export function siteUrl(): string {
+  const raw = read("SITE_URL");
+  return /^https?:\/\/[^/]+$/.test(raw) ? raw : "http://localhost:3000";
+}

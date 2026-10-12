@@ -56,11 +56,15 @@ export type OrderRecord = {
   failureMessage: string | null;
   /** 결제 환경 — test: 내 상점 테스트 키, test-docs: 토스 문서 예제용 공용 테스트 키, live: 실결제 */
   paymentEnv: PaymentEnv;
+  /** 결제를 시작할 때의 유입 출처 (7번 이후 마이그레이션 전에 만든 주문에는 없다) */
+  acquisition?: Acquisition | null;
   createdAt: string;
   updatedAt: string;
 };
 export type PaymentEnv = "test" | "test-docs" | "live";
-export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv">;
+/** 처음 들어온 출처 (광고 · 채널 비교용). 값이 없으면 null */
+export type Acquisition = { source: string | null; medium: string | null; campaign: string | null };
+export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv"> & { acquisition?: Acquisition | null };
 export type OrderPatch = Partial<
   Pick<OrderRecord, "status" | "paymentKey" | "method" | "approvedAt" | "failureCode" | "failureMessage">
 >;
@@ -103,6 +107,18 @@ export type AiUsageInput = {
   errorCode: string | null;
 };
 export type AiUsageRecord = AiUsageInput & { id: number; createdAt: string };
+
+/** 화면에서 보내는 방문 단계 — 결제 시작 · 승인 · 리포트 완성은 orders · reports에서 센다 */
+export const FUNNEL_EVENT_NAMES = ["visit", "analyze_start", "analyze_complete", "preview_view", "report_view"] as const;
+export type FunnelEventName = (typeof FUNNEL_EVENT_NAMES)[number];
+/** 이름 · 생년월일 · 응답 · 고민 · 리포트 내용은 담지 않는다 */
+export type FunnelEventInput = { anonId: string; name: FunnelEventName; path: string | null; src: string | null; medium: string | null; campaign: string | null; referrerHost: string | null };
+export type FunnelEventRecord = FunnelEventInput & { id: number; createdAt: string };
+
+/** 지표 집계용 — 개인을 구분하는 값은 회원번호뿐이며 화면에는 합계만 보인다 */
+export type MetricsOrder = Pick<OrderRecord, "id" | "userId" | "assessmentId" | "status" | "amount" | "paymentEnv" | "createdAt" | "approvedAt"> & { acquisition: Acquisition | null };
+export type MetricsReport = Pick<ReportRecord, "id" | "orderId" | "status" | "createdAt" | "readyAt">;
+export type FeedbackRecord = { reportId: string; userId: string; rating: number; createdAt: string; updatedAt: string };
 
 export type PaymentEventSource = "confirm" | "webhook" | "fail_redirect" | "checkout" | "reconcile" | "admin";
 
@@ -195,6 +211,15 @@ export interface MiyuRepository {
   /** 관리자 화면용 */
   listRecentOrders(limit: number): Promise<OrderRecord[]>;
   getOrderById(id: string): Promise<OrderRecord | null>;
+  /** 방문 단계 기록 · 만족도 · 지표 집계 (서버 전용). 7~8번 마이그레이션 전에는 쓰기를 건너뛰고 조회는 빈 값 */
+  addFunnelEvent(event: FunnelEventInput): Promise<void>;
+  listFunnelEventsSince(since: string, limit: number): Promise<FunnelEventRecord[]>;
+  listOrdersForMetrics(since: string, limit: number): Promise<MetricsOrder[]>;
+  listReportsForMetrics(since: string, limit: number): Promise<MetricsReport[]>;
+  countAssessmentsAllSince(since: string): Promise<number>;
+  upsertFeedback(input: { reportId: string; userId: string; rating: number }): Promise<void>;
+  getFeedback(reportId: string): Promise<FeedbackRecord | null>;
+  listFeedbackSince(since: string, limit: number): Promise<FeedbackRecord[]>;
   /** AI 사용 기록 (서버 전용). 테이블이 없으면(DB 변경 7번 전) 쓰기는 건너뛰고 조회는 빈 값 */
   addAiUsage(usage: AiUsageInput): Promise<void>;
   listAiUsageSince(since: string, limit: number): Promise<AiUsageRecord[]>;

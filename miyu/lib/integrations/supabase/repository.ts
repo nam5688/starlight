@@ -8,6 +8,7 @@ import type { ConsentRecord } from "../../membership/terms.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AssessmentRecord,
+  FunnelEventName,
   InsertResult,
   MiyuRepository,
   OpsEventRecord,
@@ -67,9 +68,18 @@ function toOrder(r: Row): OrderRecord {
     failureMessage: (r.failure_message as string | null) ?? null,
     // 4번째 마이그레이션 전의 DB에서도 읽을 수 있게 기본값을 둔다
     paymentEnv: ((r.payment_env as string | undefined) ?? "test") as OrderRecord["paymentEnv"],
+    acquisition: toAcquisition(r),
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
+}
+
+/** 8번 마이그레이션 전의 DB에는 열이 없다 */
+function toAcquisition(r: Row): OrderRecord["acquisition"] {
+  const source = (r.acq_source as string | null | undefined) ?? null;
+  const medium = (r.acq_medium as string | null | undefined) ?? null;
+  const campaign = (r.acq_campaign as string | null | undefined) ?? null;
+  return source || medium || campaign ? { source, medium, campaign } : null;
 }
 
 function toReport(r: Row): ReportRecord {
@@ -277,18 +287,21 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     },
 
     async insertOrder(o): Promise<InsertResult<OrderRecord>> {
-      const { data, error } = await db
-        .from("orders")
-        .insert({
-          order_number: o.orderNumber,
-          user_id: o.userId,
-          assessment_id: o.assessmentId,
-          product_id: o.productId,
-          amount: o.amount,
-          payment_env: o.paymentEnv,
-        })
-        .select()
-        .single();
+      const base = {
+        order_number: o.orderNumber,
+        user_id: o.userId,
+        assessment_id: o.assessmentId,
+        product_id: o.productId,
+        amount: o.amount,
+        payment_env: o.paymentEnv,
+      };
+      const acq = o.acquisition;
+      const withAcq = acq && (acq.source || acq.medium || acq.campaign) ? { ...base, acq_source: acq.source, acq_medium: acq.medium, acq_campaign: acq.campaign } : base;
+      let { data, error } = await db.from("orders").insert(withAcq).select().single();
+      // 8번 마이그레이션 전의 DB(출처 열 없음)에서도 결제는 막히지 않게, 출처만 빼고 다시 만든다
+      if (error && withAcq !== base && (error.code === "42703" || error.code === "PGRST204" || /acq_(source|medium|campaign)/.test(error.message ?? ""))) {
+        ({ data, error } = await db.from("orders").insert(base).select().single());
+      }
       if (error) {
         if (error.code === UNIQUE_VIOLATION) return { ok: false, reason: "conflict" };
         fail("주문 생성", error);
@@ -316,6 +329,82 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         detail: event.detail,
       });
       if (error) fail("결제 기록 저장", error);
+    },
+
+    async addFunnelEvent(e) {
+      const { error } = await db.from("funnel_events").insert({
+        anon_id: e.anonId,
+        name: e.name,
+        path: e.path,
+        src: e.src,
+        medium: e.medium,
+        campaign: e.campaign,
+        referrer_host: e.referrerHost,
+      });
+      if (error && !isMissingTableError(error)) fail("방문 단계 기록", error);
+    },
+
+    async listFunnelEventsSince(since, limit) {
+      const { data, error } = await db.from("funnel_events").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("방문 단계 조회", error);
+      }
+      return (data ?? []).map((r) => ({
+        id: r.id as number,
+        createdAt: r.created_at as string,
+        anonId: r.anon_id as string,
+        name: r.name as FunnelEventName,
+        path: (r.path as string | null) ?? null,
+        src: (r.src as string | null) ?? null,
+        medium: (r.medium as string | null) ?? null,
+        campaign: (r.campaign as string | null) ?? null,
+        referrerHost: (r.referrer_host as string | null) ?? null,
+      }));
+    },
+
+    async listOrdersForMetrics(since, limit) {
+      const { data, error } = await db.from("orders").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
+      if (error) fail("주문 집계 조회", error);
+      return (data ?? []).map((r) => {
+        const o = toOrder(r);
+        return { id: o.id, userId: o.userId, assessmentId: o.assessmentId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null };
+      });
+    },
+
+    async listReportsForMetrics(since, limit) {
+      const { data, error } = await db.from("reports").select("id, order_id, status, created_at, ready_at").gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
+      if (error) fail("리포트 집계 조회", error);
+      return (data ?? []).map((r) => ({ id: r.id as string, orderId: r.order_id as string, status: r.status as ReportRecord["status"], createdAt: r.created_at as string, readyAt: (r.ready_at as string | null) ?? null }));
+    },
+
+    async countAssessmentsAllSince(since) {
+      const { count, error } = await db.from("assessments").select("id", { count: "exact" }).gte("created_at", since).limit(1);
+      if (error) fail("검사 수 조회", error);
+      return count ?? 0;
+    },
+
+    async upsertFeedback(f) {
+      const { error } = await db.from("report_feedback").upsert({ report_id: f.reportId, user_id: f.userId, rating: f.rating }, { onConflict: "report_id" });
+      if (error) fail("만족도 저장", error);
+    },
+
+    async getFeedback(reportId) {
+      const { data, error } = await db.from("report_feedback").select().eq("report_id", reportId).maybeSingle();
+      if (error) {
+        if (isMissingTableError(error)) return null;
+        fail("만족도 조회", error);
+      }
+      return data ? { reportId: data.report_id as string, userId: data.user_id as string, rating: data.rating as number, createdAt: data.created_at as string, updatedAt: data.updated_at as string } : null;
+    },
+
+    async listFeedbackSince(since, limit) {
+      const { data, error } = await db.from("report_feedback").select().gte("created_at", since).order("created_at", { ascending: false }).limit(limit);
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("만족도 집계 조회", error);
+      }
+      return (data ?? []).map((r) => ({ reportId: r.report_id as string, userId: r.user_id as string, rating: r.rating as number, createdAt: r.created_at as string, updatedAt: r.updated_at as string }));
     },
 
     async countAssessmentsSince(userId, since) {

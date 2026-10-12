@@ -5,6 +5,7 @@ import { startCheckout } from "@/lib/services/order-service";
 import { REPORT_SLA_MS, type ReportStatus } from "@/lib/commerce/report";
 import { canRetryReport, getResultView } from "@/lib/services/report-service";
 import { paymentConfig, paymentEnvOf } from "@/server/env";
+import { readAcquisition } from "@/server/acquisition";
 import { saleGateCheck } from "@/server/capacity";
 import { claimAndSchedule } from "@/server/report-jobs";
 import { now, readRepository, writeRepository } from "@/server/services";
@@ -18,7 +19,7 @@ export async function startCheckoutAction(assessmentId: string) {
   const config = paymentConfig();
   if (!config.ok) redirect(`/results/${assessmentId}`);
 
-  const result = await startCheckout({ repo: writeRepository(), now, gate: saleGateCheck }, { userId, assessmentId, paymentEnv: paymentEnvOf(config) });
+  const result = await startCheckout({ repo: writeRepository(), now, gate: saleGateCheck }, { userId, assessmentId, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition() });
   if (result.kind === "not-found") notFound();
   // 이미 결제했거나, 지금은 새 구매를 받지 않는 경우: 결과 화면이 상태에 맞는 안내를 보여 준다 (결제는 시작하지 않았다)
   if (result.kind === "already-paid" || result.kind === "sales-closed") redirect(`/results/${assessmentId}`);

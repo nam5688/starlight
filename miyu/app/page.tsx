@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Faq } from "@/components/home/faq";
 import { ReportPreview } from "@/components/home/report-preview";
@@ -6,6 +7,8 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, pageWide } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
 import { formatKrw, PERSONAL_REPORT, REPORT_SCOPE } from "@/lib/config/product";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const PERSPECTIVES = [
   {

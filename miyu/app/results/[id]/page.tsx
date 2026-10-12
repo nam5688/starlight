@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { ReportFeedback } from "@/components/results/report-feedback";
+import { Track } from "@/components/analytics/track";
+import { ClearAnalyzeDraft } from "@/components/analyze/clear-draft";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { FullReportView } from "@/components/report/full-report-view";
@@ -66,8 +69,10 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
 
   if (view.paidOrder && report?.status === "ready" && report.content) {
     const content = report.content;
+    const feedback = await (await readRepository()).getFeedback(report.id);
     const footer = (
       <div className="space-y-4">
+        <ReportFeedback reportId={report.id} initial={feedback?.rating ?? null} />
         <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady />
         <p className="text-[13px] text-ink-3">
           주문번호 {view.paidOrder.orderNumber} · 생성 {report.generator} {report.generatorVersion}
@@ -79,6 +84,8 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
     );
     return (
       <>
+        <ClearAnalyzeDraft />
+        <Track name="report_view" />
         <ResultHeader
           title={isPersonalV2(content) ? `${assessment.nickname} 님의 개인 종합 사주 리포트` : `${assessment.nickname} 님의 개인 통합 리포트`}
           subtitle={isPersonalV2(content) ? "사주 원국 · 대운 · 세운 중심, 성향 응답은 보조 근거" : undefined}
@@ -101,6 +108,8 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
   return (
     <>
+      <ClearAnalyzeDraft />
+      <Track name="preview_view" />
       <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
       <div className={`${pageNarrow} space-y-16 py-10 md:py-14`}>
         <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />

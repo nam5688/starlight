@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { checkBirthAction, scoreDevAnswers } from "@/app/analyze/actions";
+import { trackOnce } from "@/components/analytics/track";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
 import type { Answers } from "@/lib/assessment/types";
@@ -12,6 +13,7 @@ import {
   type BasicInfo,
   type BasicInfoErrors,
 } from "@/lib/profile/basic-info";
+import { DRAFT_KEY, hasContent, parseDraft, serializeDraft } from "@/lib/profile/draft";
 import type { FreePreview } from "@/lib/report/preview";
 import { BasicInfoStep } from "./basic-info-step";
 import { FreeSummaryView } from "./free-summary";
@@ -29,7 +31,8 @@ const TOTAL_ITEMS = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
 /**
  * 기본 정보 → 검사 응답(모듈별) → 무료 미리보기.
  * 단계 이동은 브라우저 기록에도 남겨서, 휴대폰의 뒤로 가기로도 이전 단계로 돌아갈 수 있다.
- * 입력값은 이 화면의 메모리에만 있고 저장하지 않는다 (새로고침하면 처음부터).
+ * 입력값은 서버에 저장하지 않는다. 새로고침 · 앱 전환(카카오 로그인 등) · 뒤로 가기로 사라지지 않도록 이 브라우저 탭에만
+ * 임시 보관하고(sessionStorage, 탭을 닫으면 삭제), 결과를 저장하면 지운다 (lib/profile/draft.ts).
  */
 export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   const [step, setStep] = useState(0);
@@ -40,6 +43,9 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   const [preview, setPreview] = useState<FreePreview | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  /** 이전에 입력하던 내용을 복원했을 때의 안내 */
+  const [restored, setRestored] = useState(false);
+  const draftReady = useRef(false);
 
   const summaryRef = useRef<FreePreview | null>(null);
   const stepRef = useRef(0);
@@ -48,6 +54,38 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   useEffect(() => {
     summaryRef.current = preview;
   }, [preview]);
+
+  // 이 탭에 임시 보관된 입력이 있으면 이어서 쓸 수 있게 복원한다 (화면을 그린 뒤 한 번만)
+  useEffect(() => {
+    try {
+      const draft = parseDraft(window.sessionStorage.getItem(DRAFT_KEY), Date.now(), LAST_QUESTION_STEP);
+      if (draft) {
+        setInfo(draft.info);
+        setAnswers(draft.answers);
+        setStep(draft.step);
+        stepRef.current = draft.step;
+        window.history.replaceState({ ...window.history.state, meuStep: draft.step }, "");
+        setRestored(true);
+      }
+    } catch {
+      // 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서는 그냥 처음부터
+    }
+    draftReady.current = true;
+  }, []);
+
+  // 입력이 바뀔 때마다 이 탭에 임시 보관한다
+  useEffect(() => {
+    if (!draftReady.current) return;
+    try {
+      if (hasContent(info, answers)) {
+        window.sessionStorage.setItem(DRAFT_KEY, serializeDraft({ step: Math.min(step, LAST_QUESTION_STEP), info, answers }, Date.now()));
+      } else {
+        window.sessionStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {
+      // 저장 실패는 무시한다 (입력 자체에는 영향이 없다)
+    }
+  }, [info, answers, step]);
 
   useEffect(() => {
     stepRef.current = step;
@@ -101,6 +139,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   }
 
   function handleInfoChange(next: BasicInfo) {
+    trackOnce("analyze_start");
     setInfo(next);
     // 이미 표시된 오류는 값을 고치면 바로 사라지게 한다 (입력 중에 새 오류를 띄우지는 않는다)
     if (Object.keys(infoErrors).length > 0) {
@@ -162,6 +201,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     startTransition(async () => {
       const result = await scoreDevAnswers({ info, answers });
       if (result.ok) {
+        trackOnce("analyze_complete");
         setPreview(result.preview);
         summaryRef.current = result.preview;
         pushStep(SUMMARY_STEP);
@@ -172,6 +212,12 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   }
 
   function restart() {
+    setRestored(false);
+    try {
+      window.sessionStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // 무시
+    }
     setInfo(EMPTY_BASIC_INFO);
     setInfoErrors({});
     setAnswers({});
@@ -242,6 +288,14 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
       ) : (
         <div className="flex flex-1 flex-col">
           <main className="mx-auto w-full max-w-3xl flex-1 px-5 pt-8 pb-12 md:px-8 md:pt-12">
+            {restored && (
+              <p role="status" className="mb-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md bg-mist px-4 py-3 text-[14px] leading-relaxed text-ink-2">
+                <span>이 탭에서 입력하던 내용을 이어서 불러왔어요.</span>
+                <button type="button" onClick={restart} className="font-semibold text-accent underline underline-offset-4">
+                  처음부터 다시
+                </button>
+              </p>
+            )}
             {currentModule ? (
               <QuestionStep
                 module={currentModule}

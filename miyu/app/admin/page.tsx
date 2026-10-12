@@ -75,6 +75,12 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
         </div>
       </section>
 
+      <p className="text-[14px]">
+        <Link href="/admin/metrics" className={textLink}>
+          사업 지표 보기 (단계별 흐름 · 매출 · 광고 채널 · 만족도)
+        </Link>
+      </p>
+
       <section aria-labelledby="a-capacity">
         <h2 id="a-capacity" className="text-[18px] font-bold">
           생성 용량 · AI 비용

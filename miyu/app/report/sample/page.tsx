@@ -7,6 +7,8 @@ import { sampleReport } from "@/lib/samples/sample-report";
 
 export const metadata: Metadata = {
   title: "리포트 예시 · ME:U 미유",
+  description: "가상 인물의 완성된 개인 통합 리포트 예시. 구매하면 받는 내용의 깊이를 미리 읽어 볼 수 있습니다 (실제 검사 · 만세력 계산 결과가 아닙니다).",
+  alternates: { canonical: "/report/sample" },
 };
 
 export default function SampleReportPage() {

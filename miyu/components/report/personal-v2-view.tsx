@@ -2,6 +2,7 @@ import type { Evidence } from "@/lib/report/evidence";
 import { SECTION_PLAN, type Paragraph, type PersonalReportV2 } from "@/lib/report/v2/types";
 import { BASE_TERMS, glossaryFor, withHanja } from "@/lib/saju/glossary";
 import { SajuChart } from "./detail-sections";
+import { ReportToc } from "./toc";
 import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
 import { ActionList } from "./integrated-view";
 import { CoreSummaryTable, SCORE_NOTE, ScoreGroups, SectionTitle, TendencyBlock } from "./summary-blocks";
@@ -63,18 +64,7 @@ export function PersonalV2View({
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-10 md:px-8 lg:grid lg:grid-cols-[200px_minmax(0,720px)] lg:gap-16 lg:py-14">
-      <nav aria-label="리포트 목차" className="hidden lg:block">
-        <ol className="sticky top-28 space-y-1 border-l border-line text-[14px]">
-          {toc.map((t, i) => (
-            <li key={t.id}>
-              <a href={`#${t.id}`} className="-ml-px block border-l border-transparent py-1.5 pl-4 text-ink-3 hover:border-accent hover:text-ink">
-                <span className="mr-2 tabular-nums">{i + 1}</span>
-                {t.label}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <ReportToc items={toc} />
 
       <article className="min-w-0 space-y-16">
         <section aria-labelledby={id("v2-summary")}>

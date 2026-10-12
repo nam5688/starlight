@@ -393,3 +393,83 @@ test("실제 DB: 생성 중 · 대기 중 리포트 수 집계와 하루 검사 
   assert.ok((await repo.countAssessmentsSince(B.id, new Date(Date.now() - 24 * 3600_000).toISOString())) >= 1);
   assert.equal(await repo.countAssessmentsSince(B.id, new Date(Date.now() + 60_000).toISOString()), 0);
 });
+
+test("방문 단계 기록(funnel_events): 서버만 쓰고 읽으며, 허용된 단계만, 쌓기만 가능하고, 개인정보 열이 없다", async () => {
+  const repo = createSupabaseRepository(admin);
+  const anonId = randomUUID();
+  const t0 = new Date(Date.now() - 1000).toISOString();
+  await repo.addFunnelEvent({ anonId, name: "visit", path: "/", src: "naver", medium: "cpc", campaign: "fall", referrerHost: null });
+  await repo.addFunnelEvent({ anonId, name: "preview_view", path: "/results/x", src: "naver", medium: "cpc", campaign: "fall", referrerHost: null });
+  const rows = (await repo.listFunnelEventsSince(t0, 100)).filter((r) => r.anonId === anonId);
+  assert.deepEqual(rows.map((r) => r.name).sort(), ["preview_view", "visit"]);
+  assert.equal(rows[0].src, "naver");
+
+  for (const client of [A.client, anon]) {
+    assert.ok((await client.from("funnel_events").select()).error || true);
+    const read = await client.from("funnel_events").select();
+    assert.ok(read.error || read.data?.length === 0, "읽기 거부");
+    assert.ok((await client.from("funnel_events").insert({ anon_id: randomUUID(), name: "visit" })).error, "쓰기 거부");
+  }
+  assert.ok((await admin.from("funnel_events").insert({ anon_id: randomUUID(), name: "payment_confirmed" })).error, "허용되지 않은 단계(결제 이벤트는 화면에서 받지 않는다)");
+  assert.ok((await admin.from("funnel_events").update({ path: "/x" }).eq("anon_id", anonId)).error, "고치기 거부");
+  assert.ok((await admin.from("funnel_events").delete().eq("anon_id", anonId)).error, "지우기 거부");
+  const columns = await admin.from("funnel_events").select("*").limit(1);
+  const keys = Object.keys(columns.data?.[0] ?? {});
+  for (const forbidden of ["user_id", "nickname", "birth_year", "answers", "content", "email"]) assert.ok(!keys.includes(forbidden), `개인정보 열 없음: ${forbidden}`);
+});
+
+test("만족도(report_feedback): 완성된 내 리포트에만, 다시 누르면 고쳐지고, 다른 사람 · 미완성 리포트는 거부, 직접 쓰기는 거부, 내 것만 보인다", async () => {
+  const repo = createSupabaseRepository(admin);
+  const { order } = await newPendingOrder(B.id);
+  const paidResult = await confirmPayment({ repo, gateway: createFakeToss().gateway }, { userId: B.id, orderNumber: order.orderNumber, paymentKey: `pk-fb-${randomUUID()}`, amount: order.amount });
+  if (paidResult.kind !== "paid") throw new Error(paidResult.kind);
+  const queued = await queueReport({ repo }, paidResult.order);
+  if (!queued) throw new Error();
+
+  await assert.rejects(repo.upsertFeedback({ reportId: queued.id, userId: B.id, rating: 5 }), /owner|ready/i, "완성 전에는 남길 수 없다");
+  const ready = await runReport({ repo, generator: devReportGenerator, now: () => new Date() }, paidResult.order);
+  assert.equal(ready?.status, "ready");
+
+  await repo.upsertFeedback({ reportId: queued.id, userId: B.id, rating: 4 });
+  await repo.upsertFeedback({ reportId: queued.id, userId: B.id, rating: 2 });
+  assert.equal((await repo.getFeedback(queued.id))?.rating, 2, "다시 누르면 고쳐진다");
+  const count = await admin.from("report_feedback").select("id").eq("report_id", queued.id);
+  assert.equal(count.data?.length, 1, "리포트 하나에 하나");
+
+  await assert.rejects(repo.upsertFeedback({ reportId: queued.id, userId: A.id, rating: 5 }), /owner|ready/i, "다른 회원의 리포트에는 남길 수 없다");
+  assert.ok((await B.client.from("report_feedback").insert({ report_id: queued.id, user_id: B.id, rating: 5 })).error, "브라우저에서 직접 쓰기 거부");
+  assert.ok((await B.client.from("report_feedback").update({ rating: 5 }).eq("report_id", queued.id).select()).data?.length !== 1, "브라우저에서 직접 고치기 거부");
+  assert.equal((await B.client.from("report_feedback").select().eq("report_id", queued.id)).data?.length, 1, "내 것은 보인다");
+  assert.deepEqual((await A.client.from("report_feedback").select().eq("report_id", queued.id)).data, [], "다른 회원 것은 안 보인다");
+  assert.ok((await admin.from("report_feedback").update({ rating: 9 }).eq("report_id", queued.id)).error, "범위 밖 점수 거부");
+  assert.ok((await admin.from("report_feedback").update({ user_id: A.id }).eq("report_id", queued.id)).error, "주인 바꾸기 거부");
+});
+
+test("유입 출처: 주문에 기록되고 지표용 조회에 나온다. 8번 마이그레이션 전(출처 열 없음)의 DB에서도 결제 시작은 막히지 않는다", async () => {
+  const repo = createSupabaseRepository(admin);
+  const saved = await submitAssessment({ repo, saju: sajuEngine }, { userId: B.id, channel: "web", info, answers, today: new Date() });
+  if (!saved.ok) throw new Error();
+  const started = await startCheckout({ repo, now: () => new Date() }, { userId: B.id, assessmentId: saved.assessment.id, acquisition: { source: "naver", medium: "cpc", campaign: "fall" } });
+  if (started.kind !== "order") throw new Error();
+  assert.deepEqual(started.order.acquisition, { source: "naver", medium: "cpc", campaign: "fall" });
+  const listed = (await repo.listOrdersForMetrics(new Date(Date.now() - 60_000).toISOString(), 100)).find((o) => o.id === started.order.id);
+  assert.equal(listed?.acquisition?.source, "naver");
+
+  // 열이 없는 DB를 흉내 낸다 (코드가 먼저 배포되고 DB 변경이 늦은 경우)
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const psql = (q: string) => execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-q", "-c", q]);
+  try {
+    psql("alter table public.orders drop column acq_source, drop column acq_medium, drop column acq_campaign; notify pgrst, 'reload schema'");
+    await sleep(800);
+    const saved2 = await submitAssessment({ repo, saju: sajuEngine }, { userId: B.id, channel: "web", info, answers, today: new Date() });
+    if (!saved2.ok) throw new Error();
+    const started2 = await startCheckout({ repo, now: () => new Date() }, { userId: B.id, assessmentId: saved2.assessment.id, acquisition: { source: "naver", medium: "cpc", campaign: null } });
+    assert.equal(started2.kind, "order", "출처 열이 없어도 결제를 시작할 수 있다");
+    assert.equal(started2.kind === "order" && started2.order.acquisition, null);
+  } finally {
+    psql(
+      "alter table public.orders add column if not exists acq_source text check (acq_source is null or char_length(acq_source) <= 60), add column if not exists acq_medium text check (acq_medium is null or char_length(acq_medium) <= 60), add column if not exists acq_campaign text check (acq_campaign is null or char_length(acq_campaign) <= 80); notify pgrst, 'reload schema'",
+    );
+    await sleep(800);
+  }
+});

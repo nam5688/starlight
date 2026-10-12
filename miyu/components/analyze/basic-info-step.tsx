@@ -41,7 +41,7 @@ export function BasicInfoStep({
         기본 정보
       </h1>
       <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-        사주 계산과 결과 화면에 사용합니다. 이 미리보기에서는 입력한 정보를 저장하지 않습니다.
+        사주 계산과 결과 화면에 사용합니다. 저장하기 전에는 서버에 보내 두지 않고, 새로고침이나 로그인 이동에 대비해 이 브라우저 탭에만 임시 보관합니다 (탭을 닫으면 지워집니다).
       </p>
 
       <div className="mt-10 space-y-10">

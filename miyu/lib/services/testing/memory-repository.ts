@@ -6,6 +6,8 @@ import type { ConsentRecord } from "../../membership/terms.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AiUsageRecord,
+  FeedbackRecord,
+  FunnelEventRecord,
   OpsEventRecord,
   PaymentEventSource,
   AssessmentRecord,
@@ -28,6 +30,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const contexts = new Map<string, PersonalContext>();
   const opsEvents: OpsEventRecord[] = [];
   const aiUsage: AiUsageRecord[] = [];
+  const funnel: FunnelEventRecord[] = [];
+  const feedback = new Map<string, FeedbackRecord>();
   let tick = 0;
   const iso = () => now().toISOString();
 
@@ -90,6 +94,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         approvedAt: null,
         failureCode: null,
         failureMessage: null,
+        acquisition: o.acquisition ?? null,
         // 같은 시각에 여러 주문을 만들어도 순서가 구분되도록 1ms씩 더한다
         createdAt: new Date(now().getTime() + ++tick).toISOString(),
         updatedAt: iso(),
@@ -115,6 +120,42 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async addPaymentEvent(event) {
       events.push({ orderId: event.orderId, source: event.source, status: event.status, detail: event.detail, createdAt: new Date(now().getTime() + ++tick).toISOString() });
+    },
+    async addFunnelEvent(e) {
+      funnel.push({ ...e, id: funnel.length + 1, createdAt: new Date(now().getTime() + ++tick).toISOString() });
+    },
+    async listFunnelEventsSince(since, limit) {
+      return funnel.filter((e) => e.createdAt >= since).sort((a, b) => b.id - a.id).slice(0, limit);
+    },
+    async listOrdersForMetrics(since, limit) {
+      return [...orders.values()]
+        .filter((o) => o.createdAt >= since)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, limit)
+        .map((o) => ({ id: o.id, userId: o.userId, assessmentId: o.assessmentId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null }));
+    },
+    async listReportsForMetrics(since, limit) {
+      return [...reports.values()]
+        .filter((r) => r.createdAt >= since)
+        .slice(0, limit)
+        .map((r) => ({ id: r.id, orderId: r.orderId, status: r.status, createdAt: r.createdAt, readyAt: r.readyAt }));
+    },
+    async countAssessmentsAllSince(since) {
+      return [...assessments.values()].filter((a) => a.createdAt >= since).length;
+    },
+    async upsertFeedback(f) {
+      const report = reports.get(f.reportId);
+      // DB 트리거와 같은 규칙: 완성된 리포트의 주인만
+      if (!report || report.userId !== f.userId || report.status !== "ready") throw new Error("feedback only for the owner of a ready report");
+      const prev = feedback.get(f.reportId);
+      const t = new Date(now().getTime() + ++tick).toISOString();
+      feedback.set(f.reportId, { reportId: f.reportId, userId: f.userId, rating: f.rating, createdAt: prev?.createdAt ?? t, updatedAt: t });
+    },
+    async getFeedback(reportId) {
+      return feedback.get(reportId) ?? null;
+    },
+    async listFeedbackSince(since, limit) {
+      return [...feedback.values()].filter((f) => f.createdAt >= since).slice(0, limit);
     },
     async countAssessmentsSince(userId, since) {
       return [...assessments.values()].filter((a) => a.userId === userId && a.createdAt >= since).length;
@@ -227,5 +268,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, opsEvents, aiUsage };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, opsEvents, aiUsage, funnel, feedback };
 }

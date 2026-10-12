@@ -1,13 +1,23 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+import { VisitTracker } from "@/components/analytics/track";
 import { PreviewNotice } from "@/components/site/preview-notice";
 import { SiteFooter } from "@/components/site/site-footer";
 import { SiteHeader } from "@/components/site/site-header";
+import { siteUrl } from "@/server/env";
 import "./globals.css";
 
+const TITLE = "ME:U 미유 · 개인 통합 분석 리포트";
+const DESCRIPTION = "사주 · MBTI · 기질 · 애착을 함께 보는 개인 통합 분석 리포트. 무료 미리보기로 먼저 확인하고, 구매하면 저장된 같은 버전으로 다시 볼 수 있습니다.";
+
 export const metadata: Metadata = {
-  title: "ME:U 미유 · 개인 통합 분석 리포트",
-  description: "사주 · MBTI · 기질 · 애착. 네 가지 관점으로 성향과 행동 패턴을 정리합니다.",
+  // 공유 주소 · 이미지의 기준 (배포 후에는 SITE_URL의 실제 주소)
+  metadataBase: new URL(siteUrl()),
+  title: TITLE,
+  description: DESCRIPTION,
+  openGraph: { type: "website", siteName: "ME:U 미유", locale: "ko_KR", title: TITLE, description: DESCRIPTION },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 export const viewport: Viewport = {
@@ -32,6 +42,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
         </div>
         <SiteFooter />
+        <Suspense fallback={null}>
+          <VisitTracker />
+        </Suspense>
       </body>
     </html>
   );

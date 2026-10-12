@@ -10,7 +10,7 @@ import {
 } from "../commerce/order.ts";
 import { PERSONAL_REPORT } from "../config/product.ts";
 import { salesClosedMessage, type GateReason, type SaleGate } from "./capacity-service.ts";
-import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
+import type { Acquisition, MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
 
 /** 새 구매를 받아도 되는지 확인하는 함수 (용량 · 예산). 확인 자체가 실패하면 판매를 막지 않는다 */
 export type SaleGateCheck = (stage: "start" | "confirm") => Promise<SaleGate>;
@@ -38,7 +38,7 @@ export type StartCheckoutResult =
  */
 export async function startCheckout(
   deps: { repo: MiyuRepository; now: () => Date; newOrderNumber?: (now: Date) => string; gate?: SaleGateCheck },
-  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv },
+  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null },
 ): Promise<StartCheckoutResult> {
   const { repo } = deps;
   const assessment = await repo.getAssessment(input.assessmentId);
@@ -71,6 +71,7 @@ export async function startCheckout(
     productId: PERSONAL_REPORT.id,
     amount: PERSONAL_REPORT.priceKrw,
     paymentEnv: input.paymentEnv ?? "test",
+    acquisition: input.acquisition ?? null,
   });
   if (inserted.ok) return { kind: "order", order: inserted.value };
 

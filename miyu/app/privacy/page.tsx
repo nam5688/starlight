@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/membership/legal-document";
 
-export const metadata: Metadata = { title: "개인정보 처리방침 · ME:U 미유" };
+export const metadata: Metadata = { title: "개인정보 처리방침 · ME:U 미유", description: "ME:U 미유 개인정보 처리방침 (초안)", alternates: { canonical: "/privacy" } };
 
 export default function PrivacyPage() {
   return (
