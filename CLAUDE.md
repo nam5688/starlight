@@ -36,6 +36,7 @@ node scripts/render-assessment-take.ts    # 채점 방향을 숨긴 풀어보기
 node scripts/simulate-assessment-reliability.ts --write   # 가상 응답 한계 점검 문서 만들기
 node scripts/measure-saju-boundaries.ts   # 자시 · 지역 보정이 결과를 바꾸는 몫을 만세력 엔진으로 세기
 node scripts/compare-ai-dry-run.ts        # AI 비교 비용 계산 (호출 없음)
+node scripts/render-apply-sql.ts          # 마이그레이션 4~10번 통합 파일(supabase/apply-4-to-10.sql) 만들기
 ```
 
 사용자는 Windows를 쓰는 비개발자다. 설명은 한국어로, 사용자가 직접 칠 명령은 PowerShell 기준으로 안내한다.
@@ -116,7 +117,7 @@ node scripts/compare-ai-dry-run.ts        # AI 비교 비용 계산 (호출 없�
 | `miyu/lib/report/` | 리포트 타입, 무료 요약 생성, 개발용 생성기 · `evidence.ts`(해석 근거) · `v2/`(개인 종합 리포트 v2 타입 · 지시문 · 형식 검사 · `depth.ts` 내용 차이 검사) · `ai/`(제공사 무관 AI 생성기 · 모의 모델 · `budget.ts` 예산 하드스톱 · `compare-plan.ts` 단계별 비교 실행기 · `compare-personas.ts` 가상 인물) |
 | `miyu/lib/commerce/` | 주문번호, 주문·리포트 상태 규칙 |
 | `miyu/lib/services/` | 저장·주문·승인·리포트·회원 동의 흐름 (저장소·결제사·생성기는 `ports.ts` 약속으로만) · `reconcile-service.ts`(결제사 기록으로 주문 맞추기) · `capacity-service.ts`(AI 용량 · 비용 · 판매 문) · `metrics-service.ts`(사업 지표) · `admin-service.ts`(관리자 자료) · `testing/`(가짜 결제사 · 메모리 저장소) |
-| `miyu/lib/ops/` | 운영 기록 · 알림 규칙: 비밀값 가리기(`redact.ts`) · 오류번호 · 알림 중복 억제(`alerts.ts`) |
+| `miyu/lib/ops/` | 운영 기록 · 알림 규칙: 비밀값 가리기(`redact.ts`) · 오류번호 · 알림 중복 억제(`alerts.ts`) · `apply-sql.ts`(마이그레이션 통합 파일 만들기) |
 | `miyu/lib/membership/` · `lib/growth/` | 가입 동의 항목 · 약관 버전 · 다음 행동 규칙 · `withdrawal.ts`(탈퇴 안내 문구 · 보관 기간) |
 | `miyu/lib/personalization/` | 나를 더 반영하기 입력 규칙 · 개인정보 가리기 · AI 전달 형식 |
 | `miyu/lib/integrations/` | Supabase 저장소, 토스페이먼츠 승인·조회 구현체, AI 연결(지금은 로컬 모의 서버 `ai/mock-local.ts`만) |
@@ -125,7 +126,7 @@ node scripts/compare-ai-dry-run.ts        # AI 비교 비용 계산 (호출 없�
 | `miyu/app/` | 화면과 서버 함수: `/` `/analyze` `/results/[id]` `/checkout/[orderNumber]` `/payments/*` `/my` `/auth/*`(로그인 완료 · 가입 동의) `/terms` `/privacy` `/report/sample`(가상 인물의 완성 리포트 예시) `/setup`(개발용) `/my/withdraw`(회원 탈퇴) `/withdrawn` `/admin`(운영자) `/admin/metrics`(사업 지표) `/api/webhooks/toss` `/api/cron/reconcile`(정기 점검) · `app/error.tsx` · `global-error.tsx` · `track/`(익명 방문 단계 기록) · `fonts/` · `robots.ts` · `sitemap.ts` |
 | `miyu/instrumentation.ts` | 처리하지 못한 서버 오류를 운영 기록으로 남김 |
 | `miyu/proxy.ts` | 로그인 세션 갱신 |
-| `miyu/supabase/` | DB 마이그레이션, 로컬 검증 스크립트·DB 테스트(로컬 DB는 UTF-8) · `check-migrations.sql`(적용 이력 읽기 전용 확인) · `check-payments.sql` · `check-payment-detail.sql`(주문 대조, 읽기 전용) |
+| `miyu/supabase/` | DB 마이그레이션, 로컬 검증 스크립트·DB 테스트(로컬 DB는 UTF-8) · `check-migrations.sql`(적용 이력 읽기 전용 확인) · `check-payments.sql` · `check-payment-detail.sql`(주문 대조, 읽기 전용) · `apply-4-to-10.sql`(4~10번을 SQL Editor에서 한 번에 적용하는 통합 파일 — 시작 조건 확인 · 트랜잭션 · 확인 조회, `scripts/render-apply-sql.ts`가 만들며 직접 고치지 않는다, 마이그레이션이 아니다) |
 | `miyu/scripts/` | `check-deps.mjs`(의존성 점검) · `subset-font.py`(글꼴 줄이기) · `render-assessment-draft.ts` · `render-quality-sample.ts` · `render-assessment-review.ts` · `render-assessment-take.ts`(검토 문서 · 화면 만들기) · `simulate-assessment-reliability.ts` · `measure-saju-boundaries.ts` · `compare-ai-dry-run.ts`(계산 · 점검, 호출 없음) |
 | `miyu/docs/` | 기획 · 점검표 · 운영 매뉴얼 · 유지보수 안내 (위 목록) |
 
