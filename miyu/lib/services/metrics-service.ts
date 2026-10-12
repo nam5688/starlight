@@ -132,9 +132,18 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   const seen = { visit: new Set<string>(), start: new Set<string>(), preview: new Set<string>() };
   for (const e of events) {
     const label = anonLabel.get(e.anonId) ?? "직접 · 알 수 없음";
-    if (e.name === "visit" && !seen.visit.has(e.anonId)) (seen.visit.add(e.anonId), row(label).visits++);
-    if (e.name === "analyze_start" && !seen.start.has(e.anonId)) (seen.start.add(e.anonId), row(label).analyzeStarts++);
-    if (e.name === "preview_view" && !seen.preview.has(e.anonId)) (seen.preview.add(e.anonId), row(label).previews++);
+    if (e.name === "visit" && !seen.visit.has(e.anonId)) {
+      seen.visit.add(e.anonId);
+      row(label).visits++;
+    }
+    if (e.name === "analyze_start" && !seen.start.has(e.anonId)) {
+      seen.start.add(e.anonId);
+      row(label).analyzeStarts++;
+    }
+    if (e.name === "preview_view" && !seen.preview.has(e.anonId)) {
+      seen.preview.add(e.anonId);
+      row(label).previews++;
+    }
   }
   for (const o of liveOrders) {
     const r = row(orderSource(o));

@@ -55,22 +55,26 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     summaryRef.current = preview;
   }, [preview]);
 
-  // 이 탭에 임시 보관된 입력이 있으면 이어서 쓸 수 있게 복원한다 (화면을 그린 뒤 한 번만)
+  // 이 탭에 임시 보관된 입력이 있으면 이어서 쓸 수 있게 복원한다 (화면을 그린 뒤 한 번만).
+  // 저장소는 브라우저에서만 읽을 수 있어 서버가 그린 화면과 맞추려고 그린 직후에 불러온다.
   useEffect(() => {
-    try {
-      const draft = parseDraft(window.sessionStorage.getItem(DRAFT_KEY), Date.now(), LAST_QUESTION_STEP);
-      if (draft) {
-        setInfo(draft.info);
-        setAnswers(draft.answers);
-        setStep(draft.step);
-        stepRef.current = draft.step;
-        window.history.replaceState({ ...window.history.state, meuStep: draft.step }, "");
-        setRestored(true);
+    const timer = window.setTimeout(() => {
+      try {
+        const draft = parseDraft(window.sessionStorage.getItem(DRAFT_KEY), Date.now(), LAST_QUESTION_STEP);
+        if (draft) {
+          setInfo(draft.info);
+          setAnswers(draft.answers);
+          setStep(draft.step);
+          stepRef.current = draft.step;
+          window.history.replaceState({ ...window.history.state, meuStep: draft.step }, "");
+          setRestored(true);
+        }
+      } catch {
+        // 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서는 그냥 처음부터
       }
-    } catch {
-      // 저장소를 쓸 수 없는 환경(사생활 보호 모드 등)에서는 그냥 처음부터
-    }
-    draftReady.current = true;
+      draftReady.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   // 입력이 바뀔 때마다 이 탭에 임시 보관한다
