@@ -41,6 +41,7 @@ npm run test:db    # DB·접근 정책 검사 (Linux 개발 환경에서 supabas
 - 공식 검사(MBTI®, TCI, 애착검사 등) 문항을 복사하거나 그 이름으로 결과를 표시하지 않는다. 기질 · 성격은 미유 자체 상황형 문항으로 보고 "공식 검사 · 정확도" 표현을 쓰지 않는다. 현재 문항은 개발용 예시(`status: "dev-example"`)다.
 - 샘플·개발용 결과에는 출처(`source`)를 표시하고 운영 데이터와 섞지 않는다.
 - AI가 생년월일만 보고 사주 원국을 지어내지 않는다. 원국은 `lib/saju/engine.ts` 엔진 결과만 쓴다.
+- AI 리포트는 `lib/saju/interpret/` · `lib/report/survey-evidence.ts`가 만든 근거 목록 안에서만 쓰고, 문단마다 근거 ID를 단다. `lib/report/v2/validate.ts` 검사를 통과한 것만 저장한다. AI에는 이름 · 생년월일 원문을 보내지 않는다. 실제 AI 제공사 연결 · 유료 호출은 운영자 승인 후.
 - 구매한 리포트는 저장된 같은 버전을 다시 보여준다. 열 때마다 새로 생성하지 않는다.
 
 ## 상품 · 성장 원칙
@@ -78,12 +79,12 @@ npm run test:db    # DB·접근 정책 검사 (Linux 개발 환경에서 supabas
 | 경로 | 내용 |
 | --- | --- |
 | `miyu/lib/assessment/` | 검사 모듈(문항), 채점, 대표 경향 임시 규칙 |
-| `miyu/lib/report/` | 리포트 타입, 무료 요약 생성, 리포트 생성기(개발용) |
+| `miyu/lib/report/` | 리포트 타입, 무료 요약 생성, 개발용 생성기 · `evidence.ts`(해석 근거) · `v2/`(개인 종합 리포트 v2 타입 · 지시문 · 형식 검사) · `ai/`(제공사 무관 AI 생성기 · 모의 모델) |
 | `miyu/lib/commerce/` | 주문번호, 주문·리포트 상태 규칙 |
 | `miyu/lib/services/` | 저장·주문·승인·리포트·회원 동의 흐름 (저장소·결제사·생성기는 `ports.ts` 약속으로만) |
 | `miyu/lib/membership/` · `lib/growth/` | 가입 동의 항목 · 약관 버전 · 다음 행동 규칙 |
-| `miyu/lib/integrations/` | Supabase 저장소, 토스페이먼츠 승인·조회 구현체 |
-| `miyu/lib/samples/` · `lib/config/` · `lib/saju/` | 예시 데이터 · 상품·가격 · 만세력 연결 지점(연결 전) |
+| `miyu/lib/integrations/` | Supabase 저장소, 토스페이먼츠 승인·조회 구현체, AI 연결(지금은 로컬 모의 서버 `ai/mock-local.ts`만) |
+| `miyu/lib/samples/` · `lib/config/` · `lib/saju/` | 예시 데이터 · 상품·가격 · 만세력 엔진(manseryeok)과 `interpret/`(해석 근거 규칙 초안) |
 | `miyu/server/` | 웹 채널 서버 코드 (환경변수, Supabase 클라이언트, 세션 · 회원 상태, 로그인 전 결과 보관 쿠키, 설정 점검) |
 | `miyu/app/` | 화면과 서버 함수: `/` `/analyze` `/results/[id]` `/checkout/[orderNumber]` `/payments/*` `/my` `/auth/*`(로그인 완료 · 가입 동의) `/terms` `/privacy` `/setup`(개발용) `/api/webhooks/toss` |
 | `miyu/proxy.ts` | 로그인 세션 갱신 |
