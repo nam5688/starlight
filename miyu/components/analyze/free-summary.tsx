@@ -12,6 +12,7 @@ import type { Answers } from "@/lib/assessment/types";
 import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { formatBirth, type BasicInfo } from "@/lib/profile/basic-info";
 import type { FreeSummary } from "@/lib/report/types";
+import type { SajuResult } from "@/lib/saju/engine";
 
 const LOCKED_ITEMS = [
   "네 가지 상세 분석 — MBTI · 기질 · 애착 · 사주를 근거와 한계와 함께",
@@ -26,6 +27,7 @@ const LOCKED_ITEMS = [
  */
 export function FreeSummaryView({
   summary,
+  saju,
   info,
   answers,
   authReady,
@@ -33,6 +35,7 @@ export function FreeSummaryView({
   onRestart,
 }: {
   summary: FreeSummary;
+  saju: SajuResult;
   info: BasicInfo;
   answers: Answers;
   authReady: boolean;
@@ -69,6 +72,7 @@ export function FreeSummaryView({
           knownMbti={info.knownMbti || null}
           birthText={formatBirth(info)}
           region={region}
+          saju={saju}
         />
 
         <section aria-labelledby="free-locked" className="overflow-hidden rounded-xl border border-line-strong">

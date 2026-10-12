@@ -9,13 +9,15 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --test \"lib/**/*.test.ts\" \"server/**/*.test.ts\"",
-    "check": "npm run typecheck && npm run lint && npm test && npm run build",
-    "test:db": "node --test supabase/tests/db.test.ts"
+    "check": "npm run typecheck && npm run lint && npm test && npm run test:saju && npm run build",
+    "test:db": "node --test supabase/tests/db.test.ts",
+    "test:saju": "node --test lib/saju/engine.check.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.2",
     "@tosspayments/tosspayments-sdk": "2.8.1",
+    "manseryeok": "2.0.0",
     "next": "16.4.0",
     "pretendard": "^1.3.9",
     "react": "19.3.0",
@@ -26,8 +28,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "astronomy-engine": "2.1.19",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "korean-lunar-calendar": "0.4.0",
+    "lunar-javascript": "1.7.7",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

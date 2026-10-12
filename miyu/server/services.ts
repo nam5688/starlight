@@ -2,7 +2,7 @@ import "server-only";
 import { createTossPaymentGateway } from "@/lib/integrations/tosspayments/gateway";
 import { createSupabaseRepository } from "@/lib/integrations/supabase/repository";
 import { devReportGenerator } from "@/lib/report/generate-dev-report";
-import { sajuEngine } from "@/lib/saju/engine";
+import { manseryeokEngine } from "@/lib/saju/manseryeok-engine";
 import { paymentConfig } from "./env";
 import { createAdminSupabase, createServerSupabase } from "./supabase";
 
@@ -27,6 +27,7 @@ export function paymentGateway() {
 /** 리포트 생성기 — AI 해석이 연결되면 여기서 바꾼다 */
 export const reportGenerator = devReportGenerator;
 
-export { sajuEngine };
+/** 사주 계산 엔진 (manseryeok, 계산 기준은 lib/saju/policy.ts) */
+export const sajuEngine = manseryeokEngine;
 
 export const now = () => new Date();

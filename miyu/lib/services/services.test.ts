@@ -8,7 +8,7 @@ import { PERSONAL_REPORT } from "../config/product.ts";
 import { EMPTY_BASIC_INFO, type BasicInfo } from "../profile/basic-info.ts";
 import { devReportGenerator } from "../report/generate-dev-report.ts";
 import type { ReportGenerator } from "../report/generator.ts";
-import { sajuEngine } from "../saju/engine.ts";
+import { manseryeokEngine as sajuEngine } from "../saju/manseryeok-engine.ts";
 import { submitAssessment } from "./assessment-service.ts";
 import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "./order-service.ts";
 import type { GatewayResult, PaymentGateway } from "./ports.ts";
@@ -76,7 +76,7 @@ test("검사 저장: 서버에서 채점하고 모르는 문항 키는 버린다
   assert.equal(assessment.birthTime, null);
   assert.equal(assessment.knownMbti, "INFJ");
   assert.equal("extra" in assessment.answers, false);
-  assert.equal(assessment.saju.status, "not-connected");
+  assert.equal(assessment.saju.status, "ok", "만세력 엔진으로 원국을 계산해 함께 저장한다");
   assert.equal(mem.profiles.get(USER)?.nickname, "지민");
   assert.deepEqual(mem.regions.get(USER), { province: "서울특별시", district: "마포구" });
 });
@@ -88,6 +88,14 @@ test("검사 저장: 기본 정보나 응답이 잘못되면 거부한다", asyn
   assert.equal(bad.ok, false);
   const missing = await submitAssessment(d, { userId: USER, channel: "web", info: INFO, answers: { m1: 3 }, today: TODAY });
   assert.equal(missing.ok, false);
+  const noLeap = await submitAssessment(d, {
+    userId: USER,
+    channel: "web",
+    info: { ...INFO, calendar: "lunar", isLeapMonth: true, birthYear: "2021", birthMonth: "4", birthDay: "1" },
+    answers: answersAll(3),
+    today: TODAY,
+  });
+  assert.deepEqual(noLeap, { ok: false, message: "2021년에는 음력 윤4월이 없습니다. 윤달이 아니라면 ‘윤달’ 선택을 해제해 주세요." });
   assert.equal(mem.assessments.size, 0);
 });
 

@@ -35,6 +35,10 @@ export async function submitAssessment(
 
   const summary = buildDevFreeSummary(answers);
   const saju = await deps.saju.calculate({ year, month, day, calendar: info.calendar, isLeapMonth, birthTime });
+  if (saju.status === "invalid") return { ok: false, message: saju.message };
+  if (saju.status === "ok" && toDate(saju.solarDate) > input.today) {
+    return { ok: false, message: "오늘 이후 날짜는 입력할 수 없습니다." };
+  }
 
   const assessment = await deps.repo.insertAssessment({
     userId: input.userId,
@@ -64,6 +68,8 @@ export async function submitAssessment(
 
   return { ok: true, assessment };
 }
+
+const toDate = (d: { year: number; month: number; day: number }) => new Date(d.year, d.month - 1, d.day);
 
 /** 알려진 문항 id의 응답만 남긴다 (모르는 키는 저장하지 않는다) */
 function pickKnownAnswers(raw: Answers): Answers {

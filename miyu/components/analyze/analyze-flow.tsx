@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { scoreDevAnswers } from "@/app/analyze/actions";
+import { checkBirthAction, scoreDevAnswers } from "@/app/analyze/actions";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
 import type { Answers } from "@/lib/assessment/types";
@@ -13,6 +13,7 @@ import {
   type BasicInfoErrors,
 } from "@/lib/profile/basic-info";
 import type { FreeSummary } from "@/lib/report/types";
+import type { SajuResult } from "@/lib/saju/engine";
 import { BasicInfoStep } from "./basic-info-step";
 import { FreeSummaryView } from "./free-summary";
 import { QuestionStep } from "./question-step";
@@ -38,6 +39,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [showMissing, setShowMissing] = useState(false);
   const [summary, setSummary] = useState<FreeSummary | null>(null);
+  const [saju, setSaju] = useState<SajuResult | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -128,7 +130,20 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
         document.getElementById(first === "birthDate" ? "birthYear" : first)?.focus();
         return;
       }
-      pushStep(1);
+      if (info.calendar === "solar") {
+        pushStep(1);
+        return;
+      }
+      // 음력은 그 해의 윤달 · 달 길이를 만세력으로 확인한 뒤 넘어간다
+      startTransition(async () => {
+        const problem = await checkBirthAction(info);
+        if (problem) {
+          setInfoErrors({ birthDate: problem });
+          document.getElementById("birthYear")?.focus();
+          return;
+        }
+        pushStep(1);
+      });
       return;
     }
 
@@ -147,8 +162,9 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
 
     setServerError(null);
     startTransition(async () => {
-      const result = await scoreDevAnswers(answers);
+      const result = await scoreDevAnswers({ info, answers });
       if (result.ok) {
+        setSaju(result.saju);
         setSummary(result.summary);
         summaryRef.current = result.summary;
         pushStep(SUMMARY_STEP);
@@ -220,6 +236,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
       {step === SUMMARY_STEP && summary ? (
         <FreeSummaryView
           summary={summary}
+          saju={saju ?? { status: "not-connected" }}
           info={info}
           answers={answers}
           authReady={authReady}

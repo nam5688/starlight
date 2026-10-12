@@ -40,9 +40,9 @@ export function DetailSections({ report }: { report: FullReport }) {
       <Detail
         title="사주"
         headline={
-          saju.status === "sample"
-            ? `일간 ${saju.dayMaster} · ${saju.elements.map((e) => `${e.name}${e.count}`).join(" ")}`
-            : "만세력 계산 연결 전"
+          saju.status === "not-connected"
+            ? "만세력 계산 연결 전"
+            : `일간 ${saju.dayMaster} · ${saju.elements.map((e) => `${e.name}${e.count}`).join(" ")}`
         }
         block={details.saju}
       >
@@ -99,14 +99,16 @@ function Detail({
 }
 
 function SajuChart({ saju }: { saju: SajuSection }) {
-  if (saju.status !== "sample") {
-    return <p className="text-[15px] text-ink-2">만세력 계산 모듈이 연결되면 원국과 오행 분포가 표시됩니다.</p>;
+  if (saju.status === "not-connected") {
+    return <p className="text-[15px] text-ink-2">만세력 계산 결과가 없는 결과입니다.</p>;
   }
   const total = saju.elements.reduce((n, e) => n + e.count, 0);
   return (
     <div className="space-y-5">
       <table className="w-full table-fixed border-collapse text-center">
-        <caption className="mb-2 text-left text-[13px] text-ink-3">사주 원국 (예시 · 가상 데이터)</caption>
+        <caption className="mb-2 text-left text-[13px] text-ink-3">
+          {saju.status === "sample" ? "사주 원국 (예시 · 가상 데이터)" : "사주 원국 (만세력 계산)"}
+        </caption>
         <thead>
           <tr className="border-y border-line text-[13px] text-ink-3">
             <th scope="col" className="w-14 py-2 text-left font-medium">
@@ -126,6 +128,13 @@ function SajuChart({ saju }: { saju: SajuSection }) {
                 {kind === "stem" ? "천간" : "지지"}
               </th>
               {saju.pillars.map((p) => {
+                if (p.unknown) {
+                  return (
+                    <td key={p.position} className="py-3 text-[13px] text-ink-3">
+                      {kind === "stem" ? "출생시간" : "모름"}
+                    </td>
+                  );
+                }
                 const glyph = kind === "stem" ? p.stem : p.branch;
                 const info = (kind === "stem" ? STEMS : BRANCHES)[glyph];
                 const isDayMaster = kind === "stem" && p.position === "일주";
@@ -157,6 +166,14 @@ function SajuChart({ saju }: { saju: SajuSection }) {
           ))}
         </ul>
       </div>
+      {saju.notes?.length || saju.basis?.length ? (
+        <div className="space-y-2 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-3">
+          {saju.notes?.map((n) => (
+            <p key={n}>{n}</p>
+          ))}
+          {saju.basis && <p>계산 기준: {saju.basis.join(" · ")}</p>}
+        </div>
+      ) : null}
     </div>
   );
 }

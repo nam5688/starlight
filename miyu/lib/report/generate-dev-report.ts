@@ -1,6 +1,8 @@
 // 개발용 리포트 생성기 — 점수와 임시 규칙으로 문장을 조합한다 (AI 미사용).
 // 결과에는 source: "dev-scoring"이 붙고, 화면에 개발용 표시가 나온다.
 
+import { FIVE_ELEMENTS, type FiveElement } from "../saju/engine.ts";
+import { sajuSection } from "../saju/display.ts";
 import type { TendencyId } from "../assessment/dev-rules.ts";
 import type { ReportGenerator, ReportInput } from "./generator.ts";
 import type { AxisRow, FullReport, ScoreRow } from "./types.ts";
@@ -172,7 +174,7 @@ export function buildDevReport(input: ReportInput): FullReport {
 
   const relationshipFindings = summary.relationship.map(scoreFinding);
   const temperamentFindings = byStrength(summary.temperament).slice(0, 3).map(scoreFinding);
-  const sajuConnected = input.saju.status === "ok";
+  const saju = input.saju;
 
   return {
     ...summary,
@@ -197,17 +199,31 @@ export function buildDevReport(input: ReportInput): FullReport {
         limits: "임상 진단이 아니며, 특정 관계나 시기의 경험에 따라 응답이 달라질 수 있습니다.",
       },
       saju: {
-        basis: `${input.birthText}${sajuConnected ? "" : " — 만세력 계산 연결 전"}`,
-        findings: sajuConnected
-          ? ["원국 해석 문구는 아직 연결되지 않았습니다."]
-          : ["만세력 계산 모듈이 연결되면 원국과 오행 분포를 이 자리에 표시합니다."],
+        basis: `${input.birthText}${saju.status === "ok" ? " · 만세력으로 계산한 원국" : " — 만세력 계산 연결 전"}`,
+        findings:
+          saju.status === "ok"
+            ? [
+                `일간은 ${saju.dayMaster.stem}${saju.dayMaster.element}(${saju.dayMaster.stemHanja}), ${saju.dayMaster.yinYang}의 ${saju.dayMaster.element}입니다.`,
+                elementFinding(saju.elementCounts),
+                "원국 해석 문장은 AI 해석이 연결되면 이 자리에 들어갑니다 (개발용 생성기는 계산 결과만 보여줍니다).",
+              ]
+            : ["만세력 계산 결과가 없습니다."],
         limits: "사주는 전통 해석 체계이며 과학적으로 검증된 성격 측정이 아닙니다. 심리검사 점수와 합산하지 않습니다.",
-        saju: { status: "not-connected" },
+        saju: sajuSection(saju),
       },
     },
     integrated: { common, different },
     actions: ACTIONS[summary.tendency.id],
   };
+}
+
+function elementFinding(counts: Record<FiveElement, number>): string {
+  const entries = FIVE_ELEMENTS.map((e) => [e, counts[e]] as const);
+  const max = Math.max(...entries.map(([, n]) => n));
+  const most = entries.filter(([, n]) => n === max).map(([e]) => e);
+  const none = entries.filter(([, n]) => n === 0).map(([e]) => e);
+  const list = entries.map(([e, n]) => `${e} ${n}`).join(" · ");
+  return `원국 글자의 오행: ${list}. 가장 많은 오행은 ${most.join("·")}${none.length ? `, 없는 오행은 ${none.join("·")}` : ""}입니다.`;
 }
 
 export const devReportGenerator: ReportGenerator = {

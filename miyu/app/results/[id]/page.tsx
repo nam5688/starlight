@@ -92,6 +92,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
           knownMbti={assessment.knownMbti}
           birthText={formatAssessmentBirth(assessment)}
           region={null /* 지역은 성향 분석과 분리해 보관하고 결과 화면에 다시 보여주지 않는다 */}
+          saju={assessment.saju}
         />
         <PurchasePanel view={view} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} />
       </div>

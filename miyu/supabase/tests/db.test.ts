@@ -8,7 +8,7 @@ import { ASSESSMENT_MODULES } from "../../lib/assessment/modules/index.ts";
 import { createSupabaseRepository } from "../../lib/integrations/supabase/repository.ts";
 import { EMPTY_BASIC_INFO } from "../../lib/profile/basic-info.ts";
 import { devReportGenerator } from "../../lib/report/generate-dev-report.ts";
-import { sajuEngine } from "../../lib/saju/engine.ts";
+import { manseryeokEngine as sajuEngine } from "../../lib/saju/manseryeok-engine.ts";
 import { submitAssessment } from "../../lib/services/assessment-service.ts";
 import { agreeToTerms, getMemberStatus, setMarketingConsent } from "../../lib/services/member-service.ts";
 import { confirmPayment, startCheckout } from "../../lib/services/order-service.ts";

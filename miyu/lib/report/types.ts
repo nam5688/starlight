@@ -47,16 +47,24 @@ export type FreeSummary = {
 
 export type SajuPillar = {
   position: "년주" | "월주" | "일주" | "시주";
+  /** 한자 (예: 甲) */
   stem: string;
   branch: string;
+  /** 출생시간을 몰라 계산하지 않은 기둥 */
+  unknown?: boolean;
 };
 
 export type SajuSection =
   | {
-      status: "sample";
+      /** sample: 예시용 가상 원국 / computed: 만세력 엔진으로 계산한 원국 */
+      status: "sample" | "computed";
       pillars: SajuPillar[];
       dayMaster: string;
       elements: { name: string; count: number }[];
+      /** 계산 기준에 따라 달라질 수 있는 부분 안내 */
+      notes?: string[];
+      /** 엔진과 계산 기준 */
+      basis?: string[];
     }
   | { status: "not-connected" };
 
