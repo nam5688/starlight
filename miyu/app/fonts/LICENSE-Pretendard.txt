@@ -5,3 +5,6 @@ Licensed under the SIL Open Font License, Version 1.1 (https://scripts.sil.org/O
 Pretendard-core.woff2 and Pretendard-rest.woff2 in this folder are modified versions (subset to the characters this site
 uses plus the 2,350 KS X 1001 Hangul syllables, weight axis limited to 400-700, converted to WOFF2). They are generated
 from the "pretendard" npm package (OFL-1.1) with fontTools by scripts/subset-font.py.
+
+Because these files are modified, the font is served under the name "Miyu Sans" (the Reserved Font Name is not used
+as the font family). The copyright and license notices above are kept in the font files themselves.

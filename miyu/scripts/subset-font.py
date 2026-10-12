@@ -3,7 +3,7 @@
 본문 글꼴(Pretendard, OFL-1.1) 줄이기 — npm 패키지의 가변 글꼴에서 필요한 글자만 남겨 woff2 두 개로 만든다.
 - Pretendard-core.woff2: 화면 문구에 실제로 쓰인 글자 + 기본 라틴 + 기호 (첫 화면에서 받는 파일)
 - Pretendard-rest.woff2: 사용자 입력 · AI 문장에 나올 수 있는 한글 2,350자(KS X 1001) 중 core에 없는 글자 (필요한 화면에서만 받는다)
-- pretendard-subset.css: 위 두 파일의 @font-face (unicode-range로 나눠 받는다)
+- pretendard-subset.css: 위 두 파일의 @font-face (unicode-range로 나눠 받는다). 글꼴 이름은 라이선스(OFL 예약 이름)에 맞춰 "Miyu Sans"로 바꾼다
 실행(개발자 PC, 한 번): python3 -m venv /tmp/fontenv && /tmp/fontenv/bin/pip install fonttools brotli && /tmp/fontenv/bin/python scripts/subset-font.py
 화면 문구에 새 글자가 많이 늘면 다시 실행한다 (core에 없는 글자는 rest에서 받으므로 빠뜨려도 깨지지는 않는다).
 """
@@ -66,6 +66,16 @@ def build(chars, name):
     s = subset.Subsetter(opts)
     s.populate(unicodes=[ord(c) for c in chars])
     s.subset(font)
+    # OFL의 예약 글꼴 이름 규칙: 수정한 글꼴은 원래 이름(Pretendard)을 쓰지 않는다 → 이 사이트 전용 이름으로 바꾼다 (저작권 · 라이선스 문구는 그대로 둔다)
+    for rec in font["name"].names:
+        if rec.nameID in (1, 16):
+            rec.string = "Miyu Sans"
+        elif rec.nameID in (4, 18):
+            rec.string = "Miyu Sans Variable"
+        elif rec.nameID == 6:
+            rec.string = "MiyuSans-Variable"
+        elif rec.nameID == 3:
+            rec.string = "MiyuSans-Variable;subset"
     font.flavor = "woff2"
     path = os.path.join(OUT, name)
     font.save(path)
@@ -76,7 +86,7 @@ build(core, "Pretendard-core.woff2")
 build(rest, "Pretendard-rest.woff2")
 css = f"""/* scripts/subset-font.py가 만든 파일 — 직접 고치지 않는다 (글꼴 라이선스: app/fonts/LICENSE-Pretendard.txt) */
 @font-face {{
-  font-family: "Pretendard Subset";
+  font-family: "Miyu Sans";
   src: url("./Pretendard-core.woff2") format("woff2");
   font-weight: 400 700;
   font-style: normal;
@@ -84,7 +94,7 @@ css = f"""/* scripts/subset-font.py가 만든 파일 — 직접 고치지 않는
   unicode-range: {ranges(core)};
 }}
 @font-face {{
-  font-family: "Pretendard Subset";
+  font-family: "Miyu Sans";
   src: url("./Pretendard-rest.woff2") format("woff2");
   font-weight: 400 700;
   font-style: normal;

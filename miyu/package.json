@@ -11,7 +11,8 @@
     "test": "node --test \"lib/**/*.test.ts\" \"server/**/*.test.ts\"",
     "check": "npm run typecheck && npm run lint && npm test && npm run test:saju && npm run build",
     "test:db": "node --test supabase/tests/db.test.ts",
-    "test:saju": "node --test lib/saju/engine.check.ts"
+    "test:saju": "node --test lib/saju/engine.check.ts",
+    "deps": "node scripts/check-deps.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",

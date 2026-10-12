@@ -80,7 +80,7 @@ SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
    - 이미 실행한 파일을 다시 실행하면 "already exists" 오류가 납니다. 표가 모두 "있음"이면 그대로 두면 됩니다.
    - 첫 번째 파일 실행 중 오류가 났다면, 두 번째 파일로 넘어가지 말고 오류 문구를 알려주세요 (키 값은 보내지 않습니다).
 
-### 2단계 추가 — 나중에 생긴 DB 변경 (3~5번)
+### 2단계 추가 — 나중에 생긴 DB 변경 (3~9번)
 
 기능이 추가되면서 SQL 파일이 더 생겼습니다. **이미 적용한 파일은 다시 실행하지 않고, 아직 안 한 것만 번호 순서대로 한 번씩** 실행합니다. 방법은 위와 같습니다 (New query → 아래 명령으로 복사 → 붙여넣기 → Run → `Success`).
 기존 회원 · 검사 · 주문 데이터는 지우거나 바꾸지 않습니다. 파일을 고쳐서 다시 실행하라는 안내는 하지 않습니다. 바뀐 내용은 항상 새 파일로 추가됩니다.
@@ -90,15 +90,24 @@ SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
 | 3 | `20261013000000_profile_backfill.sql` | 테이블을 만들기 전에 가입한 회원의 빠진 프로필만 채웁니다 |
 | 4 | `20261014000000_payment_env.sql` | 주문에 결제 환경(내 테스트 키 / 토스 문서 예제 키 / 실결제)을 기록할 칸을 추가합니다 |
 | 5 | `20261015000000_personal_context.sql` | ‘나를 더 반영하기’(선택 입력)를 저장할 표를 만듭니다. 본인만 보고 · 고치고 · 지울 수 있습니다 |
+| 6 | `20261016000000_ops_events.sql` | 운영 기록(결제 재확인 결과 · 오류번호 · 알림 이력) 표를 만듭니다. 서버만 읽고 쓰며 고치거나 지울 수 없습니다 |
+| 7 | `20261017000000_ai_usage.sql` | AI 호출 기록(횟수 · 토큰 · 예상 비용) 표와 색인을 만듭니다. 고객 정보는 담지 않습니다 |
+| 8 | `20261018000000_funnel_feedback.sql` | 방문 단계 기록 · 구매 후 만족도 표와, 주문에 유입 출처를 적을 칸을 추가합니다 |
+| 9 | `20261019000000_performance.sql` | 하루 AI 비용 합계 함수와 결제 재확인용 색인을 더합니다 |
 
 ```powershell
 Get-Content supabase\migrations\20261013000000_profile_backfill.sql -Raw -Encoding UTF8 | Set-Clipboard
 Get-Content supabase\migrations\20261014000000_payment_env.sql -Raw -Encoding UTF8 | Set-Clipboard
 Get-Content supabase\migrations\20261015000000_personal_context.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261016000000_ops_events.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261017000000_ai_usage.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261018000000_funnel_feedback.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261019000000_performance.sql -Raw -Encoding UTF8 | Set-Clipboard
 ```
 
-(세 줄을 한꺼번에 붙여넣지 말고, **한 줄 실행 → SQL Editor에서 Run → 다음 줄** 순서로 합니다.)
+(여러 줄을 한꺼번에 붙여넣지 말고, **한 줄 실행 → SQL Editor에서 Run → 다음 줄** 순서로 합니다.)
 
+- 6~9번을 아직 안 했어도 결제 · 리포트 · MY는 그대로 동작합니다 (코드가 먼저 올라가고 DB 변경이 늦어도 주문 생성이 막히지 않도록 확인했습니다). 해당 번호를 적용하기 전에는 운영 기록 · AI 사용 기록 · 방문 단계 · 만족도가 쌓이지 않거나 집계가 비어 보일 뿐입니다. `/setup`의 DB 상태에서 `ops_events` 등으로 확인합니다.
 - 5번을 아직 안 했어도 다른 화면은 그대로 동작합니다. 다만 ‘나를 더 반영하기’ 저장이 "DB 변경 5번을 먼저 적용해야 합니다"라고 안내합니다. `/setup`의 DB 상태에서 `personal_contexts` 상태로도 확인할 수 있습니다.
 
 ## 3단계. 카카오 로그인 켜기
@@ -191,3 +200,19 @@ Supabase **Authentication → URL Configuration**에서:
 - Project Settings → Environment Variables에 `.env.local`과 같은 이름으로 값 입력 (`SITE_URL`은 실제 주소)
 - Supabase Site URL · Redirect URLs에 실제 주소 추가, 카카오에는 실제 사이트 도메인 등록, 토스 웹훅 주소 등록
 - `/setup` 화면은 운영 빌드에서 열리지 않습니다
+
+
+---
+
+## 운영 설정 (공개 배포 전 · 나중에)
+
+아래 값은 `.env.local`(로컬) 또는 Vercel 환경변수(배포)에 넣습니다. 키 · 토큰 값은 대화창에 붙여넣지 않습니다. 이름과 설명은 `.env.example`에 있습니다.
+
+| 이름 | 무엇에 쓰나 | 얻는 곳 |
+| --- | --- | --- |
+| `ADMIN_USER_IDS` | 관리자 화면(`/admin`)에 들어갈 회원 번호. 비워 두면 아무에게도 열리지 않습니다 | Supabase → Authentication → Users에서 내 계정의 **User UID** (카카오로 한 번 로그인한 뒤) |
+| `CRON_SECRET` | 정기 점검 주소(`/api/cron/reconcile`)의 인증값. 길고 추측하기 어려운 무작위 문자열 | PowerShell: `[Convert]::ToBase64String((1..32 \| ForEach-Object { Get-Random -Maximum 256 }))` 로 만들어 환경변수에 넣기 |
+| `TELEGRAM_BOT_TOKEN` · `TELEGRAM_CHAT_ID` | 운영 알림(결제 확인 필요 · 리포트 실패 · 새 구매 중단). 둘 다 있을 때만 텔레그램으로 보내고, 없으면 서버 로그에만 남깁니다 | 텔레그램 BotFather로 봇 만들기 → 내 채팅 번호 확인 |
+| `AI_MAX_CONCURRENT` · `AI_SALE_QUEUE_LIMIT` · `AI_DAILY_BUDGET_KRW` 등 | AI를 연결한 뒤의 동시 생성 · 새 구매 중단 · 하루 예산 한도 (`.env.example` 참고) | AI 제공사를 정하고 승인한 뒤 가격표를 보고 정합니다 |
+
+정기 점검은 배포 후 Vercel Cron(또는 외부 예약 실행)으로 **5~10분마다** `GET /api/cron/reconcile`을 `Authorization: Bearer <CRON_SECRET>`와 함께 호출하게 합니다. 이 작업이 (1) 결제사에서는 승인됐는데 우리 쪽에 반영되지 않은 주문을 맞추고 (2) 고객이 화면을 열지 않아 멈춰 있는 리포트를 이어서 만들고 (3) 실패 · 지연 리포트를 운영자에게 알립니다. 자세한 운영 절차는 [`runbook.md`](./runbook.md).

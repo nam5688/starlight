@@ -91,6 +91,8 @@ npm run check
 
 `npm run test:db`(DB · 접근 정책 검사)는 Linux 개발 환경에서 로컬 검증용 DB를 띄운 뒤 실행합니다 (`supabase/tests/local-stack.sh`). Windows에서는 실행하지 않아도 됩니다.
 
+`npm run deps`는 운영 패키지의 라이선스 · 알려진 보안 취약점 · 새 버전을 한 번에 보여 줍니다 (인터넷 필요, 새 도구 설치 없음).
+
 ## 환경변수
 
 카카오 로그인 · 저장 · 결제를 쓰려면 키가 필요합니다. 값 얻는 방법은 [`docs/setup-guide.md`](docs/setup-guide.md)에 있습니다.
@@ -109,19 +111,22 @@ notepad .env.local
 
 ```
 miyu/
-├── app/                  화면과 서버 함수 (메인, analyze, results, checkout, payments, my, auth, api/webhooks)
+├── app/                  화면과 서버 함수 (메인, analyze, results, checkout, payments, my, auth, admin, api/webhooks · cron)
 ├── components/           화면 부품
 ├── lib/                  채널과 무관한 핵심 로직 (다른 채널에서도 재사용)
 │   ├── assessment/       검사 모듈(문항) · 채점
 │   ├── report/           리포트 데이터 · 무료 요약 · 개발용 생성기 · v2(근거 기반 AI 생성기 · 형식 검사)
 │   ├── commerce/         주문 · 리포트 상태 규칙
-│   ├── services/         저장 · 주문 · 결제 승인 · 리포트 · 회원 동의 흐름
+│   ├── services/         저장 · 주문 · 결제 승인 · 재확인 · 리포트 · 용량 한도 · 관리자 · 지표 · 회원 동의 흐름
+│   ├── ops/              운영 알림 · 오류번호 · 비밀값 가리기
 │   ├── membership/       가입 동의 항목 · 약관 버전
 │   ├── growth/           다음 행동 규칙
 │   ├── integrations/     Supabase 저장소 · 토스페이먼츠 연결
 │   └── samples/ config/ saju/ profile/
 ├── server/               웹 서버 전용 (환경변수, 로그인 세션 · 회원 상태, 결과 보관 쿠키, 설정 점검)
 ├── supabase/             DB 마이그레이션 · 로컬 검증
+├── scripts/              글꼴 줄이기 · 의존성 점검
+├── instrumentation.ts    서버 오류를 운영 기록 · 알림으로 남김
 ├── proxy.ts              로그인 세션 갱신
-└── docs/                 기획서 · 진행 단계 · 연결 안내
+└── docs/                 기획서 · 진행 단계 · 연결 안내 · 출시 점검표 · 운영 매뉴얼 · 유지보수
 ```
