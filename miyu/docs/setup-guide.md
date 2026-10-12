@@ -20,17 +20,24 @@
 
 ---
 
-## 1단계. Supabase 프로젝트 만들고 주소 · 키 입력
+## 1단계. Supabase 주소 · 키 입력과 연결 확인
 
-1. https://supabase.com 에 가입하고 **New project**를 만듭니다. Region은 **Northeast Asia (Seoul)** 를 고릅니다. 데이터베이스 비밀번호는 내 비밀번호 관리 수단에만 보관합니다.
-2. 미유 폴더에서 PowerShell을 열고 설정 파일을 만듭니다.
+1. https://supabase.com 에 가입하고 **New project**를 만듭니다. Region은 **Northeast Asia (Seoul)** 를 고릅니다. 데이터베이스 비밀번호는 내 비밀번호 관리 수단에만 보관합니다. 만들 때 **Data API** 옵션이 보이면 켜진 상태(기본값)로 둡니다.
+2. PowerShell에서 미유 폴더로 이동한 뒤, 아래 한 줄을 실행합니다. `.env.local`이 **없을 때만** `.env.example`을 복사해 만들고, 이미 있으면 건드리지 않은 채 메모장으로 엽니다.
 
    ```powershell
-   Copy-Item .env.example .env.local
-   notepad .env.local
+   cd $HOME\Documents\starlight\miyu
+   if (Test-Path .env.local) { "이미 있습니다. 덮어쓰지 않고 엽니다." } else { Copy-Item .env.example .env.local; "새로 만들었습니다." }; notepad .env.local
    ```
 
-3. Supabase에서 아래 세 값을 찾아 메모장의 `=` 뒤에 **직접** 붙여넣습니다.
+3. 이 파일이 Git 커밋에서 빠지는지 확인합니다.
+
+   ```powershell
+   git check-ignore -v .env.local
+   ```
+
+   `miyu/.gitignore:34:.env*	.env.local`처럼 규칙이 한 줄 나오면 커밋에서 제외된 것입니다. 아무것도 나오지 않으면 진행하지 말고 알려주세요.
+4. Supabase에서 아래 세 값을 찾아 메모장의 `=` 뒤에 **직접** 붙여넣습니다. 앞뒤에 따옴표나 공백을 넣지 않습니다.
 
    | `.env.local` 이름 | Supabase에서 찾는 곳 | 모양 |
    | --- | --- | --- |
@@ -38,22 +45,40 @@
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **Project Settings → API Keys**의 Publishable key | `sb_publishable_…` |
    | `SUPABASE_SECRET_KEY` | 같은 화면의 Secret key (서버 전용, 공개 금지) | `sb_secret_…` |
 
-4. 같은 파일에 `SITE_URL=http://localhost:3000` 을 적고 저장합니다.
-5. 개발 서버를 켭니다 (이미 켜져 있으면 `Ctrl + C`로 끄고 다시).
+5. 같은 파일의 `SITE_URL=` 뒤에 `http://localhost:3000` 을 적고 저장(`Ctrl + S`)합니다.
+6. 개발 서버를 켭니다 (이미 켜져 있으면 `Ctrl + C`로 끄고 다시).
 
    ```powershell
    npm run dev
    ```
 
-6. http://localhost:3000/setup 에서 1단계가 **완료**로 바뀌는지 확인합니다. "형식 확인 필요"가 보이면 그 줄의 안내대로 고칩니다 (예: 공개 키 칸에 비밀키를 넣은 경우).
+7. http://localhost:3000/setup 을 엽니다. 이 화면은 입력 형식만 보는 것이 아니라 **Supabase에 실제로 접속해** 주소 · 공개용 키 · 비밀키를 확인합니다.
+   - 표 아래 **Supabase 연결**이 "연결됨"이면 1단계 완료입니다.
+   - "형식 확인 필요" 또는 "맞지 않습니다"가 보이면 그 안내대로 값을 고치고, 개발 서버를 껐다 켠 뒤 새로고침합니다.
+   - 키 값은 이 화면에 나오지 않습니다.
 
 ## 2단계. DB 테이블 만들기
 
-1. Supabase 프로젝트의 **SQL Editor**를 엽니다.
-2. `miyu/supabase/migrations/20261011000000_init.sql` 파일을 메모장으로 열어 내용을 전부 복사 → 붙여넣기 → **Run**.
-3. 새 쿼리 창에서 `miyu/supabase/migrations/20261012000000_consents.sql`(가입 동의 기록)도 같은 방법으로 **Run**.
-4. 두 파일은 각각 **한 번만** 실행합니다. 이미 실행한 파일을 다시 실행하면 "already exists" 오류가 나는데, 그 경우 그대로 두면 됩니다.
-5. `/setup` 새로고침 → 2단계 완료 확인 (DB 상태에 표 7개가 모두 "있음").
+SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
+
+1. Supabase 프로젝트 왼쪽 메뉴의 **SQL Editor**를 열고 **New query**를 누릅니다.
+2. PowerShell(미유 폴더)에서 첫 번째 파일 내용을 클립보드에 복사합니다.
+
+   ```powershell
+   Get-Content supabase\migrations\20261011000000_init.sql -Raw -Encoding UTF8 | Set-Clipboard
+   ```
+
+3. SQL Editor에 붙여넣고(`Ctrl + V`) **Run**을 누릅니다. 아래쪽에 `Success. No rows returned`가 나오면 성공입니다.
+   - 실행 전 "destructive operation" 확인 창이 뜨면, 이 파일은 미유 테이블을 새로 만들고 권한을 정리하는 내용이므로 확인을 누르면 됩니다. 다른 프로젝트의 SQL이 아닌지만 확인하세요.
+4. **New query**로 새 창을 열고, 두 번째 파일(가입 동의 기록)도 같은 방법으로 실행합니다.
+
+   ```powershell
+   Get-Content supabase\migrations\20261012000000_consents.sql -Raw -Encoding UTF8 | Set-Clipboard
+   ```
+
+5. `/setup`을 새로고침합니다. **DB 상태**에 표 7개(`profiles` `assessments` `user_regions` `orders` `payment_events` `reports` `user_consents`)가 모두 "있음"이면 2단계 완료입니다.
+   - 이미 실행한 파일을 다시 실행하면 "already exists" 오류가 납니다. 표가 모두 "있음"이면 그대로 두면 됩니다.
+   - 첫 번째 파일 실행 중 오류가 났다면, 두 번째 파일로 넘어가지 말고 오류 문구를 알려주세요 (키 값은 보내지 않습니다).
 
 ## 3단계. 카카오 로그인 켜기
 

@@ -1,6 +1,6 @@
 import "server-only";
 import { isAuthConfigured, paymentConfig, supabaseEnv } from "./env";
-import { buildSteps, checkEnv, CONSENT_TABLES, INIT_TABLES, type SetupFacts } from "./setup-checks";
+import { buildSteps, checkEnv, CONSENT_TABLES, INIT_TABLES, type Connection, type SetupFacts } from "./setup-checks";
 import { createAdminSupabase } from "./supabase";
 
 // 개발용 설정 점검. 값은 읽어서 판정만 하고 화면·로그에는 내보내지 않는다.
@@ -19,19 +19,27 @@ async function count(admin: Admin, table: string, filter?: [string, string]): Pr
   return error ? null : (n ?? 0);
 }
 
-/** Supabase에서 카카오 로그인이 켜져 있는지 (공개 설정 정보로 확인) */
-async function kakaoEnabled(url: string, publishableKey: string): Promise<boolean | null> {
+/**
+ * 실제 연결 확인. 공개 설정 정보(주소 + 공개용 키)와 관리자 회원 목록 1건(비밀키)을 요청해 본다.
+ * 테이블이 없어도 확인할 수 있고, 카카오 로그인이 켜져 있는지도 함께 알 수 있다.
+ */
+async function probeSupabase(url: string, publishableKey: string, admin: Admin): Promise<{ connection: Connection; kakao: boolean | null }> {
   try {
     const res = await fetch(`${url}/auth/v1/settings`, {
       headers: { apikey: publishableKey },
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return null;
+    if (res.status === 401 || res.status === 403) return { connection: "bad-publishable", kakao: null };
+    if (!res.ok) return { connection: "unreachable", kakao: null };
     const body = (await res.json()) as { external?: Record<string, boolean> };
-    return body.external?.kakao === true;
+    const kakao = body.external?.kakao === true;
+
+    const { error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1 });
+    if (error) return { connection: error.status === 401 || error.status === 403 ? "bad-secret" : "unreachable", kakao };
+    return { connection: "ok", kakao };
   } catch {
-    return null;
+    return { connection: "unreachable", kakao: null };
   }
 }
 
@@ -44,6 +52,7 @@ export async function getSetupStatus() {
   const facts: SetupFacts = {
     env,
     supabaseReady,
+    connection: null,
     tables: {},
     kakaoEnabled: null,
     completedLogins: null,
@@ -61,16 +70,18 @@ export async function getSetupStatus() {
     readyReports: null,
   };
 
-  if (supabaseReady) {
+  const admin = supabaseReady ? createAdminSupabase() : null;
+  if (admin) {
     const { url, publishableKey } = supabaseEnv();
-    const admin = createAdminSupabase();
+    const probe = await probeSupabase(url, publishableKey, admin);
+    facts.connection = probe.connection;
+    facts.kakaoEnabled = probe.kakao;
+  }
+
+  if (admin && facts.connection === "ok") {
     const tables = [...INIT_TABLES, ...CONSENT_TABLES];
-    const [exists, kakao] = await Promise.all([
-      Promise.all(tables.map((t) => tableExists(admin, t))),
-      kakaoEnabled(url, publishableKey),
-    ]);
+    const exists = await Promise.all(tables.map((t) => tableExists(admin, t)));
     tables.forEach((t, i) => (facts.tables[t] = exists[i]));
-    facts.kakaoEnabled = kakao;
 
     if (exists.every(Boolean)) {
       [facts.completedLogins, facts.savedAssessments, facts.paidOrders, facts.readyReports] = await Promise.all([
@@ -85,6 +96,7 @@ export async function getSetupStatus() {
   const supabaseUrl = supabaseEnv().url;
   return {
     env,
+    connection: facts.connection,
     steps: buildSteps(facts),
     tables: facts.tables,
     counts: {

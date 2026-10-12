@@ -30,6 +30,7 @@ test("공개 키 칸에 비밀키를 넣으면 알려준다", () => {
 const empty: SetupFacts = {
   env: [],
   supabaseReady: false,
+  connection: null,
   tables: {},
   kakaoEnabled: null,
   completedLogins: null,
@@ -47,15 +48,28 @@ test("아무것도 안 했으면 Supabase 입력이 지금 할 일이다", () =>
   assert.ok(steps.slice(1).every((s) => s.state === "blocked"));
 });
 
+test("값은 들어갔지만 실제 연결이 안 되면 1단계에 머물고 이유를 알려준다", () => {
+  for (const [connection, word] of [["unreachable", "주소"], ["bad-publishable", "공개용 키"], ["bad-secret", "비밀키"]] as const) {
+    const steps = buildSteps({ ...empty, supabaseReady: true, connection });
+    const now = currentStep(steps);
+    assert.equal(now?.id, "supabase-env");
+    assert.match(now?.detail ?? "", new RegExp(word));
+    assert.equal(steps.find((s) => s.id === "database")?.state, "blocked");
+  }
+  // 결제 키가 들어 있어도 연결이 깨졌으면 뒤 단계는 "할 차례"로 보이지 않는다
+  const broken = buildSteps({ ...empty, supabaseReady: true, connection: "bad-secret", kakaoEnabled: true, paymentReady: true, paymentReason: null });
+  assert.deepEqual(broken.filter((s) => s.state !== "blocked").map((s) => s.id), ["supabase-env"]);
+});
+
 test("동의 테이블만 없으면 2번 SQL 실행을 안내한다", () => {
-  const steps = buildSteps({ ...empty, supabaseReady: true, tables: { ...allTables, user_consents: false } });
+  const steps = buildSteps({ ...empty, supabaseReady: true, connection: "ok", tables: { ...allTables, user_consents: false } });
   const now = currentStep(steps);
   assert.equal(now?.id, "database");
   assert.match(now?.detail ?? "", /20261012000000_consents\.sql/);
 });
 
 test("로그인·저장을 확인한 뒤에야 결제 단계로 넘어간다", () => {
-  const ready = { ...empty, supabaseReady: true, tables: allTables, kakaoEnabled: true, completedLogins: 0, savedAssessments: 0 };
+  const ready = { ...empty, supabaseReady: true, connection: "ok" as const, tables: allTables, kakaoEnabled: true, completedLogins: 0, savedAssessments: 0 };
   assert.equal(currentStep(buildSteps(ready))?.id, "url-config");
   assert.equal(buildSteps(ready).find((s) => s.id === "toss-keys")?.state, "blocked");
 

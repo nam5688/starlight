@@ -233,3 +233,13 @@ revoke insert, update, delete on public.profiles, public.assessments, public.use
   public.orders, public.payment_events, public.reports from anon, authenticated;
 revoke select on public.payment_events from anon, authenticated;
 revoke select on public.profiles, public.assessments, public.user_regions, public.orders, public.reports from anon;
+
+-- 필요한 권한은 직접 준다. 프로젝트의 기본 권한 설정(새 테이블 자동 공개 여부)과 관계없이 같은 결과가 되게 한다.
+-- 브라우저(authenticated): 조회만 — 실제로 보이는 행은 위 접근 정책이 본인 것으로 제한한다
+grant usage on schema public to authenticated, service_role;
+grant select on public.profiles, public.assessments, public.user_regions, public.orders, public.reports to authenticated;
+-- 서버(service_role, 비밀키): 서비스가 쓰는 동작만
+grant select, update on public.profiles to service_role;
+grant select, insert, update on public.user_regions, public.orders, public.reports to service_role;
+grant select, insert on public.assessments, public.payment_events to service_role;
+grant usage, select on sequence public.payment_events_id_seq to service_role;

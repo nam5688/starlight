@@ -171,5 +171,5 @@ test("가입 동의: 서버가 기록하고, 본인 기록만 보이며, 고치�
   assert.ok(forged.error, "브라우저에서 직접 동의 기록을 만들 수 없다");
 
   const edit = await admin.from("user_consents").update({ agreed: false }).eq("user_id", A.id);
-  assert.match(edit.error?.message ?? "", /append-only/);
+  assert.match(edit.error?.message ?? "", /append-only|permission denied/, "서버도 동의 기록을 고칠 수 없다");
 });

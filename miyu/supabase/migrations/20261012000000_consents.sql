@@ -37,3 +37,8 @@ create policy "본인 동의 기록 조회" on public.user_consents
 
 revoke insert, update, delete on public.user_consents from anon, authenticated;
 revoke select on public.user_consents from anon;
+
+-- 필요한 권한은 직접 준다 (프로젝트 기본 권한 설정과 관계없이): 브라우저는 조회, 서버는 조회 · 추가만
+grant select on public.user_consents to authenticated;
+grant select, insert on public.user_consents to service_role;
+grant usage, select on sequence public.user_consents_id_seq to service_role;

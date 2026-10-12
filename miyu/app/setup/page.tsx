@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
 import { getSiteUrl } from "@/server/session";
-import { currentStep, type FieldState, type StepState } from "@/server/setup-checks";
+import { CONNECTION_TEXT, currentStep, type FieldState, type StepState } from "@/server/setup-checks";
 import { getSetupStatus } from "@/server/setup-status";
 
 export const metadata: Metadata = {
@@ -153,6 +153,14 @@ async function SetupContent() {
             ))}
           </tbody>
         </table>
+        <p className="mt-3 text-[14px] leading-relaxed">
+          <span className="font-semibold">Supabase 연결</span>{" "}
+          {status.connection === null ? (
+            <span className="text-ink-3">Supabase 값 세 개가 모두 들어가면 실제로 연결해 봅니다.</span>
+          ) : (
+            <span className={status.connection === "ok" ? "text-accent" : "text-danger"}>{CONNECTION_TEXT[status.connection]}</span>
+          )}
+        </p>
       </section>
 
       {Object.keys(status.tables).length > 0 && (

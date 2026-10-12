@@ -10,8 +10,7 @@ create schema auth authorization supabase_auth_admin;
 
 grant usage on schema public to anon, authenticated, service_role;
 grant usage on schema auth to anon, authenticated, service_role;
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+-- Supabase의 "새 테이블 자동 공개" 기본 권한은 일부러 흉내 내지 않는다.
+-- 마이그레이션이 필요한 권한을 직접 주는지(자동 공개를 끈 프로젝트에서도 동작하는지) 확인하기 위해서다.
 -- Supabase처럼 Auth의 마이그레이션 기록을 auth 스키마에 둔다
 alter role supabase_auth_admin set search_path = auth;

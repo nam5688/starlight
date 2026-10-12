@@ -9,10 +9,25 @@ export type SetupStep = { id: StepId; title: string; state: StepState; detail: s
 
 export type StepId = "supabase-env" | "database" | "kakao" | "url-config" | "login-save" | "toss-keys" | "test-payment";
 
+/**
+ * Supabase 실제 연결 결과 (null = 값이 덜 들어가 확인하지 않음)
+ * - unreachable: 주소로 연결할 수 없음 / bad-publishable: 공개용 키가 맞지 않음 / bad-secret: 비밀키가 맞지 않음
+ */
+export type Connection = "ok" | "unreachable" | "bad-publishable" | "bad-secret" | null;
+
+export const CONNECTION_TEXT: Record<Exclude<Connection, null>, string> = {
+  ok: "연결됨 — 주소 · 공개용 키 · 비밀키를 실제로 확인했습니다.",
+  unreachable: "주소로 연결할 수 없습니다. NEXT_PUBLIC_SUPABASE_URL 이 Project URL과 같은지, 프로젝트가 아직 만들어지는 중은 아닌지 확인해 주세요.",
+  "bad-publishable": "공개용 키가 이 프로젝트의 키와 맞지 않습니다. NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY 를 다시 복사해 넣어 주세요.",
+  "bad-secret": "비밀키가 이 프로젝트의 키와 맞지 않습니다. SUPABASE_SECRET_KEY 를 다시 복사해 넣어 주세요.",
+};
+
 /** 서버가 확인한 사실들. 값은 담지 않는다. */
 export type SetupFacts = {
   env: FieldCheck[];
+  /** Supabase 값 세 개가 모두 형식에 맞게 들어 있음 */
   supabaseReady: boolean;
+  connection: Connection;
   /** 테이블 이름 → 있음 여부 (확인하지 못했으면 비움) */
   tables: Record<string, boolean>;
   kakaoEnabled: boolean | null;
@@ -73,15 +88,19 @@ export function buildSteps(f: SetupFacts): SetupStep[] {
   const missing = (names: string[]) => names.filter((t) => f.tables[t] !== true);
   const initMissing = missing(INIT_TABLES);
   const consentMissing = missing(CONSENT_TABLES);
-  const dbReady = f.supabaseReady && initMissing.length === 0 && consentMissing.length === 0;
+  const connected = f.supabaseReady && f.connection === "ok";
+  const dbReady = connected && initMissing.length === 0 && consentMissing.length === 0;
 
   const raw: Array<{ id: StepId; title: string; done: boolean; needs: StepId[]; detail: string }> = [
     {
       id: "supabase-env",
-      title: "Supabase 프로젝트 주소와 키 입력",
-      done: f.supabaseReady,
+      title: "Supabase 주소 · 키 입력과 연결 확인",
+      done: connected,
       needs: [],
-      detail: "miyu 폴더의 .env.local 파일에 Supabase 프로젝트 주소 · 공개용 키 · 비밀키를 넣고 개발 서버를 다시 켭니다. 아래 표에서 입력 상태를 확인할 수 있습니다.",
+      detail:
+        f.supabaseReady && f.connection && f.connection !== "ok"
+          ? `${CONNECTION_TEXT[f.connection]} 고친 뒤 개발 서버를 다시 켭니다.`
+          : "miyu 폴더의 .env.local 파일에 Supabase 프로젝트 주소 · 공개용 키 · 비밀키를 넣고 개발 서버를 다시 켭니다. 아래 표에서 입력 상태를 확인할 수 있습니다.",
     },
     {
       id: "database",
@@ -134,12 +153,14 @@ export function buildSteps(f: SetupFacts): SetupStep[] {
     },
   ];
 
-  const done = new Map(raw.map((s) => [s.id, s.done]));
+  // 앞 단계가 모두 끝나야 그 단계도 끝난 것으로 본다 (예: 연결이 깨지면 뒤 단계는 모두 "앞 단계 후")
+  const done = new Map<StepId, boolean>();
+  for (const s of raw) done.set(s.id, s.done && s.needs.every((n) => done.get(n)));
   return raw.map((s) => ({
     id: s.id,
     title: s.title,
     detail: s.detail,
-    state: s.done ? "done" : s.needs.every((n) => done.get(n)) ? "todo" : "blocked",
+    state: done.get(s.id) ? "done" : s.needs.every((n) => done.get(n)) ? "todo" : "blocked",
   }));
 }
 
