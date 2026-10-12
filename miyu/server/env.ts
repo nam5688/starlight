@@ -1,4 +1,6 @@
 import "server-only";
+import type { PaymentEnv } from "@/lib/services/ports";
+import { isTossDocsKey } from "./setup-checks";
 
 // 웹 채널 서버 설정. 값은 .env.local(로컬) 또는 Vercel 환경변수에서 읽는다.
 // 값이 없으면 해당 기능은 "설정 전"으로 표시되고 동작하지 않는다.
@@ -51,4 +53,10 @@ export function paymentConfig(): PaymentConfig {
     return { ok: false, reason: "TOSS_API_BASE_URL은 로컬 검증용으로만 쓸 수 있습니다" };
   }
   return { ok: true, clientKey, secretKey, liveMode, apiBaseUrl };
+}
+
+/** 주문에 남길 결제 환경 (실결제 / 내 상점 테스트 키 / 토스 문서 예제용 공용 테스트 키) */
+export function paymentEnvOf(config: Extract<PaymentConfig, { ok: true }>): PaymentEnv {
+  if (config.liveMode) return "live";
+  return isTossDocsKey(config.clientKey) || isTossDocsKey(config.secretKey) ? "test-docs" : "test";
 }

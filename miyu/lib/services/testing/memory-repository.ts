@@ -4,6 +4,7 @@
 import { canTransition } from "../../commerce/order.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
 import type {
+  PaymentEventSource,
   AssessmentRecord,
   MiyuRepository,
   OrderRecord,
@@ -19,7 +20,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const assessments = new Map<string, AssessmentRecord>();
   const orders = new Map<string, OrderRecord>();
   const reports = new Map<string, ReportRecord>();
-  const events: { orderId: string; source: string; status: string | null }[] = [];
+  const events: { orderId: string; source: PaymentEventSource; status: string | null; detail: Record<string, unknown>; createdAt: string }[] = [];
   const consents = new Map<string, ConsentRecord[]>();
   let tick = 0;
   const iso = () => now().toISOString();
@@ -83,7 +84,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         approvedAt: null,
         failureCode: null,
         failureMessage: null,
-        createdAt: iso(),
+        // 같은 시각에 여러 주문을 만들어도 순서가 구분되도록 1ms씩 더한다
+        createdAt: new Date(now().getTime() + ++tick).toISOString(),
         updatedAt: iso(),
       };
       orders.set(record.id, record);
@@ -106,7 +108,10 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       return next;
     },
     async addPaymentEvent(event) {
-      events.push({ orderId: event.orderId, source: event.source, status: event.status });
+      events.push({ orderId: event.orderId, source: event.source, status: event.status, detail: event.detail, createdAt: new Date(now().getTime() + ++tick).toISOString() });
+    },
+    async listPaymentEvents(orderId) {
+      return events.filter((e) => e.orderId === orderId).map(({ source, status, detail, createdAt }) => ({ source, status, detail, createdAt }));
     },
     async getReportByOrder(orderId) {
       return [...reports.values()].find((r) => r.orderId === orderId) ?? null;

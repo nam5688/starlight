@@ -9,7 +9,7 @@ import {
   type OrderStatus,
 } from "../commerce/order.ts";
 import { PERSONAL_REPORT } from "../config/product.ts";
-import type { MiyuRepository, OrderRecord, PaymentEventSource, PaymentGateway } from "./ports.ts";
+import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
 
 export type StartCheckoutResult =
   | { kind: "order"; order: OrderRecord }
@@ -22,7 +22,7 @@ export type StartCheckoutResult =
  */
 export async function startCheckout(
   deps: { repo: MiyuRepository; now: () => Date; newOrderNumber?: (now: Date) => string },
-  input: { userId: string; assessmentId: string },
+  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv },
 ): Promise<StartCheckoutResult> {
   const { repo } = deps;
   const assessment = await repo.getAssessment(input.assessmentId);
@@ -50,6 +50,7 @@ export async function startCheckout(
     assessmentId: assessment.id,
     productId: PERSONAL_REPORT.id,
     amount: PERSONAL_REPORT.priceKrw,
+    paymentEnv: input.paymentEnv ?? "test",
   });
   if (inserted.ok) return { kind: "order", order: inserted.value };
 
@@ -179,7 +180,8 @@ async function applyPayment(
   payment: GatewayPayment,
   source: PaymentEventSource,
 ): Promise<ApplyResult> {
-  const detail = { method: payment.method, approvedAt: payment.approvedAt, totalAmount: payment.totalAmount };
+  // 주문번호 기준 추적용: 결제사 상점 ID(mId)를 함께 남긴다 (공용 예제 키로 결제하면 내 상점과 다른 ID가 남는다)
+  const detail = { method: payment.method, approvedAt: payment.approvedAt, totalAmount: payment.totalAmount, mId: payment.mId };
   if (payment.orderId !== order.orderNumber || payment.totalAmount !== order.amount) {
     await repo.addPaymentEvent({ orderId: order.id, source, status: "PAYMENT_MISMATCH", detail: { ...detail, status: payment.status } });
     return { kind: "unchanged", order, code: "PAYMENT_MISMATCH", message: "결제 정보가 주문과 맞지 않습니다. 고객센터로 문의해 주세요." };

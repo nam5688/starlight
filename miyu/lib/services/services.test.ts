@@ -12,6 +12,7 @@ import { manseryeokEngine as sajuEngine } from "../saju/manseryeok-engine.ts";
 import { submitAssessment } from "./assessment-service.ts";
 import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "./order-service.ts";
 import type { GatewayResult, PaymentGateway } from "./ports.ts";
+import { getMyPage, traceOrder } from "./my-service.ts";
 import { ensureReport, getResultView, listMyItems } from "./report-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
@@ -55,7 +56,7 @@ function fakeGateway(handler: {
 }
 
 function done(orderId: string, amount: number, paymentKey = "pk_test_1"): GatewayPayment {
-  return { paymentKey, orderId, status: "DONE", totalAmount: amount, balanceAmount: amount, method: "카드", approvedAt: "2026-10-11T10:00:00+09:00" };
+  return { paymentKey, orderId, status: "DONE", totalAmount: amount, balanceAmount: amount, method: "카드", approvedAt: "2026-10-11T10:00:00+09:00", mId: "tvivarepublica" };
 }
 
 async function setup() {
@@ -318,4 +319,67 @@ test("가입 동의 거절: 저장한 검사가 있는 기존 회원은 계정�
   const { canRemoveOnDecline } = await import("./member-service.ts");
   assert.equal(await canRemoveOnDecline(mem.repo, USER), false);
   assert.equal(await canRemoveOnDecline(mem.repo, OTHER), true);
+});
+
+test("MY: 구매 전에는 무료 결과, 결제 후에는 구매 완료 · 생성 상태를 따로 보여준다", async () => {
+  const { mem, assessment } = await setup();
+  let page = await getMyPage(mem.repo, USER);
+  assert.equal(page.cards[0].entitlement, "free");
+  assert.equal(page.cards[0].generation, "none");
+  assert.match(page.cards[0].subject, /^지민 님 · 1995년 4월 12일/);
+  assert.deepEqual(page.orders, []);
+
+  const first = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id, paymentEnv: "test-docs" });
+  const second = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id, paymentEnv: "test-docs" });
+  if (first.kind !== "order" || second.kind !== "order") throw new Error();
+  const { gateway } = fakeGateway({ confirm: (i) => ({ ok: true, payment: done(i.orderId, i.amount, i.paymentKey) }) });
+  const paid = await confirmPayment({ repo: mem.repo, gateway }, { userId: USER, orderNumber: second.order.orderNumber, paymentKey: "pk_my", amount: second.order.amount });
+  if (paid.kind !== "paid") throw new Error(paid.kind);
+
+  // 결제는 끝났지만 리포트 생성이 실패한 상태: 다시 구매하게 하지 않는다
+  const broken: ReportGenerator = { name: "broken", version: "0", async generate() { throw new Error("생성 실패"); } };
+  await ensureReport({ repo: mem.repo, generator: broken, now: () => TODAY }, paid.order);
+  page = await getMyPage(mem.repo, USER);
+  assert.equal(page.cards[0].entitlement, "purchased");
+  assert.equal(page.cards[0].generation, "failed");
+  assert.equal(page.cards[0].paidOrderNumber, second.order.orderNumber);
+
+  await ensureReport({ repo: mem.repo, generator: devReportGenerator, now: () => TODAY }, paid.order);
+  page = await getMyPage(mem.repo, USER);
+  assert.equal(page.cards[0].generation, "ready");
+
+  // 결제내역: 최근 주문부터, 대체된 주문과 테스트 표시 구분
+  assert.deepEqual(
+    page.orders.map((o) => [o.orderNumber, o.statusLabel, o.paymentEnv]),
+    [
+      [second.order.orderNumber, "결제 완료", "test-docs"],
+      [first.order.orderNumber, "새 결제로 대체", "test-docs"],
+    ],
+  );
+});
+
+test("주문 추적: 주문번호로 승인 기록(상점 ID 포함) · 주문 상태 · 리포트 권한을 함께 보고, 다른 회원은 볼 수 없다", async () => {
+  const { mem, assessment } = await setup();
+  const started = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id, paymentEnv: "test" });
+  if (started.kind !== "order") throw new Error();
+  const { gateway } = fakeGateway({ confirm: (i) => ({ ok: true, payment: done(i.orderId, i.amount, i.paymentKey) }) });
+  await confirmPayment({ repo: mem.repo, gateway }, { userId: USER, orderNumber: started.order.orderNumber, paymentKey: "pk_trace", amount: started.order.amount });
+
+  const trace = await traceOrder(mem.repo, mem.repo, { userId: USER, orderNumber: started.order.orderNumber });
+  assert.ok(trace);
+  assert.equal(trace.order.status, "paid");
+  assert.equal(trace.entitled, true);
+  const approval = trace.events.find((e) => e.source === "승인 요청" && e.status === "DONE");
+  assert.equal(approval?.mId, "tvivarepublica");
+  assert.equal(approval?.method, "카드");
+  assert.equal(await traceOrder(mem.repo, mem.repo, { userId: OTHER, orderNumber: started.order.orderNumber }), null);
+
+  // 결제 화면까지만 가고 승인되지 않은 주문은 리포트 권한이 없다
+  const another = await submitAssessment({ repo: mem.repo, saju: sajuEngine }, { userId: USER, channel: "web", info: INFO, answers: answersAll(2), today: TODAY });
+  if (!another.ok) throw new Error();
+  const pending = await startCheckout(deps(mem), { userId: USER, assessmentId: another.assessment.id });
+  if (pending.kind !== "order") throw new Error();
+  const notPaid = await traceOrder(mem.repo, mem.repo, { userId: USER, orderNumber: pending.order.orderNumber });
+  assert.equal(notPaid?.entitled, false);
+  assert.equal(notPaid?.order.statusLabel, "결제 미완료");
 });

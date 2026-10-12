@@ -58,6 +58,8 @@ export type GatewayPayment = {
   balanceAmount: number;
   method: string | null;
   approvedAt: string | null;
+  /** 결제를 처리한 상점 ID */
+  mId: string | null;
 };
 
 /**

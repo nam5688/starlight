@@ -3,7 +3,7 @@
 import { notFound, redirect } from "next/navigation";
 import { startCheckout } from "@/lib/services/order-service";
 import { ensureReport, getResultView } from "@/lib/services/report-service";
-import { paymentConfig } from "@/server/env";
+import { paymentConfig, paymentEnvOf } from "@/server/env";
 import { now, reportGenerator, writeRepository } from "@/server/services";
 import { getMember } from "@/server/member";
 
@@ -12,9 +12,10 @@ export async function startCheckoutAction(assessmentId: string) {
   const member = await getMember();
   if (!member || member.needsConsent) redirect(`/results/${assessmentId}`);
   const userId = member.userId;
-  if (!paymentConfig().ok) redirect(`/results/${assessmentId}`);
+  const config = paymentConfig();
+  if (!config.ok) redirect(`/results/${assessmentId}`);
 
-  const result = await startCheckout({ repo: writeRepository(), now }, { userId, assessmentId });
+  const result = await startCheckout({ repo: writeRepository(), now }, { userId, assessmentId, paymentEnv: paymentEnvOf(config) });
   if (result.kind === "not-found") notFound();
   if (result.kind === "already-paid") redirect(`/results/${assessmentId}`);
   redirect(`/checkout/${result.order.orderNumber}`);

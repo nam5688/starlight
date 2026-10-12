@@ -60,6 +60,8 @@ function toOrder(r: Row): OrderRecord {
     approvedAt: (r.approved_at as string | null) ?? null,
     failureCode: (r.failure_code as string | null) ?? null,
     failureMessage: (r.failure_message as string | null) ?? null,
+    // 4번째 마이그레이션 전의 DB에서도 읽을 수 있게 기본값을 둔다
+    paymentEnv: ((r.payment_env as string | undefined) ?? "test") as OrderRecord["paymentEnv"],
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -248,6 +250,7 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
           assessment_id: o.assessmentId,
           product_id: o.productId,
           amount: o.amount,
+          payment_env: o.paymentEnv,
         })
         .select()
         .single();
@@ -278,6 +281,17 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         detail: event.detail,
       });
       if (error) fail("결제 기록 저장", error);
+    },
+
+    async listPaymentEvents(orderId) {
+      const { data, error } = await db
+        .from("payment_events")
+        .select("source, status, detail, created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+      if (error) fail("결제 기록 조회", error);
+      return (data ?? []).map((e) => ({ source: e.source, status: e.status, detail: (e.detail ?? {}) as Record<string, unknown>, createdAt: e.created_at }));
     },
 
     async getReportByOrder(orderId) {

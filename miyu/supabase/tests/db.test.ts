@@ -49,7 +49,7 @@ const info = { ...EMPTY_BASIC_INFO, nickname: "테스트", birthYear: "1990", bi
 const gateway: PaymentGateway = {
   provider: "tosspayments",
   async confirm({ paymentKey, orderId, amount }) {
-    return { ok: true, payment: { paymentKey, orderId, status: "DONE", totalAmount: amount, balanceAmount: amount, method: "카드", approvedAt: new Date().toISOString() } };
+    return { ok: true, payment: { paymentKey, orderId, status: "DONE", totalAmount: amount, balanceAmount: amount, method: "카드", approvedAt: new Date().toISOString(), mId: "test-mid" } };
   },
   async getPayment() {
     return { ok: false, code: "NOT_FOUND_PAYMENT", message: "", retryable: false };

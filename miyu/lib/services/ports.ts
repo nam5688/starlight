@@ -52,10 +52,13 @@ export type OrderRecord = {
   approvedAt: string | null;
   failureCode: string | null;
   failureMessage: string | null;
+  /** 결제 환경 — test: 내 상점 테스트 키, test-docs: 토스 문서 예제용 공용 테스트 키, live: 실결제 */
+  paymentEnv: PaymentEnv;
   createdAt: string;
   updatedAt: string;
 };
-export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount">;
+export type PaymentEnv = "test" | "test-docs" | "live";
+export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv">;
 export type OrderPatch = Partial<
   Pick<OrderRecord, "status" | "paymentKey" | "method" | "approvedAt" | "failureCode" | "failureMessage">
 >;
@@ -83,6 +86,14 @@ export type ReportPatch = Partial<
 export type ReportStatusRecord = Pick<ReportRecord, "id" | "orderId" | "assessmentId" | "status">;
 
 export type PaymentEventSource = "confirm" | "webhook" | "fail_redirect" | "checkout";
+
+/** 결제 처리 기록 (주문 상세 · 운영 추적용). detail에는 카드 번호 등 결제수단 상세가 없다 */
+export type PaymentEventRecord = {
+  source: PaymentEventSource;
+  status: string | null;
+  detail: Record<string, unknown>;
+  createdAt: string;
+};
 
 export type InsertResult<T> = { ok: true; value: T } | { ok: false; reason: "conflict" };
 
@@ -114,6 +125,8 @@ export interface MiyuRepository {
     detail: Record<string, unknown>;
   }): Promise<void>;
 
+  /** 서버 전용 (브라우저 권한으로는 읽을 수 없다) — 주문 소유자를 확인한 뒤에만 쓴다 */
+  listPaymentEvents(orderId: string): Promise<PaymentEventRecord[]>;
   getReportByOrder(orderId: string): Promise<ReportRecord | null>;
   listReportStatuses(userId: string): Promise<ReportStatusRecord[]>;
   insertReport(report: NewReport): Promise<InsertResult<ReportRecord>>;

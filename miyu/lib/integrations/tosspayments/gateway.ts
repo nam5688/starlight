@@ -108,5 +108,6 @@ export function toGatewayPayment(json: Record<string, unknown>): GatewayPayment 
     balanceAmount: typeof json.balanceAmount === "number" ? json.balanceAmount : json.totalAmount,
     method: typeof json.method === "string" ? json.method : null,
     approvedAt: typeof json.approvedAt === "string" ? json.approvedAt : null,
+    mId: typeof json.mId === "string" ? json.mId : null,
   };
 }
