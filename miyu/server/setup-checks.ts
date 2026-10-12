@@ -22,14 +22,32 @@ export const CONNECTION_TEXT: Record<Exclude<Connection, null>, string> = {
   "bad-secret": "비밀키가 이 프로젝트의 키와 맞지 않습니다. SUPABASE_SECRET_KEY 를 다시 복사해 넣어 주세요.",
 };
 
+/**
+ * 테이블 확인 결과
+ * - ok: 있고 서버 비밀키로 읽힌다 / missing: 없다 / no-access: 있지만 권한이 없다 / error: 그 밖의 조회 실패
+ */
+export type TableState = "ok" | "missing" | "no-access" | "error";
+
+export const TABLE_STATE_TEXT: Record<TableState, string> = { ok: "있음", missing: "없음", "no-access": "권한 없음", error: "확인 실패" };
+
+/** PostgREST · Postgres 오류 코드로 테이블 상태를 판정한다 */
+export function tableStateOf(error: { code?: string | null; status?: number } | null): TableState {
+  if (!error) return "ok";
+  if (error.code === "PGRST205" || error.code === "42P01") return "missing";
+  if (error.code === "42501" || error.status === 401 || error.status === 403) return "no-access";
+  return "error";
+}
+
 /** 서버가 확인한 사실들. 값은 담지 않는다. */
 export type SetupFacts = {
   env: FieldCheck[];
   /** Supabase 값 세 개가 모두 형식에 맞게 들어 있음 */
   supabaseReady: boolean;
   connection: Connection;
-  /** 테이블 이름 → 있음 여부 (확인하지 못했으면 비움) */
-  tables: Record<string, boolean>;
+  /** 테이블 이름 → 상태 (연결 전이면 비움) */
+  tables: Record<string, TableState>;
+  /** 로그인한 적은 있지만 프로필이 없는 회원 수 (확인 못 하면 null) */
+  missingProfiles?: number | null;
   kakaoEnabled: boolean | null;
   completedLogins: number | null;
   savedAssessments: number | null;
@@ -48,11 +66,13 @@ const JWT = /^eyJ[\w-]+\.[\w-]+\.[\w-]+$/;
 
 /** 환경변수 형식 점검. 반환값에 실제 값은 넣지 않는다. */
 export function checkEnv(read: (name: string) => string): FieldCheck[] {
-  const field = (name: string, judge: (v: string) => string | null): FieldCheck => {
+  const field = (name: string, judge: (v: string) => string | null, note?: (v: string) => string | null): FieldCheck => {
     const value = read(name);
     if (!value) return { name, state: "empty" };
     const hint = judge(value);
-    return hint ? { name, state: "check", hint } : { name, state: "set" };
+    if (hint) return { name, state: "check", hint };
+    const info = note?.(value);
+    return info ? { name, state: "set", hint: info } : { name, state: "set" };
   };
 
   return [
@@ -75,7 +95,7 @@ export function checkEnv(read: (name: string) => string): FieldCheck[] {
     field("NEXT_PUBLIC_TOSS_CLIENT_KEY", (v) => {
       if (v.includes("_gsk_") || v.includes("_sk_")) return "시크릿 키가 들어 있습니다. 이 칸에는 test_gck_ 로 시작하는 클라이언트 키를 넣어 주세요";
       return v.startsWith("test_gck_") || v.startsWith("live_gck_") ? null : "결제위젯 클라이언트 키(test_gck_…)인지 확인해 주세요";
-    }),
+    }, (v) => (isTossDocsKey(v) ? DOCS_KEY_NOTE : null)),
     field("TOSS_SECRET_KEY", (v) => {
       if (v.includes("_gck_") || v.includes("_ck_")) return "클라이언트 키가 들어 있습니다. 이 칸에는 test_gsk_ 로 시작하는 시크릿 키를 넣어 주세요";
       return v.startsWith("test_gsk_") || v.startsWith("live_gsk_") ? null : "결제위젯 시크릿 키(test_gsk_…)인지 확인해 주세요";
@@ -83,11 +103,20 @@ export function checkEnv(read: (name: string) => string): FieldCheck[] {
   ];
 }
 
+/** 토스페이먼츠 문서 예제용 공용 테스트 키 (누구나 쓰는 키라 내 상점 관리자에는 결제내역이 남지 않는다) */
+export function isTossDocsKey(key: string): boolean {
+  return /^test_g?[cs]k_docs_/.test(key);
+}
+
+export const DOCS_KEY_NOTE =
+  "토스페이먼츠 문서 예제용 공용 테스트 키입니다. 테스트 결제는 되지만 내 토스페이먼츠 상점 관리자에는 결제내역이 보이지 않습니다. 결제 확인은 미유 MY의 결제내역(주문 상세)에서 합니다. 내 테스트 키는 토스페이먼츠 전자결제 신청 후 발급됩니다.";
+
 /** 해야 할 순서대로 단계를 판정한다. 앞 단계가 안 끝났으면 뒤 단계는 blocked. */
 export function buildSteps(f: SetupFacts): SetupStep[] {
-  const missing = (names: string[]) => names.filter((t) => f.tables[t] !== true);
-  const initMissing = missing(INIT_TABLES);
-  const consentMissing = missing(CONSENT_TABLES);
+  const notOk = (names: string[]) => names.filter((t) => f.tables[t] !== "ok");
+  const initMissing = notOk(INIT_TABLES);
+  const consentMissing = notOk(CONSENT_TABLES);
+  const noAccess = [...INIT_TABLES, ...CONSENT_TABLES].filter((t) => f.tables[t] === "no-access" || f.tables[t] === "error");
   const connected = f.supabaseReady && f.connection === "ok";
   const dbReady = connected && initMissing.length === 0 && consentMissing.length === 0;
 
@@ -108,11 +137,13 @@ export function buildSteps(f: SetupFacts): SetupStep[] {
       done: dbReady,
       needs: ["supabase-env"],
       detail:
-        initMissing.length > 0
-          ? "Supabase SQL Editor에서 1번 파일(20261011000000_init.sql)부터 실행합니다."
-          : consentMissing.length > 0
-            ? "Supabase SQL Editor에서 2번 파일(20261012000000_consents.sql)을 실행합니다."
-            : "필요한 테이블이 모두 있습니다.",
+        noAccess.length > 0
+          ? `표는 확인되지만 서버 비밀키로 읽지 못했습니다 (${noAccess.join(", ")}). SUPABASE_SECRET_KEY가 Secret key인지 확인하고, 계속되면 아래 DB 상태를 알려주세요.`
+          : initMissing.length > 0
+            ? "Supabase SQL Editor에서 1번 파일(20261011000000_init.sql)부터 실행합니다."
+            : consentMissing.length > 0
+              ? "Supabase SQL Editor에서 2번 파일(20261012000000_consents.sql)을 실행합니다."
+              : "필요한 테이블이 모두 있습니다.",
     },
     {
       id: "kakao",

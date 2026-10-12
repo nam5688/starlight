@@ -35,7 +35,16 @@ export async function GET(request: NextRequest) {
 
   const next = safeNextPath(searchParams.get("next"));
   const repo = writeRepository();
-  const status = await getMemberStatus(repo, data.user.id);
+  let status: Awaited<ReturnType<typeof getMemberStatus>>;
+  try {
+    // 테이블보다 먼저 가입한 회원처럼 프로필이 빠져 있으면 여기서 채운다 (이미 있으면 그대로)
+    await repo.ensureProfile(data.user.id);
+    status = await getMemberStatus(repo, data.user.id);
+  } catch (e) {
+    // 테이블이 없거나 권한이 없는 경우 — 내용은 서버 기록에만 남기고 화면에는 안내만 한다
+    console.error("[auth/callback] 회원 정보 준비 실패", e instanceof Error ? e.message : e);
+    return to("/auth/error?reason=db");
+  }
   if (status.needsConsent) return to(consentPath(next));
 
   const pending = await readPendingSubmission();

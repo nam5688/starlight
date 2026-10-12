@@ -36,6 +36,11 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async getProfile(userId) {
       return profiles.get(userId) ?? null;
     },
+    async ensureProfile(userId) {
+      const p = profiles.get(userId) ?? { userId, nickname: null, paymentCustomerKey: `ck-${userId}` };
+      profiles.set(userId, p);
+      return p;
+    },
     async updateProfileNickname(userId, nickname) {
       const p = profiles.get(userId) ?? { userId, nickname: null, paymentCustomerKey: `ck-${userId}` };
       profiles.set(userId, { ...p, nickname });

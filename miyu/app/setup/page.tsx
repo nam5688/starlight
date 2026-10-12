@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
 import { getSiteUrl } from "@/server/session";
-import { CONNECTION_TEXT, currentStep, type FieldState, type StepState } from "@/server/setup-checks";
+import { CONNECTION_TEXT, currentStep, TABLE_STATE_TEXT, type FieldState, type StepState } from "@/server/setup-checks";
 import { getSetupStatus } from "@/server/setup-status";
 
 export const metadata: Metadata = {
@@ -169,13 +169,20 @@ async function SetupContent() {
             DB 상태
           </h2>
           <ul className="mt-4 flex flex-wrap gap-2">
-            {Object.entries(status.tables).map(([table, ok]) => (
+            {Object.entries(status.tables).map(([table, state]) => (
               <li key={table} className="rounded-md border border-line px-2.5 py-1 text-[13px]">
                 <span className="font-mono">{table}</span>{" "}
-                <span className={ok ? "text-accent" : "text-danger"}>{ok ? "있음" : "없음"}</span>
+                <span className={state === "ok" ? "text-accent" : "text-danger"}>{TABLE_STATE_TEXT[state]}</span>
               </li>
             ))}
           </ul>
+          {status.missingProfiles ? (
+            <p className="mt-3 text-[14px] leading-relaxed text-danger">
+              프로필이 없는 회원이 {status.missingProfiles}명 있습니다 (테이블을 만들기 전에 가입한 회원). 해당 회원이 다시
+              로그인하거나 결제 화면을 열면 자동으로 채워집니다. 한 번에 채우려면 SQL Editor에서 3번 파일을 실행합니다:
+              20261013000000_profile_backfill.sql — 기존 데이터는 바뀌지 않습니다.
+            </p>
+          ) : null}
           {status.counts.savedAssessments !== null && (
             <p className="mt-3 text-[14px] leading-relaxed text-ink-2">
               약관 동의를 마친 회원 {status.counts.completedLogins}명 · 저장된 검사 {status.counts.savedAssessments}건 · 결제

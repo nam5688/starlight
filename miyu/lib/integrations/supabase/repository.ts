@@ -112,6 +112,17 @@ const REPORT_COLUMNS: Record<string, string> = {
 };
 
 export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
+  async function readProfile(userId: string) {
+    const { data, error } = await db
+      .from("profiles")
+      .select("id, nickname, payment_customer_key")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) fail("프로필 조회", error);
+    if (!data) return null;
+    return { userId: data.id as string, nickname: data.nickname as string | null, paymentCustomerKey: data.payment_customer_key as string };
+  }
+
   return {
     async listConsents(userId): Promise<ConsentRecord[]> {
       const { data, error } = await db
@@ -131,15 +142,16 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       if (error) fail("동의 기록 저장", error);
     },
 
-    async getProfile(userId) {
-      const { data, error } = await db
-        .from("profiles")
-        .select("id, nickname, payment_customer_key")
-        .eq("id", userId)
-        .maybeSingle();
-      if (error) fail("프로필 조회", error);
-      if (!data) return null;
-      return { userId: data.id, nickname: data.nickname, paymentCustomerKey: data.payment_customer_key };
+    getProfile: readProfile,
+
+    async ensureProfile(userId) {
+      const existing = await readProfile(userId);
+      if (existing) return existing;
+      const { error } = await db.from("profiles").upsert({ id: userId }, { onConflict: "id", ignoreDuplicates: true });
+      if (error) fail("프로필 보완", error);
+      const created = await readProfile(userId);
+      if (!created) throw new Error("프로필 보완 실패: 저장 후 다시 읽지 못했습니다.");
+      return created;
     },
 
     async updateProfileNickname(userId, nickname) {

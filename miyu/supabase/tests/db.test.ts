@@ -1,6 +1,7 @@
 // DB 검증: 접근 정책(RLS), 쓰기 차단, 상태 규칙 트리거, 실제 DB 위에서의 서비스 흐름.
 // 실행 전 local-stack.sh start 필요. 실행: npm run test:db
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHmac, randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -172,4 +173,21 @@ test("가입 동의: 서버가 기록하고, 본인 기록만 보이며, 고치�
 
   const edit = await admin.from("user_consents").update({ agreed: false }).eq("user_id", A.id);
   assert.match(edit.error?.message ?? "", /append-only|permission denied/, "서버도 동의 기록을 고칠 수 없다");
+});
+
+test("프로필 누락 보완: 테이블보다 먼저 가입한 회원도 로그인 · 결제 때 프로필이 채워지고, 다른 데이터는 그대로다", async () => {
+  const C = await makeUser();
+  // 가입 트리거가 없던 시절을 흉내 낸다: 프로필만 지운다 (서버 비밀키에는 삭제 권한이 없으므로 DB 관리자로)
+  execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-qc", `delete from public.profiles where id = '${C.id}'`]);
+  const repo = createSupabaseRepository(admin);
+  assert.equal(await repo.getProfile(C.id), null);
+  const restored = await repo.ensureProfile(C.id);
+  assert.equal(restored.userId, C.id);
+  assert.match(restored.paymentCustomerKey, /^[0-9a-f-]{36}$/);
+  // 다시 불러도 같은 프로필 (구매자 키가 바뀌지 않는다)
+  assert.equal((await repo.ensureProfile(C.id)).paymentCustomerKey, restored.paymentCustomerKey);
+  // 다른 회원(A)의 프로필 · 주문은 바뀌지 않는다
+  const { data: aOrder } = await admin.from("orders").select("status").eq("id", orderId).single();
+  assert.equal(aOrder?.status, "paid");
+  await C.client.auth.signOut();
 });

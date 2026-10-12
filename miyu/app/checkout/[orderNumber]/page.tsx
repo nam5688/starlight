@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
 import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { paymentConfig } from "@/server/env";
-import { readRepository } from "@/server/services";
+import { readRepository, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 
 export const metadata: Metadata = {
@@ -29,7 +29,14 @@ export default function CheckoutPage({ params }: PageProps<"/checkout/[orderNumb
 async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumber]">, "params">) {
   const { orderNumber } = await params;
   const config = paymentConfig();
-  if (!config.ok) notFound();
+  if (!config.ok) {
+    // 결제 설정 문제는 '없는 페이지'로 숨기지 않고 무엇이 빠졌는지 알린다 (키 값은 보여주지 않음)
+    return (
+      <Notice title="결제를 아직 진행할 수 없습니다" badge="결제 설정 전">
+        결제 설정이 끝나지 않았습니다 ({config.reason}). 결제는 진행되지 않았고, 저장된 결과는 그대로 있습니다.
+      </Notice>
+    );
+  }
 
   const member = await getMember();
   if (!member) redirect("/my");
@@ -38,11 +45,25 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
 
   const repo = await readRepository();
   const order = await repo.getOrderByNumber(orderNumber);
+  // 다른 회원의 주문은 있는지조차 알리지 않는다
   if (!order || order.userId !== userId) notFound();
   if (order.status !== "pending") redirect(`/results/${order.assessmentId}`);
 
-  const profile = await repo.getProfile(userId);
-  if (!profile) notFound();
+  // 본인 프로필(결제 구매자 키)이 빠져 있으면 서버가 채운다 — 테이블보다 먼저 가입한 회원
+  let profile = await repo.getProfile(userId);
+  if (!profile) {
+    try {
+      profile = await writeRepository().ensureProfile(userId);
+    } catch (e) {
+      console.error("[checkout] 프로필 보완 실패", e instanceof Error ? e.message : e);
+      return (
+        <Notice title="결제 정보를 준비하지 못했습니다" badge="회원 정보 확인 필요">
+          회원 정보를 불러오지 못해 결제를 시작하지 않았습니다. 잠시 후 다시 시도해 주세요. 계속되면 주문번호 {order.orderNumber}와 함께
+          문의해 주세요.
+        </Notice>
+      );
+    }
+  }
 
   return (
     <>
@@ -76,6 +97,23 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
         </Link>
       </p>
     </>
+  );
+}
+
+function Notice({ title, badge, children }: { title: string; badge: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-6 border-y border-line py-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-[17px] font-semibold">{title}</p>
+        <StatusBadge>{badge}</StatusBadge>
+      </div>
+      <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{children}</p>
+      <p className="mt-4 text-[15px]">
+        <Link href="/my" className={textLink}>
+          MY로 가기
+        </Link>
+      </p>
+    </div>
   );
 }
 

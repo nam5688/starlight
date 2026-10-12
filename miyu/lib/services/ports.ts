@@ -92,6 +92,8 @@ export interface MiyuRepository {
   addConsents(userId: string, consents: { type: ConsentType; version: string; agreed: boolean }[]): Promise<void>;
 
   getProfile(userId: string): Promise<ProfileRecord | null>;
+  /** 프로필이 없으면 만들고(이미 있으면 그대로) 돌려준다 — 테이블보다 먼저 가입한 회원 보완용 */
+  ensureProfile(userId: string): Promise<ProfileRecord>;
   updateProfileNickname(userId: string, nickname: string): Promise<void>;
   saveRegion(userId: string, region: { province: string; district: string }): Promise<void>;
 

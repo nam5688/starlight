@@ -13,6 +13,7 @@ const MESSAGES: Record<string, string> = {
   save: "검사 결과를 저장하지 못했습니다. 검사를 다시 진행해 주세요.",
   start: "카카오 로그인을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "not-configured": "로그인이 아직 설정되지 않았습니다.",
+  db: "카카오 로그인은 됐지만 회원 정보를 저장할 DB가 준비되지 않았습니다. 운영자는 개발 서버의 /setup 화면에서 DB 상태를 확인해 주세요.",
 };
 
 export default function AuthErrorPage({ searchParams }: PageProps<"/auth/error">) {
