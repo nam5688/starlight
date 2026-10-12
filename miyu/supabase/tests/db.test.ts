@@ -15,6 +15,7 @@ import { agreeToTerms, getMemberStatus, setMarketingConsent } from "../../lib/se
 import { confirmPayment, startCheckout } from "../../lib/services/order-service.ts";
 import type { PaymentGateway } from "../../lib/services/ports.ts";
 import { ensureReport, getResultView } from "../../lib/services/report-service.ts";
+import { kakaoOAuthOptions } from "../../server/kakao-options.ts";
 
 const URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
 const JWT_SECRET = process.env.JWT_SECRET ?? "local-test-jwt-secret-at-least-32-characters";
@@ -190,4 +191,19 @@ test("프로필 누락 보완: 테이블보다 먼저 가입한 회원도 로그
   const { data: aOrder } = await admin.from("orders").select("status").eq("id", orderId).single();
   assert.equal(aOrder?.status, "paid");
   await C.client.auth.signOut();
+});
+
+test("카카오 로그인: 실제 Supabase Auth를 거쳐 카카오로 가는 요청에 이메일 동의가 없다 (KOE205 회귀 방지)", async () => {
+  const kakaoScope = async (options: Record<string, unknown>) => {
+    const c = createClient(URL, ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false, flowType: "pkce" } });
+    const { data, error } = await c.auth.signInWithOAuth({ provider: "kakao", options: { skipBrowserRedirect: true, redirectTo: "http://127.0.0.1:4321/auth/callback", ...options } });
+    if (error) throw error;
+    const res = await fetch(data.url!, { redirect: "manual" });
+    return new globalThis.URL(res.headers.get("location")!).searchParams.get("scope") ?? "";
+  };
+  // 미유가 쓰는 방식: 닉네임 · 프로필 사진만
+  assert.equal(await kakaoScope(kakaoOAuthOptions("http://127.0.0.1:4321", "/my")), "profile_nickname profile_image");
+  // 기본값과 scopes 방식은 account_email이 남는다 (그래서 쓰지 않는다)
+  assert.match(await kakaoScope({}), /account_email/);
+  assert.match(await kakaoScope({ scopes: "profile_nickname profile_image" }), /account_email/);
 });
