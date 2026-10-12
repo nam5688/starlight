@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
 import { aiConfig } from "@/server/env";
 import { getSiteUrl } from "@/server/session";
-import { CONNECTION_TEXT, currentStep, TABLE_STATE_TEXT, type FieldState, type StepState } from "@/server/setup-checks";
+import { CONNECTION_TEXT, currentStep, OPTIONAL_TABLES, TABLE_STATE_TEXT, type FieldState, type StepState } from "@/server/setup-checks";
 import { getSetupStatus } from "@/server/setup-status";
 
 export const metadata: Metadata = {
@@ -184,6 +184,13 @@ async function SetupContent() {
               </li>
             ))}
           </ul>
+          {Object.entries(status.optionalTables).map(([table, state]) => (
+            <p key={table} className="mt-3 text-[14px] leading-relaxed text-ink-2">
+              <span className="font-mono">{table}</span> (선택 기능){" "}
+              <span className={state === "ok" ? "text-accent" : "text-danger"}>{TABLE_STATE_TEXT[state]}</span>
+              {state !== "ok" && <> — {OPTIONAL_TABLES[table]} 지금은 이 기능만 꺼져 있고, 다른 화면은 그대로 동작합니다.</>}
+            </p>
+          ))}
           {status.missingProfiles ? (
             <p className="mt-3 text-[14px] leading-relaxed text-danger">
               프로필이 없는 회원이 {status.missingProfiles}명 있습니다 (테이블을 만들기 전에 가입한 회원). 해당 회원이 다시

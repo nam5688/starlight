@@ -14,7 +14,15 @@ const FORBIDDEN: { re: RegExp; why: string }[] = [
   { re: /\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일/, why: "특정 날짜 예언" },
   { re: /(결혼|이혼|이별|사고)(하게 될|할) (것입니다|겁니다)/, why: "사건 예언" },
   { re: /숨겨진 (위험|단점)|후회하게|불행해질/, why: "불안을 자극하는 표현" },
+  // "사주로 알아맞힌 것이 아닙니다" 같은 부정 안내는 허용한다
+  {
+    re: /(알아맞|꿰뚫어)(?![^.!?]{0,15}(아니|아닙|아님|않))|사주(에|가|로)\s*(이미|벌써)\s*(다\s*)?(나와|드러나|보여|정해)(?![^.!?]{0,12}(아니|아닙|아님|않))/,
+    why: "알려 준 이야기를 사주로 맞힌 것처럼 쓰는 표현",
+  },
 ];
+
+/** focus 첫 문단은 고객이 알려 준 내용임을 밝혀야 한다 */
+const CONTEXT_ATTRIBUTION = /(알려|말씀해|적어|남겨) 주신|말씀하신/;
 
 const sentences = (text: string) =>
   text
@@ -36,7 +44,7 @@ function overlap(a: string, b: string) {
 const isString = (v: unknown): v is string => typeof v === "string";
 const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
 
-export function validateDraft(raw: unknown, evidence: Evidence[]): ValidationResult {
+export function validateDraft(raw: unknown, evidence: Evidence[], opts: { hasContext?: boolean } = {}): ValidationResult {
   const errors: string[] = [];
   const known = new Map(evidence.map((e) => [e.id, e]));
   const periods = new Set(evidence.filter((e) => e.period).map((e) => e.period!.label));
@@ -108,6 +116,17 @@ export function validateDraft(raw: unknown, evidence: Evidence[]): ValidationRes
     }
   }
 
+  // 알려 주신 고민 (나를 더 반영하기)
+  if (opts.hasContext) {
+    const focus = list<Paragraph>(d.focus, "focus", 1, 3);
+    focus.forEach((p, i) => checkParagraph(p, `focus[${i}]`, 80, 700));
+    if (focus[0] && isString(focus[0].text) && !CONTEXT_ATTRIBUTION.test(focus[0].text)) {
+      errors.push("focus[0]: 고객이 알려 준 내용임을 밝히며 시작해야 합니다 (예: \"알려 주신 고민을 반영하면\").");
+    }
+  } else if (Array.isArray(d.focus) && d.focus.length > 0) {
+    errors.push("focus: 알려 주신 고민이 없는데 focus를 썼습니다.");
+  }
+
   // 표현 검사와 반복 문장 검사 (리포트 전체)
   const texts: { where: string; text: string }[] = [];
   if (isString(d.headline)) texts.push({ where: "headline", text: d.headline });
@@ -116,6 +135,7 @@ export function validateDraft(raw: unknown, evidence: Evidence[]): ValidationRes
   (d.timeline ?? []).forEach((t, i) => texts.push({ where: `timeline[${i}]`, text: [t?.theme, t?.opportunity, t?.caution].filter(isString).join(" ") }));
   (d.differences ?? []).forEach((p, i) => isString(p?.text) && texts.push({ where: `differences[${i}]`, text: p.text }));
   actions.forEach((a, i) => texts.push({ where: `actions[${i}]`, text: [a?.situation, a?.action].filter(isString).join(" ") }));
+  (opts.hasContext && Array.isArray(d.focus) ? d.focus : []).forEach((p, i) => isString(p?.text) && texts.push({ where: `focus[${i}]`, text: p.text }));
   for (const { where, text } of texts) {
     for (const f of FORBIDDEN) if (f.re.test(text)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
   }

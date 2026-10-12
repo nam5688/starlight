@@ -1,5 +1,6 @@
 import type { Evidence } from "@/lib/report/evidence";
 import { SECTION_PLAN, type Paragraph, type PersonalReportV2 } from "@/lib/report/v2/types";
+import { BASE_TERMS, glossaryFor, withHanja } from "@/lib/saju/glossary";
 import { SajuChart } from "./detail-sections";
 import { SectionTitle } from "./summary-blocks";
 
@@ -26,13 +27,26 @@ export function PersonalV2View({
   const id = (name: string) => `${idPrefix}${name}`;
   const evidence = new Map(report.evidence.map((e) => [e.id, e]));
   const sectionTitle = (sid: string) => SECTION_PLAN.find((s) => s.id === sid)?.title ?? sid;
+  const focus = report.focus ?? [];
+  const usedIds = [
+    ...report.summary,
+    ...report.sections.flatMap((s) => s.paragraphs),
+    ...report.timeline,
+    ...report.differences,
+    ...report.actions,
+    ...focus,
+  ].flatMap((p) => p.evidence);
+  // 원국 표를 읽는 기본 용어는 원국 표 아래에 있으므로, 여기서는 그 밖의 용어만 풀이한다
+  const glossary = glossaryFor(report.evidence, usedIds).filter((g) => !BASE_TERMS.includes(g.term));
   const toc = [
     { id: id("v2-summary"), label: "핵심 구조" },
+    ...(focus.length ? [{ id: id("v2-focus"), label: "알려 주신 고민까지 반영한 해석" }] : []),
     { id: id("v2-chart"), label: "사주 원국" },
     ...report.sections.map((s) => ({ id: id(`v2-${s.id}`), label: sectionTitle(s.id) })),
     ...(report.timeline.length ? [{ id: id("v2-timeline"), label: "시기의 흐름" }] : []),
     ...(report.differences.length ? [{ id: id("v2-differences"), label: "사주와 응답이 다른 부분" }] : []),
     { id: id("v2-actions"), label: "상황별 실천" },
+    { id: id("v2-glossary"), label: "사주 용어 풀이" },
     { id: id("v2-basis"), label: "계산 · 해석 기준" },
   ];
 
@@ -63,6 +77,26 @@ export function PersonalV2View({
             ))}
           </div>
         </section>
+
+        {focus.length > 0 && (
+          <section aria-labelledby={id("v2-focus")} className="border-l-2 border-accent pl-4 md:pl-6">
+            <SectionTitle
+              id={id("v2-focus")}
+              note={
+                report.basis.context
+                  ? `최근 알려 주신 내용(${report.basis.context.topicLabel}${report.basis.context.fields.length ? ` · ${report.basis.context.fields.join(", ")}` : ""})을 반영해 해석의 초점과 예시를 골랐습니다. 사주 계산은 그대로이며, 알려 주신 이야기를 사주로 알아낸 것이 아닙니다.`
+                  : "알려 주신 고민을 반영해 해석의 초점과 예시를 골랐습니다. 사주 계산은 그대로입니다."
+              }
+            >
+              알려 주신 고민까지 반영한 해석
+            </SectionTitle>
+            <div className="space-y-6">
+              {focus.map((p, i) => (
+                <ParagraphBlock key={i} paragraph={p} evidence={evidence} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby={id("v2-chart")}>
           <SectionTitle id={id("v2-chart")} note="아래 해석은 모두 이 계산 결과에서 출발합니다.">
@@ -134,6 +168,24 @@ export function PersonalV2View({
               </li>
             ))}
           </ol>
+        </section>
+
+        <section aria-labelledby={id("v2-glossary")}>
+          <SectionTitle id={id("v2-glossary")} note="이 리포트에 나온 사주 용어를 한자 뜻과 쉬운 말로 풀었습니다. 원국 · 천간 · 지지 · 일간 · 오행은 원국 표 아래 '표 읽는 법'에 있습니다.">
+            사주 용어 풀이
+          </SectionTitle>
+          <dl className="divide-y divide-line border-y border-line">
+            {glossary.map((g) => (
+              <div key={g.term} className="grid gap-1 py-3.5 sm:grid-cols-[132px_minmax(0,1fr)] sm:gap-4">
+                <dt className="text-[16px] font-semibold">{withHanja(g)}</dt>
+                <dd className="text-[15px] leading-relaxed text-ink-2">
+                  <span className="text-ink-3">한자 뜻 </span>
+                  {g.literal}
+                  <span className="block text-ink">{g.plain}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
         </section>
 
         <section aria-labelledby={id("v2-basis")} className="space-y-3 border-t border-line pt-8 text-[13px] leading-relaxed text-ink-3">

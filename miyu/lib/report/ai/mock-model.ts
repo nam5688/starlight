@@ -14,7 +14,7 @@ const TOPIC_FOR: Record<string, string[]> = {
 
 /** 사용자 메시지(buildUserMessage 형식)에서 근거 목록을 꺼내 형식에 맞는 초안을 만든다 */
 export function composeMockDraft(userMessage: string): ReportDraftV2 {
-  const payload = JSON.parse(userMessage.slice(userMessage.indexOf("{"))) as { evidence: Evidence[] };
+  const payload = JSON.parse(userMessage.slice(userMessage.indexOf("{"))) as { evidence: Evidence[]; context?: { topic: string; focusGuide: string } };
   const ev = payload.evidence;
   const usable = ev.filter((e) => !e.uncertain && !e.period);
   const saju = usable.filter((e) => e.source === "saju");
@@ -61,7 +61,15 @@ export function composeMockDraft(userMessage: string): ReportDraftV2 {
     { situation: "[모의 생성] 가까운 사람에게 서운함이 쌓일 때", action: "하루를 넘기지 않고 짧게 이유를 말로 전합니다", evidence: ids },
     { situation: "[모의 생성] 새로운 일을 시작할 때", action: "첫 주 목표를 작게 잡고 결과를 기록해 다음 계획에 씁니다", evidence: ids },
   ];
-  return { headline, summary, sections, timeline, differences, actions };
+  const focus = payload.context
+    ? [
+        {
+          text: `[모의 생성] 알려 주신 고민(${payload.context.topic})을 반영하면, ${payload.context.focusGuide}을 중심으로 봅니다. 이 고민에서는 원국의 ${s0.fact}과 응답의 ${v0.fact}를 함께 살핍니다. 실제 AI가 연결되면 이 자리에 고민에 맞춘 해석이 들어갑니다.`,
+          evidence: [s0.id, v0.id],
+        },
+      ]
+    : [];
+  return { headline, summary, sections, timeline, differences, actions, focus };
 }
 
 /** 테스트용 모의 모델: 실패 · 형식 오류 · 지연을 흉내 낼 수 있다 */

@@ -43,6 +43,8 @@ npm run test:db    # DB·접근 정책 검사 (Linux 개발 환경에서 supabas
 - 샘플·개발용 결과에는 출처(`source`)를 표시하고 운영 데이터와 섞지 않는다.
 - AI가 생년월일만 보고 사주 원국을 지어내지 않는다. 원국은 `lib/saju/engine.ts` 엔진 결과만 쓴다.
 - AI 리포트는 `lib/saju/interpret/` · `lib/report/survey-evidence.ts`가 만든 근거 목록 안에서만 쓰고, 문단마다 근거 ID를 단다. `lib/report/v2/validate.ts` 검사를 통과한 것만 저장한다. AI에는 이름 · 생년월일 원문을 보내지 않는다. 실제 AI 제공사 연결 · 유료 호출은 운영자 승인 후.
+- **나를 더 반영하기**(선택 입력)는 사주 계산을 바꾸지 않고 해석의 초점과 예시만 고른다. 근거가 아니므로 문단 근거 ID는 여전히 사주 · 응답이다. 리포트에는 "알려 주신 고민까지 반영한 해석"으로 표시하고, 알려 준 이야기를 사주로 알아맞힌 것처럼 쓰지 않는다. 전체 대화 대신 짧은 요약만 받고(항목별 글자 수 제한), 연락처 · 이메일 · 주민번호 · 카드번호는 저장할 때 가린다. 고객이 직접 보고 · 고치고 · 지울 수 있고, 리포트 저장본에는 주제와 적은 항목 이름만 남긴다(내용 없음). 광고 · 분석 도구로 보내지 않는다.
+- 사주 용어는 한자 · 한자 뜻 · 쉬운 말을 함께 풀어 쓴다(`lib/saju/glossary.ts`). 한자만 나열하지 않는다.
 - 구매한 리포트는 저장된 같은 버전을 다시 보여준다. 열 때마다 새로 생성하지 않는다.
 
 ## 상품 · 성장 원칙
@@ -84,6 +86,7 @@ npm run test:db    # DB·접근 정책 검사 (Linux 개발 환경에서 supabas
 | `miyu/lib/commerce/` | 주문번호, 주문·리포트 상태 규칙 |
 | `miyu/lib/services/` | 저장·주문·승인·리포트·회원 동의 흐름 (저장소·결제사·생성기는 `ports.ts` 약속으로만) |
 | `miyu/lib/membership/` · `lib/growth/` | 가입 동의 항목 · 약관 버전 · 다음 행동 규칙 |
+| `miyu/lib/personalization/` | 나를 더 반영하기 입력 규칙 · 개인정보 가리기 · AI 전달 형식 |
 | `miyu/lib/integrations/` | Supabase 저장소, 토스페이먼츠 승인·조회 구현체, AI 연결(지금은 로컬 모의 서버 `ai/mock-local.ts`만) |
 | `miyu/lib/samples/` · `lib/config/` · `lib/saju/` | 예시 데이터 · 상품·가격 · 만세력 엔진(manseryeok)과 `interpret/`(해석 근거 규칙 초안) |
 | `miyu/server/` | 웹 채널 서버 코드 (환경변수, Supabase 클라이언트, 세션 · 회원 상태, 로그인 전 결과 보관 쿠키, 설정 점검) |

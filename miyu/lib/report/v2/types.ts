@@ -1,6 +1,7 @@
 // 개인 종합 리포트 v2 — 사주 중심 인물 해석. 문단마다 근거 ID를 가진다.
 // AI가 쓰는 부분(서술)과 코드가 채우는 부분(원국 표 · 근거 목록 · 계산 기준)을 나눈다.
 
+import type { ContextTopic } from "../../personalization/context.ts";
 import type { Evidence } from "../evidence.ts";
 import type { DataSource, SajuSection } from "../types.ts";
 
@@ -23,6 +24,8 @@ export type ReportDraftV2 = {
   timeline: { period: string; theme: string; opportunity: string; caution: string; evidence: string[] }[];
   differences: Paragraph[];
   actions: { situation: string; action: string; evidence: string[] }[];
+  /** 알려 주신 고민까지 반영한 해석 (나를 더 반영하기를 적었을 때만) */
+  focus?: Paragraph[];
 };
 
 /** 저장 · 화면용 전체 */
@@ -32,5 +35,11 @@ export type PersonalReportV2 = ReportDraftV2 & {
   personName: string;
   saju: SajuSection;
   evidence: Evidence[];
-  basis: { ruleVersions: string[]; referenceDate: string; lines: string[] };
+  basis: {
+    ruleVersions: string[];
+    referenceDate: string;
+    lines: string[];
+    /** 반영한 맥락 — 주제와 적은 항목 이름만 (내용은 담지 않는다) */
+    context?: { topic: ContextTopic; topicLabel: string; fields: string[]; updatedAt: string | null };
+  };
 };

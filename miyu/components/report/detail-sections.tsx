@@ -1,4 +1,5 @@
 import type { DetailBlock, FullReport, SajuSection } from "@/lib/report/types";
+import { BASE_TERMS, GLOSSARY, withHanja } from "@/lib/saju/glossary";
 import { BRANCHES, STEMS } from "@/lib/saju/glyphs";
 import { ChevronIcon } from "@/components/ui/icons";
 
@@ -166,6 +167,20 @@ export function SajuChart({ saju }: { saju: SajuSection }) {
           ))}
         </ul>
       </div>
+      <details className="border-t border-line pt-3">
+        <summary className="cursor-pointer text-[14px] font-medium text-accent">표 읽는 법 · 용어 풀이</summary>
+        <dl className="mt-3 space-y-2 text-[14px] leading-relaxed">
+          {BASE_TERMS.map((t) => GLOSSARY[t]).map((g) => (
+            <div key={g.term}>
+              <dt className="inline font-semibold">{withHanja(g)}</dt>
+              <dd className="inline text-ink-2">
+                {" "}
+                — {g.literal}. {g.plain}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </details>
       {saju.notes?.length || saju.basis?.length ? (
         <div className="space-y-2 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-3">
           {saju.notes?.map((n) => (

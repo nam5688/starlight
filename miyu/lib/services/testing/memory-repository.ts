@@ -3,6 +3,7 @@
 
 import { canTransition } from "../../commerce/order.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
+import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   PaymentEventSource,
   AssessmentRecord,
@@ -22,6 +23,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const reports = new Map<string, ReportRecord>();
   const events: { orderId: string; source: PaymentEventSource; status: string | null; detail: Record<string, unknown>; createdAt: string }[] = [];
   const consents = new Map<string, ConsentRecord[]>();
+  const contexts = new Map<string, PersonalContext>();
   let tick = 0;
   const iso = () => now().toISOString();
 
@@ -110,6 +112,23 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async addPaymentEvent(event) {
       events.push({ orderId: event.orderId, source: event.source, status: event.status, detail: event.detail, createdAt: new Date(now().getTime() + ++tick).toISOString() });
     },
+    async getContext(assessmentId) {
+      return contexts.get(assessmentId) ?? null;
+    },
+    async listContexts(userId) {
+      return [...contexts.values()].filter((c) => c.userId === userId).map(({ assessmentId, topic, updatedAt }) => ({ assessmentId, topic, updatedAt }));
+    },
+    async upsertContext(c) {
+      // DB 트리거와 같은 규칙: 검사 결과의 주인만
+      if (assessments.get(c.assessmentId)?.userId !== c.userId) throw new Error("personal context owner mismatch");
+      const prev = contexts.get(c.assessmentId);
+      const record: PersonalContext = { ...c, createdAt: prev?.createdAt ?? iso(), updatedAt: new Date(now().getTime() + ++tick).toISOString() };
+      contexts.set(c.assessmentId, record);
+      return record;
+    },
+    async deleteContext(assessmentId) {
+      contexts.delete(assessmentId);
+    },
     async listPaymentEvents(orderId) {
       return events.filter((e) => e.orderId === orderId).map(({ source, status, detail, createdAt }) => ({ source, status, detail, createdAt }));
     },
@@ -148,5 +167,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts };
 }

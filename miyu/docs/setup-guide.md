@@ -80,6 +80,27 @@ SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
    - 이미 실행한 파일을 다시 실행하면 "already exists" 오류가 납니다. 표가 모두 "있음"이면 그대로 두면 됩니다.
    - 첫 번째 파일 실행 중 오류가 났다면, 두 번째 파일로 넘어가지 말고 오류 문구를 알려주세요 (키 값은 보내지 않습니다).
 
+### 2단계 추가 — 나중에 생긴 DB 변경 (3~5번)
+
+기능이 추가되면서 SQL 파일이 더 생겼습니다. **이미 적용한 파일은 다시 실행하지 않고, 아직 안 한 것만 번호 순서대로 한 번씩** 실행합니다. 방법은 위와 같습니다 (New query → 아래 명령으로 복사 → 붙여넣기 → Run → `Success`).
+기존 회원 · 검사 · 주문 데이터는 지우거나 바꾸지 않습니다. 파일을 고쳐서 다시 실행하라는 안내는 하지 않습니다. 바뀐 내용은 항상 새 파일로 추가됩니다.
+
+| 번호 | 파일 | 하는 일 |
+| --- | --- | --- |
+| 3 | `20261013000000_profile_backfill.sql` | 테이블을 만들기 전에 가입한 회원의 빠진 프로필만 채웁니다 |
+| 4 | `20261014000000_payment_env.sql` | 주문에 결제 환경(내 테스트 키 / 토스 문서 예제 키 / 실결제)을 기록할 칸을 추가합니다 |
+| 5 | `20261015000000_personal_context.sql` | ‘나를 더 반영하기’(선택 입력)를 저장할 표를 만듭니다. 본인만 보고 · 고치고 · 지울 수 있습니다 |
+
+```powershell
+Get-Content supabase\migrations\20261013000000_profile_backfill.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261014000000_payment_env.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261015000000_personal_context.sql -Raw -Encoding UTF8 | Set-Clipboard
+```
+
+(세 줄을 한꺼번에 붙여넣지 말고, **한 줄 실행 → SQL Editor에서 Run → 다음 줄** 순서로 합니다.)
+
+- 5번을 아직 안 했어도 다른 화면은 그대로 동작합니다. 다만 ‘나를 더 반영하기’ 저장이 "DB 변경 5번을 먼저 적용해야 합니다"라고 안내합니다. `/setup`의 DB 상태에서 `personal_contexts` 상태로도 확인할 수 있습니다.
+
 ## 3단계. 카카오 로그인 켜기
 
 **카카오디벨로퍼스**(https://developers.kakao.com)에서:

@@ -3,6 +3,7 @@
 import { REPORT_GENERATING_STALE_MS, REPORT_MAX_ATTEMPTS } from "../commerce/report.ts";
 import type { ReportGenerator, ReportInput } from "../report/generator.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
+import type { PersonalContext } from "../personalization/context.ts";
 import type { AssessmentRecord, MiyuRepository, OrderRecord, ReportRecord } from "./ports.ts";
 
 type ReportDeps = { repo: MiyuRepository; generator: ReportGenerator; now: () => Date };
@@ -60,7 +61,9 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
   const assessment = await repo.getAssessment(order.assessmentId);
   try {
     if (!assessment) throw new Error("검사 결과를 찾을 수 없습니다.");
-    const content = await generator.generate(reportInputOf(assessment));
+    // 나를 더 반영하기: 생성을 시작하는 시점의 내용을 쓴다 (반영하는 생성기일 때만 읽는다)
+    const context = generator.usesContext ? await repo.getContext(assessment.id) : null;
+    const content = await generator.generate(reportInputOf(assessment, context));
     const ready = await repo.updateReport(report.id, ["generating"], {
       status: "ready",
       content,
@@ -98,7 +101,7 @@ export async function ensureReport(deps: ReportDeps, order: OrderRecord): Promis
 /** 다시 만들기를 더 할 수 있는지 (상한을 넘으면 운영자 확인) */
 export const canRetryReport = (report: Pick<ReportRecord, "attempts"> | null) => !report || report.attempts < REPORT_MAX_ATTEMPTS;
 
-export function reportInputOf(a: AssessmentRecord): ReportInput {
+export function reportInputOf(a: AssessmentRecord, context: PersonalContext | null = null): ReportInput {
   return {
     nickname: a.nickname,
     knownMbti: a.knownMbti,
@@ -106,6 +109,17 @@ export function reportInputOf(a: AssessmentRecord): ReportInput {
     summary: a.summary,
     saju: a.saju,
     gender: null,
+    context: context
+      ? {
+          topic: context.topic,
+          question: context.question,
+          situation: context.situation,
+          matched: context.matched,
+          differed: context.differed,
+          excerpt: context.excerpt,
+          updatedAt: context.updatedAt,
+        }
+      : null,
   };
 }
 
@@ -115,6 +129,8 @@ export type ResultView = {
   paidOrder: OrderRecord | null;
   refunded: boolean;
   report: ReportRecord | null;
+  /** 나를 더 반영하기에 적은 내용 (없으면 null) */
+  context: PersonalContext | null;
 };
 
 /** 결과 화면용 조회. 본인 것이 아니면 null (화면에서는 '찾을 수 없음'으로 처리) */
@@ -127,8 +143,8 @@ export async function getResultView(
   const orders = await repo.listOrdersForAssessment(assessment.id);
   const paidOrder = orders.find((o) => o.status === "paid") ?? null;
   const refunded = !paidOrder && orders.some((o) => o.status === "refunded");
-  const report = paidOrder ? await repo.getReportByOrder(paidOrder.id) : null;
-  return { assessment, paidOrder, refunded, report };
+  const [report, context] = await Promise.all([paidOrder ? repo.getReportByOrder(paidOrder.id) : null, repo.getContext(assessment.id)]);
+  return { assessment, paidOrder, refunded, report, context };
 }
 
 export type MyItem = {

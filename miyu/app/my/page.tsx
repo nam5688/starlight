@@ -14,6 +14,7 @@ import { ENTITLEMENT_LABEL, GENERATION_LABEL, getMyPage, PAYMENT_ENV_LABEL, type
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { readRepository } from "@/server/services";
+import { topicLabel } from "@/lib/personalization/context";
 
 export const metadata: Metadata = {
   title: "MY · ME:U 미유",
@@ -229,6 +230,12 @@ function ReportRow({ card, paymentsReady }: { card: MyReportCard; paymentsReady:
           </>
         )}
       </div>
+      <p className="mt-2 text-[13px] text-ink-3">
+        나를 더 반영하기: {card.contextTopic ? topicLabel(card.contextTopic) : "적지 않음"} ·{" "}
+        <Link href={`${href}/context`} className="underline underline-offset-2">
+          {card.contextTopic ? "보기 · 고치기 · 지우기" : "적어 보기"}
+        </Link>
+      </p>
       {card.entitlement === "purchased" && card.generation === "failed" && (
         <p className="mt-2 text-[13px] text-ink-3">결제는 정상 처리되었습니다. 다시 결제하지 말고 ‘다시 생성’을 눌러 주세요.</p>
       )}

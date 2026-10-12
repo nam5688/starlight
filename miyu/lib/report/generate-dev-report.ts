@@ -229,6 +229,7 @@ function elementFinding(counts: Record<FiveElement, number>): string {
 export const devReportGenerator: ReportGenerator = {
   name: "dev-rules",
   version: "dev-0.1",
+  usesContext: false,
   async generate(input) {
     return buildDevReport(input);
   },

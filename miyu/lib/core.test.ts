@@ -12,7 +12,7 @@ import { buildDevReport } from "./report/generate-dev-report.ts";
 const LIB = fileURLToPath(new URL(".", import.meta.url));
 
 /** 채널 공통 핵심 폴더 — Next.js, React, 외부 서비스 SDK를 불러오면 안 된다 */
-const CORE_DIRS = ["assessment", "commerce", "growth", "membership", "profile", "report", "saju", "samples", "services"];
+const CORE_DIRS = ["assessment", "commerce", "growth", "membership", "personalization", "profile", "report", "saju", "samples", "services"];
 const FORBIDDEN = [/from "next/, /from "react/, /"server-only"/, /from "@supabase\//, /from "@tosspayments\//, /integrations\//];
 
 function files(dir: string): string[] {
@@ -52,7 +52,7 @@ test("개발용 리포트: 모든 영역을 채우고, 괄호 바로 뒤에 조�
       ASSESSMENT_MODULES.flatMap((m) => m.items.map((item, i) => [item.id, ((v + i) % 5) + 1])),
     );
     const summary = buildDevFreeSummary(answers);
-    const report = buildDevReport({ nickname: "지민", knownMbti: "INFJ", birthText: "1995년 4월 12일 (양력) · 출생시간 모름", summary, saju: { status: "not-connected" }, gender: null });
+    const report = buildDevReport({ nickname: "지민", knownMbti: "INFJ", birthText: "1995년 4월 12일 (양력) · 출생시간 모름", summary, saju: { status: "not-connected" }, gender: null, context: null });
     assert.equal(report.source, "dev-scoring");
     assert.ok(report.details.mbti.findings.length >= 4);
     assert.ok(report.integrated.common.length >= 1);

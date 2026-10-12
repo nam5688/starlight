@@ -1,6 +1,6 @@
 import "server-only";
 import { isAuthConfigured, paymentConfig, supabaseEnv } from "./env";
-import { buildSteps, checkEnv, CONSENT_TABLES, INIT_TABLES, tableStateOf, type Connection, type SetupFacts, type TableState } from "./setup-checks";
+import { buildSteps, checkEnv, CONSENT_TABLES, INIT_TABLES, OPTIONAL_TABLES, tableStateOf, type Connection, type SetupFacts, type TableState } from "./setup-checks";
 import { createAdminSupabase } from "./supabase";
 
 // 개발용 설정 점검. 값은 읽어서 판정만 하고 화면·로그에는 내보내지 않는다.
@@ -57,6 +57,7 @@ async function probeSupabase(url: string, publishableKey: string, admin: Admin):
 
 export async function getSetupStatus() {
   const env = checkEnv((name) => (process.env[name] ?? "").trim());
+  const optional: Record<string, TableState> = {};
   const supabaseFields = env.filter((e) => e.name.includes("SUPABASE"));
   const supabaseReady = isAuthConfigured() && supabaseFields.every((e) => e.state === "set");
   const payment = paymentConfig();
@@ -95,6 +96,13 @@ export async function getSetupStatus() {
     const states = await Promise.all(tables.map((t) => tableState(admin, t)));
     tables.forEach((t, i) => (facts.tables[t] = states[i]));
 
+    // 선택 기능 테이블은 상태만 알려 준다 (다른 단계의 완료 여부에 영향 없음)
+    await Promise.all(
+      Object.keys(OPTIONAL_TABLES).map(async (t) => {
+        optional[t] = await tableState(admin, t);
+      }),
+    );
+
     if (states.every((s) => s === "ok")) {
       facts.missingProfiles = await missingProfiles(admin);
       [facts.completedLogins, facts.savedAssessments, facts.paidOrders, facts.readyReports] = await Promise.all([
@@ -108,6 +116,7 @@ export async function getSetupStatus() {
 
   const supabaseUrl = supabaseEnv().url;
   return {
+    optionalTables: optional,
     env,
     connection: facts.connection,
     steps: buildSteps(facts),

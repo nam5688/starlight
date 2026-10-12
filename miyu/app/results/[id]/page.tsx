@@ -6,6 +6,7 @@ import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
 import { FreeSummaryBody } from "@/components/report/free-summary-body";
 import { FullReportView } from "@/components/report/full-report-view";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
+import { ContextPanel } from "@/components/results/context-panel";
 import { PurchasePanel } from "@/components/results/purchase-panel";
 import { SourceBadge } from "@/components/ui/source-badge";
 import { buttonSecondary, pageNarrow, pageWide } from "@/components/ui/styles";
@@ -13,7 +14,7 @@ import { isPersonalV2 } from "@/lib/report/generator";
 import { formatAssessmentBirth } from "@/lib/services/assessment-service";
 import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
-import { readRepository } from "@/server/services";
+import { readRepository, reportGenerator } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 
 export const metadata: Metadata = {
@@ -55,12 +56,14 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   if (!view) notFound();
 
   const { assessment, report } = view;
+  const usesContext = Boolean(reportGenerator().usesContext);
   const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
 
   if (view.paidOrder && report?.status === "ready" && report.content) {
     const content = report.content;
     const footer = (
       <div className="space-y-4">
+        <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady />
         <p className="text-[13px] text-ink-3">
           주문번호 {view.paidOrder.orderNumber} · 생성 {report.generator} {report.generatorVersion}
         </p>
@@ -99,6 +102,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
           region={null /* 지역은 성향 분석과 분리해 보관하고 결과 화면에 다시 보여주지 않는다 */}
           saju={assessment.saju}
         />
+        <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady={false} />
         <PurchasePanel view={view} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} />
       </div>
     </>

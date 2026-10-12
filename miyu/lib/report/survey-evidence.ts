@@ -50,7 +50,7 @@ export function surveyEvidence(summary: FreeSummary, knownMbti: string | null): 
       topics: ["personality"],
       strength: "weak",
       fact: `본인이 알고 있는 MBTI ${knownMbti}`,
-      cue: "자기 인식 참고값으로만 쓰고, 성격을 판정하거나 사주로 알아맞힌 것처럼 쓰지 않습니다.",
+      cue: "본인이 알고 있는 자기 인식 참고값으로만 씁니다. 성격 판정이나 사주 해석의 근거로 쓰지 않습니다.",
     });
   }
   return out;

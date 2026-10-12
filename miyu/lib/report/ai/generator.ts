@@ -4,6 +4,7 @@
 // - 그래도 실패하면 오류를 던진다 → reports에 failed로 남고 고객은 "다시 만들기"를 누를 수 있다
 
 import { sajuEvidence, SAJU_RULE_VERSION } from "../../saju/interpret/rules.ts";
+import { filledFields, topicLabel } from "../../personalization/context.ts";
 import { describePolicy } from "../../saju/policy.ts";
 import { sajuSection } from "../../saju/display.ts";
 import type { Evidence } from "../evidence.ts";
@@ -52,6 +53,7 @@ function fillName(draft: ReportDraftV2, name: string): ReportDraftV2 {
     timeline: draft.timeline.map((t) => ({ ...t, theme: fix(t.theme), opportunity: fix(t.opportunity), caution: fix(t.caution) })),
     differences: draft.differences.map((p) => ({ ...p, text: fix(p.text) })),
     actions: draft.actions.map((a) => ({ ...a, situation: fix(a.situation), action: fix(a.action) })),
+    ...(draft.focus?.length ? { focus: draft.focus.map((p) => ({ ...p, text: fix(p.text) })) } : {}),
   };
 }
 
@@ -79,10 +81,12 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
   return {
     name: `ai:${model.provider}`,
     version: `${model.model}|${PROMPT_VERSION}|${SAJU_RULE_VERSION}`,
+    usesContext: true,
     async generate(input) {
       const ref = seoulYm(now());
       const evidence = buildEvidence(input, ref);
-      const messages: ModelMessage[] = [{ role: "user", content: buildUserMessage(evidence, ref.iso) }];
+      const context = input.context;
+      const messages: ModelMessage[] = [{ role: "user", content: buildUserMessage(evidence, ref.iso, context) }];
 
       let lastErrors: string[] = [];
       for (let round = 0; round <= maxRepairs; round++) {
@@ -95,7 +99,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           messages.push({ role: "assistant", content: result.text.slice(0, 20000) }, { role: "user", content: buildRepairMessage(lastErrors) });
           continue;
         }
-        const checked = validateDraft(parsed, evidence);
+        const checked = validateDraft(parsed, evidence, { hasContext: Boolean(context) });
         if (checked.ok) {
           const report: PersonalReportV2 = {
             kind: "personal-v2",
@@ -107,6 +111,9 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
               ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, PROMPT_VERSION],
               referenceDate: ref.iso,
               lines: input.saju.status === "ok" ? [`만세력 엔진 ${input.saju.engine.name} ${input.saju.engine.version}`, ...describePolicy(input.saju.options)] : [],
+              ...(context
+                ? { context: { topic: context.topic, topicLabel: topicLabel(context.topic), fields: filledFields(context), updatedAt: context.updatedAt ?? null } }
+                : {}),
             },
             ...fillName(checked.draft, input.nickname),
           };

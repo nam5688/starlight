@@ -11,6 +11,7 @@ import { validateDraft } from "../v2/validate.ts";
 import { buildEvidence, createAiReportGenerator, extractJson } from "./generator.ts";
 import { composeMockDraft, createMockModel } from "./mock-model.ts";
 import { ModelCallError, type TextModel } from "./model.ts";
+import { glossaryFor } from "../../saju/glossary.ts";
 
 const NOW = () => new Date("2026-10-12T03:00:00Z");
 const REF = { year: 2026, month: 10 };
@@ -24,6 +25,7 @@ function input(overrides: Partial<ReportInput> = {}): ReportInput {
     summary: buildDevFreeSummary(answers),
     saju: calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" }),
     gender: "female",
+    context: null,
     ...overrides,
   };
 }
@@ -196,4 +198,79 @@ test("형식 검사: 장이 빠지거나 실천 개수가 맞지 않으면 막�
   assert.ok(!r.ok);
   assert.ok(r.errors.some((e) => /conditions/.test(e)));
   assert.ok(r.errors.some((e) => /actions: 2개/.test(e)));
+});
+
+// ---- 나를 더 반영하기 ----
+
+const WORK_CONTEXT = {
+  topic: "work" as const,
+  question: "지금 회사를 옮겨도 될지, 무엇을 기준으로 정해야 할지 궁금해요. 연락은 010-1234-5678로 주세요",
+  situation: "새 제안이 오면 처음엔 끌리다가 결정할 때가 되면 계속 미뤄요",
+  matched: "",
+  differed: "무료 결과에서는 신중하다고 했는데 저는 충동적인 편이에요",
+  excerpt: "",
+  updatedAt: "2026-10-12T01:00:00.000Z",
+};
+
+test("나를 더 반영하기: 고민을 AI 자료에 넣되 연락처는 가리고, 리포트에 '알려 주신 고민' 해석과 반영 항목(내용 없이)을 남긴다", async () => {
+  const model = createMockModel();
+  const seen: string[] = [];
+  const wrapped: TextModel = { provider: "mock", model: "mock-0", complete: (req) => (seen.push(req.messages[0].content), model.complete(req)) };
+  const report = await createAiReportGenerator({ model: wrapped, now: NOW, sleep: noSleep }).generate(input({ context: WORK_CONTEXT }));
+  if (!("kind" in report)) throw new Error();
+  assert.match(seen[0], /"topic":"일 · 진로 · 이직"/);
+  assert.match(seen[0], /선택과 불확실성에 대한 반응/, "주제별로 더 자세히 풀 부분");
+  assert.match(seen[0], /\[연락처 가림\]/);
+  assert.doesNotMatch(seen[0], /010-1234-5678/);
+  assert.equal(report.focus?.length, 1);
+  assert.match(report.focus![0].text, /알려 주신 고민\(일 · 진로 · 이직\)/);
+  assert.deepEqual(report.basis.context, {
+    topic: "work",
+    topicLabel: "일 · 진로 · 이직",
+    fields: ["지금 가장 궁금한 문제", "최근 반복되는 상황", "이전 풀이에서 달랐던 점"],
+    updatedAt: "2026-10-12T01:00:00.000Z",
+  });
+  assert.doesNotMatch(JSON.stringify(report.basis), /회사를 옮겨도/, "리포트 기준 정보에는 적은 내용을 담지 않는다");
+});
+
+test("나를 더 반영하기: 적지 않았으면 focus가 없고, AI 자료에도 context가 없다", async () => {
+  const report = await createAiReportGenerator({ model: createMockModel(), now: NOW, sleep: noSleep }).generate(input());
+  if (!("kind" in report)) throw new Error();
+  assert.equal(report.focus, undefined);
+  assert.equal(report.basis.context, undefined);
+  assert.doesNotMatch(buildUserMessage(evidence, "2026-10-12"), /"context"/);
+});
+
+test("형식 검사: 고민을 적었는데 focus가 없거나, 고객이 말한 내용임을 밝히지 않거나, 사주로 맞힌 것처럼 쓰면 막는다", () => {
+  const msg = buildUserMessage(evidence, "2026-10-12", WORK_CONTEXT);
+  const draft = composeMockDraft(msg);
+  assert.ok(validateDraft(draft, evidence, { hasContext: true }).ok);
+
+  const missing = { ...draft, focus: [] };
+  const r1 = validateDraft(missing, evidence, { hasContext: true });
+  assert.ok(!r1.ok && r1.errors.some((e) => /focus: 0개/.test(e)));
+
+  const noAttribution = { ...draft, focus: [{ ...draft.focus![0], text: draft.focus![0].text.replace("알려 주신 고민", "이직 고민") }] };
+  const r2 = validateDraft(noAttribution, evidence, { hasContext: true });
+  assert.ok(!r2.ok && r2.errors.some((e) => /알려 준 내용임을 밝히며/.test(e)));
+
+  const guessed = { ...draft, focus: [{ ...draft.focus![0], text: `${draft.focus![0].text} 이 고민은 사주에 이미 나와 있습니다.` }] };
+  const r3 = validateDraft(guessed, evidence, { hasContext: true });
+  assert.ok(!r3.ok && r3.errors.some((e) => /사주로 맞힌 것처럼/.test(e)));
+
+  const disclaimer = { ...draft, focus: [{ ...draft.focus![0], text: `${draft.focus![0].text} 알려 주신 이야기를 사주로 알아맞힌 것은 아닙니다.` }] };
+  assert.ok(validateDraft(disclaimer, evidence, { hasContext: true }).ok, "부정 안내 문장은 허용");
+
+  const r4 = validateDraft(draft, evidence, { hasContext: false });
+  assert.ok(!r4.ok && r4.errors.some((e) => /고민이 없는데 focus/.test(e)));
+});
+
+test("쉬운 말: AI 자료에 리포트 근거에 나온 사주 용어의 한자와 쉬운 뜻을 함께 보낸다", () => {
+  const msg = JSON.parse(buildUserMessage(evidence, "2026-10-12").slice(buildUserMessage(evidence, "2026-10-12").indexOf("{")));
+  const terms = msg.terms.map((t: { term: string }) => t.term);
+  for (const t of ["일간", "오행", "상관", "정인", "인성", "대운", "세운", "충"]) assert.ok(terms.includes(t), t);
+  const sanggwan = msg.terms.find((t: { term: string }) => t.term === "상관");
+  assert.equal(sanggwan.hanja, "傷官");
+  assert.match(sanggwan.plain, /틀/);
+  assert.equal(glossaryFor(evidence).length, msg.terms.length);
 });

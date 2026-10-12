@@ -6,6 +6,7 @@ import { PERSONAL_REPORT } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
+import type { ContextTopic } from "../personalization/context.ts";
 
 export type Entitlement = "free" | "purchased" | "refunded";
 export type Generation = "none" | "in-progress" | "ready" | "failed";
@@ -22,6 +23,8 @@ export type MyReportCard = {
   generation: Generation;
   paidOrderNumber: string | null;
   source: DataSource;
+  /** 나를 더 반영하기에 적은 주제 (적지 않았으면 null) */
+  contextTopic: ContextTopic | null;
 };
 
 export type MyOrderRow = {
@@ -82,10 +85,11 @@ export function generationOf(report: Pick<ReportRecord, "status"> | null | undef
 }
 
 export async function getMyPage(repo: MiyuRepository, userId: string): Promise<{ cards: MyReportCard[]; orders: MyOrderRow[] }> {
-  const [assessments, orders, reports] = await Promise.all([
+  const [assessments, orders, reports, contexts] = await Promise.all([
     repo.listAssessments(userId),
     repo.listOrdersForUser(userId),
     repo.listReportStatuses(userId),
+    repo.listContexts(userId),
   ]);
   const mineOrders = orders.filter((o) => o.userId === userId);
 
@@ -105,6 +109,7 @@ export async function getMyPage(repo: MiyuRepository, userId: string): Promise<{
         generation: paid ? generationOf(report) : "none",
         paidOrderNumber: paid?.orderNumber ?? null,
         source: a.source,
+        contextTopic: contexts.find((c) => c.assessmentId === a.id)?.topic ?? null,
       };
     });
 

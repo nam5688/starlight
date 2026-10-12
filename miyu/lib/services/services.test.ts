@@ -15,6 +15,7 @@ import { submitAssessment } from "./assessment-service.ts";
 import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "./order-service.ts";
 import type { GatewayResult, PaymentGateway } from "./ports.ts";
 import { getMyPage, traceOrder } from "./my-service.ts";
+import { deleteContext, getContextView, saveContext } from "./context-service.ts";
 import { canRetryReport, claimReport, completeReport, ensureReport, getResultView, listMyItems, queueReport, runReport } from "./report-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
@@ -306,6 +307,77 @@ test("리포트 v2(AI 모의 모델): 일시 오류가 계속되면 failed, 다�
   const again = await ensureReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order);
   assert.equal(model.calls, callsBefore, "완성된 리포트는 다시 보기만 한다 (AI 비용 없음)");
   assert.deepEqual(again?.content, ready.content);
+});
+
+test("나를 더 반영하기: 본인 결과에만 저장 · 수정 · 삭제, 동의 없이는 저장하지 않고 연락처는 가린다", async () => {
+  const { mem, assessment } = await setup();
+  const ids = { userId: USER, assessmentId: assessment.id };
+  const raw = { topic: "marriage", question: "지금 사람과 결혼을 결정해도 될지", excerpt: "그 사람 번호는 010-2222-3333" };
+
+  const noAgree = await saveContext(mem.repo, { ...ids, raw, agreed: false, now: () => TODAY });
+  assert.equal(noAgree.kind, "invalid");
+  assert.equal(await mem.repo.getContext(assessment.id), null);
+
+  const other = await saveContext(mem.repo, { userId: OTHER, assessmentId: assessment.id, raw, agreed: true, now: () => TODAY });
+  assert.equal(other.kind, "not-found", "다른 회원의 검사 결과에는 저장할 수 없다");
+  assert.equal(await getContextView(mem.repo, { userId: OTHER, assessmentId: assessment.id }), null);
+
+  const saved = await saveContext(mem.repo, { ...ids, raw, agreed: true, now: () => TODAY });
+  assert.equal(saved.kind, "saved");
+  if (saved.kind !== "saved") return;
+  assert.equal(saved.redactions, 1);
+  assert.equal(saved.context.excerpt, "그 사람 번호는 [연락처 가림]");
+  assert.equal(saved.context.agreedAt, TODAY.toISOString());
+
+  const edited = await saveContext(mem.repo, { ...ids, raw: { topic: "work", situation: "결정을 미뤄요" }, agreed: true, now: () => TODAY });
+  assert.ok(edited.kind === "saved" && edited.context.topic === "work" && edited.context.question === "" && edited.context.excerpt === "");
+  const view = await getContextView(mem.repo, ids);
+  assert.equal(view?.context?.situation, "결정을 미뤄요");
+  assert.equal(view?.reportStatus, null);
+  assert.deepEqual((await mem.repo.listContexts(USER)).map((c) => c.topic), ["work"]);
+
+  assert.equal(await deleteContext(mem.repo, { userId: OTHER, assessmentId: assessment.id }), false);
+  assert.ok(await mem.repo.getContext(assessment.id), "다른 회원은 지울 수 없다");
+  assert.equal(await deleteContext(mem.repo, ids), true);
+  assert.equal(await mem.repo.getContext(assessment.id), null);
+});
+
+test("나를 더 반영하기: AI 생성기는 생성 시점의 내용을 반영하고, 리포트를 만든 뒤 고치거나 지워도 구매한 리포트는 그대로다", async () => {
+  const { mem, assessment } = await setup();
+  await saveContext(mem.repo, { userId: USER, assessmentId: assessment.id, raw: { topic: "work", question: "이직을 해도 될지" }, agreed: true, now: () => TODAY });
+  const started = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id });
+  if (started.kind !== "order") throw new Error();
+  const { gateway } = fakeGateway({ confirm: (i) => ({ ok: true, payment: done(i.orderId, i.amount, i.paymentKey) }) });
+  const paid = await confirmPayment({ repo: mem.repo, gateway }, { userId: USER, orderNumber: started.order.orderNumber, paymentKey: "pk_ctx", amount: started.order.amount });
+  if (paid.kind !== "paid") throw new Error();
+
+  const generator = createAiReportGenerator({ model: createMockModel(), now: () => TODAY, sleep: async () => {} });
+  const ready = await ensureReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order);
+  assert.ok(ready?.content && isPersonalV2(ready.content));
+  assert.equal(ready.content.basis.context?.topicLabel, "일 · 진로 · 이직");
+  assert.match(ready.content.focus?.[0].text ?? "", /알려 주신 고민/);
+  assert.equal((await getContextView(mem.repo, { userId: USER, assessmentId: assessment.id }))?.reportStatus, "ready");
+
+  const before = JSON.stringify(ready.content);
+  await deleteContext(mem.repo, { userId: USER, assessmentId: assessment.id });
+  const again = await ensureReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order);
+  assert.equal(JSON.stringify(again?.content), before);
+});
+
+test("나를 더 반영하기: 개발용 규칙 생성기는 반영하지 않으므로 읽지도 않는다", async () => {
+  const { mem, assessment } = await setup();
+  await saveContext(mem.repo, { userId: USER, assessmentId: assessment.id, raw: { topic: "love" }, agreed: true, now: () => TODAY });
+  let reads = 0;
+  const original = mem.repo.getContext;
+  mem.repo.getContext = async (id) => (reads++, original(id));
+  const started = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id });
+  if (started.kind !== "order") throw new Error();
+  const { gateway } = fakeGateway({ confirm: (i) => ({ ok: true, payment: done(i.orderId, i.amount, i.paymentKey) }) });
+  const paid = await confirmPayment({ repo: mem.repo, gateway }, { userId: USER, orderNumber: started.order.orderNumber, paymentKey: "pk_dev", amount: started.order.amount });
+  if (paid.kind !== "paid") throw new Error();
+  const ready = await ensureReport({ repo: mem.repo, generator: devReportGenerator, now: () => TODAY }, paid.order);
+  assert.equal(ready?.status, "ready");
+  assert.equal(reads, 0);
 });
 
 test("가입 동의: 필수 항목이 빠지면 기록하지 않고, 모두 동의하면 이용 가능", async () => {

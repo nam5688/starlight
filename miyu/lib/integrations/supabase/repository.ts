@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ConsentRecord } from "../../membership/terms.ts";
+import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AssessmentRecord,
   InsertResult,
@@ -17,6 +18,9 @@ import type {
 type Row = Record<string, unknown>;
 
 const UNIQUE_VIOLATION = "23505";
+/** 테이블이 아직 없음 (PostgREST · Postgres) — 선택 기능은 꺼진 것으로 보고 기존 화면은 그대로 동작하게 한다 */
+const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
+export const isMissingTableError = (error: { code?: string | null } | null | undefined) => Boolean(error?.code && MISSING_TABLE.has(error.code));
 
 function fail(context: string, error: { message: string; code?: string }): never {
   const e = new Error(`${context}: ${error.message}`) as Error & { code?: string };
@@ -86,6 +90,22 @@ function toReport(r: Row): ReportRecord {
 }
 
 /** camelCase 패치 → DB 컬럼 */
+function toContext(r: Row): PersonalContext {
+  return {
+    assessmentId: r.assessment_id as string,
+    userId: r.user_id as string,
+    topic: r.topic as PersonalContext["topic"],
+    question: (r.question as string) ?? "",
+    situation: (r.situation as string) ?? "",
+    matched: (r.matched as string) ?? "",
+    differed: (r.differed as string) ?? "",
+    excerpt: (r.excerpt as string) ?? "",
+    agreedAt: r.agreed_at as string,
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
 function columns(patch: Record<string, unknown>, map: Record<string, string>): Row {
   const out: Row = {};
   for (const [key, value] of Object.entries(patch)) {
@@ -281,6 +301,52 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         detail: event.detail,
       });
       if (error) fail("결제 기록 저장", error);
+    },
+
+    async getContext(assessmentId) {
+      const { data, error } = await db.from("personal_contexts").select().eq("assessment_id", assessmentId).maybeSingle();
+      if (error) {
+        if (error.code === "22P02" || isMissingTableError(error)) return null;
+        fail("반영 정보 조회", error);
+      }
+      return data ? toContext(data) : null;
+    },
+
+    async listContexts(userId) {
+      const { data, error } = await db.from("personal_contexts").select("assessment_id, topic, updated_at").eq("user_id", userId);
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("반영 정보 목록 조회", error);
+      }
+      return (data ?? []).map((r) => ({ assessmentId: r.assessment_id as string, topic: r.topic as PersonalContext["topic"], updatedAt: r.updated_at as string }));
+    },
+
+    async upsertContext(c) {
+      const { data, error, status } = await db
+        .from("personal_contexts")
+        .upsert({
+          assessment_id: c.assessmentId,
+          user_id: c.userId,
+          topic: c.topic,
+          question: c.question,
+          situation: c.situation,
+          matched: c.matched,
+          differed: c.differed,
+          excerpt: c.excerpt,
+          agreed_at: c.agreedAt,
+        })
+        .select()
+        .single();
+      if (error) {
+        // 테이블이 없을 때 저장(.single)은 상태 404에 빈 오류가 온다 (조회 · 삭제는 42P01 코드가 있다)
+        fail("반영 정보 저장", status === 404 && !error.code ? { code: "42P01", message: "personal_contexts 테이블이 없습니다" } : error);
+      }
+      return toContext(data);
+    },
+
+    async deleteContext(assessmentId) {
+      const { error } = await db.from("personal_contexts").delete().eq("assessment_id", assessmentId);
+      if (error) fail("반영 정보 삭제", error);
     },
 
     async listPaymentEvents(orderId) {

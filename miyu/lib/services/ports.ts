@@ -5,6 +5,7 @@ import type { Answers } from "../assessment/types.ts";
 import type { GatewayPayment, OrderStatus } from "../commerce/order.ts";
 import type { ReportStatus } from "../commerce/report.ts";
 import type { ConsentRecord, ConsentType } from "../membership/terms.ts";
+import type { PersonalContext, PersonalContextInput } from "../personalization/context.ts";
 import type { ReportContent } from "../report/generator.ts";
 import type { DataSource, FreeSummary } from "../report/types.ts";
 import type { SajuResult } from "../saju/engine.ts";
@@ -99,6 +100,10 @@ export type PaymentEventRecord = {
 
 export type InsertResult<T> = { ok: true; value: T } | { ok: false; reason: "conflict" };
 
+export type NewPersonalContext = PersonalContextInput & Pick<PersonalContext, "assessmentId" | "userId" | "agreedAt">;
+/** 목록용 — 적은 내용은 담지 않는다 */
+export type PersonalContextSummary = Pick<PersonalContext, "assessmentId" | "topic" | "updatedAt">;
+
 export interface MiyuRepository {
   /** 동의 기록 (지우지 않고 쌓는다) */
   listConsents(userId: string): Promise<ConsentRecord[]>;
@@ -126,6 +131,12 @@ export interface MiyuRepository {
     status: string | null;
     detail: Record<string, unknown>;
   }): Promise<void>;
+
+  /** 나를 더 반영하기 — 검사 결과 하나에 하나. 쓰기 · 지우기는 서비스에서 소유자를 확인한 뒤에만 */
+  getContext(assessmentId: string): Promise<PersonalContext | null>;
+  listContexts(userId: string): Promise<PersonalContextSummary[]>;
+  upsertContext(context: NewPersonalContext): Promise<PersonalContext>;
+  deleteContext(assessmentId: string): Promise<void>;
 
   /** 서버 전용 (브라우저 권한으로는 읽을 수 없다) — 주문 소유자를 확인한 뒤에만 쓴다 */
   listPaymentEvents(orderId: string): Promise<PaymentEventRecord[]>;

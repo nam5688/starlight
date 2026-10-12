@@ -16,6 +16,7 @@ import { confirmPayment, startCheckout } from "../../lib/services/order-service.
 import type { PaymentGateway } from "../../lib/services/ports.ts";
 import { ensureReport, getResultView } from "../../lib/services/report-service.ts";
 import { kakaoOAuthOptions } from "../../server/kakao-options.ts";
+import { deleteContext, getContextView, saveContext } from "../../lib/services/context-service.ts";
 
 const URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
 const JWT_SECRET = process.env.JWT_SECRET ?? "local-test-jwt-secret-at-least-32-characters";
@@ -191,6 +192,35 @@ test("프로필 누락 보완: 테이블보다 먼저 가입한 회원도 로그
   const { data: aOrder } = await admin.from("orders").select("status").eq("id", orderId).single();
   assert.equal(aOrder?.status, "paid");
   await C.client.auth.signOut();
+});
+
+test("나를 더 반영하기: 서버가 소유자를 확인해 저장 · 삭제하고, 본인만 보며, 다른 회원 결과에는 붙지 않는다", async () => {
+  const server = createSupabaseRepository(admin);
+  const saved = await saveContext(server, { userId: A.id, assessmentId, raw: { topic: "work", question: "이직해도 될까요", excerpt: "연락처 010-1111-2222" }, agreed: true, now: () => new Date() });
+  assert.equal(saved.kind, "saved");
+  if (saved.kind !== "saved") return;
+  assert.equal(saved.context.excerpt, "연락처 [연락처 가림]");
+
+  const mine = await getContextView(createSupabaseRepository(A.client), { userId: A.id, assessmentId });
+  assert.equal(mine?.context?.question, "이직해도 될까요");
+  assert.equal(mine?.reportStatus, "ready");
+  const others = await B.client.from("personal_contexts").select().eq("assessment_id", assessmentId);
+  assert.deepEqual(others.data, [], "다른 회원에게는 보이지 않는다");
+  const anonymous = await anon.from("personal_contexts").select();
+  assert.ok(anonymous.error || anonymous.data?.length === 0);
+
+  const direct = await A.client.from("personal_contexts").update({ question: "x" }).eq("assessment_id", assessmentId).select();
+  assert.ok(direct.error || direct.data?.length === 0, "브라우저에서 직접 고칠 수 없다");
+  const forged = await admin.from("personal_contexts").upsert({ assessment_id: assessmentId, user_id: B.id, topic: "love", agreed_at: new Date().toISOString() });
+  assert.match(forged.error?.message ?? "", /owner mismatch/, "서버 코드 실수로도 다른 회원의 결과에 붙지 않는다");
+  const tooLong = await admin.from("personal_contexts").update({ excerpt: "가".repeat(1501) }).eq("assessment_id", assessmentId);
+  assert.ok(tooLong.error, "글자 수 제한은 DB에서도 지킨다");
+
+  const edited = await saveContext(server, { userId: A.id, assessmentId, raw: { topic: "marriage" }, agreed: true, now: () => new Date() });
+  assert.ok(edited.kind === "saved" && edited.context.question === "" && edited.context.topic === "marriage");
+  assert.equal(await deleteContext(server, { userId: B.id, assessmentId }), false);
+  assert.equal(await deleteContext(server, { userId: A.id, assessmentId }), true);
+  assert.equal(await server.getContext(assessmentId), null);
 });
 
 test("카카오 로그인: 실제 Supabase Auth를 거쳐 카카오로 가는 요청에 이메일 동의가 없다 (KOE205 회귀 방지)", async () => {

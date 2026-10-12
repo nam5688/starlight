@@ -1,0 +1,107 @@
+// 사주 용어 풀이 — 한자, 한자 뜻(글자 그대로), 쉬운 말(무엇을 뜻하는지)을 함께 보여 준다.
+// 리포트에 실제로 쓰인 근거에서 용어를 고른다. AI 문장을 글자로 훑지 않는다
+// ("상관없이", "세운 계획"처럼 일상어와 겹치는 용어가 많기 때문).
+
+import type { Evidence } from "../report/evidence.ts";
+
+export type GlossaryEntry = {
+  term: string;
+  hanja: string;
+  /** 한자 뜻 (글자 그대로) */
+  literal: string;
+  /** 쉬운 말 — 전통 해석에서 무엇을 뜻하는지 */
+  plain: string;
+};
+
+const E = (term: string, hanja: string, literal: string, plain: string): GlossaryEntry => ({ term, hanja, literal, plain });
+
+export const GLOSSARY: Record<string, GlossaryEntry> = Object.fromEntries(
+  [
+    E("원국", "原局", "본래의 판", "태어난 때로 정해지는 사주 여덟 글자입니다. 출생시간을 모르면 여섯 글자로 봅니다."),
+    E("천간", "天干", "하늘의 줄기", "각 기둥의 위 글자입니다. 겉으로 드러나는 기운으로 봅니다."),
+    E("지지", "地支", "땅의 가지", "각 기둥의 아래 글자입니다. 바탕과 환경이 되는 기운으로 봅니다."),
+    E("일간", "日干", "태어난 날의 줄기", "태어난 날의 위 글자로, 사주에서 '나 자신'을 나타냅니다."),
+    E("일지", "日支", "태어난 날의 가지", "태어난 날의 아래 글자로, 전통적으로 배우자 자리로 봅니다."),
+    E("오행", "五行", "다섯 가지 움직임", "목(나무) · 화(불) · 토(흙) · 금(쇠) · 수(물). 서로 돕기도 하고 누르기도 하는 다섯 기운입니다."),
+    E("목", "木", "나무", "자라고, 계획하고, 시작하려는 힘으로 봅니다."),
+    E("화", "火", "불", "드러내고, 표현하고, 열정을 내는 힘으로 봅니다."),
+    E("토", "土", "흙", "지키고, 중재하고, 안정시키는 힘으로 봅니다."),
+    E("금", "金", "쇠", "정리하고, 판단하고, 기준을 세우는 힘으로 봅니다."),
+    E("수", "水", "물", "생각하고, 유연하게 흐르고, 쉬어 가는 힘으로 봅니다."),
+    E("십신", "十神", "열 가지 관계", "나(일간)와 다른 글자의 관계를 열 가지로 나눈 것입니다."),
+    E("비겁", "比劫", "비견과 겁재", "나와 같은 기운입니다. 자기 기준 · 독립심 · 동료와의 경쟁과 협력으로 봅니다."),
+    E("비견", "比肩", "어깨를 나란히 함", "나와 같은 기운(음양도 같음)입니다. 동료, 자기 기준으로 봅니다."),
+    E("겁재", "劫財", "재물을 빼앗음", "나와 같은 기운(음양은 다름)입니다. 경쟁심, 밀어붙이는 힘으로 봅니다."),
+    E("식상", "食傷", "식신과 상관", "내가 만들어 내는 기운입니다. 표현 · 재능 · 결과물로 봅니다."),
+    E("식신", "食神", "먹을 것을 주는 신", "즐기면서 꾸준히 만들어 내는 힘으로 봅니다."),
+    E("상관", "傷官", "관(규칙)을 상하게 함", "기존 틀을 그대로 따르기보다 고치려 하고, 생각을 말로 꺼내는 힘으로 봅니다."),
+    E("재성", "財星", "재물의 별", "내가 다스리는 기운입니다. 현실 감각 · 성과 · 돈과 자원을 다루는 방식으로 봅니다."),
+    E("편재", "偏財", "치우친 재물", "넓게 움직이며 기회를 잡는 재물 감각으로 봅니다."),
+    E("정재", "正財", "바른 재물", "꾸준히 모으고 관리하는 재물 감각으로 봅니다."),
+    E("관성", "官星", "벼슬의 별", "나를 다스리는 기운입니다. 규칙 · 책임 · 평판 · 조직 안의 역할로 봅니다."),
+    E("편관", "偏官", "치우친 벼슬", "압박과 도전 속에서 버티고 결단하는 힘으로 봅니다."),
+    E("정관", "正官", "바른 벼슬", "규칙과 책임을 지키며 신뢰를 쌓는 힘으로 봅니다."),
+    E("인성", "印星", "도장의 별", "나를 돕는 기운입니다. 배움 · 검토 · 보살핌으로 봅니다."),
+    E("편인", "偏印", "치우친 도장", "남다른 관점으로 배우고 직관으로 파악하는 힘으로 봅니다."),
+    E("정인", "正印", "바른 도장", "차근차근 배우고 이해한 뒤에 움직이는 힘, 보살핌으로 봅니다."),
+    E("대운", "大運", "큰 운", "10년 단위로 바뀌는 큰 흐름입니다."),
+    E("세운", "歲運", "해의 운", "그해 한 해의 흐름입니다."),
+    E("공망", "空亡", "비어서 없음", "그 자리의 힘이 비어 있는 듯 약하게 느껴질 수 있다고 보는 자리입니다."),
+    E("천간합", "天干合", "하늘 줄기의 합", "위 글자 두 개가 짝을 이뤄 묶이는 관계입니다."),
+    E("육합", "六合", "여섯 쌍의 합", "아래 글자 두 개가 짝을 이뤄 어울리는 관계입니다."),
+    E("반합", "半合", "반쪽의 합", "세 글자가 모여 한 기운을 이루는 조합 중 두 글자가 만난 관계입니다."),
+    E("충", "沖", "부딪침", "두 글자가 맞부딪혀 변화나 이동이 생기기 쉬운 관계로 봅니다."),
+    E("형", "刑", "벌 · 다스림", "마찰이 생겨 조정이 필요한 관계로 봅니다."),
+    E("절기", "節氣", "계절의 마디", "사주에서 달이 바뀌는 기준입니다 (입춘 · 경칩 등)."),
+    E("자시", "子時", "쥐의 시간", "밤 11시~새벽 1시입니다. 이때 날짜를 언제 바꿀지는 학파마다 다릅니다."),
+  ].map((e) => [e.term, e]),
+);
+
+/** 원국 표를 읽는 데 필요한 기본 용어 */
+export const BASE_TERMS = ["원국", "천간", "지지", "일간", "오행"];
+
+const TEN_GODS = ["비견", "겁재", "식신", "상관", "편재", "정재", "편관", "정관", "편인", "정인"];
+const COMBO_TERMS: Record<string, string[]> = {
+  "sanggwan-paein": ["상관", "인성"],
+  "siksang-saengjae": ["식상", "재성"],
+  "jae-in": ["재성", "인성"],
+  "gwan-in": ["관성", "인성"],
+};
+const UNCERTAIN_TERMS: Record<string, string[]> = {
+  "jasi-school": ["자시"],
+  "jeolgi-day": ["절기"],
+  "near-boundary": ["절기"],
+};
+
+/** 근거 하나에 나오는 용어 (근거 ID는 미유 규칙이 만든 것이라 표현이 정해져 있다) */
+export function termsOfEvidence(e: Evidence): string[] {
+  const parts = e.id.split(".");
+  const out: string[] = [];
+  if (e.source !== "saju") return out;
+  const [, kind, a] = parts;
+  if (kind === "daymaster") out.push("일간");
+  if (kind === "element") out.push("오행", a);
+  if (kind === "tengod") out.push("십신", a);
+  if (kind === "combo") out.push(...(COMBO_TERMS[a] ?? []));
+  if (kind === "spouse-palace") out.push("일지");
+  if (kind === "spouse-star") out.push(e.fact.includes("관성") ? "관성" : "재성");
+  if (kind === "void") out.push("공망");
+  if (kind === "daeun") out.push("대운");
+  if (kind === "seun") out.push("세운");
+  if (kind === "uncertain") out.push(...(UNCERTAIN_TERMS[a] ?? []));
+  const last = parts[parts.length - 1];
+  if (["충", "형", "육합", "반합", "천간합"].includes(last)) out.push(last);
+  for (const g of TEN_GODS) if (e.fact.includes(g)) out.push(g);
+  return out;
+}
+
+/** 리포트에 쓰인 근거들의 용어 풀이 (기본 용어 먼저, 겹치지 않게) */
+export function glossaryFor(evidence: Evidence[], usedIds?: Iterable<string>): GlossaryEntry[] {
+  const used = usedIds ? new Set(usedIds) : null;
+  const terms = new Set(BASE_TERMS);
+  for (const e of evidence) if (!used || used.has(e.id)) for (const t of termsOfEvidence(e)) terms.add(t);
+  return [...terms].map((t) => GLOSSARY[t]).filter((g): g is GlossaryEntry => Boolean(g));
+}
+
+/** "상관(傷官)" */
+export const withHanja = (g: GlossaryEntry) => `${g.term}(${g.hanja})`;
