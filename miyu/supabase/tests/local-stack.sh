@@ -57,10 +57,19 @@ start() {
   for _ in $(seq 1 60); do curl -sf "http://127.0.0.1:9999/health" >/dev/null && break; sleep 0.5; done
   curl -sf "http://127.0.0.1:9999/health" >/dev/null || { echo "auth 시작 실패"; tail -20 "$WORK_DIR/auth.log"; exit 1; }
 
-  # 앱 테이블
-  if ! "${psql[@]}" -tAc "select 1 from pg_tables where tablename='orders'" | grep -q 1; then
-    for f in "$MIGRATIONS"/*.sql; do "${psql[@]}" -f "$f"; done
+  # 앱 테이블: 아직 적용하지 않은 마이그레이션만 순서대로 실행한다 (기록은 API에 노출되지 않는 local_meta 스키마)
+  "${psql[@]}" -c "create schema if not exists local_meta; create table if not exists local_meta.applied (name text primary key)"
+  if "${psql[@]}" -tAc "select 1 from pg_tables where schemaname='public' and tablename='orders'" | grep -q 1 \
+    && ! "${psql[@]}" -tAc "select 1 from local_meta.applied limit 1" | grep -q 1; then
+    "${psql[@]}" -c "insert into local_meta.applied values ('20261011000000_init.sql')" # 기록 도입 전에 만든 DB
   fi
+  for f in "$MIGRATIONS"/*.sql; do
+    name="$(basename "$f")"
+    if ! "${psql[@]}" -tAc "select 1 from local_meta.applied where name='$name'" | grep -q 1; then
+      "${psql[@]}" -f "$f"
+      "${psql[@]}" -c "insert into local_meta.applied values ('$name')"
+    fi
+  done
 
   cat > "$WORK_DIR/postgrest.conf" <<CONF
 db-uri = "postgres://authenticator:authenticator@127.0.0.1:$PG_PORT/postgres"

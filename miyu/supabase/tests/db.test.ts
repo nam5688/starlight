@@ -10,6 +10,7 @@ import { EMPTY_BASIC_INFO } from "../../lib/profile/basic-info.ts";
 import { devReportGenerator } from "../../lib/report/generate-dev-report.ts";
 import { sajuEngine } from "../../lib/saju/engine.ts";
 import { submitAssessment } from "../../lib/services/assessment-service.ts";
+import { agreeToTerms, getMemberStatus, setMarketingConsent } from "../../lib/services/member-service.ts";
 import { confirmPayment, startCheckout } from "../../lib/services/order-service.ts";
 import type { PaymentGateway } from "../../lib/services/ports.ts";
 import { ensureReport, getResultView } from "../../lib/services/report-service.ts";
@@ -148,4 +149,27 @@ test("고유 조건: 같은 검사에 결제 완료 주문은 하나만", async 
 test("트리거: 완성된 리포트는 바꿀 수 없다", async () => {
   const change = await admin.from("reports").update({ content: { tampered: true } }).eq("order_id", orderId);
   assert.match(change.error?.message ?? "", /immutable/);
+});
+
+test("가입 동의: 서버가 기록하고, 본인 기록만 보이며, 고치거나 직접 쓸 수 없다", async () => {
+  const repo = createSupabaseRepository(admin);
+  assert.deepEqual(await getMemberStatus(repo, A.id), { needsConsent: true, isNew: true, marketing: false });
+
+  const refused = await agreeToTerms(repo, A.id, { age_14: true, terms: true });
+  assert.equal(refused.ok, false, "필수 항목이 빠지면 기록하지 않는다");
+  assert.ok((await getMemberStatus(repo, A.id)).isNew);
+
+  assert.deepEqual(await agreeToTerms(repo, A.id, { age_14: true, terms: true, privacy: true }), { ok: true });
+  await setMarketingConsent(repo, A.id, true);
+  assert.deepEqual(await getMemberStatus(createSupabaseRepository(A.client), A.id), { needsConsent: false, isNew: false, marketing: true });
+
+  const others = await B.client.from("user_consents").select().eq("user_id", A.id);
+  assert.deepEqual(others.data, [], "다른 회원의 동의 기록은 보이지 않는다");
+  assert.equal((await getMemberStatus(createSupabaseRepository(B.client), B.id)).needsConsent, true);
+
+  const forged = await B.client.from("user_consents").insert({ user_id: B.id, consent_type: "terms", version: "x", agreed: true });
+  assert.ok(forged.error, "브라우저에서 직접 동의 기록을 만들 수 없다");
+
+  const edit = await admin.from("user_consents").update({ agreed: false }).eq("user_id", A.id);
+  assert.match(edit.error?.message ?? "", /append-only/);
 });

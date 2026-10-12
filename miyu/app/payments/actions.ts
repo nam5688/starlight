@@ -4,7 +4,7 @@ import { confirmPayment, markCheckoutFailed } from "@/lib/services/order-service
 import { ensureReport } from "@/lib/services/report-service";
 import { paymentConfig } from "@/server/env";
 import { now, paymentGateway, reportGenerator, writeRepository } from "@/server/services";
-import { getSessionUserId } from "@/server/session";
+import { getMember } from "@/server/member";
 
 export type ConfirmOutcome =
   | { kind: "paid"; assessmentId: string }
@@ -15,8 +15,9 @@ export type ConfirmOutcome =
 /** 결제 성공 주소에서 호출: 서버가 주문 금액·소유자를 확인하고 결제사에 승인 요청 */
 export async function confirmPaymentAction(input: { orderId: string; paymentKey: string; amount: number }): Promise<ConfirmOutcome> {
   if (!paymentConfig().ok) return { kind: "rejected", message: "결제가 아직 설정되지 않았습니다.", assessmentId: null };
-  const userId = await getSessionUserId();
-  if (!userId) return { kind: "login" };
+  const member = await getMember();
+  if (!member || member.needsConsent) return { kind: "login" };
+  const userId = member.userId;
   if (typeof input?.orderId !== "string" || typeof input?.paymentKey !== "string" || typeof input?.amount !== "number") {
     return { kind: "rejected", message: "결제 정보가 올바르지 않습니다.", assessmentId: null };
   }
@@ -48,8 +49,9 @@ export async function confirmPaymentAction(input: { orderId: string; paymentKey:
 /** 결제 실패 주소에서 호출: 대기 중인 주문을 취소·실패로 정리한다 */
 export async function recordPaymentFailureAction(input: { orderId: string; code: string; message: string }): Promise<{ assessmentId: string | null }> {
   if (!paymentConfig().ok) return { assessmentId: null };
-  const userId = await getSessionUserId();
-  if (!userId || typeof input?.orderId !== "string") return { assessmentId: null };
+  const member = await getMember();
+  if (!member || member.needsConsent || typeof input?.orderId !== "string") return { assessmentId: null };
+  const userId = member.userId;
   const repo = writeRepository();
   await markCheckoutFailed(
     { repo },

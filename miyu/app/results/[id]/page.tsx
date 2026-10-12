@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
 import { FreeSummaryBody } from "@/components/report/free-summary-body";
@@ -12,7 +12,7 @@ import { formatAssessmentBirth } from "@/lib/services/assessment-service";
 import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { readRepository } from "@/server/services";
-import { getSessionUserId } from "@/server/session";
+import { consentPath, getMember } from "@/server/member";
 
 export const metadata: Metadata = {
   title: "내 리포트 · ME:U 미유",
@@ -33,8 +33,8 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   const { id } = await params;
   if (!isAuthConfigured()) notFound();
 
-  const userId = await getSessionUserId();
-  if (!userId) {
+  const member = await getMember();
+  if (!member) {
     return (
       <div className={`${pageNarrow} py-14 md:py-20`}>
         <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
@@ -46,8 +46,10 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
     );
   }
 
+  if (member.needsConsent) redirect(consentPath(`/results/${id}`));
+
   // 로그인한 사용자 권한으로 조회 — 다른 회원의 결과는 DB 접근 정책에서도 걸러진다
-  const view = await getResultView(await readRepository(), { userId, assessmentId: id });
+  const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId: id });
   if (!view) notFound();
 
   const { assessment, report } = view;

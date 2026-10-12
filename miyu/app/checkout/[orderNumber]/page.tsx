@@ -8,7 +8,7 @@ import { pageNarrow, textLink } from "@/components/ui/styles";
 import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { paymentConfig } from "@/server/env";
 import { readRepository } from "@/server/services";
-import { getSessionUserId } from "@/server/session";
+import { consentPath, getMember } from "@/server/member";
 
 export const metadata: Metadata = {
   title: "결제 · ME:U 미유",
@@ -31,8 +31,10 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
   const config = paymentConfig();
   if (!config.ok) notFound();
 
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/my");
+  const member = await getMember();
+  if (!member) redirect("/my");
+  if (member.needsConsent) redirect(consentPath(`/checkout/${orderNumber}`));
+  const userId = member.userId;
 
   const repo = await readRepository();
   const order = await repo.getOrderByNumber(orderNumber);

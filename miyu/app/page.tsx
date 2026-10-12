@@ -55,15 +55,15 @@ export default function Home() {
       {/* 핵심 소개 + 실제 리포트 예시 */}
       <section className={`${pageWide} grid gap-12 py-12 md:py-16 lg:grid-cols-[minmax(0,1fr)_480px] lg:items-center lg:gap-16 lg:py-20`}>
         <div>
-          <p className="text-[15px] font-semibold text-accent">개인 통합 분석 리포트</p>
+          <p className="text-[15px] font-semibold text-accent">ME:U 개인 통합 리포트</p>
           <h1 className="mt-3 text-[32px] font-bold leading-[1.3] tracking-[-0.02em] md:text-[44px]">
-            나에 대한 분석,
+            나를 설명하는 정보,
             <br />한 번에 정리하세요.
           </h1>
           <p className="mt-5 text-[17px] leading-relaxed text-ink-2 md:text-[19px]">
-            <span className="font-semibold text-ink">사주 · MBTI · 기질 · 애착.</span>
+            <span className="font-semibold text-ink">사주 · MBTI · 기질 · 애착</span>
             <br />
-            네 가지 관점으로 성향과 행동 패턴을 정리합니다.
+            네 가지 관점의 결과와 근거를 한 리포트로 정리합니다.
           </p>
           <p className="mt-3 text-[16px] text-ink-3">긴 서론 대신, 필요한 결론부터.</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -74,7 +74,10 @@ export default function Home() {
               리포트 예시 보기
             </Link>
           </div>
-          <ul className="mt-10 grid grid-cols-2 border-t border-line text-[14px] sm:grid-cols-4">
+          <p className="mt-4 text-[15px] text-ink-2">
+            기본 요약 무료 · {PERSONAL_REPORT.name} <span className="font-semibold tabular-nums text-ink">{formatKrw(PERSONAL_REPORT.priceKrw)}</span>
+          </p>
+          <ul className="mt-8 grid grid-cols-2 border-t border-line text-[14px] sm:grid-cols-4">
             {["대표 경향", "한 줄 요약", "항목별 점수", "실천 제안"].map((t) => (
               <li key={t} className="flex items-center gap-1.5 border-b border-line py-3 text-ink-2">
                 <CheckIcon className="size-4 text-accent" />

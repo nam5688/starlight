@@ -4,6 +4,7 @@
 import type { Answers } from "../assessment/types.ts";
 import type { GatewayPayment, OrderStatus } from "../commerce/order.ts";
 import type { ReportStatus } from "../commerce/report.ts";
+import type { ConsentRecord, ConsentType } from "../membership/terms.ts";
 import type { DataSource, FreeSummary, FullReport } from "../report/types.ts";
 import type { SajuResult } from "../saju/engine.ts";
 
@@ -86,6 +87,10 @@ export type PaymentEventSource = "confirm" | "webhook" | "fail_redirect" | "chec
 export type InsertResult<T> = { ok: true; value: T } | { ok: false; reason: "conflict" };
 
 export interface MiyuRepository {
+  /** 동의 기록 (지우지 않고 쌓는다) */
+  listConsents(userId: string): Promise<ConsentRecord[]>;
+  addConsents(userId: string, consents: { type: ConsentType; version: string; agreed: boolean }[]): Promise<void>;
+
   getProfile(userId: string): Promise<ProfileRecord | null>;
   updateProfileNickname(userId: string, nickname: string): Promise<void>;
   saveRegion(userId: string, region: { province: string; district: string }): Promise<void>;

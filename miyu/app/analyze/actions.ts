@@ -12,7 +12,7 @@ import { isAuthConfigured } from "@/server/env";
 import { kakaoAuthorizeUrl } from "@/server/kakao";
 import { savePendingSubmission } from "@/server/pending-submission";
 import { sajuEngine, writeRepository } from "@/server/services";
-import { getSessionUserId } from "@/server/session";
+import { consentPath, getMember } from "@/server/member";
 
 export type ScoreResult = { ok: true; summary: FreeSummary } | { ok: false; message: string };
 
@@ -48,11 +48,16 @@ export async function saveResultAndContinue(input: { info: unknown; answers: unk
     return { ok: false, message: "답하지 않은 문항이 있습니다." };
   }
 
-  const userId = await getSessionUserId();
-  if (userId) {
+  const member = await getMember();
+  if (member?.needsConsent) {
+    // 로그인은 됐지만 가입 동의 전: 결과를 보관하고 동의 화면으로 (동의 후 저장)
+    await savePendingSubmission(info, answers);
+    redirect(consentPath("/my"));
+  }
+  if (member) {
     const saved = await submitAssessment(
       { repo: writeRepository(), saju: sajuEngine },
-      { userId, channel: "web", info, answers, today: new Date() },
+      { userId: member.userId, channel: "web", info, answers, today: new Date() },
     );
     if (!saved.ok) return { ok: false, message: saved.message };
     redirect(`/results/${saved.assessment.id}`);

@@ -4,6 +4,7 @@
 // - 서버 비밀키 클라이언트: 쓰기용. 서비스가 소유자를 직접 확인한 뒤에만 쓴다
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ConsentRecord } from "../../membership/terms.ts";
 import type {
   AssessmentRecord,
   InsertResult,
@@ -112,6 +113,24 @@ const REPORT_COLUMNS: Record<string, string> = {
 
 export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
   return {
+    async listConsents(userId): Promise<ConsentRecord[]> {
+      const { data, error } = await db
+        .from("user_consents")
+        .select("consent_type, version, agreed, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
+      if (error) fail("동의 기록 조회", error);
+      return (data ?? []).map((r) => ({ type: r.consent_type, version: r.version, agreed: r.agreed, createdAt: r.created_at }));
+    },
+
+    async addConsents(userId, consents) {
+      const { error } = await db
+        .from("user_consents")
+        .insert(consents.map((c) => ({ user_id: userId, consent_type: c.type, version: c.version, agreed: c.agreed })));
+      if (error) fail("동의 기록 저장", error);
+    },
+
     async getProfile(userId) {
       const { data, error } = await db
         .from("profiles")

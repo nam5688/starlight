@@ -1,15 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { submitAssessment } from "@/lib/services/assessment-service";
+import { getMemberStatus } from "@/lib/services/member-service";
 import { isAuthConfigured } from "@/server/env";
+import { consentPath } from "@/server/member";
 import { clearPendingSubmission, readPendingSubmission } from "@/server/pending-submission";
 import { sajuEngine, writeRepository } from "@/server/services";
 import { getSiteUrl, safeNextPath } from "@/server/session";
 import { createServerSupabase } from "@/server/supabase";
 
 /**
- * 카카오 로그인 후 돌아오는 주소.
+ * 카카오 로그인 후 돌아오는 미유 사이트의 로그인 완료 주소 (/auth/callback).
+ * Supabase 대시보드의 Redirect URLs에 등록하는 주소가 이것이다.
+ * (카카오 디벨로퍼스에는 Supabase의 callback 주소를 등록한다 — 다른 주소)
+ *
  * 1) 인증 코드를 세션으로 바꾼다
- * 2) 로그인 전에 보관한 검사 결과가 있으면 이 회원번호로 저장하고 결과 화면으로 보낸다
+ * 2) 신규 회원이거나 약관이 바뀌었으면 가입 동의 화면으로 보낸다 (보관한 검사 결과는 동의 후 저장)
+ * 3) 로그인 전에 보관한 검사 결과가 있으면 이 회원번호로 저장하고 결과 화면으로 보낸다
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -27,15 +33,20 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   if (error || !data.user) return to("/auth/error?reason=exchange");
 
+  const next = safeNextPath(searchParams.get("next"));
+  const repo = writeRepository();
+  const status = await getMemberStatus(repo, data.user.id);
+  if (status.needsConsent) return to(consentPath(next));
+
   const pending = await readPendingSubmission();
   if (pending) {
     await clearPendingSubmission();
     const saved = await submitAssessment(
-      { repo: writeRepository(), saju: sajuEngine },
+      { repo, saju: sajuEngine },
       { userId: data.user.id, channel: "web", info: pending.info, answers: pending.answers, today: new Date() },
     );
     return saved.ok ? to(`/results/${saved.assessment.id}`) : to("/auth/error?reason=save");
   }
 
-  return to(safeNextPath(searchParams.get("next")));
+  return to(next);
 }

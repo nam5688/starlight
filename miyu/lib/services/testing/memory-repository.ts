@@ -2,6 +2,7 @@
 // 운영 코드에서 쓰지 않는다.
 
 import { canTransition } from "../../commerce/order.ts";
+import type { ConsentRecord } from "../../membership/terms.ts";
 import type {
   AssessmentRecord,
   MiyuRepository,
@@ -19,9 +20,19 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const orders = new Map<string, OrderRecord>();
   const reports = new Map<string, ReportRecord>();
   const events: { orderId: string; source: string; status: string | null }[] = [];
+  const consents = new Map<string, ConsentRecord[]>();
+  let tick = 0;
   const iso = () => now().toISOString();
 
   const repo: MiyuRepository = {
+    async listConsents(userId) {
+      return [...(consents.get(userId) ?? [])];
+    },
+    async addConsents(userId, list) {
+      // 같은 시각에 여러 번 기록해도 순서가 구분되도록 1ms씩 더한다
+      const rows = list.map((c) => ({ ...c, createdAt: new Date(now().getTime() + ++tick).toISOString() }));
+      consents.set(userId, [...(consents.get(userId) ?? []), ...rows]);
+    },
     async getProfile(userId) {
       return profiles.get(userId) ?? null;
     },
@@ -127,5 +138,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents };
 }

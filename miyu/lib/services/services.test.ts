@@ -269,3 +269,45 @@ test("리포트: 생성에 실패하면 failed로 남기고 다시 시도할 수
   assert.equal(retried?.status, "ready");
   assert.equal(retried?.attempts, 2);
 });
+
+test("가입 동의: 필수 항목이 빠지면 기록하지 않고, 모두 동의하면 이용 가능", async () => {
+  const mem = createMemoryRepository(() => TODAY);
+  const { getMemberStatus, agreeToTerms, setMarketingConsent, canRemoveOnDecline } = await import("./member-service.ts");
+  const fresh = await getMemberStatus(mem.repo, USER);
+  assert.deepEqual(fresh, { needsConsent: true, isNew: true, marketing: false });
+
+  const partial = await agreeToTerms(mem.repo, USER, { age_14: true, terms: true });
+  assert.equal(partial.ok, false);
+  assert.equal((await mem.repo.listConsents(USER)).length, 0);
+
+  assert.deepEqual(await agreeToTerms(mem.repo, USER, { age_14: true, terms: true, privacy: true }), { ok: true });
+  const after = await getMemberStatus(mem.repo, USER);
+  assert.equal(after.needsConsent, false);
+  assert.equal(after.marketing, false, "선택 항목은 따로 동의해야 한다");
+
+  await setMarketingConsent(mem.repo, USER, true);
+  assert.equal((await getMemberStatus(mem.repo, USER)).marketing, true);
+  await setMarketingConsent(mem.repo, USER, false);
+  assert.equal((await getMemberStatus(mem.repo, USER)).marketing, false, "철회는 새 기록으로 남는다");
+  assert.equal((await mem.repo.listConsents(USER)).length, 6);
+
+  assert.equal(await canRemoveOnDecline(mem.repo, USER), true);
+});
+
+test("가입 동의: 약관 버전이 바뀌면 다시 동의해야 한다", async () => {
+  const { hasRequiredConsents } = await import("../membership/terms.ts");
+  const old = [
+    { type: "age_14" as const, version: "old", agreed: true, createdAt: "2026-01-01T00:00:00Z" },
+    { type: "terms" as const, version: "old", agreed: true, createdAt: "2026-01-01T00:00:00Z" },
+    { type: "privacy" as const, version: "old", agreed: true, createdAt: "2026-01-01T00:00:00Z" },
+  ];
+  assert.equal(hasRequiredConsents(old), false);
+  assert.equal(hasRequiredConsents(old, "old"), true);
+});
+
+test("가입 동의 거절: 저장한 검사가 있는 기존 회원은 계정을 지우지 않는다", async () => {
+  const { mem } = await setup();
+  const { canRemoveOnDecline } = await import("./member-service.ts");
+  assert.equal(await canRemoveOnDecline(mem.repo, USER), false);
+  assert.equal(await canRemoveOnDecline(mem.repo, OTHER), true);
+});

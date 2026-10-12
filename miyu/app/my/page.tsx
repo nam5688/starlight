@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { signOut } from "@/app/auth/actions";
+import { setMarketingAction } from "@/app/my/actions";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
 import { StatusBadge } from "@/components/ui/source-badge";
-import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styles";
-import { listMyItems, type MyItem } from "@/lib/services/report-service";
+import { buttonPrimary, buttonSecondary, pageNarrow, textLink } from "@/components/ui/styles";
+import { nextActionForResult } from "@/lib/growth/next-action";
+import { listMyItems } from "@/lib/services/report-service";
 import { isAuthConfigured } from "@/server/env";
+import { consentPath, getMember } from "@/server/member";
 import { readRepository } from "@/server/services";
-import { getSessionUserId } from "@/server/session";
 
 export const metadata: Metadata = {
   title: "MY · ME:U 미유",
@@ -45,20 +48,24 @@ async function MyContent() {
     );
   }
 
-  const userId = await getSessionUserId();
-  if (!userId) {
+  const member = await getMember();
+  if (!member) {
     return (
       <div className="mt-8 border-y border-line py-8">
         <p className="text-[17px] font-semibold">로그인하고 내 결과를 확인하세요</p>
-        <p className="mt-2 text-[15px] leading-relaxed text-ink-2">카카오 계정으로 가입·로그인합니다. 토스 가입이나 앱 설치는 필요 없습니다.</p>
+        <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
+          카카오 계정으로 가입·로그인합니다. 토스 가입이나 앱 설치는 필요 없습니다. 같은 카카오 계정으로 다시 로그인하면 저장한
+          결과를 그대로 볼 수 있습니다.
+        </p>
         <div className="mt-6">
           <KakaoLoginForm next="/my" />
         </div>
       </div>
     );
   }
+  if (member.needsConsent) redirect(consentPath("/my"));
 
-  const items = await listMyItems(await readRepository(), userId);
+  const items = await listMyItems(await readRepository(), member.userId);
   return (
     <>
       <section aria-labelledby="my-list" className="mt-8">
@@ -69,41 +76,73 @@ async function MyContent() {
           <p className="mt-3 border-y border-line py-8 text-[15px] text-ink-2">아직 저장한 결과가 없습니다.</p>
         ) : (
           <ul className="mt-3 border-t border-ink">
-            {items.map((item) => (
-              <li key={item.assessment.id} className="border-b border-line">
-                <Link
-                  href={`/results/${item.assessment.id}`}
-                  className="flex items-center justify-between gap-4 py-4 hover:bg-mist/60"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-[16px] font-semibold">
-                      {item.assessment.tendencyName}
-                      <span className="ml-2 text-[14px] font-normal text-ink-3">{item.assessment.nickname} 님</span>
+            {items.map((item) => {
+              const action = nextActionForResult({ purchase: item.purchase, reportStatus: item.reportStatus });
+              return (
+                <li key={item.assessment.id} className="border-b border-line">
+                  <Link
+                    href={`/results/${item.assessment.id}`}
+                    className="flex items-center justify-between gap-4 py-4 hover:bg-mist/60"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[16px] font-semibold">
+                        {item.assessment.tendencyName}
+                        <span className="ml-2 text-[14px] font-normal text-ink-3">{item.assessment.nickname} 님</span>
+                      </span>
+                      <span className="mt-0.5 block text-[14px] text-ink-3">
+                        {new Date(item.assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}
+                        {" · "}
+                        {item.purchase === "paid" ? "구매함" : item.purchase === "refunded" ? "환불됨" : "무료 요약"}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block text-[14px] text-ink-3">
-                      {new Date(item.assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })}
+                    <span
+                      className={`shrink-0 text-[14px] font-semibold ${action.kind === "recover-report" ? "text-danger" : "text-accent"}`}
+                    >
+                      {action.label}
                     </span>
-                  </span>
-                  <StatusBadge>{statusLabel(item)}</StatusBadge>
-                </Link>
-              </li>
-            ))}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="my-account" className="mt-10">
+        <h2 id="my-account" className="text-[18px] font-bold">
+          계정
+        </h2>
+        <dl className="mt-3 border-y border-line text-[15px]">
+          <div className="flex items-center justify-between gap-4 border-b border-line py-3">
+            <dt className="text-ink-3">로그인</dt>
+            <dd>카카오 계정</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 py-3">
+            <dt className="text-ink-3">새 상품·할인 소식</dt>
+            <dd className="flex items-center gap-3">
+              <span>{member.marketing ? "받음" : "받지 않음"}</span>
+              <form action={setMarketingAction.bind(null, !member.marketing)}>
+                <button type="submit" className={`${textLink} text-[14px]`}>
+                  {member.marketing ? "끄기" : "받기"}
+                </button>
+              </form>
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-2 text-[13px] text-ink-3">
+          결과 안내처럼 서비스 이용에 필요한 알림은 이 설정과 관계없이 제공됩니다.{" "}
+          <Link href="/terms" className={textLink}>
+            이용약관
+          </Link>{" "}
+          ·{" "}
+          <Link href="/privacy" className={textLink}>
+            개인정보 처리방침
+          </Link>
+        </p>
       </section>
       <Actions signedIn />
     </>
   );
-}
-
-function statusLabel(item: MyItem): string {
-  if (item.purchase === "paid") {
-    if (item.reportStatus === "ready") return "리포트 보기";
-    if (item.reportStatus === "failed") return "리포트 생성 실패";
-    return "리포트 준비 중";
-  }
-  if (item.purchase === "refunded") return "환불됨";
-  return "무료 요약";
 }
 
 function Actions({ signedIn = false }: { signedIn?: boolean }) {
