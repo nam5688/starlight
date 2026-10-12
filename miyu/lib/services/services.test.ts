@@ -14,7 +14,7 @@ import { manseryeokEngine as sajuEngine } from "../saju/manseryeok-engine.ts";
 import { submitAssessment } from "./assessment-service.ts";
 import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "./order-service.ts";
 import type { GatewayResult, PaymentGateway } from "./ports.ts";
-import { getMyPage, traceOrder } from "./my-service.ts";
+import { getMyPage, orderStatusLabel, traceOrder } from "./my-service.ts";
 import { deleteContext, getContextView, saveContext } from "./context-service.ts";
 import { canRetryReport, claimReport, completeReport, ensureReport, getResultView, listMyItems, queueReport, runReport } from "./report-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
@@ -53,6 +53,9 @@ function fakeGateway(handler: {
     async getPayment(paymentKey) {
       calls.get++;
       return handler.get ? handler.get(paymentKey) : { ok: false, code: "NOT_FOUND_PAYMENT", message: "", retryable: false };
+    },
+    async getPaymentByOrderId() {
+      return { ok: false, code: "NOT_FOUND_PAYMENT", message: "", retryable: false };
     },
   };
   return { gateway, calls };
@@ -480,9 +483,11 @@ test("주문 추적: 주문번호로 승인 기록(상점 ID 포함) · 주문 �
   if (!another.ok) throw new Error();
   const pending = await startCheckout(deps(mem), { userId: USER, assessmentId: another.assessment.id });
   if (pending.kind !== "order") throw new Error();
-  const notPaid = await traceOrder(mem.repo, mem.repo, { userId: USER, orderNumber: pending.order.orderNumber });
+  const notPaid = await traceOrder(mem.repo, mem.repo, { userId: USER, orderNumber: pending.order.orderNumber, now: TODAY });
   assert.equal(notPaid?.entitled, false);
-  assert.equal(notPaid?.order.statusLabel, "결제 미완료");
+  // 방금 연 결제창은 승인 여부를 아직 모르므로 "확인 중", 오래 지나도 기록이 없으면 "미완료"
+  assert.equal(notPaid?.order.statusLabel, "결제 확인 중");
+  assert.equal(orderStatusLabel({ status: "pending", failureCode: null, createdAt: "2026-01-01T00:00:00Z" }, new Date("2026-01-01T02:00:00Z")), "결제 미완료");
 });
 
 async function paidOrder() {

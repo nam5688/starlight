@@ -49,3 +49,17 @@ export async function claimAndSchedule(order: OrderRecord, opts: { retryFailed?:
   }
   return report;
 }
+
+/**
+ * 지금 이 자리에서 생성까지 끝낸다 (이미 응답 뒤 백그라운드 · 정기 점검처럼 기다려도 되는 곳에서 쓴다).
+ * after() 안에서 다시 after()를 부르면 실행되지 않을 수 있어, 그런 곳에서는 예약하지 않고 직접 실행한다.
+ */
+export async function runReportInline(order: OrderRecord) {
+  try {
+    await queueReport({ repo: writeRepository() }, order);
+    return await runReport(deps(), order);
+  } catch (e) {
+    log("직접 생성 오류", e);
+    return null;
+  }
+}

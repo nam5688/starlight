@@ -13,6 +13,9 @@ import { manseryeokEngine as sajuEngine } from "../../lib/saju/manseryeok-engine
 import { submitAssessment } from "../../lib/services/assessment-service.ts";
 import { agreeToTerms, getMemberStatus, setMarketingConsent } from "../../lib/services/member-service.ts";
 import { confirmPayment, startCheckout } from "../../lib/services/order-service.ts";
+import { reconcileOrder } from "../../lib/services/reconcile-service.ts";
+import { createFakeToss } from "../../lib/services/testing/fake-toss.ts";
+import { queueReport, runReport } from "../../lib/services/report-service.ts";
 import type { PaymentGateway } from "../../lib/services/ports.ts";
 import { ensureReport, getResultView } from "../../lib/services/report-service.ts";
 import { kakaoOAuthOptions } from "../../server/kakao-options.ts";
@@ -54,6 +57,9 @@ const gateway: PaymentGateway = {
     return { ok: true, payment: { paymentKey, orderId, status: "DONE", totalAmount: amount, balanceAmount: amount, method: "카드", approvedAt: new Date().toISOString(), mId: "test-mid" } };
   },
   async getPayment() {
+    return { ok: false, code: "NOT_FOUND_PAYMENT", message: "", retryable: false };
+  },
+  async getPaymentByOrderId() {
     return { ok: false, code: "NOT_FOUND_PAYMENT", message: "", retryable: false };
   },
 };
@@ -236,4 +242,104 @@ test("카카오 로그인: 실제 Supabase Auth를 거쳐 카카오로 가는 �
   // 기본값과 scopes 방식은 account_email이 남는다 (그래서 쓰지 않는다)
   assert.match(await kakaoScope({}), /account_email/);
   assert.match(await kakaoScope({ scopes: "profile_nickname profile_image" }), /account_email/);
+});
+
+
+test("운영 기록(ops_events): 서버만 쓰고 읽으며, 로그인 사용자 · 비로그인은 접근할 수 없고, 고치거나 지울 수 없다", async () => {
+  const repo = createSupabaseRepository(admin);
+  const key = `t-${randomUUID()}`;
+  const errorId = "ERR-TESTAB23";
+  await repo.addOpsEvent({ kind: "test.event", severity: "warn", orderNumber: "MEU-TEST-OPS", errorId, dedupeKey: key, message: "테스트 기록", detail: { a: 1 } });
+  assert.equal(await repo.hasOpsEventSince(key, new Date(Date.now() - 60_000).toISOString()), true);
+  assert.equal(await repo.hasOpsEventSince(key, new Date(Date.now() + 60_000).toISOString()), false);
+  const byError = await repo.listOpsEvents({ errorId, limit: 5 });
+  assert.equal(byError[0]?.message, "테스트 기록");
+  assert.equal(byError[0]?.severity, "warn");
+  assert.equal((await repo.listOpsEvents({ orderNumber: "MEU-TEST-OPS", limit: 5 })).length >= 1, true);
+
+  for (const client of [A.client, anon]) {
+    const read = await client.from("ops_events").select();
+    assert.ok(read.error || read.data?.length === 0, "읽기 거부");
+    const write = await client.from("ops_events").insert({ kind: "x", message: "x" });
+    assert.ok(write.error, "쓰기 거부");
+  }
+  const update = await admin.from("ops_events").update({ message: "바꿈" }).eq("dedupe_key", key);
+  assert.ok(update.error, "고치기 거부");
+  const del = await admin.from("ops_events").delete().eq("dedupe_key", key);
+  assert.ok(del.error, "지우기 거부");
+  assert.equal((await repo.listOpsEvents({ errorId, limit: 5 }))[0]?.message, "테스트 기록");
+});
+
+test("결제 기록의 출처: 재확인(reconcile) · 관리자(admin)는 허용되고 알 수 없는 출처는 거부된다", async () => {
+  const repo = createSupabaseRepository(admin);
+  await repo.addPaymentEvent({ orderId, source: "reconcile", status: "DONE", detail: {} });
+  await repo.addPaymentEvent({ orderId, source: "admin", status: "DONE", detail: {} });
+  const bad = await admin.from("payment_events").insert({ order_id: orderId, source: "bogus", status: "DONE", detail: {} });
+  assert.ok(bad.error, "알 수 없는 출처 거부");
+});
+
+async function newPendingOrder(userId: string) {
+  const repo = createSupabaseRepository(admin);
+  const saved = await submitAssessment({ repo, saju: sajuEngine }, { userId, channel: "web", info, answers, today: new Date() });
+  if (!saved.ok) throw new Error("save");
+  const started = await startCheckout({ repo, now: () => new Date() }, { userId, assessmentId: saved.assessment.id });
+  if (started.kind !== "order") throw new Error("order");
+  return { repo, order: started.order, assessmentId: saved.assessment.id };
+}
+
+test("실제 DB 동시성: 같은 승인 요청이 6번 동시에 와도 결제 완료 1건 · 결제사 기록 1건 · 리포트 1건, 생성기는 한 번만 실행", async () => {
+  const toss = createFakeToss();
+  const { repo, order } = await newPendingOrder(B.id);
+  const input = { userId: B.id, orderNumber: order.orderNumber, paymentKey: "pk-race-1", amount: order.amount };
+  const results = await Promise.all(Array.from({ length: 6 }, () => confirmPayment({ repo, gateway: toss.gateway }, input)));
+  assert.ok(results.every((r) => r.kind === "paid"), JSON.stringify(results.map((r) => r.kind)));
+  assert.equal(toss.byKey.size, 1);
+  const rows = await admin.from("orders").select("id, status").eq("order_number", order.orderNumber);
+  assert.equal(rows.data?.length, 1);
+  assert.equal(rows.data?.[0]?.status, "paid");
+
+  const paid = (await repo.getOrderByNumber(order.orderNumber))!;
+  let generated = 0;
+  const generator = { ...devReportGenerator, async generate(i: Parameters<typeof devReportGenerator.generate>[0]) { generated++; return devReportGenerator.generate(i); } };
+  await Promise.all(Array.from({ length: 6 }, () => queueReport({ repo }, paid)));
+  await Promise.all(Array.from({ length: 6 }, () => runReport({ repo, generator, now: () => new Date() }, paid)));
+  assert.equal(generated, 1, "같은 리포트를 여러 번 생성하지 않는다");
+  const reports = await admin.from("reports").select("id, status").eq("order_id", paid.id);
+  assert.equal(reports.data?.length, 1);
+  assert.equal(reports.data?.[0]?.status, "ready");
+});
+
+test("실제 DB: 승인은 됐는데 응답이 끊긴 주문을 재확인이 주문번호로 찾아 결제 완료로 맞추고, 반복해도 변하지 않는다", async () => {
+  const toss = createFakeToss();
+  const { repo, order } = await newPendingOrder(B.id);
+  toss.state.confirmMode = "approve-then-lost";
+  const first = await confirmPayment({ repo, gateway: toss.gateway }, { userId: B.id, orderNumber: order.orderNumber, paymentKey: "pk-lost-1", amount: order.amount });
+  assert.equal(first.kind, "checking");
+  assert.equal((await repo.getOrderByNumber(order.orderNumber))?.status, "pending", "응답을 못 받았다고 실패로 바꾸지 않는다");
+
+  // 결제 요청 시각을 5분 전으로 (결제 진행 중일 수 있는 시간이 지난 뒤의 재확인)
+  await admin.from("orders").update({ created_at: new Date(Date.now() - 5 * 60_000).toISOString() }).eq("order_number", order.orderNumber);
+  const queued: string[] = [];
+  const deps = { repo, gateway: toss.gateway, now: () => new Date(), onPaid: async (o: { orderNumber: string }) => void queued.push(o.orderNumber) };
+  const r = await reconcileOrder(deps, (await repo.getOrderByNumber(order.orderNumber))!);
+  assert.equal(r.kind, "paid");
+  assert.equal((await repo.getOrderByNumber(order.orderNumber))?.paymentKey, "pk-lost-1");
+  for (let i = 0; i < 3; i++) assert.equal((await reconcileOrder(deps, (await repo.getOrderByNumber(order.orderNumber))!)).kind, "ok");
+  assert.deepEqual(queued, [order.orderNumber], "리포트 준비는 한 번만");
+  const events = await repo.listPaymentEvents((await repo.getOrderByNumber(order.orderNumber))!.id);
+  assert.ok(events.some((e) => e.source === "reconcile" && e.status === "DONE"));
+});
+
+test("실제 DB: 결제사에서 취소된 결제를 재확인이 환불됨으로 맞추고, 같은 검사에 결제 완료 주문이 둘이 되지 않는다", async () => {
+  const toss = createFakeToss();
+  const { repo, order } = await newPendingOrder(B.id);
+  const input = { userId: B.id, orderNumber: order.orderNumber, paymentKey: "pk-cancel-1", amount: order.amount };
+  assert.equal((await confirmPayment({ repo, gateway: toss.gateway }, input)).kind, "paid");
+  toss.cancel("pk-cancel-1");
+  const deps = { repo, gateway: toss.gateway, now: () => new Date() };
+  assert.equal((await reconcileOrder(deps, (await repo.getOrderByNumber(order.orderNumber))!)).kind, "refunded");
+  assert.equal((await repo.getOrderByNumber(order.orderNumber))?.status, "refunded");
+  const view = await getResultView(repo, { userId: B.id, assessmentId: order.assessmentId });
+  assert.equal(view?.paidOrder, null, "환불된 주문은 열람 권한이 없다");
+  assert.equal(view?.refunded, true);
 });

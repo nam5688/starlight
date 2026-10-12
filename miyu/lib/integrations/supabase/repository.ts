@@ -10,6 +10,7 @@ import type {
   AssessmentRecord,
   InsertResult,
   MiyuRepository,
+  OpsEventRecord,
   OrderRecord,
   ReportRecord,
   ReportStatusRecord,
@@ -103,6 +104,20 @@ function toContext(r: Row): PersonalContext {
     agreedAt: r.agreed_at as string,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+  };
+}
+
+function toOps(r: Row): OpsEventRecord {
+  return {
+    id: r.id as number,
+    createdAt: r.created_at as string,
+    kind: r.kind as string,
+    severity: r.severity as OpsEventRecord["severity"],
+    orderNumber: (r.order_number as string | null) ?? null,
+    errorId: (r.error_id as string | null) ?? null,
+    dedupeKey: (r.dedupe_key as string | null) ?? null,
+    message: r.message as string,
+    detail: (r.detail as Record<string, unknown>) ?? {},
   };
 }
 
@@ -301,6 +316,89 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         detail: event.detail,
       });
       if (error) fail("결제 기록 저장", error);
+    },
+
+    async addOpsEvent(e) {
+      const { error } = await db.from("ops_events").insert({
+        kind: e.kind.slice(0, 60),
+        severity: e.severity ?? "info",
+        order_number: e.orderNumber ?? null,
+        error_id: e.errorId ?? null,
+        dedupe_key: e.dedupeKey ?? null,
+        message: e.message.slice(0, 500),
+        detail: e.detail ?? {},
+      });
+      if (error && !isMissingTableError(error)) fail("운영 기록 저장", error);
+    },
+
+    async listOpsEvents(filter) {
+      let q = db.from("ops_events").select().order("created_at", { ascending: false }).order("id", { ascending: false }).limit(filter.limit);
+      if (filter.orderNumber) q = q.eq("order_number", filter.orderNumber);
+      if (filter.errorId) q = q.eq("error_id", filter.errorId);
+      if (filter.kinds?.length) q = q.in("kind", filter.kinds);
+      if (filter.since) q = q.gte("created_at", filter.since);
+      const { data, error } = await q;
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("운영 기록 조회", error);
+      }
+      return (data ?? []).map(toOps);
+    },
+
+    async hasOpsEventSince(dedupeKey, since) {
+      const { data, error } = await db.from("ops_events").select("id").eq("dedupe_key", dedupeKey).gte("created_at", since).limit(1);
+      if (error) {
+        if (isMissingTableError(error)) return false;
+        fail("운영 기록 조회", error);
+      }
+      return (data ?? []).length > 0;
+    },
+
+    async listOrdersForReconcile(opts) {
+      const [pending, paid] = await Promise.all([
+        db.from("orders").select().eq("status", "pending").lt("created_at", opts.pendingCreatedBefore).order("created_at", { ascending: true }).limit(opts.limit),
+        db.from("orders").select().eq("status", "paid").gte("approved_at", opts.paidSince).order("approved_at", { ascending: false }).limit(opts.limit),
+      ]);
+      if (pending.error) fail("재확인 대상 조회", pending.error);
+      if (paid.error) fail("재확인 대상 조회", paid.error);
+      return [...(pending.data ?? []), ...(paid.data ?? [])].slice(0, opts.limit).map(toOrder);
+    },
+
+    async listRecentOrders(limit) {
+      const { data, error } = await db.from("orders").select().order("created_at", { ascending: false }).limit(limit);
+      if (error) fail("최근 주문 조회", error);
+      return (data ?? []).map(toOrder);
+    },
+
+    async getOrderById(id) {
+      const { data, error } = await db.from("orders").select().eq("id", id).maybeSingle();
+      if (error) {
+        if (error.code === "22P02") return null;
+        fail("주문 조회", error);
+      }
+      return data ? toOrder(data) : null;
+    },
+
+    async listProblemReports(opts) {
+      let q = db
+        .from("reports")
+        .select("id, order_id, assessment_id, status, attempts, last_error, created_at, updated_at")
+        .in("status", [...opts.statuses])
+        .order("updated_at", { ascending: true })
+        .limit(opts.limit);
+      if (opts.updatedBefore) q = q.lt("updated_at", opts.updatedBefore);
+      const { data, error } = await q;
+      if (error) fail("문제 리포트 조회", error);
+      return (data ?? []).map((r) => ({
+        id: r.id as string,
+        orderId: r.order_id as string,
+        assessmentId: r.assessment_id as string,
+        status: r.status as ReportRecord["status"],
+        attempts: r.attempts as number,
+        lastError: (r.last_error as string | null) ?? null,
+        createdAt: r.created_at as string,
+        updatedAt: r.updated_at as string,
+      }));
     },
 
     async getContext(assessmentId) {

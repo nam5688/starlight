@@ -6,6 +6,7 @@ import { PERSONAL_REPORT } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
+import { RECONCILE_DEFAULTS } from "./reconcile-service.ts";
 import type { ContextTopic } from "../personalization/context.ts";
 
 export type Entitlement = "free" | "purchased" | "refunded";
@@ -62,7 +63,10 @@ export const PAYMENT_ENV_LABEL: Record<PaymentEnv, string> = {
   "test-docs": "테스트 결제 · 공용 예제 키",
 };
 
-export function orderStatusLabel(o: Pick<OrderRecord, "status" | "failureCode">): string {
+/** 결제창을 연 뒤 이 시간 안에는 "결제 미완료"로 단정하지 않고 "확인 중"으로 보여준다 (reconcile 정리 시점과 같다) */
+const PENDING_CHECKING_MS = RECONCILE_DEFAULTS.abandonedAfterMs;
+
+export function orderStatusLabel(o: Pick<OrderRecord, "status" | "failureCode" | "createdAt">, now: Date = new Date()): string {
   switch (o.status) {
     case "paid":
       return "결제 완료";
@@ -71,9 +75,11 @@ export function orderStatusLabel(o: Pick<OrderRecord, "status" | "failureCode">)
     case "failed":
       return "결제 실패";
     case "canceled":
-      return o.failureCode === "SUPERSEDED" ? "새 결제로 대체" : "결제 취소";
+      if (o.failureCode === "SUPERSEDED") return "새 결제로 대체";
+      return o.failureCode === "ABANDONED" ? "결제 미완료" : "결제 취소";
     case "pending":
-      return "결제 미완료";
+      // 결제사 승인이 이미 났는데 우리가 아직 모르는 경우일 수 있다 — 한동안은 "확인 중"
+      return now.getTime() - new Date(o.createdAt).getTime() < PENDING_CHECKING_MS ? "결제 확인 중" : "결제 미완료";
   }
 }
 
@@ -84,7 +90,7 @@ export function generationOf(report: Pick<ReportRecord, "status"> | null | undef
   return "in-progress";
 }
 
-export async function getMyPage(repo: MiyuRepository, userId: string): Promise<{ cards: MyReportCard[]; orders: MyOrderRow[] }> {
+export async function getMyPage(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<{ cards: MyReportCard[]; orders: MyOrderRow[] }> {
   const [assessments, orders, reports, contexts] = await Promise.all([
     repo.listAssessments(userId),
     repo.listOrdersForUser(userId),
@@ -120,7 +126,7 @@ export async function getMyPage(repo: MiyuRepository, userId: string): Promise<{
         productName: productName(o.productId),
         amount: o.amount,
         status: o.status,
-        statusLabel: orderStatusLabel(o),
+        statusLabel: orderStatusLabel(o, now),
         paymentEnv: o.paymentEnv,
         approvedAt: o.approvedAt,
         createdAt: o.createdAt,
@@ -155,13 +161,18 @@ export const EVENT_STATUS_LABEL: Record<string, string> = {
   PAY_PROCESS_ABORTED: "결제가 중단됨",
   REJECT_CARD_COMPANY: "카드사에서 거절",
   NETWORK_ERROR: "결제사 응답을 받지 못함 (확인 중)",
+  ABANDONED: "결제사에 결제 기록이 없어 미완료로 정리",
+  IN_PROGRESS: "결제사에서 진행 중",
+  PAID_BUT_NOT_AT_GATEWAY: "결제 완료로 기록됐지만 결제사에서 찾지 못함 (운영자 확인)",
 };
 
-const SOURCE_LABEL: Record<PaymentEventRecord["source"], string> = {
+export const SOURCE_LABEL: Record<PaymentEventRecord["source"], string> = {
   checkout: "결제 시작",
   confirm: "승인 요청",
   webhook: "결제사 알림",
   fail_redirect: "결제창에서 돌아옴",
+  reconcile: "결제사 기록과 대조",
+  admin: "운영자 확인",
 };
 
 /**
@@ -171,7 +182,7 @@ const SOURCE_LABEL: Record<PaymentEventRecord["source"], string> = {
 export async function traceOrder(
   readRepo: MiyuRepository,
   serverRepo: MiyuRepository,
-  input: { userId: string; orderNumber: string },
+  input: { userId: string; orderNumber: string; now?: Date },
 ): Promise<OrderTrace | null> {
   const order = await readRepo.getOrderByNumber(input.orderNumber);
   if (!order || order.userId !== input.userId) return null;
@@ -183,7 +194,7 @@ export async function traceOrder(
       productName: productName(order.productId),
       amount: order.amount,
       status: order.status,
-      statusLabel: orderStatusLabel(order),
+      statusLabel: orderStatusLabel(order, input.now),
       paymentEnv: order.paymentEnv,
       approvedAt: order.approvedAt,
       createdAt: order.createdAt,

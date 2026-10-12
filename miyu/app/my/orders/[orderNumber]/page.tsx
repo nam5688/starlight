@@ -8,6 +8,7 @@ import { pageNarrow, textLink } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
 import { GENERATION_LABEL, PAYMENT_ENV_LABEL, traceOrder } from "@/lib/services/my-service";
 import { consentPath, getMember } from "@/server/member";
+import { reconcileUserInBackground } from "@/server/reconcile";
 import { readRepository, writeRepository } from "@/server/services";
 import { DOCS_KEY_NOTE } from "@/server/setup-checks";
 
@@ -36,6 +37,7 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
   const member = await getMember();
   if (!member) redirect("/my");
   if (member.needsConsent) redirect(consentPath(`/my/orders/${orderNumber}`));
+  reconcileUserInBackground(member.userId);
 
   // 소유자 확인은 로그인 사용자 권한(RLS)으로, 결제 기록은 확인 후에 서버 권한으로 읽는다
   const trace = await traceOrder(await readRepository(), writeRepository(), { userId: member.userId, orderNumber });

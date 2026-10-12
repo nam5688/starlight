@@ -13,6 +13,7 @@ import { formatKrw } from "@/lib/config/product";
 import { ENTITLEMENT_LABEL, GENERATION_LABEL, getMyPage, PAYMENT_ENV_LABEL, type MyReportCard } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
+import { reconcileUserInBackground } from "@/server/reconcile";
 import { readRepository } from "@/server/services";
 import { topicLabel } from "@/lib/personalization/context";
 
@@ -66,6 +67,8 @@ async function MyContent() {
     );
   }
   if (member.needsConsent) redirect(consentPath("/my"));
+  // 결제 승인이 났는데 돌아오지 못한 주문이 있으면 응답 뒤에 결제사 기록과 맞춘다
+  reconcileUserInBackground(member.userId);
 
   const { cards, orders } = await getMyPage(await readRepository(), member.userId);
   const paymentsReady = paymentConfig().ok;

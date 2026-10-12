@@ -62,6 +62,7 @@ export const CONSENT_TABLES = ["user_consents"];
 /** 선택 기능용 테이블 — 없어도 다른 단계는 막지 않고, 상태와 안내만 보여 준다 */
 export const OPTIONAL_TABLES: Record<string, string> = {
   personal_contexts: "‘나를 더 반영하기’를 쓰려면 SQL Editor에서 5번 파일(20261015000000_personal_context.sql)을 실행합니다.",
+  ops_events: "운영 기록 · 알림 · 결제 재확인 기록을 남기려면 SQL Editor에서 6번 파일(20261016000000_ops_events.sql)을 실행합니다.",
 };
 
 const SUPABASE_URL = /^https:\/\/[a-z0-9-]+\.supabase\.co$/;

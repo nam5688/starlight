@@ -12,7 +12,7 @@ import { buildDevReport } from "./report/generate-dev-report.ts";
 const LIB = fileURLToPath(new URL(".", import.meta.url));
 
 /** 채널 공통 핵심 폴더 — Next.js, React, 외부 서비스 SDK를 불러오면 안 된다 */
-const CORE_DIRS = ["assessment", "commerce", "growth", "membership", "personalization", "profile", "report", "saju", "samples", "services"];
+const CORE_DIRS = ["assessment", "commerce", "growth", "membership", "ops", "personalization", "profile", "report", "saju", "samples", "services"];
 const FORBIDDEN = [/from "next/, /from "react/, /"server-only"/, /from "@supabase\//, /from "@tosspayments\//, /integrations\//];
 
 function files(dir: string): string[] {

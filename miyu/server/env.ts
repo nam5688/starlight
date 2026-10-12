@@ -61,6 +61,26 @@ export function paymentEnvOf(config: Extract<PaymentConfig, { ok: true }>): Paym
   return isTossDocsKey(config.clientKey) || isTossDocsKey(config.secretKey) ? "test-docs" : "test";
 }
 
+/** 운영 알림용 텔레그램 값 — 둘 다 있을 때만 보낸다 (없으면 서버 로그에만 남긴다) */
+export function telegramEnv(): { botToken: string; chatId: string } | null {
+  const botToken = read("TELEGRAM_BOT_TOKEN");
+  const chatId = read("TELEGRAM_CHAT_ID");
+  return botToken && chatId ? { botToken, chatId } : null;
+}
+
+/** 관리자 화면에 들어갈 수 있는 회원번호(Supabase user id) 목록 — 비어 있으면 관리자 화면은 열리지 않는다 */
+export function adminUserIds(): string[] {
+  return read("ADMIN_USER_IDS")
+    .split(",")
+    .map((v) => v.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** 정기 실행(재확인 작업) 주소의 인증값 — 비어 있으면 정기 실행 주소는 닫혀 있다 */
+export function cronSecret(): string {
+  return read("CRON_SECRET");
+}
+
 export type AiConfig =
   /** AI 연결 전 — 개발용 규칙 생성기를 쓴다 */
   | { kind: "none" }

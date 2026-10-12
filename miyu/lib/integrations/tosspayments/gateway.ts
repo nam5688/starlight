@@ -75,6 +75,9 @@ export function createTossPaymentGateway(options: TossGatewayOptions): PaymentGa
     getPayment(paymentKey) {
       return call(`/v1/payments/${encodeURIComponent(paymentKey)}`, { method: "GET" });
     },
+    getPaymentByOrderId(orderNumber) {
+      return call(`/v1/payments/orders/${encodeURIComponent(orderNumber)}`, { method: "GET" });
+    },
   };
 }
 

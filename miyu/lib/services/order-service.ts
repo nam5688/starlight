@@ -63,8 +63,12 @@ export async function startCheckout(
 
 export type ConfirmPaymentResult =
   | { kind: "paid"; order: OrderRecord }
-  /** 결제사 응답을 받지 못해 결과를 아직 모름 — 주문은 대기 상태로 두고 웹훅·재확인으로 맞춘다 */
-  | { kind: "checking"; order: OrderRecord }
+  /**
+   * 결제 결과를 아직 모름 — 주문은 대기 상태로 두고 재확인(결제사 주문번호 조회)으로 맞춘다. 고객에게는 다시 결제하라고 하지 않는다.
+   * - gateway-unreachable: 결제사 응답을 받지 못함 (승인됐을 수도 있다)
+   * - save-failed: 결제사는 승인했는데 우리 쪽 저장이 실패함 (운영자 알림 대상)
+   */
+  | { kind: "checking"; order: OrderRecord; reason: "gateway-unreachable" | "save-failed" }
   | { kind: "rejected"; code: string; message: string; order: OrderRecord | null }
   | { kind: "not-found" };
 
@@ -102,7 +106,13 @@ export async function confirmPayment(
   }
 
   if (result.ok) {
-    const applied = await applyPayment(repo, order, result.payment, "confirm");
+    let applied: ApplyResult;
+    try {
+      applied = await applyPayment(repo, order, result.payment, "confirm");
+    } catch {
+      // 결제사는 이미 승인했다. 저장 실패를 "결제 실패"로 알리거나 다시 결제하게 하지 않고, 확인 중으로 두고 재확인이 맞춘다.
+      return { kind: "checking", order, reason: "save-failed" };
+    }
     if (applied.kind === "paid") return applied;
     if (applied.kind === "updated") {
       return { kind: "rejected", code: `PAYMENT_${result.payment.status}`, message: "결제가 완료되지 않았습니다.", order: applied.order };
@@ -111,7 +121,7 @@ export async function confirmPayment(
   }
 
   await repo.addPaymentEvent({ orderId: order.id, source: "confirm", status: result.code, detail: { retryable: result.retryable } });
-  if (result.retryable) return { kind: "checking", order };
+  if (result.retryable) return { kind: "checking", order, reason: "gateway-unreachable" };
 
   const failed = await repo.updateOrder(order.id, ["pending"], {
     status: "failed",
@@ -168,13 +178,22 @@ export async function syncPayment(
   return { kind: "unchanged", order: applied.order };
 }
 
-type ApplyResult =
+/** 결제 처리 기록은 최선으로 남긴다 — 기록 저장이 실패해도 주문 상태 반영(구매 권한)을 막지 않는다 */
+async function recordPaymentEvent(repo: MiyuRepository, event: Parameters<MiyuRepository["addPaymentEvent"]>[0]): Promise<void> {
+  try {
+    await repo.addPaymentEvent(event);
+  } catch {
+    // 기록 실패는 운영 기록(ops_events)에서 따로 추적한다
+  }
+}
+
+export type ApplyResult =
   | { kind: "paid"; order: OrderRecord }
   | { kind: "updated"; order: OrderRecord }
   | { kind: "unchanged"; order: OrderRecord; code: string; message: string };
 
 /** 결제사 기록을 주문에 반영한다. 같은 내용을 여러 번 반영해도 결과가 같다. */
-async function applyPayment(
+export async function applyPayment(
   repo: MiyuRepository,
   order: OrderRecord,
   payment: GatewayPayment,
@@ -183,14 +202,19 @@ async function applyPayment(
   // 주문번호 기준 추적용: 결제사 상점 ID(mId)를 함께 남긴다 (공용 예제 키로 결제하면 내 상점과 다른 ID가 남는다)
   const detail = { method: payment.method, approvedAt: payment.approvedAt, totalAmount: payment.totalAmount, mId: payment.mId };
   if (payment.orderId !== order.orderNumber || payment.totalAmount !== order.amount) {
-    await repo.addPaymentEvent({ orderId: order.id, source, status: "PAYMENT_MISMATCH", detail: { ...detail, status: payment.status } });
+    await recordPaymentEvent(repo, { orderId: order.id, source, status: "PAYMENT_MISMATCH", detail: { ...detail, status: payment.status } });
     return { kind: "unchanged", order, code: "PAYMENT_MISMATCH", message: "결제 정보가 주문과 맞지 않습니다. 고객센터로 문의해 주세요." };
   }
-  await repo.addPaymentEvent({ orderId: order.id, source, status: payment.status, detail });
+  await recordPaymentEvent(repo, { orderId: order.id, source, status: payment.status, detail });
 
   const target = orderStatusFor(payment);
   if (target === "paid") {
-    if (order.status === "paid") return { kind: "paid", order };
+    // 이미 다른 결제키로 결제 완료된 주문에 또 다른 승인이 들어오면 같은 결제로 보지 않고 운영자 확인(환불) 대상으로 올린다
+    const duplicate = async (): Promise<ApplyResult> => {
+      await recordPaymentEvent(repo, { orderId: order.id, source, status: "DUPLICATE_PAYMENT", detail });
+      return { kind: "unchanged", order, code: "DUPLICATE_PAYMENT", message: "이미 결제된 주문이 있습니다. 고객센터로 문의해 주세요." };
+    };
+    if (order.status === "paid") return order.paymentKey && order.paymentKey !== payment.paymentKey ? duplicate() : { kind: "paid", order };
     let updated: OrderRecord | null;
     try {
       updated = await repo.updateOrder(order.id, ["pending", "failed", "canceled"], {
@@ -201,16 +225,19 @@ async function applyPayment(
         failureCode: null,
         failureMessage: null,
       });
-    } catch {
-      // 같은 검사에 이미 결제된 다른 주문이 있으면 DB가 막는다 → 운영자 확인(환불) 대상
-      await repo.addPaymentEvent({ orderId: order.id, source, status: "DUPLICATE_PAYMENT", detail });
-      return { kind: "unchanged", order, code: "DUPLICATE_PAYMENT", message: "이미 결제된 주문이 있습니다. 고객센터로 문의해 주세요." };
+    } catch (error) {
+      // 같은 검사에 이미 결제된 다른 주문이 있으면 DB 고유 조건(23505)이 막는다 → 운영자 확인(환불) 대상.
+      // 그 밖의 오류(DB 일시 장애 등)를 중복 결제로 오해하지 않고 그대로 올려, 호출한 쪽이 "확인 중"으로 처리한다.
+      if ((error as { code?: string } | null)?.code !== "23505") throw error;
+      return duplicate();
     }
     if (updated) return { kind: "paid", order: updated };
     const fresh = (await repo.getOrderByNumber(order.orderNumber)) ?? order;
-    return fresh.status === "paid"
-      ? { kind: "paid", order: fresh }
-      : { kind: "unchanged", order: fresh, code: "ORDER_NOT_PAYABLE", message: "결제할 수 없는 주문입니다." };
+    if (fresh.status === "paid") {
+      // 동시에 들어온 다른 요청이 먼저 반영한 경우: 같은 결제키면 같은 결제, 다르면 두 번 승인된 것
+      return fresh.paymentKey === payment.paymentKey ? { kind: "paid", order: fresh } : duplicate();
+    }
+    return { kind: "unchanged", order: fresh, code: "ORDER_NOT_PAYABLE", message: "결제할 수 없는 주문입니다." };
   }
   if (target === "refunded") {
     const updated = await repo.updateOrder(order.id, ["paid"], { status: "refunded" });

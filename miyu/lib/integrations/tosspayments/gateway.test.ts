@@ -67,3 +67,20 @@ test("결제 조회: paymentKey를 주소에 안전하게 넣는다", async () =
   assert.equal(captured[0].url, "http://127.0.0.1:9/v1/payments/a%2Fb%3Fc");
   assert.equal(captured[0].init.method, "GET");
 });
+
+test("주문번호로 결제 조회: 결제사 주소 형식과 '결제 없음'(404) 해석", async () => {
+  const captured: Captured[] = [];
+  const found = await createTossPaymentGateway({ secretKey: "k", fetch: fakeFetch(200, PAYMENT, captured) }).getPaymentByOrderId(PAYMENT.orderId);
+  assert.equal(captured[0].url, `https://api.tosspayments.com/v1/payments/orders/${PAYMENT.orderId}`);
+  assert.ok(found.ok && found.payment.status === "DONE");
+
+  const none = await createTossPaymentGateway({
+    secretKey: "k",
+    fetch: fakeFetch(404, { code: "NOT_FOUND_PAYMENT", message: "존재하지 않는 결제 입니다." }, []),
+  }).getPaymentByOrderId("MEU-20261011-NOPAYMENT1");
+  assert.deepEqual(none, { ok: false, code: "NOT_FOUND_PAYMENT", message: "존재하지 않는 결제 입니다.", retryable: false });
+
+  // 결제사 장애는 '결제 없음'이 아니라 재시도 가능한 오류 — 실패나 취소로 단정하지 않는다
+  const down = await createTossPaymentGateway({ secretKey: "k", fetch: fakeFetch(503, {}, []) }).getPaymentByOrderId("MEU-20261011-ABCDEFGHJK");
+  assert.ok(!down.ok && down.retryable && down.code === "HTTP_503");
+});

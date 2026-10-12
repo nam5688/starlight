@@ -5,6 +5,7 @@ import { canTransition } from "../../commerce/order.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
+  OpsEventRecord,
   PaymentEventSource,
   AssessmentRecord,
   MiyuRepository,
@@ -24,6 +25,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const events: { orderId: string; source: PaymentEventSource; status: string | null; detail: Record<string, unknown>; createdAt: string }[] = [];
   const consents = new Map<string, ConsentRecord[]>();
   const contexts = new Map<string, PersonalContext>();
+  const opsEvents: OpsEventRecord[] = [];
   let tick = 0;
   const iso = () => now().toISOString();
 
@@ -112,6 +114,47 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async addPaymentEvent(event) {
       events.push({ orderId: event.orderId, source: event.source, status: event.status, detail: event.detail, createdAt: new Date(now().getTime() + ++tick).toISOString() });
     },
+    async addOpsEvent(e) {
+      opsEvents.push({
+        id: opsEvents.length + 1,
+        createdAt: new Date(now().getTime() + ++tick).toISOString(),
+        kind: e.kind,
+        severity: e.severity ?? "info",
+        orderNumber: e.orderNumber ?? null,
+        errorId: e.errorId ?? null,
+        dedupeKey: e.dedupeKey ?? null,
+        message: e.message.slice(0, 500),
+        detail: e.detail ?? {},
+      });
+    },
+    async listOpsEvents(f) {
+      return opsEvents
+        .filter((e) => (!f.orderNumber || e.orderNumber === f.orderNumber) && (!f.errorId || e.errorId === f.errorId) && (!f.kinds || f.kinds.includes(e.kind)) && (!f.since || e.createdAt >= f.since))
+        .sort((a, b) => b.id - a.id)
+        .slice(0, f.limit);
+    },
+    async hasOpsEventSince(key, since) {
+      return opsEvents.some((e) => e.dedupeKey === key && e.createdAt >= since);
+    },
+    async listOrdersForReconcile(o) {
+      const all = [...orders.values()];
+      const pending = all.filter((x) => x.status === "pending" && x.createdAt < o.pendingCreatedBefore).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const paid = all.filter((x) => x.status === "paid" && (x.approvedAt ?? x.createdAt) >= o.paidSince);
+      return [...pending, ...paid].slice(0, o.limit);
+    },
+    async listRecentOrders(limit) {
+      return [...orders.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+    },
+    async getOrderById(orderId) {
+      return orders.get(orderId) ?? null;
+    },
+    async listProblemReports(o) {
+      return [...reports.values()]
+        .filter((r) => o.statuses.includes(r.status) && (!o.updatedBefore || r.updatedAt < o.updatedBefore))
+        .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
+        .slice(0, o.limit)
+        .map(({ id, orderId, assessmentId, status, attempts, lastError, createdAt, updatedAt }) => ({ id, orderId, assessmentId, status, attempts, lastError, createdAt, updatedAt }));
+    },
     async getContext(assessmentId) {
       return contexts.get(assessmentId) ?? null;
     },
@@ -167,5 +210,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, opsEvents };
 }

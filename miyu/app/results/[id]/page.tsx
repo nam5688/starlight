@@ -17,6 +17,7 @@ import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { readRepository, reportGenerator } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
+import { reconcileUserInBackground } from "@/server/reconcile";
 
 export const metadata: Metadata = {
   title: "내 리포트 · ME:U 미유",
@@ -51,6 +52,8 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
   }
 
   if (member.needsConsent) redirect(consentPath(`/results/${id}`));
+  // 결제 승인이 났는데 돌아오지 못한 주문이 있으면 응답 뒤에 결제사 기록과 맞춘다
+  reconcileUserInBackground(member.userId);
 
   // 로그인한 사용자 권한으로 조회 — 다른 회원의 결과는 DB 접근 정책에서도 걸러진다
   const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId: id });

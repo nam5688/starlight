@@ -6,6 +6,14 @@ import { connection } from "next/server";
 import { supabaseEnv } from "./env";
 
 /**
+ * Next.js는 화면을 그리는 동안(그리고 그 뒤의 after 안에서도) 같은 주소의 GET 요청을 한 번만 보내고 결과를 재사용한다.
+ * DB 조회에는 맞지 않는다 — 방금 저장한 것을 같은 요청 안에서 다시 읽으면 저장 전의 결과가 돌아와
+ * (예: 대기열에 올린 리포트가 "없음"으로 읽혀 생성이 시작되지 않음) 결제 · 리포트 흐름이 어긋난다.
+ * AbortController 신호를 붙이면 이 재사용에서 빠진다 (Next.js fetch 문서의 Memoization 항목).
+ */
+const freshFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: "no-store", signal: init?.signal ?? new AbortController().signal });
+
+/**
  * 로그인한 사용자 권한의 클라이언트 (쿠키의 세션 사용).
  * DB 접근 정책(RLS)이 적용되어 본인 데이터만 읽을 수 있다.
  */
@@ -15,6 +23,7 @@ export async function createServerSupabase() {
   const { url, publishableKey } = supabaseEnv();
   const cookieStore = await cookies();
   return createServerClient(url, publishableKey, {
+    global: { fetch: freshFetch },
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -38,5 +47,6 @@ export function createAdminSupabase() {
   const { url, secretKey } = supabaseEnv();
   return createClient(url, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: freshFetch },
   });
 }
