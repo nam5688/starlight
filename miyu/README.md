@@ -2,11 +2,11 @@
 
 사주 · MBTI · 기질 · 애착을 함께 정리하는 **개인 통합 분석 리포트** 웹서비스입니다.
 
-현재 상태: 화면 · 검사 흐름에 더해 **카카오 로그인 · 결과 저장 · 토스페이먼츠 테스트 결제 · 리포트 저장**이 구현되어 있습니다. 검사 문항과 리포트 문장은 개발용 예시입니다.
+현재 상태: 화면 · 검사 흐름에 더해 **카카오 로그인 · 가입 동의 · 결과 저장 · 토스페이먼츠 테스트 결제 · 리포트 저장**이 구현되어 있습니다. 검사 문항과 리포트 문장은 개발용 예시입니다.
 키를 넣기 전에는 로그인 · 결제가 "설정 전"으로 표시되고, 나머지 화면은 그대로 볼 수 있습니다.
 
-- 외부 서비스 연결 순서: [`docs/setup-guide.md`](docs/setup-guide.md)
-- 진행 단계: [`docs/roadmap.md`](docs/roadmap.md) · 상세 기획: [`docs/product-spec.md`](docs/product-spec.md)
+- 외부 서비스 연결 순서: [`docs/setup-guide.md`](docs/setup-guide.md) — 개발 서버를 켜고 http://localhost:3000/setup 에서 진행 상황 확인
+- 진행 단계: [`docs/roadmap.md`](docs/roadmap.md) · 상세 기획: [`docs/product-spec.md`](docs/product-spec.md) · 사업 설계: [`docs/business-plan.md`](docs/business-plan.md)
 
 ---
 
@@ -70,8 +70,11 @@ npm run dev
 | 메인 | http://localhost:3000 | 소개 → 리포트 예시 → 제공 항목 → 이용 방법·가격 → 자주 묻는 질문 |
 | 내 분석 시작하기 | http://localhost:3000/analyze | 기본 정보 → MBTI 성향 → 기질 → 관계 → 무료 요약. 이전 버튼과 휴대폰 뒤로 가기, 답변 수정 |
 | 리포트 예시 | http://localhost:3000/report/sample | 결과 7단계 구성, 상세 분석 펼치기 |
-| MY | http://localhost:3000/my | 카카오 로그인, 저장한 결과 목록 (키 설정 후) |
-| 결과 | `/results/...` | 저장된 무료 요약 + 결제하기 / 구매 후 리포트 (로그인 후) |
+| MY | http://localhost:3000/my | 카카오 로그인, 저장한 결과 목록, 소식 받기 설정 (키 설정 후) |
+| 가입 동의 | `/auth/consent` | 처음 로그인한 회원의 약관 동의 (키 설정 후) |
+| 결과 | `/results/...` | 저장된 무료 요약 + 리포트 구매 / 구매 후 리포트 (로그인 후) |
+| 약관 · 처리방침 | http://localhost:3000/terms · /privacy | 초안 |
+| 설정 점검 | http://localhost:3000/setup | 외부 서비스 연결 진행 상황 (개발용, 키 값은 보이지 않음) |
 | 결제 | `/checkout/...` | 토스페이먼츠 결제 화면 (테스트 결제) |
 
 휴대폰 화면으로 보려면 Chrome에서 `F12` → 왼쪽 위 휴대폰 아이콘(기기 툴바)을 누르고 폭을 390으로 맞춥니다.
@@ -112,10 +115,12 @@ miyu/
 │   ├── assessment/       검사 모듈(문항) · 채점
 │   ├── report/           리포트 데이터 · 무료 요약 · 리포트 생성기(개발용)
 │   ├── commerce/         주문 · 리포트 상태 규칙
-│   ├── services/         저장 · 주문 · 결제 승인 · 리포트 흐름
+│   ├── services/         저장 · 주문 · 결제 승인 · 리포트 · 회원 동의 흐름
+│   ├── membership/       가입 동의 항목 · 약관 버전
+│   ├── growth/           다음 행동 규칙
 │   ├── integrations/     Supabase 저장소 · 토스페이먼츠 연결
 │   └── samples/ config/ saju/ profile/
-├── server/               웹 서버 전용 (환경변수, 로그인 세션, 결과 보관 쿠키)
+├── server/               웹 서버 전용 (환경변수, 로그인 세션 · 회원 상태, 결과 보관 쿠키, 설정 점검)
 ├── supabase/             DB 마이그레이션 · 로컬 검증
 ├── proxy.ts              로그인 세션 갱신
 └── docs/                 기획서 · 진행 단계 · 연결 안내
