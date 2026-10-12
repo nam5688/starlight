@@ -6,6 +6,7 @@
 - 상세 기획: `miyu/docs/product-spec.md`
 - 사업 설계(메뉴 역할 · 가격 가설 · 고객 흐름 · 측정 지표): `miyu/docs/business-plan.md`
 - **v2 방향 제안(사주 중심 인물 해석 · 상황형 질문 · 카테고리 상품 · 수익 구조 · AI 후보 비용): `miyu/docs/service-v2-proposal.md`** — 운영자 확인 전 항목은 제안으로 다룬다
+- 대표 경향 12유형 설계안(일상 12유형 + 가까운 관계 방식, 분류 · 경계 · 버전 구분): `miyu/docs/tendency-types-v2.md` — 운영자 확인 전. 지금 화면은 4유형 개발용 규칙 그대로
 - 단계와 진행 상황: `miyu/docs/roadmap.md` — **현재 단계 범위만 구현한다**
 - 상업 출시 점검표(구현 · 테스트 통과 · 실제 연동 구분): `miyu/docs/launch-checklist.md` — 연동 단계를 마칠 때마다 갱신한다
 - 실행 방법: `miyu/README.md`
@@ -78,7 +79,7 @@ npm run test:db    # DB·접근 정책 검사 (Linux 개발 환경에서 supabas
 
 | 경로 | 내용 |
 | --- | --- |
-| `miyu/lib/assessment/` | 검사 모듈(문항), 채점, 대표 경향 임시 규칙 |
+| `miyu/lib/assessment/` | 검사 모듈(문항), 채점, 대표 경향 임시 규칙(4유형) · `tendency-v2.ts`(12유형 설계 초안, 화면 미연결) |
 | `miyu/lib/report/` | 리포트 타입, 무료 요약 생성, 개발용 생성기 · `evidence.ts`(해석 근거) · `v2/`(개인 종합 리포트 v2 타입 · 지시문 · 형식 검사) · `ai/`(제공사 무관 AI 생성기 · 모의 모델) |
 | `miyu/lib/commerce/` | 주문번호, 주문·리포트 상태 규칙 |
 | `miyu/lib/services/` | 저장·주문·승인·리포트·회원 동의 흐름 (저장소·결제사·생성기는 `ports.ts` 약속으로만) |
