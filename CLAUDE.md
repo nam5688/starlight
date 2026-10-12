@@ -6,6 +6,7 @@
 - 상세 기획: `miyu/docs/product-spec.md`
 - 사업 설계(메뉴 역할 · 가격 가설 · 고객 흐름 · 측정 지표): `miyu/docs/business-plan.md`
 - 단계와 진행 상황: `miyu/docs/roadmap.md` — **현재 단계 범위만 구현한다**
+- 상업 출시 점검표(구현 · 테스트 통과 · 실제 연동 구분): `miyu/docs/launch-checklist.md` — 연동 단계를 마칠 때마다 갱신한다
 - 실행 방법: `miyu/README.md`
 - 외부 서비스 연결 순서: `miyu/docs/setup-guide.md` (개발 서버의 `/setup` 화면이 같은 순서로 진행 상황을 보여준다)
 
