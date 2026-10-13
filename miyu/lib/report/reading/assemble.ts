@@ -83,7 +83,7 @@ function buildInputs(args: { knownMbti: string | null; hasContext: boolean; hasS
   return out;
 }
 
-const positionText = (progress: number | undefined) => (progress === undefined ? "" : progress < 1 / 3 ? "지금은 그 앞부분을 지나고 있습니다" : progress < 2 / 3 ? "지금은 그 중간쯤을 지나고 있습니다" : "지금은 그 뒷부분을 지나고 있습니다");
+const positionText = (progress: number | undefined) => (progress === undefined ? "" : progress < 1 / 3 ? "지금은 그 앞부분을 지나고 있어요" : progress < 2 / 3 ? "지금은 그 중간쯤을 지나고 있어요" : "지금은 그 뒷부분을 지나고 있어요");
 
 export type AssembleOptions = {
   draft: ReadingDraftV1;
@@ -162,7 +162,7 @@ export function assembleReading(o: AssembleOptions): IntegratedReadingReport {
         kind: "flow",
         label: CARD_LABEL.flow,
         keyword: draft.cards.flow.keyword,
-        note: current ? `${dot(current.from)}부터 ${dot(current.to)}까지, ${positionText(current.progress)}.` : "10년 시기의 기간은 계산하지 못했습니다. 가까운 해의 분위기만 읽었습니다.",
+        note: current ? `${dot(current.from)}부터 ${dot(current.to)}까지, ${positionText(current.progress)}.` : "10년 시기의 기간은 계산하지 못했어요. 가까운 해의 분위기만 읽었어요.",
       },
     ],
     inputs: buildInputs({ knownMbti: input.knownMbti, hasContext: Boolean(context), hasSaju: saju.status === "ok", topics: topicsForInputs, allEvidence: evidence, nickname: name }),

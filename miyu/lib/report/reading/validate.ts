@@ -200,7 +200,7 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
 
   // 앞으로의 시기
   const f = d.flow;
-  if (!f) errors.push("flow: 앞으로의 시기이 없습니다.");
+  if (!f) errors.push("flow: 앞으로의 시기가 없습니다.");
   else {
     text(f.headline, "flow.headline", L.blockHeadline.min, L.flow.headlineMax);
     paragraphLike(f.summary, "flow.summary", L.flow.summaryMin, L.flow.summaryMax, 2);
@@ -222,7 +222,7 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
     scenarios.forEach((s, i) => {
       text(s?.when, `flow.scenarios[${i}].when`, 10, L.flow.scenarios.whenMax);
       text(s?.then, `flow.scenarios[${i}].then`, 15, L.flow.scenarios.thenMax);
-      if (isString(s?.then) && !/수 있습니다|수도 있습니다|일 수|가능성/.test(s.then)) errors.push(`flow.scenarios[${i}].then: 확률이 아닌 가능성으로 써 주세요 ("~할 수 있습니다").`);
+      if (isString(s?.then) && !/수 있(?:습니다|어요|죠)|수도 있(?:습니다|어요|죠)|일 수|가능성/.test(s.then)) errors.push(`flow.scenarios[${i}].then: 확률이 아닌 가능성으로 써 주세요 ("~할 수 있어요").`);
     });
     ids(f.evidence, "flow.evidence", { needSaju: true, period: refs.length > 0 });
   }
@@ -253,7 +253,7 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
   for (const { where, text: t } of texts) {
     if (JARGON.test(t)) errors.push(`${where}: 사주 전문 용어(${JARGON.exec(t)![0]})는 본문에 쓰지 않습니다 — 쉬운 말로 풀어 쓰고 용어는 근거로만 남깁니다.`);
     if (SCORE_TEXT.test(t)) errors.push(`${where}: 점수 · 퍼센트 · 확률 표현은 본문에 쓰지 않습니다.`);
-    if (CAUSE_NARROWING.test(t)) errors.push(`${where}: 원인을 하나로 좁혀 말하지 않습니다 ("~때문입니다" 대신 "~일 수 있습니다").`);
+    if (CAUSE_NARROWING.test(t)) errors.push(`${where}: 원인을 하나로 좁혀 말하지 않습니다 ("~때문이에요" 대신 "~일 수 있어요").`);
     if (AGE_TEXT.test(t)) errors.push(`${where}: 나이를 쓰지 않습니다.`);
     for (const f of FORBIDDEN) if (f.re.test(t)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
     for (const y of t.match(/(?<![\d.])(?:19|20)\d{2}(?![\d.])/g) ?? []) if (!allowedYears.has(y)) errors.push(`${where}: 계산되지 않은 해 ${y}`);

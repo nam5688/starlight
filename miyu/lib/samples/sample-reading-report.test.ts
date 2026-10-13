@@ -131,18 +131,18 @@ test("리포트 예시: 원인을 하나로 좁혀 말하지 않고, 막는 표�
     for (const f of FORBIDDEN) assert.doesNotMatch(t, f.re, `${f.why}: ${t.slice(0, 30)}`);
     // 연구 통계를 쓰지 않은 이유를 밝히는 문장은 "확률"이라는 말을 쓸 수 있다
     if (t === R.flow.statistics) continue;
-    assert.doesNotMatch(t, /성격이 아니라|불안이 아니라|시기 때문입니다|때문입니다/, `원인을 좁혀 말함: ${t.slice(0, 30)}`);
+    assert.doesNotMatch(t, /성격이 아니라|불안이 아니라|시기 때문입니다|때문입니다|때문이에요|때문이죠/, `원인을 좁혀 말함: ${t.slice(0, 30)}`);
     assert.doesNotMatch(t, /\d+\s*%|확률/, `확률 표현: ${t.slice(0, 30)}`);
     assert.doesNotMatch(t, /\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일/, `특정 날짜: ${t.slice(0, 30)}`);
     assert.doesNotMatch(t, /결혼|이별|헤어지|이직하게|취업|퇴사/, `사건 예언: ${t.slice(0, 30)}`);
     // 나이 · 직업은 "다루지 않는다" 또는 "알지 못한다"는 안내에서만 나온다 (만들어 채우지 않는다)
-    if (/나이|직업/.test(t)) assert.match(t, /다루지 않습니다|알지 못합니다/, `나이 · 직업 언급: ${t.slice(0, 30)}`);
+    if (/나이|직업/.test(t)) assert.match(t, /다루지 않(습니다|아요)|알지 못(합니다|해요)|알 수 없어서/, `나이 · 직업 언급: ${t.slice(0, 30)}`);
   }
   // 시기는 계산된 해(2026~2028)와 대운 기간만 (타임라인의 이전 · 다음 기간은 계산에서 나오며 글에 적지 않는다)
   const years = new Set(bodyTexts().join(" ").match(/\b20\d{2}\b/g));
   for (const y of years) assert.ok(["2026", "2027", "2028", "2024", "2034"].includes(y), `계산되지 않은 해 ${y}`);
-  assert.match(R.flow.caveat, /예측이 아니며/);
-  assert.match(R.flow.scenarioNote, /예측이 아닙니다/);
+  assert.match(R.flow.caveat, /예측이 아니(며|고)/);
+  assert.match(R.flow.scenarioNote, /예측이 아(닙니다|니에요)/);
   assert.match(R.flow.statistics, /사용하지 않았습니다/);
 });
 

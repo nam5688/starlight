@@ -72,7 +72,7 @@ test("기본 생성 형식은 읽기 구조다 — 모의 모델로 만든 리�
   assert.ok(!JSON.stringify(report).includes("{name}"));
   // 코드가 채우는 값: 타임라인은 계산 결과, 큰 흐름 카드의 기간 문장도 계산 결과
   assert.deepEqual(report.timeline.map((s) => s.role), ["previous", "current", "next"]);
-  assert.match(report.summary[2].note, /^2024\.08부터 2034\.07까지, 지금은 그 앞부분을 지나고 있습니다\.$/);
+  assert.match(report.summary[2].note, /^2024\.08부터 2034\.07까지, 지금은 그 앞부분을 지나고 있어요\.$/);
 });
 
 test("가짜 모델이 예시와 같은 초안을 돌려주면, 생성기가 만든 리포트의 구조 · 고정 문구 · 타임라인 · 자료 목록이 예시와 같다 (예시와 실제 생성의 기준이 같다)", async () => {
@@ -272,7 +272,7 @@ test("성별이 없어 대운을 계산하지 못하면 큰 흐름 타임라인�
   const report = await createAiReportGenerator({ model: createMockModel(), now: NOW, sleep: noSleep }).generate(noGender);
   assert.ok(isReadingReport(report));
   assert.deepEqual(report.timeline, []);
-  assert.match(report.summary[2].note, /기간은 계산하지 못했습니다/);
+  assert.match(report.summary[2].note, /기간은 계산하지 못했어요/);
   assert.ok(report.flow.periods.every((p) => /^\d{4}년$/.test(p.period)));
 });
 
@@ -289,6 +289,6 @@ test("저장된 리포트 글 뽑기: 읽기 구조 리포트도 이미 준 리�
   const t = reportTexts(report);
   assert.equal(t.headline, sampleReadingReport.headline);
   assert.equal(t.summary.length, 5);
-  assert.ok(t.all.some((x) => x.includes("후기와 사용법을 충분히 읽은 뒤")));
+  assert.ok(t.all.some((x) => x.includes("후기부터 읽어 본 적 있죠")));
   assert.ok(t.actions.length >= 3);
 });
