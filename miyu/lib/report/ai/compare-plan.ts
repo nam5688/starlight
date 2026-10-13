@@ -5,10 +5,23 @@
 import { buildUserMessage, SYSTEM_PROMPT } from "../v2/prompt.ts";
 import { isPersonalV2, type AiUsageSample, type ReportContent } from "../generator.ts";
 import { checkDepth, crossPersonOverlap } from "../v2/depth.ts";
+import { checkPhilosophicalDepth, crossOverlapBlocks } from "../philosophy/depth.ts";
+import { readingBlocks } from "../philosophy/compare.ts";
+import { buildPhilosophyUserMessage, PHILOSOPHY_SYSTEM_PROMPT } from "../philosophy/prompt.ts";
+import { isPhilosophicalReport, type PhilosophicalReportV0 } from "../philosophy/types.ts";
 import { buildEvidence, createAiReportGenerator } from "./generator.ts";
+import { createPhilosophicalGenerator } from "./philosophy-generator.ts";
 import { BudgetExceededError, BudgetGuard, costKrw, estimateInputTokens, withBudget, worstCaseKrw, type BudgetSettings, type ModelPrice } from "./budget.ts";
 import type { Persona } from "./compare-personas.ts";
 import type { TextModel } from "./model.ts";
+
+/** 무엇을 쓰게 하는가 — personal-v2: 지금의 개인 종합 리포트 지시문, philosophical-v0: 자기 이해 풀이 비교용 지시문(제품 미연결) */
+export type CompareVariant = "personal-v2" | "philosophical-v0";
+
+/** 변형마다 AI에게 보내는 지시문 · 사용자 메시지 (비용 추정과 입력 토큰 보정에 같은 값을 쓴다) */
+export function promptsFor(variant: CompareVariant, evidence: ReturnType<typeof buildEvidence>, iso: string, context: Persona["input"]["context"]): [string, string] {
+  return variant === "philosophical-v0" ? [PHILOSOPHY_SYSTEM_PROMPT, buildPhilosophyUserMessage(evidence, iso, context)] : [SYSTEM_PROMPT, buildUserMessage(evidence, iso, context)];
+}
 
 export type CompareCandidate = { key: string; model: TextModel; price: ModelPrice };
 
@@ -59,13 +72,13 @@ export function referenceFor(now: Date) {
 }
 
 /** 호출하지 않고 비용을 계산한다 (드라이런). 입력은 제품이 실제로 만드는 지시문 · 근거 목록 길이로 추정한다 */
-export function planStage(opts: { stage: string; capKrw: number; personas: Persona[]; candidates: Pick<CompareCandidate, "key" | "price">[]; settings: Pick<BudgetSettings, "fxKrwPerUsd" | "surcharge">; now: Date }): StagePlan {
+export function planStage(opts: { stage: string; capKrw: number; personas: Persona[]; candidates: Pick<CompareCandidate, "key" | "price">[]; settings: Pick<BudgetSettings, "fxKrwPerUsd" | "surcharge">; now: Date; variant?: CompareVariant }): StagePlan {
   const ref = referenceFor(opts.now);
   const rows: PlanRow[] = [];
   for (const p of opts.personas) {
     const evidence = buildEvidence(p.input, ref);
-    const user = buildUserMessage(evidence, ref.iso, p.input.context);
-    const inputTokens = estimateInputTokens([SYSTEM_PROMPT, user]);
+    const [system, user] = promptsFor(opts.variant ?? "personal-v2", evidence, ref.iso, p.input.context);
+    const inputTokens = estimateInputTokens([system, user]);
     for (const c of opts.candidates) {
       const first = worstCaseKrw(c.price, { inputTokens, maxOutputTokens: MAX_OUTPUT_TOKENS }, opts.settings);
       // 두 번째 호출: 지시문 + 근거 + 첫 응답(최대 출력만큼) + 고치기 안내
@@ -111,7 +124,7 @@ export type CompareRun = {
   costKrw: number;
   latencyMs: number;
   errorCode: string | null;
-  report: ReportContent | null;
+  report: ReportContent | PhilosophicalReportV0 | null;
   /** 내용 차이 검사 결과 (lib/report/v2/depth.ts) — 낱말 · 표지를 세는 어림이며 좋은 글이라는 보증이 아니다. 가려 읽는 평가가 따로 있다 */
   depth: { pass: boolean; fails: string[]; warns: string[]; conditionRatio: number; selfOverlapMax: number } | null;
 };
@@ -158,12 +171,15 @@ export async function runStage(opts: {
   guard: BudgetGuard;
   approval: CompareApproval | null | undefined;
   now: Date;
+  /** 쓰게 할 리포트의 종류 (기본: 개인 종합 리포트) */
+  variant?: CompareVariant;
   blindSeed: number;
   /** 제공사 오류 재시도 사이의 대기 (테스트에서는 즉시) */
   sleep?: (ms: number) => Promise<void>;
   callTimeoutMs?: number;
 }): Promise<StageResult> {
   checkApproval(opts.stage, opts.guard, opts.approval);
+  const variant = opts.variant ?? "personal-v2";
   const blindKey = assignBlind(opts.personas.map((p) => p.id), opts.candidates.map((c) => c.key), opts.blindSeed);
   const runs: CompareRun[] = [];
   let stoppedByBudget = false;
@@ -178,15 +194,16 @@ export async function runStage(opts: {
       }
       const spentBefore = opts.guard.spentKrw;
       const usage: AiUsageSample[] = [];
-      const generator = createAiReportGenerator({
+      const generatorOptions = {
         model: withBudget(candidate.model, opts.guard, candidate.price),
         now: () => opts.now,
         sleep: opts.sleep,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         callTimeoutMs: opts.callTimeoutMs,
-      });
+      };
+      const generator = variant === "philosophical-v0" ? createPhilosophicalGenerator(generatorOptions) : createAiReportGenerator(generatorOptions);
       const started = Date.now();
-      let report: ReportContent | null = null;
+      let report: ReportContent | PhilosophicalReportV0 | null = null;
       let errorCode: string | null = null;
       try {
         report = await generator.generate(persona.input, { onUsage: (u) => usage.push(u) });
@@ -201,11 +218,14 @@ export async function runStage(opts: {
       const outputTokens = usage.reduce((n, u) => n + (u.outputTokens ?? 0), 0);
       if (first?.inputTokens) {
         const ref = referenceFor(opts.now);
-        const est = estimateInputTokens([SYSTEM_PROMPT, buildUserMessage(buildEvidence(persona.input, ref), ref.iso, persona.input.context)]);
+        const est = estimateInputTokens(promptsFor(variant, buildEvidence(persona.input, ref), ref.iso, persona.input.context));
         ratios.push(first.inputTokens / est);
       }
       let depth: CompareRun["depth"] = null;
-      if (report && isPersonalV2(report)) {
+      if (report && isPhilosophicalReport(report)) {
+        const d = checkPhilosophicalDepth({ draft: report, evidence: report.evidence, concern: persona.input.context });
+        depth = { pass: d.pass, fails: d.fails, warns: d.warns, conditionRatio: d.metrics.conditionShare, selfOverlapMax: d.metrics.selfOverlapMax };
+      } else if (report && isPersonalV2(report)) {
         const d = checkDepth({ draft: report, evidence: report.evidence, hasContext: Boolean(persona.input.context) });
         depth = { pass: d.pass, fails: d.flags.filter((f) => f.severity === "fail").map((f) => f.id), warns: d.flags.filter((f) => f.severity === "warn").map((f) => f.id), conditionRatio: d.metrics.conditionRatio, selfOverlapMax: d.metrics.selfOverlapMax };
       }
@@ -228,9 +248,14 @@ export async function runStage(opts: {
   }
   const crossPersonOverlapBy: Record<string, number | null> = {};
   for (const c of opts.candidates) {
-    const reports = runs.filter((r) => r.candidate === c.key && r.report && isPersonalV2(r.report)).map((r) => r.report as Extract<ReportContent, { kind: "personal-v2" }>);
     const values: number[] = [];
-    for (let i = 0; i < reports.length; i++) for (let j = 0; j < reports.length; j++) if (i !== j) values.push(crossPersonOverlap(reports[i], reports[j]));
+    if (variant === "philosophical-v0") {
+      const blocks = runs.filter((r) => r.candidate === c.key && r.report && isPhilosophicalReport(r.report)).map((r) => readingBlocks(r.report as PhilosophicalReportV0));
+      for (let i = 0; i < blocks.length; i++) for (let j = 0; j < blocks.length; j++) if (i !== j) values.push(crossOverlapBlocks(blocks[i], blocks[j]));
+    } else {
+      const reports = runs.filter((r) => r.candidate === c.key && r.report && !isPhilosophicalReport(r.report) && isPersonalV2(r.report)).map((r) => r.report as Extract<ReportContent, { kind: "personal-v2" }>);
+      for (let i = 0; i < reports.length; i++) for (let j = 0; j < reports.length; j++) if (i !== j) values.push(crossPersonOverlap(reports[i], reports[j]));
+    }
     crossPersonOverlapBy[c.key] = values.length ? values.reduce((n, v) => n + v, 0) / values.length : null;
   }
   return {

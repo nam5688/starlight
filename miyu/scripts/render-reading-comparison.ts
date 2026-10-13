@@ -105,9 +105,9 @@ const rRight = {
   conflicts: [...R.conflicts.map((c) => para(c.text, c.evidence, c.title)), para(R.disagreement.text, R.disagreement.evidence, "세 가지를 합치지 않습니다")].join(""),
   strength: R.strengthCost.map((s) => `<div class="blk"><p class="bt">${esc(s.strength)}</p><p><b>대가</b> ${esc(s.cost)} <span class="when">(${esc(s.when)})</span></p><p>${esc(s.reading)}</p>${chips(s.evidence)}</div>`).join(""),
   choices:
-    R.choices.map((c) => `<div class="blk"><p class="bt">${esc(c.option)}</p><p><b>지키는 것</b> ${esc(c.protects)}</p><p><b>내려놓는 것</b> ${esc(c.costs)}</p><p><b>확인할 것</b> ${esc(c.check)}</p>${chips(c.evidence)}</div>`).join("") +
+    (R.choices ?? []).map((c) => `<div class="blk"><p class="bt">${esc(c.option)}</p><p><b>지키는 것</b> ${esc(c.protects)}</p><p><b>내려놓는 것</b> ${esc(c.costs)}</p><p><b>확인할 것</b> ${esc(c.check)}</p>${chips(c.evidence)}</div>`).join("") +
     para(R.flow.text, R.flow.evidence, "계산된 흐름") +
-    `<p class="note">${esc(nm(R.noVerdict))}</p>`,
+    `<p class="note">${esc(nm(R.noVerdict ?? ""))}</p>`,
   actions: R.questionsActions.map((q) => `<div class="blk"><p class="bt">${esc(q.when)}</p><p class="q">${esc(q.question)}</p><p>${esc(q.action)}</p>${chips(q.evidence)}</div>`).join(""),
 };
 const SECTIONS = [

@@ -72,14 +72,14 @@ test("자기 이해 풀이(수정안): 모든 문단이 계산된 근거 안에�
 test("자기 이해 풀이(수정안): 지어낸 어린 시절 · 상처 · 사건 예언 · 결정 대신 내리기가 없고, 알려 준 이야기를 사주로 알아맞힌 것처럼 쓰지 않는다", async () => {
   const { revised } = await load();
   const r = revised.reading;
-  const all = readingBlocks(r).map((b) => b.text).concat(r.headline, r.noVerdict);
+  const all = readingBlocks(r).map((b) => b.text).concat(r.headline, r.noVerdict ?? "");
   for (const t of all) for (const f of FORBIDDEN) assert.doesNotMatch(t, f.re, `${f.why}: ${t.slice(0, 40)}`);
   const text = all.join("\n");
   assert.doesNotMatch(text, /어린 시절|트라우마|상처|부모님|어머니|아버지|전생|영혼|본질|운명|진정한 자아|내면 깊/, "지어낸 배경 · 부풀린 추상어");
   assert.doesNotMatch(text, /(옮기세요|남으세요|옮기는 게 맞|옮기는 것이 맞|남는 것이 맞|남는 게 맞)/, "결정을 대신 내리지 않는다");
   assert.doesNotMatch(text, /사주(에|로|가)[^.!?]{0,30}(새 팀|프로젝트|일주일|옮기)/, "알려 준 이야기를 사주가 보여 준 것처럼 쓰지 않는다");
   assert.match(r.intro.text, /알아맞힌 것이 아닙니다/);
-  assert.match(r.noVerdict, /정하지 않습니다/);
+  assert.match(r.noVerdict ?? "", /정하지 않습니다/);
   // 고민의 사실(새 팀 · 프로젝트 · 일주일째 · 아는 사람)을 말하는 해석 문단은 알려 준 내용임을 밝힌다
   for (const b of [...r.values, ...r.conflicts]) {
     if (/새 팀|프로젝트|일주일|아는 사람|제안/.test(b.text)) assert.match(b.text, /알려 주신|하신/, `알려 준 내용임을 밝히지 않음: ${b.title}`);
@@ -98,8 +98,9 @@ test("자기 이해 풀이(수정안): 다섯 부분이 모두 있고, 갈등은
   assert.match(r.disagreement.text, /하나의 결론으로 합치지 않고/);
   assert.ok(r.strengthCost.length >= 2, "강점과 그 대가");
   for (const s of r.strengthCost) assert.ok(s.strength && s.cost && s.when && s.reading, "강점 · 대가 · 때 · 근거 문장");
-  assert.ok(r.choices.length >= 2 && r.choices.length <= 4, "이번 고민의 선택지");
-  for (const c of r.choices) assert.ok(c.protects && c.costs && c.check, `${c.option} 지키는 것 · 내려놓는 것 · 확인할 것`);
+  const choices = r.choices ?? [];
+  assert.ok(choices.length >= 2 && choices.length <= 4, "이번 고민의 선택지");
+  for (const c of choices) assert.ok(c.protects && c.costs && c.check, `${c.option} 지키는 것 · 내려놓는 것 · 확인할 것`);
   assert.ok(r.questionsActions.length >= 4, "돌아볼 질문과 행동");
   for (const q of r.questionsActions) {
     assert.match(q.question, /\?$/);

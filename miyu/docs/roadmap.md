@@ -251,7 +251,10 @@
 - [x] 측정(`lib/report/philosophy/compare.ts`, 낱말 · 표지를 센 어림): 길이 · 근거 · 조건 표지 · 상황 표지 없는 추상 문장 · 고민 낱말 반영 · 행동 구체성 · 개인 종합 리포트와의 겹침 + 검사 5개. 수정안은 기존 형식보다 1.30배 길고, 추상어 문장 중 상황 표지가 없는 것은 0개
 - [x] 나란히 보기 `docs/reading-comparison-haerin.html` · 요약 `docs/philosophical-reading-comparison.md` (문단별로 무엇이 새로운지 · 기존과 겹치는 곳 · 알려진 약점 · 승인 시 반영할 변경 목록)
 
+- [x] **AI 비교 1단계용 지시문 · 검사 · 미리보기 (2026-10-13, 호출 0회)**: 비교용 지시문 `philosophical-v0-prompt-0.1`(`lib/report/philosophy/prompt.ts`), 형식 검사(`validate.ts`) · 내용 점검(`depth.ts`) · 생성기(`lib/report/ai/philosophy-generator.ts`) · 비교 실행기 변형(`compare-plan.ts`의 `variant`) · 모의 작성기 + 테스트(`philosophy-generator.test.ts` 6개), 1단계 가상 인물 2명의 목표 문장 예시(`docs/samples/stage1-target-sentences.json` · 테스트 5개), 평가 기준 · 합격선(`ai-quality-comparison-plan.md` 9장), 승인 전 미리보기 `docs/ai-stage1-preview.html`(`scripts/render-ai-stage1-preview.ts`). 비용 계산은 `node scripts/compare-ai-dry-run.ts --variant philosophical-v0`(1단계 평소 약 890원 · 고쳐 쓰기까지 하는 최악 약 2,869원, 한도 3,000원 안).
+
 미완료 · 결정 필요
+- [ ] 운영자가 `ai-stage1-preview.html`(구성 · 목표 문장 · 평가 기준)을 확인하고 **1단계 3,000원 승인** → 승인 뒤에만 API 계정 · 키 안내와 제공사 연결 코드(어댑터)
 - [ ] 운영자가 나란히 보고 구조 확정 · 수정 → 그 뒤 `concern-v2` 지시문 · 형식 검사 · 모의 작성기 · 화면 반영 (개인 종합 리포트에 적용할지는 따로 결정)
 - [ ] 실제 AI로 같은 수준의 글이 나오는지, 가려 읽는 사람의 평가 (AI 연결 · 예산 승인 뒤)
 

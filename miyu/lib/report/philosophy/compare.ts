@@ -8,22 +8,12 @@ import type { PersonalContextInput } from "../../personalization/context.ts";
 import type { Evidence } from "../evidence.ts";
 import { CONCRETE_ACT, CONDITION, containment, jaccard, QUANTITY, shingles } from "../v2/depth.ts";
 import { sentences } from "../v2/validate.ts";
+import type { PBlock, PhilosophicalDraftV0 } from "./types.ts";
 import type { ConcernDraftV1 } from "../concern/types.ts";
 
-/** 자기 이해 풀이(수정안) — 아직 제품 형식이 아니다. 비교용 구조 */
-export type ReadingBlock = { text: string; evidence: string[] };
-export type PhilosophicalReading = {
-  headline: string;
-  intro: ReadingBlock;
-  values: (ReadingBlock & { title: string })[];
-  conflicts: (ReadingBlock & { title: string; between: [string, string] })[];
-  disagreement: ReadingBlock;
-  strengthCost: { strength: string; cost: string; when: string; reading: string; evidence: string[] }[];
-  choices: { option: string; protects: string; costs: string; check: string; evidence: string[] }[];
-  flow: ReadingBlock;
-  noVerdict: string;
-  questionsActions: { when: string; question: string; action: string; evidence: string[] }[];
-};
+/** 자기 이해 풀이(수정안) — 아직 제품 형식이 아니다. 비교용 구조 (types.ts) */
+export type ReadingBlock = PBlock;
+export type PhilosophicalReading = PhilosophicalDraftV0;
 
 /** 두 풀이를 같은 잣대로 세기 위해 "글 덩어리"로 편다 */
 export type Block = { kind: string; text: string; evidence: string[]; isAction?: boolean };
@@ -35,7 +25,7 @@ export function readingBlocks(r: PhilosophicalReading): Block[] {
     ...r.conflicts.map((c) => ({ kind: "내 안의 갈등", text: `${c.title}. ${c.text}`, evidence: c.evidence })),
     { kind: "내 안의 갈등", text: r.disagreement.text, evidence: r.disagreement.evidence },
     ...r.strengthCost.map((s) => ({ kind: "강점과 대가", text: `${s.strength}. ${s.when}: ${s.cost}. ${s.reading}`, evidence: s.evidence })),
-    ...r.choices.map((c) => ({ kind: "고민의 선택지", text: `${c.option}. 지키는 것: ${c.protects}. 내려놓는 것: ${c.costs}. 확인할 것: ${c.check}`, evidence: c.evidence })),
+    ...(r.choices ?? []).map((c) => ({ kind: "고민의 선택지", text: `${c.option}. 지키는 것: ${c.protects}. 내려놓는 것: ${c.costs}. 확인할 것: ${c.check}`, evidence: c.evidence })),
     { kind: "계산된 흐름", text: r.flow.text, evidence: r.flow.evidence },
     ...r.questionsActions.map((q) => ({ kind: "질문과 행동", text: `${q.when}: ${q.question} ${q.action}`, evidence: q.evidence, isAction: true })),
   ];

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>AI 비교 1단계 미리보기</title>
+<style>
+:root{--bg:#ffffff;--mist:#f5f6f8;--line:#e2e5e9;--line-strong:#c9ced5;--ink:#1d2125;--ink-2:#464d55;--ink-3:#5f666e;--accent:#1e4b8f;--accent-soft:#edf2f9;--danger:#b3261e;--danger-soft:#fbeeed;--font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--mist:#1b1f24;--line:#2b3138;--line-strong:#3c444d;--ink:#e8eaed;--ink-2:#c3c8ce;--ink-3:#9aa1a9;--accent:#8fb3e6;--accent-soft:#1c2736;--danger:#f0988f;--danger-soft:#33201f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171a;--mist:#1b1f24;--line:#2b3138;--line-strong:#3c444d;--ink:#e8eaed;--ink-2:#c3c8ce;--ink-3:#9aa1a9;--accent:#8fb3e6;--accent-soft:#1c2736;--danger:#f0988f;--danger-soft:#33201f;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:3.5rem}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.7;word-break:keep-all;overflow-wrap:break-word}
+.wrap{max-width:60rem;margin-inline:auto;padding-inline:16px;padding-block:20px 56px}
+h1{font-size:1.5rem;line-height:1.3;margin:0 0 6px;text-wrap:balance}
+h2{font-size:1.15rem;line-height:1.4;margin:34px 0 10px;padding-top:18px;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-size:1rem;margin:18px 0 6px}
+p,li{text-wrap:pretty}
+.sub{margin:0;color:var(--ink-2)}
+.status{margin:12px 0 0;padding:10px 12px;background:var(--mist);border-left:3px solid var(--accent);color:var(--ink-2);font-size:.9rem}
+.status.warn{border-left-color:var(--danger);background:var(--danger-soft)}
+.persona{display:grid;gap:6px;margin:10px 0;padding:12px 14px;background:var(--mist);border-radius:4px;font-size:.92rem}
+.persona p{margin:0}
+.quote{margin:6px 0 0;padding:8px 12px;border-left:3px solid var(--line-strong);color:var(--ink-2)}
+.blk{padding:12px 0;border-bottom:1px solid var(--line)}
+.blk p{margin:0 0 6px}
+.part{font-size:.82rem;color:var(--accent);font-weight:700}
+.bt{font-weight:700;color:var(--ink)}
+.q{font-weight:600}
+.when{color:var(--ink-3);font-size:.9em}
+.avoid{margin:6px 0;padding:10px 12px;background:var(--danger-soft);border-radius:4px;font-size:.92rem}
+.avoid p{margin:0}
+.note{margin:10px 0 0;padding:10px 12px;background:var(--accent-soft);border-radius:4px;color:var(--ink-2);font-size:.92rem}
+.ev{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.chip{font-size:.74rem;color:var(--ink-3);border:1px solid var(--line-strong);border-radius:3px;padding:0 6px;line-height:1.6}
+.tablewrap{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-size:.82rem;color:var(--ink-3);font-weight:600;border-bottom:1px solid var(--line-strong);background:var(--mist)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.small{font-size:.84rem;color:var(--ink-3)}
+ul.rules,ol.rules{margin:8px 0;padding-left:1.3rem;display:grid;gap:6px}
+code{font-size:.85em;background:var(--mist);padding:1px 5px;border-radius:3px}
+details{margin:4px 0}
+summary{cursor:pointer;color:var(--accent);font-size:.9rem}
+.ask{margin:14px 0;padding:14px 16px;border:2px solid var(--accent);border-radius:4px;background:var(--accent-soft)}
+.ask p{margin:0 0 8px}
+.ask p:last-child{margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>AI 비교 1단계 — 승인 전 미리보기</h1>
+<p class="sub">철학적인 사주 해석 방향을 반영한 비교용 지시문 · 가상 인물 2명 · 리포트 구성 · 짧은 목표 문장 · 평가 기준 · 비용</p>
+<p class="status warn"><b>지금 상태:</b> 유료 AI 호출 <b>0회</b> · API 키 없음 · 예산 <b>미승인</b> · 제공사 연결 코드 없음. 이 문서는 호출하기 전에 확인하려고 만든 것이며, 아래 내용을 확인하고 승인하기 전에는 아무것도 보내지 않는다.</p>
+
+<h2>1. 요청하신 방향을 어떻게 반영했나</h2>
+<p class="sub">지시문 버전 <code>philosophical-v0-prompt-0.1</code>. 기존 개인 종합 리포트 지시문으로 두 AI를 비교하면 요청하신 방향이 나오는지 판단할 수 없어서, 1단계는 이 지시문으로 한다. 제품의 생성 지침에는 아직 연결하지 않았다.</p>
+<div class="tablewrap"><table><thead><tr><th>요청</th><th>지시문이 AI에게 요구하는 것</th><th>어긋나면 어떻게 거르나</th></tr></thead><tbody><tr><td>내가 중요하게 여기는 가치</td><td>'중요하게 여기는 것'을 정확히 3개(가치 · 혼자 맡는 책임의 범위 · 고를 때의 기준)로 쓰게 한다. 사실이 아니라 근거에서 읽은 가설이므로 &quot;~일 수 있습니다&quot;로 쓰게 한다.</td><td>형식 검사: 3개가 아니면 실패 · 읽는 법에 &quot;가설&quot;이 없으면 실패</td></tr><tr><td>내 안에서 충돌하는 마음</td><td>서로 부딪히는 두 마음을 적고 각각 무엇을 지키는지 쓰게 한다. 한쪽을 이기게 하지 않고, 사주와 응답이 갈라지면 &quot;하나의 결론으로 합치지 않고 나란히 둔다&quot;고 쓰게 한다.</td><td>형식 검사: 갈등 2~3개, 사주 근거와 응답 근거를 함께 달아야 함 · 합치지 않는다는 말이 없으면 실패</td></tr><tr><td>잘하는 점이 부담으로 바뀌는 상황</td><td>강점마다 &quot;어떤 때&quot; 부담이 되는지(생활 장면)와 그때 치르는 대가를 쓰게 한다.</td><td>형식 검사: 강점 2~3개마다 장면 · 대가 · 근거 문장이 있어야 함</td></tr><tr><td>선택할 때 생각해 볼 기준</td><td>고민을 알려 준 사람에게만, 선택지마다 지키는 것 · 내려놓는 것 · 확인할 것을 쓰게 한다. 어느 쪽이 맞는지는 정하지 않는다고 밝히게 한다.</td><td>형식 검사: 결정 대신 내리는 말(&quot;~하세요&quot; · &quot;그게 맞습니다&quot;)이 있으면 실패 · 고민이 없는 사람에게 선택지가 나오면 실패</td></tr><tr><td>구체적인 일상 사례</td><td>모든 해석 문장이 원국 · 응답 · 알려 준 내용 · 조건(&quot;~할 때&quot;) · 시점이나 분량 중 하나에 붙어 있어야 한다. 마지막 질문마다 &quot;이번 주 안에 10분&quot;처럼 시점이 보이는 행동을 붙이게 한다.</td><td>내용 점검: 붙을 곳 없는 추상 문장 4개 이상이면 실패 · 구체적인 행동 67% 미만이면 실패</td></tr><tr><td>추상적인 위로 · 누구에게나 맞는 말 줄이기</td><td>&quot;본질 · 영혼 · 진정한 자아&quot; 같은 큰 낱말과 &quot;누구나&quot; · &quot;괜찮아요&quot; 같은 문장을 쓰지 않게 한다. 어린 시절 · 상처 · 앞날의 사건을 지어내지 않게 한다.</td><td>형식 검사: 지어낸 배경 · 부풀린 추상어 · 금지 표현 1건이라도 실패</td></tr></tbody></table></div>
+<p class="note">사주가 틀이고, 성향 · 관계 응답과 알려 준 고민은 어디를 볼지 초점만 정한다. 응답 때문에 원국이나 시기 해석을 바꾸지 않고, 알려 준 이야기를 사주로 알아맞힌 것처럼 쓰지 않는다. 응답 점수 숫자는 본문에 쓰지 않고 "높게 · 낮게"와 행동으로만 쓰게 한다.</p>
+
+<h2>2. 비교에 쓰는 가상 인물 2명 (실제 고객 아님)</h2>
+<p class="sub">원국은 만세력 엔진이 계산한 값이고, 응답은 현재 개발용 문항에 가상으로 답한 값이다. 새 자체 문항(30문항 초안)을 적용한 값이 아니다.</p>
+<div class="persona">
+<p><b>P01</b> · 기(己) 일간 · 여성 · 태어난 시각 있음 · 내 고민 자세히 알려주기 있음</p>
+<p class="small">가상의 고민(실제 고객 정보 아님): 연애 — '연락이 뜸해지면 먼저 할지 기다릴지 계속 고민돼요.' / 상황 — '대화가 길어지면 말수가 줄고 혼자 정리하려고 해요.'</p>
+<div class="quote">고민(가상): 연락이 뜸해지면 먼저 할지 기다릴지 계속 고민돼요.<br>상황(가상): 대화가 길어지면 말수가 줄고 혼자 정리하려고 해요.</div>
+<details><summary>AI가 받는 근거 24개 (전체 36개 중 핵심, 쉬운 말로)</summary>
+<ul class="rules"><li>원국 · 일간 기토(己), 음의 토</li><li>원국 · 원국 글자 중 목 3개</li><li>원국 · 원국 글자 중 토 4개</li><li>원국 · 원국 글자에 금이 없음</li><li>원국 · 원국 글자에 수가 없음</li><li>원국 · 비겁 3자리 (겁재 · 겁재 · 비견</li><li>원국 · 원국에 식상이 없음</li><li>원국 · 원국에 재성이 없음</li><li>원국 · 관성 3자리 (정관 · 정관 · 정관</li><li>원국 · 관성 3자리 + 인성 1자리</li><li>원국 · 전통 해석의 배우자 별(여성 원국: 관성) 3자리</li><li>원국 · 배우자 자리(일지) 미(未)</li><li>응답 · 새로운 것을 찾아 나서는 정도가 낮은 쪽</li><li>응답 · 행동하기 전에 신중하게 따지는 정도가 높은 쪽</li><li>응답 · 다른 사람의 반응에 신경 쓰는 정도가 높은 쪽</li><li>응답 · 한 가지를 오래 이어 가는 정도가 낮은 쪽</li><li>응답 · 가까운 관계에서 불안을 느끼는 정도가 낮은 쪽</li><li>응답 · 가까운 사람과 거리를 두는 정도가 높은 쪽</li><li>본인이 알고 있는 MBTI INFJ</li><li>원국 · 현재 대운 신해(辛亥) 2017-11~2027-10 — 천간 식신, 지지 정재 <span class="small">(계산된 시기)</span></li><li>원국 · 다음 대운 경술(庚戌) 2027-11~2037-10 — 천간 상관, 지지 겁재 <span class="small">(계산된 시기)</span></li><li>원국 · 2026년 세운 병오 — 천간 정인, 지지 편인 <span class="small">(계산된 시기)</span></li><li>원국 · 2027년 세운 정미 — 천간 편인, 지지 비견 <span class="small">(계산된 시기)</span></li><li>원국 · 2028년 세운 무신 — 천간 겁재, 지지 상관 <span class="small">(계산된 시기)</span></li></ul>
+</details>
+<p class="small">보내지 않는 것: 이름 · 생년월일 원문 (이름 자리에는 <code>{name}</code>만 쓴다). 응답은 현재 개발용 문항에 가상으로 답한 값이다.</p>
+</div>
+<div class="persona">
+<p><b>P02</b> · 경(庚) 일간 · 남성 · 태어난 시각 있음 · 내 고민 자세히 알려주기 없음</p>
+<p class="small">고민을 알려 주지 않은 인물 — '알려 주신'이라는 말과 선택지 · 정하지 않는다는 안내가 없어야 한다.</p>
+
+<details><summary>AI가 받는 근거 20개 (전체 25개 중 핵심, 쉬운 말로)</summary>
+<ul class="rules"><li>원국 · 일간 경금(庚), 양의 금</li><li>원국 · 원국 글자에 화가 없음</li><li>원국 · 원국 글자 중 토 3개</li><li>원국 · 원국 글자 중 금 3개</li><li>원국 · 원국 글자에 수가 없음</li><li>원국 · 원국에 식상이 없음</li><li>원국 · 원국에 관성이 없음</li><li>원국 · 인성 3자리 (편인 · 편인 · 편인</li><li>원국 · 재성 2자리 + 인성 3자리</li><li>원국 · 전통 해석의 배우자 별(남성 원국: 재성) 2자리</li><li>원국 · 배우자 자리(일지) 신(申)</li><li>응답 · 다른 사람의 반응에 신경 쓰는 정도가 낮은 쪽</li><li>응답 · 한 가지를 오래 이어 가는 정도가 낮은 쪽</li><li>응답 · 가까운 사람과 거리를 두는 정도가 낮은 쪽</li><li>본인이 알고 있는 MBTI ENTP</li><li>원국 · 현재 대운 무오(戊午) 2018-01~2027-12 — 천간 편인, 지지 정관 <span class="small">(계산된 시기)</span></li><li>원국 · 다음 대운 기미(己未) 2028-01~2037-12 — 천간 정인, 지지 정인 <span class="small">(계산된 시기)</span></li><li>원국 · 2026년 세운 병오 — 천간 편관, 지지 정관 <span class="small">(계산된 시기)</span></li><li>원국 · 2027년 세운 정미 — 천간 정관, 지지 정인 <span class="small">(계산된 시기)</span></li><li>원국 · 2028년 세운 무신 — 천간 편인, 지지 비견 <span class="small">(계산된 시기)</span></li></ul>
+</details>
+<p class="small">보내지 않는 것: 이름 · 생년월일 원문 (이름 자리에는 <code>{name}</code>만 쓴다). 응답은 현재 개발용 문항에 가상으로 답한 값이다.</p>
+</div>
+<p class="small">P01은 고민이 있어 고민을 반영하는 경로를, P02는 고민이 없어 "알려 주신"과 선택지가 나오지 않아야 하는 경로를 시험한다. 두 사람은 일간이 다르고(기토 · 경금) 같은 틀로 쓰되 다른 말이어야 한다.</p>
+
+<h2>3. 리포트 구성 — 아홉 부분 (순서와 개수 고정)</h2>
+<div class="tablewrap"><table><thead><tr><th>부분</th><th>개수 · 길이</th><th>고민이 없는 사람(P02)</th><th>고민이 있는 사람(P01)</th></tr></thead><tbody><tr><td>① 읽는 법</td><td>40~300자</td><td>근거에서 읽은 가설이며 마지막 질문으로 직접 확인하라는 안내</td><td>+ 알려 주신 내용은 사주로 알아맞힌 것이 아니라는 말</td></tr><tr><td>② 내가 중요하게 여기는 것</td><td>3개 · 각 150~600자</td><td>가치 / 혼자 맡는 책임의 범위 / 고를 때의 기준</td><td>+ 알려 주신 고민에서 읽은 것</td></tr><tr><td>③ 내 안의 갈등</td><td>2~3개 · 각 120~500자</td><td>부딪히는 두 마음, 각각 지키는 것</td><td>+ 알려 주신 장면</td></tr><tr><td>④ 갈라지는 곳</td><td>1개 · 50~400자</td><td>사주와 응답이 다른 곳은 합치지 않고 나란히</td><td>같음</td></tr><tr><td>⑤ 잘하는 점이 부담이 되는 때</td><td>2~3개</td><td>잘하는 점 · 부담이 되는 때 · 대가 · 읽은 이유</td><td>같음</td></tr><tr><td>⑥ 이번 고민의 선택지</td><td>고민이 있을 때만 2~4개</td><td>(쓰지 않음)</td><td>지키는 것 · 내려놓는 것 · 확인할 것</td></tr><tr><td>⑦ 큰 흐름</td><td>1개 · 80~500자</td><td>계산된 해의 주제 + &quot;어떤 일이 일어난다는 뜻은 아닙니다&quot;</td><td>같음</td></tr><tr><td>⑧ 정하지 않는다는 안내</td><td>고민이 있을 때만</td><td>(쓰지 않음)</td><td>&quot;어느 쪽이 맞는지 정하지 않습니다&quot;</td></tr><tr><td>⑨ 돌아볼 질문과 행동</td><td>4~5개</td><td>때 · 질문 · 시점이 보이는 행동</td><td>같음</td></tr></tbody></table></div>
+<p class="small">기존 개인 종합 리포트(9,900원)를 되풀이하는 글이 아니라, 같은 사람을 "무엇을 중요하게 여기고 어디서 부딪히는가"의 틀로 다시 읽는 글이다. 이 구성은 아직 제품 화면 · 생성 지침에 반영하지 않았다 (4,900원 고민 반영 리포트에 쓸지는 운영자가 비교 결과를 본 뒤 정한다).</p>
+
+<h2>4. 짧은 목표 문장 예시 — 이 정도로 구체적이고 근거가 보이는 글</h2>
+<p class="sub">사람이 쓴 기준선이다. AI가 이 문장을 베끼게 하려는 것이 아니라, 결과를 읽을 때 "이 수준인가"를 비교하는 눈금이다. 아래 칩은 문단이 단 근거 ID이며, 실제 인물의 계산 결과에 있는 것만 썼다.</p>
+<h3>P01 목표 문장 (고민이 있는 인물)</h3>
+<div class="blk"><p class="part">내가 중요하게 여기는 것 (가설)</p><p>알려 주신 '연락이 뜸해지면 먼저 할지 기다릴지'라는 고민에서, 중요한 것은 연락의 횟수보다 '먼저 움직여도 어색해지지 않는다는 확신'일 수 있습니다. 응답에서 신중함과 타인 반응 민감도가 모두 높게 나왔고, 원국에서는 정관(正官, 규칙 · 책임을 뜻하는 힘)이 세 자리라 관계에서 선과 예의를 지키는 쪽에 무게가 실립니다.</p><div class="ev"><span class="chip">survey.caution.high</span><span class="chip">survey.sensitivity.high</span><span class="chip">saju.tengod.관성.many</span></div></div><div class="blk"><p class="part">혼자 맡는 책임의 범위</p><p>알려 주신 '대화가 길어지면 말수가 줄고 혼자 정리한다'는 모습은 사주로 알아맞힌 것이 아니라 말씀해 주신 내용입니다. 다만 원국에 식상(食傷, 마음을 말과 결과물로 꺼내는 힘)이 없고 응답에서 거리 두기가 높은 쪽으로 나와, 정리가 끝나기 전에는 말을 아끼고 정리한 뒤에 한꺼번에 꺼내는 쪽일 수 있습니다.</p><div class="ev"><span class="chip">saju.tengod.식상.none</span><span class="chip">survey.avoidance.high</span></div></div><div class="blk"><p class="part">내 안의 갈등: 먼저 하고 싶은 마음 ↔ 기다리고 싶은 마음</p><p>알려 주신 '먼저 할지 기다릴지'는 두 마음이 부딪히는 모양입니다. 응답에서 관계 불안은 낮게 나오고 타인 반응 민감도는 높게 나와, 답이 없다고 크게 흔들리지는 않아도 보낸 말에 대한 반응은 오래 신경 쓰일 수 있습니다. 원국에서는 비겁(比劫, 나와 같은 편이 되어 주는 힘)이 세 자리라 내 방식대로 하고 싶은 힘이, 관성이 세 자리라 선을 지키려는 힘이 맞서서 두 쪽 모두 근거가 있고, 하나의 결론으로 합치지 않고 나란히 둡니다.</p><div class="ev"><span class="chip">survey.anxiety.low</span><span class="chip">survey.sensitivity.high</span><span class="chip">saju.tengod.비겁.many</span><span class="chip">saju.tengod.관성.many</span></div></div><div class="blk"><p class="part">잘하는 점이 부담이 되는 때</p><p><b>잘하는 점</b> 말을 보내기 전에 상대가 받을 장면을 먼저 떠올리는 신중함</p><p><b>부담이 되는 때</b> 상대의 답이 평소보다 늦어질 때</p><p><b>치르는 대가</b> 신중함이 높게, 새로움 추구가 낮게 함께 나오고 원국에서도 정관이 세 자리라 틀을 지키는 쪽이어서, 익숙하지 않은 방식(예: 용건 없이 안부만 먼저 보내기)은 계속 미루게 될 수 있습니다.</p><div class="ev"><span class="chip">survey.caution.high</span><span class="chip">survey.novelty.low</span><span class="chip">saju.tengod.관성.many</span></div></div><div class="blk"><p class="part">이번 고민의 선택지 ①</p><p class="bt">먼저 연락한다</p><p><b>지키는 것</b> 조용히 멀어지는 것을 막을 가능성</p><p><b>내려놓는 것</b> '상대가 먼저 움직여 준다'는 확인</p><p><b>확인할 것</b> 먼저 보낸 가벼운 안부에 이틀 안에 답이 오는지. 알려 주신 내용에는 상대가 평소 답하는 속도가 없어 직접 확인해야 합니다.</p><div class="ev"><span class="chip">saju.tengod.비겁.many</span><span class="chip">survey.caution.high</span></div></div><div class="blk"><p class="part">이번 고민의 선택지 ②</p><p class="bt">정한 기간만 기다린다</p><p><b>지키는 것</b> 부담스러운 사람이 되지 않는다는 안정감</p><p><b>내려놓는 것</b> 먼저 말했다면 알 수 있었을 상대의 반응</p><p><b>확인할 것</b> 기다리는 동안 내가 얼마나 자주 확인하는지. 기간을 정하지 않으면 기다림이 끝없이 길어질 수 있습니다.</p><div class="ev"><span class="chip">saju.tengod.관성.many</span><span class="chip">survey.sensitivity.high</span></div></div><div class="blk"><p class="part">돌아볼 질문과 행동</p><p class="when">상대의 답이 평소보다 늦다고 느낄 때</p><p class="q">연락이 뜸해졌다고 느끼는 기준은 며칠이고, 그 기준을 다른 사람에게도 똑같이 적용하나요?</p><p><b>행동</b> 이번 주 안에 '며칠째부터 먼저 연락한다'는 기준을 메모 한 줄로 적고, 다음 주 같은 요일에 지켰는지 한 줄 덧붙입니다.</p><div class="ev"><span class="chip">survey.caution.high</span><span class="chip">saju.tengod.관성.many</span></div></div><div class="blk"><p class="part">큰 흐름 (계산된 해만)</p><p>계산된 흐름에서 2026년 세운 병오(丙午)는 천간 정인, 지지 편인으로 배움 · 준비 · 도움을 받는 주제가 두드러지는 해로 봅니다. 현재 대운 신해는 2027년 10월까지이고, 다음 대운 경술은 2027년 11월에 시작합니다. 어떤 일이 일어난다는 뜻은 아닙니다.</p><div class="ev"><span class="chip">saju.seun.2026</span><span class="chip">saju.daeun.current</span><span class="chip">saju.daeun.next</span></div></div><div class="blk"><p class="part">정하지 않는다는 안내</p><p>이 풀이는 먼저 연락하는 쪽과 기다리는 쪽 중 어느 쪽이 맞는지 정하지 않습니다. 정하는 일은 {name}님의 몫입니다.</p><div class="ev"><span class="chip">saju.tengod.관성.many</span><span class="chip">survey.caution.high</span></div></div>
+<h3>P01 — 이렇게 쓰지 않는다 (자동 점검에도 걸리는 예)</h3>
+<div class="avoid"><p>누구에게나 연락은 어려운 일이에요. 당신은 마음이 깊은 사람이라 진정한 인연은 결국 이어질 거예요.</p><p class="small">왜: 누구에게나 붙는 위로 · 근거와 조건이 없음 · 앞날을 단정</p></div><div class="avoid"><p>기다리는 것도 먼저 하는 것도 정답은 없어요. 스스로의 마음을 믿고 삶의 의미를 찾아가 보세요.</p><p class="small">왜: 추상적인 위로 · 알려 준 고민의 낱말도 조건도 분량도 없음</p></div><div class="avoid"><p>먼저 연락하세요. 그게 맞습니다.</p><p class="small">왜: 결정을 대신 내림</p></div>
+<h3>P02 목표 문장 (고민이 없는 인물)</h3>
+<div class="blk"><p class="part">내가 중요하게 여기는 것 (가설)</p><p>원국에 인성(印星, 나를 돕는 배움 · 검토의 힘)이 편인으로 세 자리인 것은, 전통 해석에서 충분히 이해한 뒤에 움직이는 구조로 봅니다. 응답에서 지속성이 낮게 나와 같은 일을 오래 반복하기보다 새로 이해한 것으로 옮겨 가는 쪽에 가까워, 중요한 것은 '이해가 끝났다는 느낌'일 수 있습니다.</p><div class="ev"><span class="chip">saju.tengod.인성.many</span><span class="chip">survey.persistence.low</span></div></div><div class="blk"><p class="part">혼자 맡는 책임의 범위</p><p>원국에 관성(官星, 규칙 · 책임 · 평판의 힘)이 없는 것은, 조직의 규칙이나 평판보다 스스로 세운 기준이 움직이는 이유가 되는 구조로 봅니다. 응답에서 타인 반응 민감도가 낮게 나와, 평가하는 사람이 없는 자리에서는 맡는 일의 범위를 스스로 넓히거나 줄이기 쉬울 수 있습니다.</p><div class="ev"><span class="chip">saju.tengod.관성.none</span><span class="chip">survey.sensitivity.low</span></div></div><div class="blk"><p class="part">내 안의 갈등: 이해하려는 마음 ↔ 끝까지 닫으려는 마음</p><p>원국은 배우는 쪽(인성 세 자리)으로 기울어 있고 응답은 한 가지를 오래 붙들지 않는 쪽(지속성 낮음)이라서, 이해는 빨리 되는데 닫는 단계에서 멈추는 두 마음이 맞설 수 있습니다. 원국에 식상(食傷, 생각을 결과물로 꺼내는 힘)도 없어 결과물로 닫는 통로를 따로 만들지 않으면 '알기만 한 것'이 쌓일 수 있습니다. 원국과 응답이 같은 방향이 아니므로 하나의 결론으로 합치지 않고 나란히 둡니다.</p><div class="ev"><span class="chip">saju.tengod.인성.many</span><span class="chip">saju.tengod.식상.none</span><span class="chip">survey.persistence.low</span></div></div><div class="blk"><p class="part">잘하는 점이 부담이 되는 때</p><p><b>잘하는 점</b> 새로운 분야의 원리를 빨리 잡고 다음으로 넘어가는 속도</p><p><b>부담이 되는 때</b> 새 일을 시작한 지 몇 주가 지나 처음의 호기심이 줄 때</p><p><b>치르는 대가</b> 식상이 없고 지속성이 낮아, 결과물로 닫는 단계를 따로 정해 두지 않으면 시작만 많고 끝난 일이 적게 남을 수 있습니다.</p><div class="ev"><span class="chip">saju.tengod.식상.none</span><span class="chip">survey.persistence.low</span></div></div><div class="blk"><p class="part">돌아볼 질문과 행동</p><p class="when">새 일을 시작한 지 몇 주가 지나 흥미가 줄었다고 느낄 때</p><p class="q">지금 이해하고 있는 것 가운데 한 장짜리 결과물로 닫아 본 것은 몇 개인가요?</p><p><b>행동</b> 이번 주 안에 최근에 배운 것 하나를 골라 A4 한 장 분량으로 정리해 적고, 다음 주 같은 요일에 다시 읽어 봅니다.</p><div class="ev"><span class="chip">saju.tengod.식상.none</span><span class="chip">survey.persistence.low</span></div></div><div class="blk"><p class="part">큰 흐름 (계산된 해만)</p><p>계산된 흐름에서 2026년 세운 병오는 천간 편관, 지지 정관으로 책임 · 평판 · 관계의 틀이 주제가 되는 해로 봅니다. 현재 대운 무오는 2027년 12월까지이고, 2028년 1월부터 다음 대운 기미가 시작해 배움 · 준비 · 도움을 받는 주제가 이어집니다. 어떤 일이 일어난다는 뜻은 아닙니다.</p><div class="ev"><span class="chip">saju.seun.2026</span><span class="chip">saju.daeun.current</span><span class="chip">saju.daeun.next</span></div></div>
+<h3>P02 — 이렇게 쓰지 않는다 (자동 점검에도 걸리는 예)</h3>
+<div class="avoid"><p>당신은 어떤 일이든 해낼 수 있는 능력을 가졌어요. 때로는 쉬어 가며 자신을 사랑해 주세요.</p><p class="small">왜: 누구에게나 붙는 위로 · 근거 없음</p></div><div class="avoid"><p>경금 일간은 강하고 단단한 사람입니다. 인생의 의미는 스스로 찾는 거예요.</p><p class="small">왜: 일간 이름만으로 단정 · 추상적인 말 · 근거와 조건과 분량 없음</p></div><div class="avoid"><p>올해는 큰 변화가 생기고 좋은 인연이 찾아옵니다.</p><p class="small">왜: 앞날의 사건을 단정</p></div>
+<p class="small">확인한 것: 근거 ID와 "높게 · 낮게"로 쓴 방향이 위 인물의 실제 계산 결과와 맞고, 막는 표현이 없으며, "이렇게 쓰지 않는다" 예시가 실제로 점검에 걸린다 (테스트 5개). 확인하지 못한 것: 이 문장들이 좋은 글인지(사람이 읽고 판단해야 한다), 실제 AI가 이 수준으로 쓰는지.</p>
+
+<h2>5. 평가 기준 — 결과를 보기 전에 고정</h2>
+<h3>자동 점검 (낱말과 표지를 세는 어림 · 좋은 글의 보증이 아님)</h3>
+<div class="tablewrap"><table><thead><tr><th>점검</th><th>실패</th><th>경고</th></tr></thead><tbody><tr><td>형식 · 구성 순서 · 개수 · 글자 범위</td><td>어기면 실패 (한 번 고쳐 쓰게 한 뒤 다시 점검)</td><td></td></tr><tr><td>근거 ID 오류 · 계산된 시기 밖의 해 · 앞날 단정</td><td>1건이라도 실패</td><td></td></tr><tr><td>지어낸 배경 · 부풀린 추상어 · 결정 대신 내리기 · 금지 표현</td><td>1건이라도 실패</td><td></td></tr><tr><td>고민이 없는 인물에서 &quot;알려 주신&quot; · 선택지 · 정하지 않는다는 안내</td><td>1건이라도 실패</td><td></td></tr><tr><td>상황 표지 없는 추상 문장</td><td>4개 이상 실패</td><td>1~3개 경고</td></tr><tr><td>사주 근거를 단 덩어리의 몫</td><td>80% 미만 실패</td><td></td></tr><tr><td>구체적인 행동의 몫</td><td>67% 미만 실패</td><td></td></tr><tr><td>덩어리끼리 겹침</td><td>35% 초과 실패</td><td></td></tr><tr><td>조건 표지 · 사주와 응답을 함께 단 덩어리</td><td></td><td>각각 60% 미만 경고</td></tr><tr><td>응답 점수 숫자(&quot;88점&quot; · 백분위)를 본문에 씀</td><td></td><td>1건이라도 경고</td></tr></tbody></table></div>
+<h3>이름을 가린 채 운영자가 채점 (X · Y, 5점 만점)</h3>
+<div class="tablewrap"><table><thead><tr><th>항목</th><th>보는 것</th></tr></thead><tbody><tr><td>장면의 구체성</td><td>이름을 가려도 이 사람의 이야기로 읽히는가 · &quot;~할 때&quot; 같은 생활 장면이 있는가</td></tr><tr><td>중요하게 여기는 것</td><td>가설로 쓰였고 근거와 맞으며 &quot;그럴 수 있겠다&quot;고 느껴지는가 (단정 · 일반론이면 낮게)</td></tr><tr><td>내 안의 갈등</td><td>부딪히는 두 마음이 각각 무엇을 지키는지 보이는가 (한쪽 편들기 · 뻔한 대립이면 낮게)</td></tr><tr><td>잘하는 점이 부담이 되는 때</td><td>부담이 되는 때가 구체적인 장면인가</td></tr><tr><td>선택지 (P01만)</td><td>지키는 것 · 내려놓는 것 · 확인할 것이 있고 결정을 대신하지 않는가</td></tr><tr><td>추상적 위로 · 누구에게나 맞는 말</td><td>&quot;아무에게나 해당한다&quot;고 느낀 문장 수를 센다 (적을수록 좋다 — 거꾸로 점수)</td></tr><tr><td>근거 일치</td><td>문단이 단 근거와 내용이 맞는가 · 알려 준 이야기를 사주로 알아맞힌 것처럼 쓴 문장은 없는가</td></tr><tr><td>한국어 자연스러움</td><td>번역투 · 반복 · 어색한 문장</td></tr><tr><td>따로 받을 만한가</td><td>개인 종합 리포트와 다른 것을 얻었고 더 알고 싶은가</td></tr></tbody></table></div>
+<h3>1단계 합격선</h3>
+<ul class="rules">
+<li>지어낸 배경 · 사건 · 날짜 · 직업 · 나이: <b>0건</b></li>
+<li>자동 점검의 실패 항목 없음 (고쳐 쓰기 1회 안에서). 경고는 사람이 읽고 판단</li>
+<li>블라인드 평가: "장면의 구체성" · "근거 일치" · "따로 받을 만한가" 평균 4.0 이상, "추상적 위로 · 누구에게나 맞는 말"은 한 편에 3문장 이하</li>
+<li>건당 비용 400원 이하 (고쳐 쓰기 포함 평균)</li>
+</ul>
+<p class="note"><b>생성 4건으로 알 수 있는 것:</b> 지시문대로 구성을 지키는가 · 지어낸 내용이 있는가 · 비용과 시간이 예상 범위인가 · 같은 근거로 쓴 두 글의 질감이 눈에 띄게 다른가.<br><b>알 수 없는 것:</b> 어느 회사가 더 낫다는 순위(4건은 우연의 폭이 크다), 사주 해석의 정확성(해석 규칙은 전문가 검토 전 초안), 실제 고객의 만족, 새 자체 문항으로 만든 근거에서의 품질. 글이 깊어 보이는 것이 곧 해석이 맞다는 뜻도 아니다. 후보 하나가 이 작업을 하는 Claude와 같은 계열이므로, 이름을 가린 운영자 채점이 판단의 기준이다.</p>
+
+<h2>6. 비용 — 호출 없는 계산</h2>
+<p class="sub">같은 지시문 · 같은 근거를 두 후보 모두에게 보낸다. 두 후보 단가는 입력 $2 · 출력 $10 (100만 토큰당, 공식 문서 확인일 2026-10-12 — 운영자가 따로 확인한 값은 아님). 환율 1,600원/달러(가정) · 여유율 10% · 입력 토큰은 한글 글자당 2토큰으로 보수적으로 추정.</p>
+<div class="tablewrap"><table><thead><tr><th>구분</th><th class="num">금액</th></tr></thead><tbody><tr><td>생성 1건 — 평소(출력 1만 토큰)</td><td class="num">약 217원</td></tr><tr><td>생성 1건 — 많이(출력 최대 1만 6천 토큰)</td><td class="num">약 333원</td></tr><tr><td>생성 1건 — 많이 + 형식 검사 실패로 고쳐 쓰기 1회</td><td class="num">약 728원</td></tr><tr><td>1단계 평소 예상 (생성 4건)</td><td class="num">약 890원</td></tr><tr><td>1단계 첫 호출만 쓰는 최악</td><td class="num">약 1,313원</td></tr><tr><td>1단계 모든 생성이 고쳐 쓰기까지 하는 최악</td><td class="num">약 2,869원 (승인 한도 3,000원 안)</td></tr></tbody></table></div>
+<p class="small">이 한도(3,000원)는 이번 테스트에서 쓸 수 있는 최대 금액이며 API 계정에 먼저 충전해야 하는 금액과는 다를 수 있다(계정마다 최소 충전액이 다르다). 앞으로 고객 리포트를 만들 때의 호출 비용은 이와 별개다. 모든 호출은 호출 전에 최악 비용을 예약하고, 한도를 넘길 호출은 제공사에 보내지 않으며, 승인 기록이 없으면 실행하지 않는다.</p>
+
+<h2>7. 승인 요청</h2>
+<div class="ask">
+<p><b>1단계만 요청합니다.</b> 가운데 등급 두 모델(<code>claude-sonnet-5-5</code> · <code>gpt-6.1-sol</code>)로 위 가상 인물 2명 × 2 = 생성 4건에 <b>총 3,000원 한도</b>의 유료 API 호출을 해도 되는가.</p>
+<p>승인해도 일어나지 않는 것: 실제 고객 정보 사용 · 2단계(20건) 실행 · 한도를 넘는 호출 · 키를 대화창에 붙여넣기 · 제품 화면 변경 · 실결제.</p>
+<p>승인하면 이어지는 일: ① 운영자가 두 회사 API 계정을 만들고 월 사용 한도를 걸고 키를 <code>.env.local</code>에만 입력합니다(한 단계씩 안내, 키는 채팅에 보내지 않음). ② 그다음에야 두 회사 연결 코드를 만들고, 호출 직전에 이 비용 표를 한 번 더 보여 드립니다. ③ 운영자 PC에서 실행하고 결과는 X · Y로 가린 파일로 나옵니다.</p>
+</div>
+<p class="small">확인해 주실 것 세 가지: (1) 위 아홉 부분 구성이 원하는 풀이 방향과 맞는가 (2) 목표 문장의 수준 · 말투가 맞는가 (3) 평가 기준과 합격선을 이대로 고정해도 되는가.</p>
+</div>
+</body>
+</html>

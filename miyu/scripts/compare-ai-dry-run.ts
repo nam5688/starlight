@@ -1,19 +1,24 @@
 // AI 품질 비교의 비용 계획을 계산해 보여 준다 (드라이런) — 어떤 AI도 부르지 않고, 키도 필요 없다.
 // 가상 인물의 실제 지시문 · 근거 목록 길이로 입력 토큰을 추정하고, 환율 · 여유율 가정과 재시도(고쳐 쓰기)를 포함해 단계별 비용을 낸다.
-// 실행: node scripts/compare-ai-dry-run.ts   (miyu 폴더에서)
+// 실행: node scripts/compare-ai-dry-run.ts [--variant philosophical-v0]   (miyu 폴더에서)
+//   --variant philosophical-v0 : 비교용 "자기 이해 풀이" 지시문의 길이로 계산한다 (기본은 개인 종합 리포트 v2 지시문)
 import { AI_CANDIDATES, COMPARE_STAGES } from "../lib/config/ai-candidates.ts";
 import { buildEvidence } from "../lib/report/ai/generator.ts";
 import { costKrw, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE, estimateInputTokens } from "../lib/report/ai/budget.ts";
 import { buildPersonas } from "../lib/report/ai/compare-personas.ts";
 import { MAX_OUTPUT_TOKENS, planStage, referenceFor, TYPICAL_OUTPUT_TOKENS } from "../lib/report/ai/compare-plan.ts";
-import { buildUserMessage, SYSTEM_PROMPT } from "../lib/report/v2/prompt.ts";
+import { type CompareVariant, promptsFor } from "../lib/report/ai/compare-plan.ts";
 
+const argVariant = process.argv.includes("--variant") ? process.argv[process.argv.indexOf("--variant") + 1] : "personal-v2";
+if (argVariant !== "personal-v2" && argVariant !== "philosophical-v0") throw new Error(`알 수 없는 --variant: ${argVariant}`);
+const variant: CompareVariant = argVariant;
 const won = (x: number) => `${Math.round(x).toLocaleString("ko-KR")}원`;
 const now = new Date("2026-10-12T03:00:00Z");
 const settings = { fxKrwPerUsd: DEFAULT_FX_KRW_PER_USD, surcharge: DEFAULT_SURCHARGE };
 const cands = AI_CANDIDATES.map((c) => ({ key: c.key, price: c.price }));
 
 console.log("# AI 품질 비교 비용 계획 (드라이런 — 호출 없음, 예산 미승인)\n");
+console.log(`- 지시문: ${variant === "philosophical-v0" ? "자기 이해 풀이(비교용 v0)" : "개인 종합 리포트 v2(기존)"}`);
 console.log(`- 환율 ${DEFAULT_FX_KRW_PER_USD.toLocaleString("ko-KR")}원/달러 (가정값, 2026-10 실제 환율은 확인하지 않음) · 부가세 등 여유율 ${Math.round((DEFAULT_SURCHARGE - 1) * 100)}%`);
 for (const c of AI_CANDIDATES) console.log(`- 후보 ${c.key}: ${c.company} \`${c.modelId}\` 입력 $${c.price.inputUsdPerMTok} / 출력 $${c.price.outputUsdPerMTok} (100만 토큰당) — 확인일 ${c.checkedAt}`);
 
@@ -24,10 +29,10 @@ console.log("| 인물 | 설명 | 지시문 글자 | 근거 목록 글자 | 입�
 console.log("| --- | --- | --- | --- | --- |");
 const inputs: number[] = [];
 for (const p of personas) {
-  const user = buildUserMessage(buildEvidence(p.input, ref), ref.iso, p.input.context);
-  const tokens = estimateInputTokens([SYSTEM_PROMPT, user]);
+  const [system, user] = promptsFor(variant, buildEvidence(p.input, ref), ref.iso, p.input.context);
+  const tokens = estimateInputTokens([system, user]);
   inputs.push(tokens);
-  console.log(`| ${p.id} | ${p.note} | ${SYSTEM_PROMPT.length.toLocaleString("ko-KR")} | ${user.length.toLocaleString("ko-KR")} | ${tokens.toLocaleString("ko-KR")} |`);
+  console.log(`| ${p.id} | ${p.note} | ${system.length.toLocaleString("ko-KR")} | ${user.length.toLocaleString("ko-KR")} | ${tokens.toLocaleString("ko-KR")} |`);
 }
 const maxIn = Math.max(...inputs);
 const minIn = Math.min(...inputs);
@@ -54,7 +59,7 @@ for (const fx of [1400, 1600, 1800]) {
 }
 
 for (const stage of COMPARE_STAGES) {
-  const plan = planStage({ stage: stage.name, capKrw: stage.capKrw, personas: buildPersonas(stage.personaCount), candidates: cands, settings, now });
+  const plan = planStage({ stage: stage.name, capKrw: stage.capKrw, personas: buildPersonas(stage.personaCount), candidates: cands, settings, now, variant });
   console.log(`\n## ${stage.label}\n`);
   console.log(`- 하드스톱 한도(승인 요청 금액): **${won(stage.capKrw)}**`);
   console.log(`- 평소 수준 예상: ${won(plan.expectedKrw)} (${plan.expectedFits ? "한도 안" : "한도 초과"})`);
