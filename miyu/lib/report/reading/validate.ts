@@ -3,7 +3,7 @@
 // 한계: 낱말 · 길이 · 표지를 세는 검사다. 좋은 글임을 보증하지 않는다 (가려 읽는 평가가 따로 있다).
 import type { Evidence } from "../evidence.ts";
 import { FORBIDDEN, CONTEXT_ATTRIBUTION, overlap, sentences } from "../v2/validate.ts";
-import { BLOCK_PLAN, CAUSE_NARROWING, JARGON, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
+import { AGE_TEXT, BLOCK_PLAN, CAUSE_NARROWING, JARGON, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
 import type { ReadingDraftV1 } from "./types.ts";
 
 export type ReadingValidation = { ok: true; draft: ReadingDraftV1 } | { ok: false; errors: string[] };
@@ -21,6 +21,17 @@ export function periodRefs(evidence: Evidence[]): PeriodRef[] {
   const years = [...new Set(evidence.filter((e) => e.period).map((e) => /^saju\.seun\.(\d{4})/.exec(e.id)?.[1]).filter((y): y is string => Boolean(y)))].sort();
   for (const y of years) out.push({ ref: `y${y}`, label: `${y}년`, ids: idsOf(`saju.seun.${y}`) });
   return out;
+}
+
+/**
+ * 시기 근거의 이름(period.label: "현재 대운 신미" · "다음 대운 경오" · "2026년 병오")을 읽는 사람 화면용 쉬운 이름으로 바꾼다 — 대운 · 간지는 본문에 쓰지 않는다.
+ * 고민 반영 리포트가 시기 이름을 그대로 저장하던 것을 같은 규칙으로 맞춘다.
+ */
+export function plainPeriodLabel(label: string): string {
+  if (/^현재 대운/.test(label)) return "지금 지나는 큰 흐름";
+  if (/^다음 대운/.test(label)) return "다음 큰 흐름";
+  const year = /^(\d{4})년/.exec(label);
+  return year ? `${year[1]}년` : label;
 }
 
 const isString = (v: unknown): v is string => typeof v === "string";
@@ -243,7 +254,7 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
     if (JARGON.test(t)) errors.push(`${where}: 사주 전문 용어(${JARGON.exec(t)![0]})는 본문에 쓰지 않습니다 — 쉬운 말로 풀어 쓰고 용어는 근거로만 남깁니다.`);
     if (SCORE_TEXT.test(t)) errors.push(`${where}: 점수 · 퍼센트 · 확률 표현은 본문에 쓰지 않습니다.`);
     if (CAUSE_NARROWING.test(t)) errors.push(`${where}: 원인을 하나로 좁혀 말하지 않습니다 ("~때문입니다" 대신 "~일 수 있습니다").`);
-    if (/\d{1,2}\s*살|\d{2}\s*세(?!기)|(?:스물|서른|마흔|쉰|예순)\s*(?:살|세)/.test(t)) errors.push(`${where}: 나이를 쓰지 않습니다.`);
+    if (AGE_TEXT.test(t)) errors.push(`${where}: 나이를 쓰지 않습니다.`);
     for (const f of FORBIDDEN) if (f.re.test(t)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
     for (const y of t.match(/(?<![\d.])(?:19|20)\d{2}(?![\d.])/g) ?? []) if (!allowedYears.has(y)) errors.push(`${where}: 계산되지 않은 해 ${y}`);
     if (!opts.hasContext && /알려 주신/.test(t)) errors.push(`${where}: 고민을 알려 주지 않았는데 "알려 주신"을 썼습니다.`);

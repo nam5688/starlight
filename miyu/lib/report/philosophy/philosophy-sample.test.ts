@@ -45,10 +45,16 @@ async function load() {
   return { evidence, existing, revised, baseText };
 }
 
-test("기존 형식 예시(고민 반영 리포트 지시문대로 쓴 글)는 지금 제품의 형식 · 근거 · 내용 차이 검사를 통과한다 — 비교 대상이 허수아비가 아니다", async () => {
+// 고민 반영 리포트 지시문이 0.2(본문에 사주 용어 · 점수 금지, 문단 3문장 이하)로 바뀌기 전에 쓴 "기존 형식" 예시다.
+// 비교용 기준선이라 글은 고치지 않는다 — 0.1 규칙(형식 · 근거 · 내용 차이)은 지금도 통과해야 비교 대상이 허수아비가 아니고, 0.2에서 새로 생긴 본문 규칙은 따로 센다.
+const RULES_SINCE_0_2 = /사주 전문 용어|점수 · 퍼센트|원인을 하나로|나이를 쓰지|계산되지 않은 해|문장 \(3문장/;
+
+test("기존 형식 예시(이전 지시문 0.1대로 쓴 글)는 이전 규칙의 형식 · 근거 · 내용 차이 검사를 통과한다 — 비교 대상이 허수아비가 아니다 (0.2의 본문 규칙은 아직 따르지 않는다)", async () => {
   const { evidence, existing, baseText } = await load();
   const v = validateConcernDraft(existing.draft, evidence);
-  assert.deepEqual(v.ok ? [] : v.errors, []);
+  const errors = v.ok ? [] : v.errors;
+  assert.deepEqual(errors.filter((e) => !RULES_SINCE_0_2.test(e)), []);
+  assert.ok(errors.some((e) => RULES_SINCE_0_2.test(e)), "이 예시는 0.2 이전에 쓴 글이라 새 본문 규칙(쉬운 말 등)에는 걸린다 — 기준선이 아니라 지금 제품 규칙이 바뀌었다는 뜻");
   const depth = checkConcernDepth({ draft: existing.draft, concern: existing.concern, baseTexts: [baseText] });
   assert.deepEqual(depth.errors, []);
   assert.deepEqual(depth.warnings, []);

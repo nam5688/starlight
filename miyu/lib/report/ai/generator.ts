@@ -17,7 +17,7 @@ import type { ConcernInput, GenerateContext, ReportGenerator, ReportInput } from
 import { assembleReading } from "../reading/assemble.ts";
 import { checkReadingDepth } from "../reading/depth.ts";
 import { buildReadingRepairMessage, buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
-import { validateReadingDraft } from "../reading/validate.ts";
+import { plainPeriodLabel, validateReadingDraft } from "../reading/validate.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
 import { buildRepairMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from "../v2/prompt.ts";
 import type { PersonalReportV2, ReportDraftV2 } from "../v2/types.ts";
@@ -86,7 +86,7 @@ function fillConcernName(draft: ConcernDraftV1, name: string): ConcernDraftV1 {
     understanding: draft.understanding.map((p) => ({ ...p, text: fix(p.text) })),
     pattern: draft.pattern.map((p) => ({ ...p, text: fix(p.text) })),
     situations: draft.situations.map((x) => ({ ...x, situation: fix(x.situation), reading: fix(x.reading), suggestion: fix(x.suggestion) })),
-    timeline: draft.timeline.map((t) => ({ ...t, theme: fix(t.theme), opportunity: fix(t.opportunity), caution: fix(t.caution) })),
+    timeline: draft.timeline.map((t) => ({ ...t, period: plainPeriodLabel(t.period), theme: fix(t.theme), opportunity: fix(t.opportunity), caution: fix(t.caution) })),
     differences: draft.differences.map((p) => ({ ...p, text: fix(p.text) })),
     actions: draft.actions.map((a) => ({ ...a, situation: fix(a.situation), action: fix(a.action) })),
   };

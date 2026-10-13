@@ -1,8 +1,9 @@
 // 모의 고민 리포트 작성 — 실제 AI를 부르지 않고, 받은 근거 목록과 고객이 적은 고민으로 형식에 맞는 초안을 만든다.
 // 단위 테스트와 로컬 전체 흐름 검사(가짜 AI 서버)에서만 쓴다. 문장마다 "[모의 생성]" 표시가 붙으며 판매할 수 있는 글이 아니다.
-// 근거의 설명 문장(cue)은 개인 종합 리포트 모의 글과 겹치지 않도록 옮겨 쓰지 않고, 고객이 적은 말을 받아 조립한다.
+// 근거의 설명 문장(cue · fact)은 옮겨 쓰지 않는다 — 본문에는 사주 용어 · 점수를 쓰지 않는 규칙(validate.ts)을 지키고, 고객이 적은 말을 받아 조립한다.
 
 import type { Evidence } from "../evidence.ts";
+import { plainPeriodLabel } from "../reading/validate.ts";
 import type { ConcernDraftV1 } from "./types.ts";
 
 type Payload = {
@@ -49,25 +50,29 @@ export function composeMockConcernDraft(userMessage: string): ConcernDraftV1 {
     },
   ];
   const pattern = [0, 1].map((i) => ({
-    text: `[모의 생성] ${s(i).fact}이라는 점은, 알려 주신 "${clip(situations[i % situations.length], 40)}" 같은 상황에서 ${key(i)}을 먼저 살피게 하는 쪽으로 나타날 수 있습니다. 응답에서는 ${v(i).fact}로 나타났기 때문에, 같은 고민이라도 혼자 있을 때와 사람들 앞에서 반응이 달라질 수 있습니다. ${closers[i % closers.length]}`,
+    text: `[모의 생성] 사주에서 읽은 특징은, 알려 주신 "${clip(situations[i % situations.length], 40)}" 같은 상황에서 ${key(i)}을 먼저 살피게 하는 쪽으로 나타날 수 있습니다. 응답에서도 ${key(i)}과 이어지는 비슷한 경향이 보여서, 같은 고민이라도 혼자 있을 때와 사람들 앞에서 반응이 달라질 수 있습니다. ${closers[i % closers.length]}`,
     evidence: [s(i).id, v(i).id],
   }));
   const situationItems = situations.map((text, i) => ({
     situation: `[모의 생성] 알려 주신 "${clip(text, 50)}" 같은 상황`,
-    reading: `[모의 생성] 이 상황에서는 ${s(i + 1).fact}이라는 점 때문에 ${key(i)}을 놓고 한 번 더 따져 보게 될 수 있습니다. 응답의 ${v(i + 1).fact}를 함께 보면, ${moods[i % moods.length]}`,
+    reading: `[모의 생성] 이 상황에서는 사주에서 읽은 특징 때문에 ${key(i)}을 놓고 한 번 더 따져 보게 될 수 있습니다. 응답의 경향을 함께 보면, ${moods[i % moods.length]}`,
     suggestion: `[모의 생성] ${key(i)}과 관련해 지금 정할 것과 미룰 것을 따로 적어 두고, ${nexts[i % nexts.length]} 선택을 해 볼 수 있습니다.`,
     evidence: [s(i + 1).id, v(i + 1).id],
   }));
-  const timeline = periods.map((p) => ({
-    period: p.period!.label,
-    theme: `[모의 생성] ${p.period!.label}에는 ${concern.topic} 이야기가 두드러질 수 있습니다.`,
-    opportunity: `[모의 생성] ${p.period!.label}에 ${key(0)}을 정리해 두면 선택이 쉬워질 수 있습니다.`,
-    caution: `[모의 생성] ${p.period!.label}에는 서두르지 말고 ${key(1)}의 조건을 한 번 더 확인해 보세요.`,
-    evidence: [p.id],
-  }));
+  // period 칸은 근거의 시기 이름 그대로(검사가 계산된 시기인지 본다), 본문에는 쉬운 이름을 쓴다 — 저장할 때 화면용 이름으로 바뀐다
+  const timeline = periods.map((p) => {
+    const plain = plainPeriodLabel(p.period!.label);
+    return {
+      period: p.period!.label,
+      theme: `[모의 생성] ${plain}에는 ${concern.topic} 이야기가 두드러질 수 있습니다.`,
+      opportunity: `[모의 생성] ${plain}에 ${key(0)}을 정리해 두면 선택이 쉬워질 수 있습니다.`,
+      caution: `[모의 생성] ${plain}에는 서두르지 말고 ${key(1)}의 조건을 한 번 더 확인해 보세요.`,
+      evidence: [p.id],
+    };
+  });
   const differences =
     survey.length && saju.length
-      ? [{ text: `[모의 생성] 원국의 ${s(2).fact}과 응답의 ${v(2).fact}는 ${concern.topic} 고민에서 서로 다르게 보일 수 있습니다. 이 차이는 상황에 따라 달라지는 모습으로 읽고, 어느 한쪽이 틀렸다고 보지 않습니다.`, evidence: [s(2).id, v(2).id] }]
+      ? [{ text: `[모의 생성] 사주에서 읽은 특징과 응답에서 나타난 경향은 ${concern.topic} 고민에서 서로 다르게 보일 수 있습니다. 이 차이는 상황에 따라 달라지는 모습으로 읽고, 어느 한쪽이 틀렸다고 보지 않습니다.`, evidence: [s(2).id, v(2).id] }]
       : [];
   const actions = [
     { situation: `[모의 생성] 이번 주, ${key(0)} 때`, action: `[모의 생성] 이번 주 안에 ${key(0)}에서 마음에 걸리는 점을 세 줄로 적어 두고 하루 뒤에 다시 읽어 봅니다.`, evidence: [s(0).id, v(0).id] },

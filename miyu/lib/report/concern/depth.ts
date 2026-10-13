@@ -7,7 +7,7 @@
 
 import { concernTerms } from "../../personalization/concern.ts";
 import type { PersonalContextInput } from "../../personalization/context.ts";
-import { BARNUM, CONCRETE_ACT, CONDITION, containment, QUANTITY, shingles } from "../v2/depth.ts";
+import { BARNUM, CONCRETE_ACT, CONDITION, containment, shingles } from "../v2/depth.ts";
 import type { ConcernDraftV1 } from "./types.ts";
 
 export const CONCERN_DEPTH = {
@@ -122,9 +122,10 @@ export function checkConcernDepth(input: {
   if (conditionRatio < T.conditionWarn) warnings.push(`조건 · 상황 표지가 있는 문단이 ${Math.round(conditionRatio * 100)}%입니다 (기준 ${Math.round(T.conditionWarn * 100)}%).`);
   const genericParagraphs = parts.filter((b) => BARNUM.some((re) => re.test(b.text)) && !CONDITION.test(b.text)).length;
   if (parts.length && genericParagraphs / parts.length > T.genericWarn) warnings.push(`아무에게나 해당하는 말로 읽히는 문단이 ${genericParagraphs}개입니다.`);
-  const concrete = draft.actions.filter((a) => QUANTITY.test(a.action) && CONCRETE_ACT.test(a.action)).length;
+  // 실제로 하는 행동(적기 · 묻기 · 정하기 …)이 보이는가 — 시점 · 기간은 임의로 정하지 않으므로 보지 않는다
+  const concrete = draft.actions.filter((a) => CONCRETE_ACT.test(a.action)).length;
   const actionConcreteShare = draft.actions.length ? concrete / draft.actions.length : 0;
-  if (actionConcreteShare < T.actionConcreteWarn) warnings.push(`시점 · 분량과 구체적인 행동이 모두 보이는 제안이 ${Math.round(actionConcreteShare * 100)}%입니다.`);
+  if (actionConcreteShare < T.actionConcreteWarn) warnings.push(`적기 · 묻기 · 정하기처럼 실제로 하는 행동이 보이는 제안이 ${Math.round(actionConcreteShare * 100)}%입니다.`);
 
   let previousOverlap: number | null = null;
   if (input.previousTexts?.length) {

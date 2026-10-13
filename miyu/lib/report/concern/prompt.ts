@@ -5,7 +5,7 @@ import { contextForPrompt, topicLabel, type ContextTopic, type PersonalContextIn
 import { glossaryFor } from "../../saju/glossary.ts";
 import type { Evidence, Topic } from "../evidence.ts";
 
-export const CONCERN_PROMPT_VERSION = "concern-v1-prompt-0.1";
+export const CONCERN_PROMPT_VERSION = "concern-v1-prompt-0.2";
 
 /** 고민 주제에 해당하는 근거의 주제 (근거 목록에서 먼저 보여 줄 것) */
 export function evidenceTopicsFor(topic: ContextTopic): Topic[] {
@@ -43,15 +43,17 @@ export const CONCERN_SYSTEM_PROMPT = `너는 ME:U(미유)의 "내 고민 반영 
 - 사주와 응답 점수를 더하거나 비교 점수를 만들지 않는다. 응답 점수 숫자를 본문에 그대로 쓰지 않는다.
 
 [쉬운 말]
-- 사주를 모르는 사람도 바로 이해하도록 쉬운 말로 짧게 쓴다. 사주 용어는 처음 나올 때 한 번만 "상관(傷官, 기존 틀을 고치려 하고 생각을 말로 꺼내는 힘)"처럼 한자와 쉬운 뜻을 붙이고, 뜻은 terms 목록을 따른다.
+- 화면에 보이는 모든 글(결론 · 문단 · 상황별 해석 · 제안 · 시기 · 행동)에는 사주 용어(일간 · 천간 · 지지 · 원국 · 오행 · 십신 이름 · 대운 · 세운 · 용신 등)와 점수 · 퍼센트 · 확률을 쓰지 않는다. 용어 풀이 · 계산 결과 · 응답 점수는 화면의 접어 둔 "분석 근거"에 따로 보이므로 네가 쓰지 않는다. terms의 plain을 참고해 쉬운 말로 풀어 쓴다 (대운 → "10년 단위의 큰 흐름", 세운 → "그해의 흐름").
+- 짧은 문장으로 쓰고, 한 문단은 2~3문장으로 묶는다. 문장마다 줄을 나누지 않는다. 결론을 먼저 쓰고 같은 말을 되풀이하지 않는다.
+- 결론은 근거의 cue가 말하는 범위 안에서만 쓴다. 원인을 하나로 좁히지 않는다 ("~ 때문입니다", "성격이 아니라 ~" 대신 "~일 수 있습니다"). 나이를 쓰지 않는다. 특징을 좋고 나쁨으로 나누지 않는다.
 
 [쓰는 방식]
 - understanding: 첫 문단은 "알려 주신 고민을 …"처럼 고객이 말해 준 내용임을 밝히며 시작하고, 어떤 고민을 어떤 순서로 풀지 쓴다 (1~2문단).
 - pattern: 이 고민이 이 사람에게 왜 이런 모양으로 반복되는지, 원국 · 대운과 응답 근거로 쓴다 (2~3문단, 문단은 120~450자). 일반론 대신 조건 · 상황 · 예외를 쓴다.
 - situations: 고객이 적은 상황마다 하나씩 3~5개. situation에는 고객이 적은 상황을 그 사람의 말로 짧게, reading에는 그 상황에서 왜 그렇게 되는지(조건 포함), suggestion에는 해 볼 구체적인 선택을 쓴다. 상황은 서로 달라야 하고, alreadyProvided의 상황과 겹치지 않는다.
-- timeline: evidence의 period.label에 있는 시기만 1~3개. 이 고민의 관점에서 그 시기에 두드러지는 주제 · 살릴 기회 · 살펴볼 점을 쓴다. 사건을 예언하지 않는다.
+- timeline: evidence의 period.label에 있는 시기만 1~3개 (period 칸에는 label을 한 글자도 바꾸지 않고 그대로 적는다 — 화면에 보이는 이름은 코드가 쉬운 말로 바꾼다). theme · opportunity · caution에는 시기 이름을 "지금 지나는 큰 흐름 · 다음 큰 흐름 · 2026년"처럼 쉬운 말로 쓰고, evidence에 없는 해를 쓰지 않는다. 이 고민의 관점에서 그 시기에 두드러지는 주제 · 살릴 기회 · 살펴볼 점을 쓴다. 사건을 예언하지 않는다.
 - differences: 이 고민에서 사주와 응답이 다르게 나온 부분이 있을 때만 0~2문단. 차이를 억지로 만들지 않는다.
-- actions: 4~6개. action마다 언제(이번 주 · 이번 달 · 세 달 안) · 얼마나 · 무엇을 하는지가 보이게 쓴다. "마음을 편하게 가지세요" 같은 말은 쓰지 않는다. alreadyProvided의 실천 제안과 겹치지 않게 이 고민에 맞는 새 행동을 쓴다. 서로 다른 상황의 서로 다른 행동이어야 한다.
+- actions: 4~6개. situation에는 고객이 적은 상황의 조건("~할 때")을, action에는 그때 실제로 하는 작은 행동(적기 · 묻기 · 정하기 · 확인하기처럼)을 쓴다. 시점이나 기간(이번 주 · 세 달 안 등)을 임의로 정하지 않는다. "마음을 편하게 가지세요" 같은 말은 쓰지 않는다. alreadyProvided의 실천 제안과 겹치지 않게 이 고민에 맞는 새 행동을 쓴다. 서로 다른 상황의 서로 다른 행동이어야 한다.
 - 연애 · 결혼 고민에서도 상대의 나이 · 직업 · 만나는 날짜를 만들거나 예측하지 않는다. 상대방의 성격을 단정하지 않는다.
 - 이름이 필요하면 "{name}님"이라고 쓴다.
 - 쓰지 않는 표현: 정확도 · 적중률, 진단, 100% · 틀림없이 · 반드시 일어난다, 운명이다, 특정 날짜(○년 ○월 ○일), 사건 예언, "숨겨진 위험" · "후회하게 된다" 같은 불안 자극, 감성 별명 · 동물 이름 · 알파벳 유형 코드.
@@ -92,7 +94,7 @@ export function buildConcernUserMessage(input: {
     concern: contextForPrompt(input.concern),
     alreadyProvided: input.alreadyProvided,
     previousConcerns: input.previousConcerns.slice(0, 3).map((p) => ({ topic: topicLabel(p.topic), headline: p.headline })),
-    terms: glossaryFor(input.evidence).map((g) => ({ term: g.term, hanja: g.hanja, plain: g.plain })),
+    terms: glossaryFor(input.evidence).map((g) => ({ term: g.term, plain: g.plain })),
     evidence: ordered.map((e) => ({
       id: e.id,
       source: e.source,

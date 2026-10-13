@@ -2,6 +2,7 @@
 // (형식 검사는 개인 종합 리포트(v2)와 같은 금지 표현 · 근거 규칙을 쓴다. 고민이 실제로 반영됐는지는 depth.ts가 따로 본다.)
 
 import type { Evidence } from "../evidence.ts";
+import { AGE_TEXT, CAUSE_NARROWING, JARGON, SCORE_TEXT } from "../reading/plan.ts";
 import { CONTEXT_ATTRIBUTION, FORBIDDEN, overlap, sentences } from "../v2/validate.ts";
 import type { Paragraph } from "../v2/types.ts";
 import type { ConcernDraftV1 } from "./types.ts";
@@ -15,6 +16,7 @@ const CONCERN_FORBIDDEN: { re: RegExp; why: string }[] = [
 ];
 
 const isString = (v: unknown): v is string => typeof v === "string";
+const sentenceCount = (t: string) => t.split(/(?<=[.!?])\s+/).filter(Boolean).length;
 const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
 
 export function validateConcernDraft(raw: unknown, evidence: Evidence[]): ConcernValidation {
@@ -54,6 +56,7 @@ export function validateConcernDraft(raw: unknown, evidence: Evidence[]): Concer
       return;
     }
     len(p.text, where, min, max);
+    if (sentenceCount(p.text) > 3) errors.push(`${where}: ${sentenceCount(p.text)}문장 (3문장 이하로 묶어 주세요)`);
     checkIds(p.evidence, where);
   };
 
@@ -75,6 +78,7 @@ export function validateConcernDraft(raw: unknown, evidence: Evidence[]): Concer
     len(s.situation, `${where}.situation`, 10, 220);
     len(s.reading, `${where}.reading`, 60, 520);
     len(s.suggestion, `${where}.suggestion`, 30, 420);
+    if (sentenceCount(s.reading) > 3) errors.push(`${where}.reading: ${sentenceCount(s.reading)}문장 (3문장 이하로 묶어 주세요)`);
     checkIds(s.evidence, where);
   });
 
@@ -120,8 +124,17 @@ export function validateConcernDraft(raw: unknown, evidence: Evidence[]): Concer
   (d.timeline ?? []).forEach((t, i) => push(`timeline[${i}]`, t?.theme, t?.opportunity, t?.caution));
   (d.differences ?? []).forEach((p, i) => push(`differences[${i}]`, p?.text));
   (d.actions ?? []).forEach((a, i) => push(`actions[${i}]`, a?.situation, a?.action));
+  // 본문에 쓸 수 있는 해: 계산된 시기(세운 · 대운 기간)의 해
+  const allowedYears = new Set<string>();
+  for (const e of evidence) if (e.period) for (const y of [e.period.from.slice(0, 4), e.period.to.slice(0, 4)]) allowedYears.add(y);
   for (const { where, text } of texts) {
     for (const f of [...FORBIDDEN, ...CONCERN_FORBIDDEN]) if (f.re.test(text)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
+    // 읽기 구조와 같은 규칙: 본문은 쉬운 말 — 사주 용어 · 점수 · 원인 단정 · 나이 · 계산되지 않은 해를 쓰지 않는다
+    if (JARGON.test(text)) errors.push(`${where}: 사주 전문 용어(${JARGON.exec(text)![0]})는 본문에 쓰지 않습니다 — 쉬운 말로 풀어 쓰고 용어는 근거로만 남깁니다.`);
+    if (SCORE_TEXT.test(text)) errors.push(`${where}: 점수 · 퍼센트 · 확률 표현은 본문에 쓰지 않습니다.`);
+    if (CAUSE_NARROWING.test(text)) errors.push(`${where}: 원인을 하나로 좁혀 말하지 않습니다 ("~때문입니다" 대신 "~일 수 있습니다").`);
+    if (AGE_TEXT.test(text)) errors.push(`${where}: 나이를 쓰지 않습니다.`);
+    for (const y of text.match(/(?<![\d.])(?:19|20)\d{2}(?![\d.])/g) ?? []) if (!allowedYears.has(y)) errors.push(`${where}: 계산되지 않은 해 ${y}`);
   }
   const seen = new Map<string, string>();
   for (const { where, text } of texts) {
