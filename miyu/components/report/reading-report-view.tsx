@@ -15,6 +15,7 @@ import {
   FoldRow,
   LuckTimelineCard,
   Paragraphs,
+  Prose,
   ReactionStepper,
   SummaryCards,
   TraitCards,
@@ -167,7 +168,7 @@ export function ReadingReportView({
           </h2>
           <article className="mt-6">
             <h3 className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">{report.flow.headline}</h3>
-            <p className="mt-2 text-[16px] leading-[1.7]">{report.flow.summary}</p>
+            <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
             <CaveatNote text={report.flow.caveat} />
 
             <LuckTimelineCard timeline={report.timeline} text={report.flow.cardText} reference={report.timelineReference} />
@@ -193,32 +194,32 @@ export function ReadingReportView({
                       {report.flow.periods.map((p) => (
                         <li key={p.period} className="border-l-[3px] border-line-strong pl-3.5">
                           <p className="text-[13px] font-semibold text-ink-3">{p.period}</p>
-                          <p className="mt-1.5 text-[15px] leading-[1.75]">{p.theme}</p>
-                          <p className="mt-2 text-[15px] leading-[1.75] text-ink-2">{p.watch}</p>
+                          <Prose text={p.theme} className="mt-1.5 text-[15px] leading-[1.75]" />
+                          <Prose text={p.watch} className="mt-2 text-[15px] leading-[1.75] text-ink-2" />
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div>
                     <p className="text-[16px] font-bold">응답으로 본 가능성</p>
-                    <p className="mt-0.5 text-[13px] leading-[1.6] text-ink-3">{report.flow.scenarioNote}</p>
+                    <Prose text={report.flow.scenarioNote} className="mt-0.5 text-[13px] leading-[1.6] text-ink-3" />
                     <ul className="mt-3 space-y-5">
                       {report.flow.scenarios.map((s) => (
                         <li key={s.when} className="border-l-[3px] border-accent pl-3.5">
                           <p className="text-[13px] font-semibold text-accent">이런 모습이 이어지면</p>
-                          <p className="mt-1 text-[15px] leading-[1.7] font-semibold">{s.when}</p>
+                          <Prose text={s.when} className="mt-1 text-[15px] leading-[1.7] font-semibold" />
                           <p className="mt-3 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
                             <ArrowIcon className="size-3.5" />
                             이렇게 될 수 있습니다
                           </p>
-                          <p className="mt-1 text-[15px] leading-[1.75]">{s.then}</p>
+                          <Prose text={s.then} className="mt-1 text-[15px] leading-[1.75]" />
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div>
                     <p className="text-[16px] font-bold">연구 통계</p>
-                    <p className="mt-2 text-[14px] leading-[1.75] text-ink-2">{report.flow.statistics}</p>
+                    <Prose text={report.flow.statistics} className="mt-2 text-[14px] leading-[1.75] text-ink-2" />
                   </div>
                 </div>
               </Fold>
@@ -257,7 +258,7 @@ export function ReadingReportView({
                   <input type="checkbox" className="mt-0.5 size-5 shrink-0 cursor-pointer accent-accent" />
                   <span className="min-w-0">
                     <span className="block text-[16px] leading-snug font-semibold">{a.title}</span>
-                    <span className="mt-1 block text-[15px] leading-[1.65] text-ink-2">{a.detail}</span>
+                    <Prose as="span" text={a.detail} className="mt-1 block text-[15px] leading-[1.65] text-ink-2" />
                   </span>
                 </label>
               </li>
@@ -335,7 +336,7 @@ function BlockView({ block: b, id, showTopic }: { block: ReadingBlock; id: strin
       <h3 id={`${id}-h`} className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">
         {b.headline}
       </h3>
-      <p className="mt-2 text-[16px] leading-[1.7]">{b.summary}</p>
+      <Prose text={b.summary} className="mt-2 text-[16px] leading-[1.7]" />
 
       {b.traits && <TraitCards traits={b.traits} />}
       {b.reactionFlow && <ReactionStepper flow={b.reactionFlow} />}
@@ -352,7 +353,7 @@ function BlockView({ block: b, id, showTopic }: { block: ReadingBlock; id: strin
               <div className={`${b.details.length > 0 ? "mt-6 border-t border-line pt-5" : ""}`}>
                 <div className="border-l-[3px] border-line-strong pl-3.5">
                   <p className="text-[13px] font-semibold text-ink-3">이럴 때 도움이 되는 것</p>
-                  <p className="mt-1.5 text-[15px] leading-[1.75] text-ink-2">{b.reactionFlow.helpful}</p>
+                  <Prose text={b.reactionFlow.helpful} className="mt-1.5 text-[15px] leading-[1.75] text-ink-2" />
                 </div>
               </div>
             )}

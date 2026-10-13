@@ -1,9 +1,29 @@
+import { Fragment } from "react";
 import { AdjustIcon, ChevronIcon, FlowIcon, InfoIcon, StrengthIcon } from "@/components/ui/icons";
+import { lineGroups } from "@/lib/report/reading/line-breaks";
 import type { LuckSlot, ReadingBasis, ReadingBlock, ReadingSummaryCard, ReadingTrait } from "@/lib/report/reading/types";
 
 // 읽기 구조 리포트의 부품. 크기: 카드 제목 17px · 본문 16px(줄 간격 1.7) · 보조 설명 13~14px.
 // 색: 내가 강한 포인트 = positive, 내가 힘들 수 있는 포인트 = caution, 현재 위치 · 링크 = accent. 색은 작은 이름표 · 핵심 구절 · 구분선에만 쓰고,
 // 뜻은 항상 글자와 아이콘이 함께 전한다(색만으로 구분하지 않는다). 카드 안에 카드를 넣지 않는다.
+
+/**
+ * 본문 글 — 저장된 글은 그대로 두고, 문장 길이에 따라 줄을 나눈다 (`lib/report/reading/line-breaks.ts`).
+ * 짧은 문장 + 짧은 문장은 이어서, 긴 문장이 끼면 줄을 바꾼다. 한 문단(<p>) 안에서 줄만 바뀌므로 읽는 순서 · 글자는 같다.
+ */
+export function Prose({ text, className, as: Tag = "p" }: { text: string; className?: string; as?: "p" | "span" | "div" }) {
+  const lines = lineGroups(text);
+  return (
+    <Tag className={`${className ?? ""} text-pretty`.trim()}>
+      {lines.map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 && <br />}
+          {line}
+        </Fragment>
+      ))}
+    </Tag>
+  );
+}
 
 /** 특징 카드와 일상 예시에서 같이 쓰는 이름표 */
 export const TRAIT_LABEL = { strong: "내가 강한 포인트", hard: "내가 힘들 수 있는 포인트" } as const;
@@ -27,7 +47,7 @@ export function SummaryCards({ cards }: { cards: ReadingSummaryCard[] }) {
               {c.label}
             </p>
             <p className="mt-1.5 text-[17px] leading-snug font-bold tracking-tight">{c.keyword}</p>
-            <p className="mt-1 text-[14px] leading-[1.6] text-ink-2">{c.note}</p>
+            <Prose text={c.note} className="mt-1 text-[14px] leading-[1.6] text-ink-2" />
           </li>
         );
       })}
@@ -63,7 +83,7 @@ export function ExampleBox({ text, variant = "box" }: { text: string; variant?: 
   return (
     <div className={variant === "box" ? "mt-4 rounded-lg bg-accent-soft px-4 py-3.5" : "mt-4 border-l-[3px] border-line-strong pl-3"}>
       <p className={`text-[13px] font-semibold ${variant === "box" ? "text-accent-strong" : "text-ink-3"}`}>예를 들면</p>
-      <p className="mt-1 text-[15px] leading-[1.7] text-ink-2">{text}</p>
+      <Prose text={text} className="mt-1 text-[15px] leading-[1.7] text-ink-2" />
     </div>
   );
 }
@@ -73,7 +93,7 @@ export function CaveatNote({ text }: { text: string }) {
   return (
     <p className="mt-3 flex gap-1.5 text-[13px] leading-[1.6] text-ink-3">
       <InfoIcon className="mt-[3px] size-3.5 shrink-0" />
-      <span>{text}</span>
+      <Prose as="span" text={text} />
     </p>
   );
 }
@@ -121,7 +141,7 @@ export function TraitSentences({ traits }: { traits: ReadingTrait[] }) {
               <StrengthIcon />
               {TRAIT_LABEL.strong}
             </p>
-            <p className="mt-1.5 text-[15px] leading-[1.75]">{t.shines}</p>
+            <Prose text={t.shines} className="mt-1.5 text-[15px] leading-[1.75]" />
           </div>
 
           <div className="mt-5 border-l-[3px] border-caution pl-3.5">
@@ -129,12 +149,12 @@ export function TraitSentences({ traits }: { traits: ReadingTrait[] }) {
               <AdjustIcon />
               {TRAIT_LABEL.hard}
             </p>
-            <p className="mt-1.5 text-[15px] leading-[1.75]">{t.burden}</p>
+            <Prose text={t.burden} className="mt-1.5 text-[15px] leading-[1.75]" />
           </div>
 
           <div className="mt-5 border-l-[3px] border-line-strong pl-3.5">
             <p className="text-[13px] font-semibold text-ink-3">예를 들면</p>
-            <p className="mt-1.5 text-[15px] leading-[1.75] text-ink-2">{t.example}</p>
+            <Prose text={t.example} className="mt-1.5 text-[15px] leading-[1.75] text-ink-2" />
           </div>
         </li>
       ))}
@@ -167,7 +187,7 @@ export function ComfortPair({ comfort }: { comfort: NonNullable<ReadingBlock["co
           </div>
         ))}
       </div>
-      <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">{comfort.note}</p>
+      <Prose text={comfort.note} className="mt-2 text-[13px] leading-[1.6] text-ink-3" />
     </div>
   );
 }
@@ -227,7 +247,7 @@ export function LuckTimelineCard({ timeline, text, reference }: { timeline: Luck
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-[16px] leading-[1.7]">{text}</p>
+      <Prose text={text} className="mt-3 text-[16px] leading-[1.7]" />
 
       <div className="mt-5">
         <div
@@ -301,14 +321,12 @@ export function BasisList({ basis }: { basis: ReadingBasis }) {
   );
 }
 
-/** 본문 문단 — 한 문단 2~3문장, 문장마다 줄을 바꾸지 않는다 */
+/** 본문 문단 — 한 문단 2~3문장. 줄바꿈은 문장 길이로 화면이 정한다(Prose) */
 export function Paragraphs({ items }: { items: string[] }) {
   return (
     <div className="space-y-5">
       {items.map((p) => (
-        <p key={p} className="text-[16px] leading-[1.75]">
-          {p}
-        </p>
+        <Prose key={p} text={p} className="text-[16px] leading-[1.75]" />
       ))}
     </div>
   );
@@ -320,7 +338,7 @@ export function WatchNote({ text }: { text: string }) {
     <div className="mt-6 border-t border-line pt-5">
       <div className="border-l-[3px] border-accent pl-3.5">
         <p className="text-[13px] font-semibold text-accent">살펴볼 점</p>
-        <p className="mt-1.5 text-[15px] leading-[1.75]">{text}</p>
+        <Prose text={text} className="mt-1.5 text-[15px] leading-[1.75]" />
       </div>
     </div>
   );
