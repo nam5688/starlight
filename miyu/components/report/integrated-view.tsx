@@ -3,13 +3,13 @@ import type { FullReport } from "@/lib/report/types";
 /** 6) 통합 해석 — 공통점과 서로 다른 관점을 나눠서 보여준다 */
 export function IntegratedView({ integrated }: { integrated: FullReport["integrated"] }) {
   return (
-    <div className="grid gap-10 md:grid-cols-2 md:gap-8">
-      <div>
-        <h3 className="border-b border-ink pb-2 text-[17px] font-bold">공통적으로 나타나는 특징</h3>
-        <ul className="divide-y divide-line">
+    <div className="grid gap-3 md:grid-cols-2">
+      <div className="rounded-xl border border-line bg-canvas px-4 py-4">
+        <h3 className="text-[16px] font-bold">공통적으로 나타나는 특징</h3>
+        <ul className="mt-3 divide-y divide-line">
           {integrated.common.map((c) => (
-            <li key={c.point} className="py-4">
-              <p className="text-[16px] font-semibold leading-snug">{c.point}</p>
+            <li key={c.point} className="py-3.5 first:pt-0 last:pb-0">
+              <p className="text-[15px] leading-snug font-semibold">{c.point}</p>
               <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="근거 지표">
                 {c.basis.map((b) => (
                   <li key={b} className="rounded bg-mist px-2 py-0.5 text-[13px] text-ink-2">
@@ -21,13 +21,13 @@ export function IntegratedView({ integrated }: { integrated: FullReport["integra
           ))}
         </ul>
       </div>
-      <div>
-        <h3 className="border-b border-ink pb-2 text-[17px] font-bold">관점이 다른 부분</h3>
-        <ul className="divide-y divide-line">
+      <div className="rounded-xl border border-line bg-canvas px-4 py-4">
+        <h3 className="text-[16px] font-bold">관점이 다른 부분</h3>
+        <ul className="mt-3 divide-y divide-line">
           {integrated.different.map((d) => (
-            <li key={d.point} className="py-4">
-              <p className="text-[16px] font-semibold leading-snug">{d.point}</p>
-              <p className="mt-1.5 text-[15px] leading-relaxed text-ink-2">{d.explanation}</p>
+            <li key={d.point} className="py-3.5 first:pt-0 last:pb-0">
+              <p className="text-[15px] leading-snug font-semibold">{d.point}</p>
+              <p className="mt-1.5 text-[14px] leading-[1.7] text-ink-2">{d.explanation}</p>
             </li>
           ))}
         </ul>
@@ -39,14 +39,14 @@ export function IntegratedView({ integrated }: { integrated: FullReport["integra
 /** 7) 실천 제안 */
 export function ActionList({ actions }: { actions: FullReport["actions"] }) {
   return (
-    <ol className="border-t border-ink">
+    <ol className="space-y-3">
       {actions.map((a, i) => (
-        <li key={a.title} className="flex gap-4 border-b border-line py-4">
-          <span className="w-6 shrink-0 text-[17px] font-bold tabular-nums text-accent">{i + 1}</span>
-          <div>
-            <p className="text-[16px] font-semibold leading-snug">{a.title}</p>
-            <p className="mt-1 text-[15px] leading-relaxed text-ink-2">{a.detail}</p>
-          </div>
+        <li key={a.title} className="rounded-xl border border-line bg-canvas px-4 py-4">
+          <p className="flex gap-2.5 text-[16px] leading-snug font-semibold">
+            <span className="w-4 shrink-0 text-accent-strong tabular-nums">{i + 1}</span>
+            <span>{a.title}</span>
+          </p>
+          <p className="mt-2 pl-[26px] text-[15px] leading-[1.7] text-ink-2">{a.detail}</p>
         </li>
       ))}
     </ol>

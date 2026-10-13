@@ -11,8 +11,9 @@ import { FullReportView } from "@/components/report/full-report-view";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
 import { ContextPanel } from "@/components/results/context-panel";
 import { PurchasePanel } from "@/components/results/purchase-panel";
-import { SourceBadge } from "@/components/ui/source-badge";
-import { buttonSecondary, pageNarrow, pageWide } from "@/components/ui/styles";
+import { ReadingNav } from "@/components/report/reading-nav";
+import { ResultHeader } from "@/components/report/result-header";
+import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2 } from "@/lib/report/generator";
 import { buildFreePreview } from "@/lib/report/preview";
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
 
 export default function ResultPage({ params }: PageProps<"/results/[id]">) {
   return (
-    <main>
+    <main className="bg-page">
       <Suspense fallback={<PageFallback text="결과를 불러오고 있어요." className={`${pageNarrow} py-16`} tall />}>
         <ResultContent params={params} />
       </Suspense>
@@ -91,7 +92,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
         <Track name="report_view" />
         <ResultHeader
           title={isPersonalV2(content) ? `${assessment.nickname} 님의 개인 종합 사주 리포트` : `${assessment.nickname} 님의 개인 통합 리포트`}
-          subtitle={isPersonalV2(content) ? "사주 원국 · 대운 · 세운 중심, 성향 응답은 보조 근거" : undefined}
+          subtitle={isPersonalV2(content) ? "사주 원국 · 대운 · 세운 중심, 성향 응답은 보조 근거" : "사주 · MBTI · 기질 · 애착을 한 사람의 해석으로 읽었습니다."}
           source={content.source}
           meta={`검사일 ${created} · 저장된 리포트`}
         />
@@ -113,37 +114,22 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
     <>
       <ClearAnalyzeDraft />
       <Track name="preview_view" />
-      <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
-      <div className={`${pageNarrow} space-y-16 py-10 md:py-14`}>
+      <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위입니다." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      <ReadingNav
+        expandAll={false}
+        items={[
+          { id: "r-tendency", label: "전체 요약" },
+          { id: "r-saju", label: "사주 원국" },
+          { id: "r-situations", label: "상황별" },
+          { id: "r-scores", label: "점수 · MBTI" },
+          { id: "r-locked", label: "구매 안내" },
+        ]}
+      />
+      <div className="mx-auto w-full max-w-[720px] space-y-12 px-5 pt-6 pb-16">
         <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
         <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady={false} />
         <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null} />
       </div>
     </>
-  );
-}
-
-function ResultHeader({
-  title,
-  subtitle = "사주 · MBTI · 기질 · 애착",
-  source,
-  meta,
-}: {
-  title: string;
-  subtitle?: string;
-  source: "sample" | "dev-scoring";
-  meta: string;
-}) {
-  return (
-    <div className="border-b border-line bg-mist">
-      <div className={`${pageWide} py-7 md:py-9`}>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <SourceBadge source={source} />
-          <span className="text-[13px] text-ink-3">{meta}</span>
-        </div>
-        <h1 className="mt-3 text-[26px] font-bold tracking-tight md:text-[32px]">{title}</h1>
-        <p className="mt-1 text-[16px] text-ink-2">{subtitle}</p>
-      </div>
-    </div>
   );
 }

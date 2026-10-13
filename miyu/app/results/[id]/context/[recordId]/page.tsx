@@ -10,8 +10,9 @@ import { ReportFeedback } from "@/components/results/report-feedback";
 import { ReportStatusPoller } from "@/components/results/report-status-poller";
 import { formatDate, formatDateTime } from "@/components/ui/format";
 import { PageFallback } from "@/components/ui/page-fallback";
-import { StatusBadge, SourceBadge } from "@/components/ui/source-badge";
-import { buttonPrimary, buttonSecondary, pageNarrow, pageWide, textLink } from "@/components/ui/styles";
+import { ResultHeader } from "@/components/report/result-header";
+import { StatusBadge } from "@/components/ui/source-badge";
+import { buttonPrimary, buttonSecondary, pageNarrow, textLink } from "@/components/ui/styles";
 import { CONCERN_REPORT } from "@/lib/config/product";
 import { CONTEXT_FIELDS, topicLabel } from "@/lib/personalization/context";
 import { isConcernReport } from "@/lib/report/concern/types";
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
 
 export default function ConcernRecordPage({ params, searchParams }: PageProps<"/results/[id]/context/[recordId]">) {
   return (
-    <main>
+    <main className="bg-page">
       <Suspense fallback={<PageFallback text="리포트를 불러오고 있어요." className={`${pageNarrow} py-16`} tall />}>
         <Content params={params} searchParams={searchParams} />
       </Suspense>
@@ -70,17 +71,13 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
   const retryWait = query.retry === "cooldown" ? "방금 다시 시도했어요. 1분 정도 지난 뒤에 다시 눌러 주세요. 결제는 그대로 유효합니다." : query.retry === "capacity" ? "지금 리포트를 준비하는 주문이 많아 순서를 기다리고 있어요. 결제는 그대로 유효합니다." : null;
 
   const header = (meta: string, source?: "sample" | "dev-scoring") => (
-    <div className="border-b border-line bg-mist">
-      <div className={`${pageWide} py-7 md:py-9`}>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {source && <SourceBadge source={source} />}
-          <span className="text-[13px] text-ink-3">{meta}</span>
-        </div>
-        <p className="mt-3 text-[14px] font-semibold text-accent">{CONCERN_REPORT.name}</p>
-        <h1 className="mt-1 text-[26px] font-bold tracking-tight md:text-[32px]">{topicLabel(record.topic)} 고민 리포트</h1>
-        <p className="mt-1 text-[16px] text-ink-2">{formatDateTime(record.writtenAt)}에 적은 고민을 반영한 별도 리포트</p>
-      </div>
-    </div>
+    <ResultHeader
+      kicker={CONCERN_REPORT.name}
+      title={`${topicLabel(record.topic)} 고민 리포트`}
+      subtitle={`${formatDateTime(record.writtenAt)}에 적은 고민을 반영한 별도 리포트`}
+      source={source}
+      meta={meta}
+    />
   );
 
   // 결제 전 · 환불 — 열람 권한이 없다 (결제가 확인된 주문만 리포트를 연다)
@@ -151,7 +148,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
       <>
         <Track name="report_view" />
         {header(`발급일 ${issued} · 저장된 리포트`, report.content.source)}
-        <div className={`${pageWide} pt-6`}>
+        <div className="mx-auto w-full max-w-[720px] px-5 pt-2">
           {scrubbedNow && (
             <p role="status" className="rounded-lg bg-accent-soft px-4 py-3 text-[15px] text-accent">
               그때 적은 고민 내용을 지웠습니다. 리포트는 그대로 남아 있어요.

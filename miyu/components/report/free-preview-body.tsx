@@ -22,13 +22,13 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { prev
   const primaryLabel = ctaLabel ?? (hasPartner ? "내 관계 패턴과 잘 맞는 상대 확인하기" : "구매하고 전체 보기");
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-12">
       {/* 1. 대표 경향 — 이름 앞부분만 */}
       <section aria-labelledby={id("tendency")}>
-        <h2 id={id("tendency")} className="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-accent">
+        <h2 id={id("tendency")} className="flex scroll-mt-[44px] flex-wrap items-center gap-2 text-[13px] font-semibold text-accent md:scroll-mt-[52px]">
           대표 경향 <LockTag>이름 전체는 구매 후</LockTag>
         </h2>
-        <p className="mt-1 text-[32px] font-bold leading-tight tracking-tight md:text-[38px]">
+        <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">
           <span aria-label={`${tendency.head}로 시작하는 유형`}>{tendency.head}</span>
           <LockedMask chars={2} />
           {tendency.tail}

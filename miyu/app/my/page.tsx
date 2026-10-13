@@ -6,17 +6,16 @@ import { Suspense } from "react";
 import { signOut } from "@/app/auth/actions";
 import { setMarketingAction } from "@/app/my/actions";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
+import { ConcernRow, ReportRow } from "@/components/my/report-rows";
 import { StatusBadge } from "@/components/ui/source-badge";
-import { buttonPrimary, buttonSecondary, pageNarrow, textLink } from "@/components/ui/styles";
-import { retryReportAction } from "@/app/results/[id]/actions";
-import { formatDate, formatDateTime } from "@/components/ui/format";
+import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
+import { formatDate } from "@/components/ui/format";
 import { formatKrw } from "@/lib/config/product";
-import { ENTITLEMENT_LABEL, GENERATION_LABEL, getMyPage, PAYMENT_ENV_LABEL, type MyConcernCard, type MyReportCard } from "@/lib/services/my-service";
+import { getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
 import { readRepository } from "@/server/services";
-import { topicLabel } from "@/lib/personalization/context";
 import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = {
@@ -26,12 +25,14 @@ export const metadata: Metadata = {
 
 export default function MyPage() {
   return (
-    <main className={`${pageNarrow} py-12 md:py-16`}>
-      <h1 className="text-[26px] font-bold tracking-tight md:text-[30px]">MY</h1>
-      <p className="mt-2 text-[16px] text-ink-2">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있습니다.</p>
-      <Suspense fallback={<PageFallback className="mt-8" />}>
-        <MyContent />
-      </Suspense>
+    <main className="bg-page">
+      <div className="mx-auto w-full max-w-[720px] px-5 py-8 md:py-12">
+        <h1 className="text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">MY</h1>
+        <p className="mt-1 text-[14px] leading-[1.6] text-ink-2">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있습니다.</p>
+        <Suspense fallback={<PageFallback className="mt-8" />}>
+          <MyContent />
+        </Suspense>
+      </div>
     </main>
   );
 }
@@ -77,13 +78,13 @@ async function MyContent() {
   return (
     <>
       <section aria-labelledby="my-list" className="mt-8">
-        <h2 id="my-list" className="text-[18px] font-bold">
+        <h2 id="my-list" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
           내 리포트
         </h2>
         {cards.length === 0 ? (
-          <p className="mt-3 border-y border-line py-8 text-[15px] text-ink-2">아직 저장한 결과가 없습니다.</p>
+          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-8 text-[15px] text-ink-2">아직 저장한 결과가 없습니다.</p>
         ) : (
-          <ul className="mt-3 border-t border-ink">
+          <ul className="mt-3 space-y-3">
             {cards.map((card) => (
               <ReportRow key={card.assessmentId} card={card} paymentsReady={paymentsReady} />
             ))}
@@ -92,12 +93,12 @@ async function MyContent() {
       </section>
 
       {concerns.length > 0 && (
-        <section aria-labelledby="my-concerns" className="mt-10">
-          <h2 id="my-concerns" className="text-[18px] font-bold">
+        <section aria-labelledby="my-concerns" className="mt-12">
+          <h2 id="my-concerns" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
             내 고민 반영 리포트
           </h2>
-          <p className="mt-1 text-[13px] text-ink-3">개인 통합 리포트와 별도로 발급한 리포트입니다. 발급일 · 고민 주제로 구분하며, 이전 리포트는 새 리포트가 나와도 그대로 남습니다.</p>
-          <ul className="mt-3 border-t border-ink">
+          <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">개인 통합 리포트와 별도로 발급한 리포트입니다. 발급일 · 고민 주제로 구분하며, 이전 리포트는 새 리포트가 나와도 그대로 남습니다.</p>
+          <ul className="mt-3 space-y-3">
             {concerns.map((c) => (
               <ConcernRow key={c.recordId} card={c} />
             ))}
@@ -105,23 +106,23 @@ async function MyContent() {
         </section>
       )}
 
-      <section aria-labelledby="my-orders" className="mt-10">
-        <h2 id="my-orders" className="text-[18px] font-bold">
+      <section aria-labelledby="my-orders" className="mt-12">
+        <h2 id="my-orders" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
           결제내역
         </h2>
         {orders.length === 0 ? (
-          <p className="mt-3 border-y border-line py-6 text-[15px] text-ink-2">결제내역이 없습니다.</p>
+          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-6 text-[15px] text-ink-2">결제내역이 없습니다.</p>
         ) : (
-          <ul className="mt-3 border-t border-ink">
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-canvas">
             {orders.map((o) => (
-              <li key={o.orderNumber} className="border-b border-line">
-                <Link href={`/my/orders/${o.orderNumber}`} className="block py-3.5 hover:bg-mist/60">
+              <li key={o.orderNumber}>
+                <Link href={`/my/orders/${o.orderNumber}`} className="block px-4 py-3.5 hover:bg-mist/60">
                   <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                     <span className="text-[15px] font-semibold">{o.productName}</span>
                     <span className="text-[15px] font-semibold tabular-nums">{formatKrw(o.amount)}</span>
                   </span>
                   <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-3">
-                    <span className={o.status === "paid" ? "font-semibold text-accent" : "font-semibold text-ink-2"}>{o.statusLabel}</span>
+                    <span className={o.status === "paid" ? "font-semibold text-positive" : "font-semibold text-ink-2"}>{o.statusLabel}</span>
                     <span>· {formatDate(o.approvedAt ?? o.createdAt)}</span>
                     <span className="tabular-nums">· {o.orderNumber}</span>
                     {PAYMENT_ENV_LABEL[o.paymentEnv] && <StatusBadge>{PAYMENT_ENV_LABEL[o.paymentEnv]}</StatusBadge>}
@@ -131,15 +132,15 @@ async function MyContent() {
             ))}
           </ul>
         )}
-        <p className="mt-2 text-[13px] text-ink-3">주문을 누르면 결제 승인 기록과 리포트 제공 상태를 주문번호 기준으로 볼 수 있습니다.</p>
+        <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">주문을 누르면 결제 승인 기록과 리포트 제공 상태를 주문번호 기준으로 볼 수 있습니다.</p>
       </section>
 
-      <section aria-labelledby="my-account" className="mt-10">
-        <h2 id="my-account" className="text-[18px] font-bold">
+      <section aria-labelledby="my-account" className="mt-12">
+        <h2 id="my-account" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
           계정
         </h2>
-        <dl className="mt-3 border-y border-line text-[15px]">
-          <div className="flex items-center justify-between gap-4 border-b border-line py-3">
+        <dl className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-canvas px-4 text-[15px]">
+          <div className="flex items-center justify-between gap-4 py-3">
             <dt className="text-ink-3">로그인</dt>
             <dd>카카오 계정</dd>
           </div>
@@ -194,116 +195,5 @@ function Actions({ signedIn = false }: { signedIn?: boolean }) {
         </Link>
       )}
     </div>
-  );
-}
-
-/** 고민 반영 리포트 한 건: 발급일 · 고민 주제 · 고민을 쓴 시점 · 생성 상태 */
-function ConcernRow({ card }: { card: MyConcernCard }) {
-  const href = `/results/${card.assessmentId}/context/${card.recordId}`;
-  const small = "inline-flex h-10 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
-  const primary = `${small} bg-accent text-white hover:bg-accent-strong`;
-  const secondary = `${small} border border-line-strong bg-canvas text-ink hover:bg-mist`;
-  return (
-    <li className="border-b border-line py-4" data-testid="my-concern">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] tabular-nums text-ink-3">발급일 {formatDate(card.issuedAt)}</span>
-        <StatusBadge>{card.entitlement === "refunded" ? "환불됨" : ENTITLEMENT_LABEL.purchased}</StatusBadge>
-        {card.generation !== "none" && <StatusBadge>{GENERATION_LABEL[card.generation]}</StatusBadge>}
-      </div>
-      <p className="mt-1.5 text-[16px] font-semibold">{card.topicLabel} 고민 리포트</p>
-      <p className="mt-0.5 text-[14px] text-ink-2">{card.subject}</p>
-      <p className="mt-0.5 text-[13px] text-ink-3">
-        고민 작성 시점 {formatDateTime(card.writtenAt)}
-        {card.contentScrubbed ? " · 적은 내용을 지움" : ""} · 주문번호 {card.orderNumber}
-      </p>
-      {card.entitlement === "purchased" && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {card.generation === "ready" ? (
-            <Link href={href} className={primary}>
-              이 고민이 반영된 리포트 보러가기
-            </Link>
-          ) : card.generation === "failed" ? (
-            <Link href={href} className={primary}>
-              같은 발급 건으로 다시 만들기
-            </Link>
-          ) : (
-            <Link href={href} className={secondary}>
-              생성 중 — 상태 보기
-            </Link>
-          )}
-          <Link href={`/results/${card.assessmentId}/context`} className={secondary}>
-            나의 고민 기록소
-          </Link>
-        </div>
-      )}
-    </li>
-  );
-}
-
-/** 리포트 한 건: 상품 · 대상 · 날짜 · 이용 권한 · 생성 상태와, 상태에 맞는 버튼만 */
-function ReportRow({ card, paymentsReady }: { card: MyReportCard; paymentsReady: boolean }) {
-  const href = `/results/${card.assessmentId}`;
-  const small = "inline-flex h-10 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
-  const primary = `${small} bg-accent text-white hover:bg-accent-strong`;
-  const secondary = `${small} border border-line-strong bg-canvas text-ink hover:bg-mist`;
-  return (
-    <li className="border-b border-line py-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[16px] font-semibold">{card.productName}</span>
-        <StatusBadge>{ENTITLEMENT_LABEL[card.entitlement]}</StatusBadge>
-        {card.generation !== "none" && <StatusBadge>{GENERATION_LABEL[card.generation]}</StatusBadge>}
-        {card.source === "dev-scoring" && <StatusBadge>개발용 결과</StatusBadge>}
-      </div>
-      <p className="mt-1 text-[14px] text-ink-2">{card.subject}</p>
-      <p className="mt-0.5 text-[13px] text-ink-3">
-        생성일 {formatDate(card.createdAt)}
-        {card.period ? ` · 기간 ${card.period}` : ""}
-        {card.paidOrderNumber ? ` · 주문번호 ${card.paidOrderNumber}` : ""}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {card.entitlement === "purchased" ? (
-          card.generation === "failed" ? (
-            <>
-              <form action={retryReportAction.bind(null, card.assessmentId)}>
-                <button type="submit" className={primary}>
-                  다시 생성
-                </button>
-              </form>
-              <Link href={href} className={secondary}>
-                결과 화면
-              </Link>
-            </>
-          ) : card.generation === "ready" ? (
-            <Link href={href} className={primary}>
-              구매한 리포트 보기
-            </Link>
-          ) : (
-            <Link href={href} className={secondary}>
-              생성 중 — 상태 보기
-            </Link>
-          )
-        ) : (
-          <>
-            <Link href={href} className={secondary}>
-              무료 결과 보기
-            </Link>
-            {card.entitlement === "free" && paymentsReady && (
-              <Link href={`${href}#r-purchase`} className={primary}>
-                전체 리포트 구매
-              </Link>
-            )}
-          </>
-        )}
-      </div>
-      <p className="mt-2 text-[13px] text-ink-3">
-        내 고민 자세히 알려주기: {card.contextTopic ? topicLabel(card.contextTopic) : "작성 기록 없음"} ·{" "}
-        <Link href={`${href}/context`} className="underline underline-offset-2">
-          나의 고민 기록소
-        </Link>
-      </p>
-      {card.entitlement === "purchased" && card.generation === "failed" && (
-        <p className="mt-2 text-[13px] text-ink-3">결제는 정상 처리되었습니다. 다시 결제하지 말고 ‘다시 생성’을 눌러 주세요.</p>
-      )}
-    </li>
   );
 }

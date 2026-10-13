@@ -8,7 +8,7 @@ export type ReadingNavItem = { id: string; label: string };
  * 주제 이동 막대 — 화면 위에 붙어 있고, 지금 읽는 주제를 표시한다. 오른쪽 "전체 펼치기"는 리포트 안의 모든 접힘(data-fold)을 한 번에 열고 닫는다.
  * 스크립트가 없어도 링크로 이동하고 접힘은 눌러서 열린다(향상 기능일 뿐이다).
  */
-export function ReadingNav({ items }: { items: ReadingNavItem[] }) {
+export function ReadingNav({ items, expandAll = true }: { items: ReadingNavItem[]; /** 접힘이 있는 화면에서만 "전체 펼치기"를 보인다 */ expandAll?: boolean }) {
   const [current, setCurrent] = useState(items[0]?.id ?? "");
   const [allOpen, setAllOpen] = useState(false);
   const rail = useRef<HTMLDivElement>(null);
@@ -73,6 +73,7 @@ export function ReadingNav({ items }: { items: ReadingNavItem[] }) {
             </a>
           ))}
         </div>
+        {expandAll && (
         <button
           type="button"
           onClick={toggleAll}
@@ -81,6 +82,7 @@ export function ReadingNav({ items }: { items: ReadingNavItem[] }) {
         >
           {allOpen ? "전체 접기" : "전체 펼치기"}
         </button>
+        )}
       </div>
     </nav>
   );

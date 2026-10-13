@@ -35,15 +35,18 @@ export function SummaryCards({ cards }: { cards: ReadingSummaryCard[] }) {
   );
 }
 
-/** 눌러서 펼치는 접힘. data-fold는 "전체 펼치기"가 찾는 표시 — 잠금(구매 전 가림)과 모양이 다르다(화살표 · 열린 상자) */
-export function Fold({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) {
+/** 눌러서 펼치는 접힘. data-fold는 "전체 펼치기"가 찾는 표시 — 잠금(구매 전 가림)과 모양이 다르다(화살표 · 열리는 상자). hint: 접힌 채로 보이는 한 줄 설명 */
+export function Fold({ label, hint, children, wide = false }: { label: string; hint?: string; children: React.ReactNode; wide?: boolean }) {
   return (
     <details
       data-fold
-      className={`group min-w-0 rounded-lg border border-line-strong bg-canvas open:flex-[1_1_100%] ${wide ? "flex-[1_1_100%]" : "flex-[1_1_calc(50%-0.25rem)]"}`}
+      className={`group min-w-0 rounded-lg border border-line-strong bg-canvas open:flex-[1_1_100%] ${wide || hint ? "flex-[1_1_100%]" : "flex-[1_1_calc(50%-0.25rem)]"}`}
     >
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 py-2.5 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
-        <span>{label}</span>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-[15px] font-semibold">{label}</span>
+          {hint && <span className="mt-0.5 block text-[13px] leading-[1.5] text-ink-3">{hint}</span>}
+        </span>
         <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
       </summary>
       <div className="border-t border-line px-4 py-5">{children}</div>

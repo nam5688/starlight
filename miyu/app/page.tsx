@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CompareSection } from "@/components/home/compare-section";
 import { Faq } from "@/components/home/faq";
 import { ReportPreview } from "@/components/home/report-preview";
-import { CheckIcon } from "@/components/ui/icons";
+import { AdjustIcon, ArrowIcon, CheckIcon, FlowIcon, StrengthIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, pageWide } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
@@ -33,6 +34,12 @@ const PERSPECTIVES = [
   },
 ];
 
+const HERO_POINTS = [
+  { title: "직접 확인한 내 모습", desc: "내가 답한 응답으로 평소의 반응을 확인합니다." },
+  { title: "자료를 연결한 종합 해석", desc: "사주 · 응답 · MBTI가 겹치는 부분과 다른 부분을 나눠 보여 줍니다." },
+  { title: "확인할 수 있는 분석 이유", desc: "영역마다 무엇을 근거로 봤는지와 한계를 함께 적습니다." },
+];
+
 const QUESTION_COUNT = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
 
 const STEPS = [
@@ -46,20 +53,30 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <main>
-      {/* 핵심 소개 + 실제 리포트 예시 */}
-      <section className={`${pageWide} grid gap-12 py-12 md:py-16 lg:grid-cols-[minmax(0,1fr)_480px] lg:items-center lg:gap-16 lg:py-20`}>
+    <main className="bg-page">
+      {/* 핵심 소개 */}
+      <section className={`${pageWide} grid gap-10 py-10 md:py-16 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:gap-16 lg:py-20`}>
         <div>
-          <p className="text-[15px] font-semibold text-accent">ME:U 개인 통합 리포트</p>
-          <h1 className="mt-3 text-[32px] font-bold leading-[1.3] tracking-[-0.02em] md:text-[44px]">
-            내 사주,
-            <br />쉬운 말로 풀어 드립니다.
+          <p className="text-[14px] font-semibold text-accent">ME:U 개인 통합 리포트</p>
+          <h1 className="mt-3 text-[28px] leading-[1.35] font-bold tracking-tight md:text-[42px]">
+            생년월일만으로는
+            <br />
+            설명되지 않는 나까지.
           </h1>
-          <p className="mt-5 text-[17px] leading-relaxed text-ink-2 md:text-[19px]">
-            생년월일로 계산한 <span className="font-semibold text-ink">사주 원국</span>에 내 행동 응답을 더해,
-            <br className="hidden md:block" /> 일 · 가까운 사람 · 선택 · 돈 · 갈등에서 어떤 점이 강하고 어떤 점을 조심하면 좋은지 알려 드려요.
+          <p className="mt-4 max-w-[34rem] text-[16px] leading-[1.75] text-ink-2 md:text-[18px]">
+            사주 원국에 내가 직접 답한 기질 · 성격 · 가까운 관계 반응과 입력한 MBTI를 연결해, 한 사람의 해석으로 읽습니다.
           </p>
-          <p className="mt-3 text-[15px] text-ink-3">한자는 뜻과 함께, 어려운 용어는 일상의 말로 풀어 씁니다.</p>
+          <ul className="mt-6 max-w-[34rem] space-y-3.5">
+            {HERO_POINTS.map((p) => (
+              <li key={p.title} className="flex gap-3">
+                <CheckIcon className="mt-0.5 size-5 shrink-0 text-accent" />
+                <p className="text-[15px] leading-[1.65]">
+                  <span className="font-semibold">{p.title}</span>
+                  <span className="block text-ink-2">{p.desc}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/analyze" className={buttonPrimary}>
               내 분석 시작하기
@@ -68,31 +85,58 @@ export default function Home() {
               리포트 예시 보기
             </Link>
           </div>
-          <p className="mt-4 text-[15px] text-ink-2">
+          <p className="mt-4 text-[14px] leading-[1.65] text-ink-2">
             미리보기 무료 · {PERSONAL_REPORT.name} <span className="font-semibold tabular-nums text-ink">{formatKrw(PERSONAL_REPORT.priceKrw)}</span> · 문항 {QUESTION_COUNT}개
           </p>
-          <dl className="mt-8 border-t border-line text-[14px]">
-            <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-line py-3">
-              <dt className="font-semibold text-ink-2">무료로 보는 것</dt>
-              <dd className="text-ink-2">원국 표 · 오행이 뜻하는 것 · 쉬운 한 줄 풀이 · 내 원국이 던지는 질문</dd>
-            </div>
-            <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-line py-3">
-              <dt className="font-semibold text-accent">구매하면 더</dt>
-              <dd className="text-ink-2">질문의 답 · 상황별 잘하는 점과 주의할 점 · 어울리는 관계 조건 · 보완 아이템</dd>
-            </div>
-          </dl>
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[14px] leading-[1.6] text-ink-3">
+            내 분석은 이어서
+            <span className="inline-flex items-center gap-1.5">
+              궁합 비교 <StatusBadge>준비 중</StatusBadge>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              고민 상담 <StatusBadge>준비 중</StatusBadge>
+            </span>
+            으로 이어집니다.
+          </p>
         </div>
-        <ReportPreview />
+        <ConnectDiagram />
+      </section>
+
+      <CompareSection />
+
+      {/* 무료 미리보기 예시 */}
+      <section aria-labelledby="home-preview" className={`${pageWide} py-12 md:py-16`}>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_480px] lg:items-start lg:gap-16">
+          <div>
+            <h2 id="home-preview" className="text-[22px] leading-snug font-bold tracking-tight md:text-[28px]">
+              무료 미리보기는 이렇게 보입니다
+            </h2>
+            <p className="mt-2 text-[15px] leading-[1.7] text-ink-2">
+              검사를 마치면 구매 전에 아래 범위까지 무료로 볼 수 있습니다. 잠긴 내용은 화면에서 가리는 것이 아니라 구매 후에만 내려받습니다.
+            </p>
+            <dl className="mt-6 border-t border-line text-[14px]">
+              <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-line py-3">
+                <dt className="font-semibold text-ink-2">무료로 보는 것</dt>
+                <dd className="leading-[1.65] text-ink-2">원국 표 · 오행이 뜻하는 것 · 쉬운 한 줄 풀이 · 내 원국이 던지는 질문</dd>
+              </div>
+              <div className="grid grid-cols-[88px_minmax(0,1fr)] gap-3 border-b border-line py-3">
+                <dt className="font-semibold text-accent-strong">구매하면 더</dt>
+                <dd className="leading-[1.65] text-ink-2">질문의 답 · 상황별 잘하는 점과 주의할 점 · 어울리는 관계 조건 · 보완 아이템</dd>
+              </div>
+            </dl>
+          </div>
+          <ReportPreview />
+        </div>
       </section>
 
       {/* 제공 항목 */}
-      <section className="border-y border-line bg-mist py-14 md:py-20">
+      <section className="border-y border-line bg-canvas py-12 md:py-16">
         <div className={pageWide}>
           <h2 className="text-[24px] font-bold tracking-tight md:text-[28px]">리포트에 담기는 항목</h2>
           <p className="mt-2 text-[16px] text-ink-2">검사 후 무료 미리보기를 먼저 보고, 필요할 때 개인 통합 리포트를 구매합니다.</p>
 
           <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-14">
-            <table className="w-full border-collapse bg-canvas text-left">
+            <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-ink text-[13px] text-ink-2">
                   <th scope="col" className="px-3 py-3 font-semibold md:px-4">
@@ -184,6 +228,47 @@ export default function Home() {
         </div>
       </section>
     </main>
+  );
+}
+
+/** 어떤 자료가 한 해석으로 이어지는지 — 구현된 자료만 (고민 반영 · 상대 자료는 준비 중이라 넣지 않는다) */
+function ConnectDiagram() {
+  const inputs = [
+    ["사주 원국", "생년월일 · 출생시간으로 계산"],
+    ["기질 · 성격 응답", "내가 직접 답한 문항"],
+    ["가까운 관계 반응", "내가 직접 답한 문항"],
+    ["입력한 MBTI", "알고 있는 값을 그대로"],
+  ];
+  return (
+    <div className="hidden rounded-xl border border-line bg-canvas p-5 lg:block" aria-label="자료가 하나의 해석으로 이어지는 방식">
+      <p className="text-[13px] font-semibold text-ink-3">내가 준 자료</p>
+      <ul className="mt-2 divide-y divide-line border-y border-line">
+        {inputs.map(([name, note]) => (
+          <li key={name} className="flex items-baseline justify-between gap-3 py-2.5">
+            <span className="text-[15px] font-semibold">{name}</span>
+            <span className="text-[13px] text-ink-3">{note}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="my-3 flex items-center gap-1.5 text-[13px] font-semibold text-accent-strong">
+        <ArrowIcon className="size-3.5 rotate-90" />
+        겹치는 부분과 다른 부분을 나눠 한 사람의 해석으로
+      </p>
+      <ul className="space-y-2 text-[15px]">
+        <li className="flex items-center gap-2 font-semibold text-positive">
+          <StrengthIcon />
+          내가 강한 포인트
+        </li>
+        <li className="flex items-center gap-2 font-semibold text-caution">
+          <AdjustIcon />
+          내가 힘들 수 있는 포인트
+        </li>
+        <li className="flex items-center gap-2 font-semibold text-accent-strong">
+          <FlowIcon />
+          상황별로 해볼 선택
+        </li>
+      </ul>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 import type { DetailBlock, FullReport, SajuSection } from "@/lib/report/types";
 import { BASE_TERMS, GLOSSARY, withHanja } from "@/lib/saju/glossary";
 import { BRANCHES, STEMS } from "@/lib/saju/glyphs";
-import { ChevronIcon } from "@/components/ui/icons";
+import { Fold } from "./reading-parts";
 
 /** 5) 네 가지 상세 분석 — 영역별로 펼쳐 보기 */
 export function DetailSections({ report, showChart = true }: { report: FullReport; showChart?: boolean }) {
@@ -15,7 +15,7 @@ export function DetailSections({ report, showChart = true }: { report: FullRepor
   const saju = details.saju.saju;
 
   return (
-    <div className="border-t border-ink">
+    <div className="flex flex-wrap gap-2">
       <Detail
         title="MBTI 성향"
         headline={`이번 응답 ${report.mbti.code}${report.knownMbti ? ` · 본인 입력 ${report.knownMbti}` : ""}`}
@@ -65,37 +65,26 @@ function Detail({
   children?: React.ReactNode;
 }) {
   return (
-    <details className="group border-b border-line">
-      <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 py-4 hover:bg-mist/60 [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0">
-          <span className="block text-[17px] font-bold">{title}</span>
-          <span className="mt-0.5 block text-[14px] text-ink-3">{headline}</span>
-        </span>
-        <span className="flex shrink-0 items-center gap-1 text-[14px] text-ink-3">
-          <span className="group-open:hidden">펼치기</span>
-          <span className="hidden group-open:inline">접기</span>
-          <ChevronIcon className="size-5 transition-transform group-open:rotate-180" />
-        </span>
-      </summary>
-      <div className="space-y-5 pb-7">
+    <Fold label={title} hint={headline} wide>
+      <div className="space-y-6">
         <div>
           <p className="text-[13px] font-semibold text-ink-3">무엇을 봤나요</p>
-          <p className="mt-1 text-[15px] text-ink-2">{block.basis}</p>
+          <p className="mt-1 text-[15px] leading-[1.7] text-ink-2">{block.basis}</p>
         </div>
         {children}
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {block.findings.map((f) => (
-            <li key={f} className="relative pl-4 text-[16px] leading-relaxed before:absolute before:top-[0.7em] before:left-0 before:h-px before:w-2 before:bg-ink-3">
+            <li key={f} className="relative pl-4 text-[15px] leading-[1.75] before:absolute before:top-[0.8em] before:left-0 before:size-1.5 before:rounded-full before:bg-line-strong">
               {f}
             </li>
           ))}
         </ul>
-        <div className="rounded-md bg-mist px-4 py-3">
-          <p className="text-[13px] font-semibold text-ink-2">한계</p>
-          <p className="mt-1 text-[14px] leading-relaxed text-ink-2">{block.limits}</p>
+        <div className="border-l-[3px] border-line-strong pl-3.5">
+          <p className="text-[13px] font-semibold text-ink-3">한계</p>
+          <p className="mt-1 text-[14px] leading-[1.7] text-ink-2">{block.limits}</p>
         </div>
       </div>
-    </details>
+    </Fold>
   );
 }
 
