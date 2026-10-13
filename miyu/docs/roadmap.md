@@ -254,8 +254,9 @@
 - [x] **AI 비교 1단계용 지시문 · 검사 · 미리보기 (2026-10-13, 호출 0회)**: 비교용 지시문 `philosophical-v0-prompt-0.1`(`lib/report/philosophy/prompt.ts`), 형식 검사(`validate.ts`) · 내용 점검(`depth.ts`) · 생성기(`lib/report/ai/philosophy-generator.ts`) · 비교 실행기 변형(`compare-plan.ts`의 `variant`) · 모의 작성기 + 테스트(`philosophy-generator.test.ts` 6개), 1단계 가상 인물 2명의 목표 문장 예시(`docs/samples/stage1-target-sentences.json` · 테스트 5개), 평가 기준 · 합격선(`ai-quality-comparison-plan.md` 9장), 승인 전 미리보기 `docs/ai-stage1-preview.html`(`scripts/render-ai-stage1-preview.ts`). 비용 계산은 `node scripts/compare-ai-dry-run.ts --variant philosophical-v0`(1단계 평소 약 890원 · 고쳐 쓰기까지 하는 최악 약 2,869원, 한도 3,000원 안).
 
 미완료 · 결정 필요
-- [ ] 운영자가 `ai-stage1-preview.html`(구성 · 목표 문장 · 평가 기준)을 확인하고 **1단계 3,000원 승인** → 승인 뒤에만 API 계정 · 키 안내와 제공사 연결 코드(어댑터)
-- [ ] 운영자가 나란히 보고 구조 확정 · 수정 → 그 뒤 `concern-v2` 지시문 · 형식 검사 · 모의 작성기 · 화면 반영 (개인 종합 리포트에 적용할지는 따로 결정)
+- [ ] 운영자가 목표 예시 2판(`ai-stage1-preview.html` · `docs/samples/stage1-target-sentences.json`)을 읽고 확정 → 그 수준에 맞게 지시문 · 검사 수정(근거 범위 안의 결론 · 쉬운 말 · 문단별 이유 칸 · 갈등은 근거가 있을 때만 · 한계 문구 한 번 · 행동의 시점 강제 없음) → 호출 전 재확인 → **1단계 3,000원 승인** → 승인 뒤에만 API 계정 · 키 안내와 제공사 연결 코드(어댑터)
+- [ ] 철학적 깊이는 9,900원 통합 리포트 · 4,900원 고민 반영 리포트의 공통 품질 — 확정된 수준을 두 리포트의 생성 지침에 함께 반영(지금 9,900원 리포트 지시문 `lib/report/v2/prompt.ts`는 아직 이 방향이 아니다)
+- [ ] 운영자가 나란히 보고 구조 확정 · 수정 → 그 뒤 `concern-v2` 지시문 · 형식 검사 · 모의 작성기 · 화면 반영 (개인 종합 리포트 9,900원에도 같은 깊이를 적용 — 2026-10-13 운영자)
 - [ ] 실제 AI로 같은 수준의 글이 나오는지, 가려 읽는 사람의 평가 (AI 연결 · 예산 승인 뒤)
 
 ## 보류 · 후속 확장 목록 (지금 만들지 않음)

@@ -132,7 +132,7 @@
 ## 7. 운영자 결정 — 한꺼번에 하지 않아도 된다
 
 **지금 필요한 것 (다음 단계가 이 둘에 달려 있다)**
-1. **AI 비교 생성 예산 승인 여부** — 아직 승인하지 않았다(2026-10-13 운영자: 비교용 지시문 · 가상 인물 · 구성 · 목표 문장 미리보기 `ai-stage1-preview.html`을 확인한 뒤 승인하겠다고 함, 미리보기 준비됨 · 호출 0회). 승인할 때는 **1단계만**(생성 4건, 3,000원 한도) 먼저 요청한다. 2단계(생성 20건, 8,000원 한도)는 1단계 결과를 본 뒤 따로 ([`ai-quality-comparison-plan.md`](./ai-quality-comparison-plan.md)).
+1. **AI 비교 생성 예산 승인 여부** — 아직 승인하지 않았다(2026-10-13 운영자: 비교용 지시문 · 가상 인물 · 구성 · 목표 문장 미리보기 `ai-stage1-preview.html`을 확인한 뒤 승인하겠다고 함, 목표 예시 2판 준비됨 · 운영자 확정 대기 · 호출 0회). 승인할 때는 **1단계만**(생성 4건, 3,000원 한도) 먼저 요청한다. 2단계(생성 20건, 8,000원 한도)는 1단계 결과를 본 뒤 따로 ([`ai-quality-comparison-plan.md`](./ai-quality-comparison-plan.md)).
 2. **자체 문항 초안 검토** — 먼저 풀어보기 화면(`docs/assessment-take.html`)으로 직접 풀고 검토 모드에 의견을 남긴 뒤, 검토 화면(`docs/assessment-review.html`)에서 두 번째 검토를 한다. 읽는 범위는 **A안으로 결정됨** ([`assessment-design-v1.md`](./assessment-design-v1.md) · [`assessment-reliability-sim.md`](./assessment-reliability-sim.md)).
 
 3. **최초 구매에 무료 발급을 몇 회 포함할지** — 내 고민 반영 리포트 가격 4,900원은 운영자가 확정했다(2026-10-13). 무료 발급은 지금 없고, 실제 AI 글을 읽어 본 뒤 정하는 것을 권한다 ([`concern-records.md`](./concern-records.md) 6장).
