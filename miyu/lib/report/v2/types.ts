@@ -25,7 +25,7 @@ export type ReportDraftV2 = {
   timeline: { period: string; theme: string; opportunity: string; caution: string; evidence: string[] }[];
   differences: Paragraph[];
   actions: { situation: string; action: string; evidence: string[] }[];
-  /** 알려 주신 고민까지 반영한 해석 (나를 더 반영하기를 적었을 때만) */
+  /** 알려 주신 고민까지 반영한 해석 (내 고민 자세히 알려주기를 적었을 때만) */
   focus?: Paragraph[];
 };
 

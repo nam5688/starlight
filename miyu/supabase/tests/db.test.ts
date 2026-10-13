@@ -8,6 +8,11 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ASSESSMENT_MODULES } from "../../lib/assessment/modules/index.ts";
 import { createSupabaseRepository } from "../../lib/integrations/supabase/repository.ts";
 import { EMPTY_BASIC_INFO } from "../../lib/profile/basic-info.ts";
+import { concernProductId } from "../../lib/config/product.ts";
+import { concernInputOf } from "../../lib/personalization/concern.ts";
+import { createAiReportGenerator } from "../../lib/report/ai/generator.ts";
+import { createMockModel } from "../../lib/report/ai/mock-model.ts";
+import { isConcernReport } from "../../lib/report/concern/types.ts";
 import { devReportGenerator } from "../../lib/report/generate-dev-report.ts";
 import { manseryeokEngine as sajuEngine } from "../../lib/saju/manseryeok-engine.ts";
 import { submitAssessment } from "../../lib/services/assessment-service.ts";
@@ -19,6 +24,7 @@ import { queueReport, runReport } from "../../lib/services/report-service.ts";
 import type { PaymentGateway } from "../../lib/services/ports.ts";
 import { ensureReport, getResultView } from "../../lib/services/report-service.ts";
 import { kakaoOAuthOptions } from "../../server/kakao-options.ts";
+import { getConcernWorkspace, startConcernCheckout } from "../../lib/services/concern-service.ts";
 import { deleteContext, getContextView, saveContext } from "../../lib/services/context-service.ts";
 
 const URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
@@ -200,7 +206,7 @@ test("프로필 누락 보완: 테이블보다 먼저 가입한 회원도 로그
   await C.client.auth.signOut();
 });
 
-test("나를 더 반영하기: 서버가 소유자를 확인해 저장 · 삭제하고, 본인만 보며, 다른 회원 결과에는 붙지 않는다", async () => {
+test("내 고민 자세히 알려주기: 서버가 소유자를 확인해 저장 · 삭제하고, 본인만 보며, 다른 회원 결과에는 붙지 않는다", async () => {
   const server = createSupabaseRepository(admin);
   const saved = await saveContext(server, { userId: A.id, assessmentId, raw: { topic: "work", question: "이직해도 될까요", excerpt: "연락처 010-1111-2222" }, agreed: true, now: () => new Date() });
   assert.equal(saved.kind, "saved");
@@ -227,6 +233,162 @@ test("나를 더 반영하기: 서버가 소유자를 확인해 저장 · 삭제
   assert.equal(await deleteContext(server, { userId: B.id, assessmentId }), false);
   assert.equal(await deleteContext(server, { userId: A.id, assessmentId }), true);
   assert.equal(await server.getContext(assessmentId), null);
+});
+
+test("고민 기록(11번 마이그레이션): 서버가 저장하고 본인만 보며, 고치지 못하고 내용 지우기만 되며, 같은 저장본은 하나뿐이고 발급 주문은 기록마다 하나다", async () => {
+  const U = await makeUser(); // 이 시험 전용 회원 · 검사 · 주문 (다른 시험의 집계에 섞이지 않게)
+  const V = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const now = () => new Date();
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "고민기록" }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+
+  // 개인 통합 리포트를 먼저 산다 (기존 구매자 전용)
+  const buy = await startCheckout({ repo: server, now }, { userId: U.id, assessmentId: aid });
+  if (buy.kind !== "order") throw new Error();
+  const buyPaid = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: buy.order.orderNumber, paymentKey: `pk-${randomUUID()}`, amount: buy.order.amount });
+  if (buyPaid.kind !== "paid") throw new Error();
+  const baseReport = await ensureReport({ repo: server, generator: devReportGenerator, now }, buyPaid.order);
+  assert.equal(baseReport?.status, "ready");
+  const baseJson = JSON.stringify(baseReport?.content);
+
+  const work = { topic: "work", question: "지금 다니는 회사를 계속 다닐지 이직을 준비할지 결정을 못 하고 있어요.", situation: "새로운 제안이 오면 처음엔 끌리다가 연봉 협상 이야기가 나오면 계속 미루게 돼요. 팀장님 앞에서는 말이 잘 안 나와요." };
+  const first = await saveContext(server, { userId: U.id, assessmentId: aid, raw: work, agreed: true, now });
+  assert.equal(first.kind, "saved");
+  const gen = createAiReportGenerator({ model: createMockModel(), now: () => new Date(), sleep: async () => {} });
+
+  // 1) 저장은 기록 · 주문을 만들지 않는다. 발급을 시작하면 그 순간의 고민이 기록으로 남고 4,900원 별도 주문이 생긴다 (더블 클릭은 한 건)
+  assert.deepEqual(await server.listConcernRecords(aid), []);
+  const issuing = { enabled: true } as const;
+  const [s1, s2] = await Promise.all([startConcernCheckout({ repo: server, now, issuing }, { userId: U.id, assessmentId: aid }), startConcernCheckout({ repo: server, now, issuing }, { userId: U.id, assessmentId: aid })]);
+  if (s1.kind !== "order" || s2.kind !== "order") throw new Error(`${s1.kind}/${s2.kind}`);
+  assert.equal(s1.record.id, s2.record.id, "같은 저장본에는 기록이 하나");
+  assert.equal(s1.order.orderNumber, s2.order.orderNumber, "동시에 눌러도 대기 주문은 하나");
+  assert.equal(s1.order.amount, 4900);
+  assert.equal(s1.order.productId, concernProductId(s1.record.id));
+  assert.equal((await server.listConcernRecords(aid)).length, 1);
+  const record = s1.record;
+
+  // 2) 접근 정책: 본인만 조회, 브라우저 직접 쓰기 거부, 다른 회원 결과에는 붙지 않는다
+  assert.equal((await createSupabaseRepository(U.client).listConcernRecords(aid)).length, 1);
+  assert.deepEqual(await createSupabaseRepository(V.client).listConcernRecords(aid), []);
+  assert.equal(await createSupabaseRepository(V.client).getConcernRecord(record.id), null);
+  const anonymous = await anon.from("concern_records").select();
+  assert.ok(anonymous.error || anonymous.data?.length === 0);
+  const direct = await U.client.from("concern_records").update({ scrubbed_at: new Date().toISOString() }).eq("id", record.id).select();
+  assert.ok(direct.error || direct.data?.length === 0, "브라우저에서 직접 고칠 수 없다");
+  const directInsert = await U.client.from("concern_records").insert({ assessment_id: aid, user_id: U.id, topic: "love", written_at: new Date().toISOString(), agreed_at: new Date().toISOString() });
+  assert.ok(directInsert.error, "브라우저에서 직접 만들 수 없다");
+  const directDelete = await U.client.from("concern_records").delete().eq("id", record.id).select();
+  assert.ok(directDelete.error || directDelete.data?.length === 0, "브라우저에서 직접 지울 수 없다");
+  const forged = await admin.from("concern_records").insert({ assessment_id: aid, user_id: V.id, topic: "love", written_at: new Date().toISOString(), agreed_at: new Date().toISOString() });
+  assert.match(forged.error?.message ?? "", /owner mismatch/, "서버 코드 실수로도 다른 회원의 결과에 붙지 않는다");
+  const tooLong = await admin.from("concern_records").insert({ assessment_id: aid, user_id: U.id, topic: "love", question: "가".repeat(301), written_at: new Date().toISOString(), agreed_at: new Date().toISOString() });
+  assert.ok(tooLong.error, "글자 수 제한은 DB에서도 지킨다");
+
+  // 3) 기록은 고치지 않는다 — 허용되는 것은 내용 지우기뿐
+  for (const patch of [{ topic: "love" }, { question: "바꾼 내용" }, { written_at: new Date().toISOString() }, { agreed_at: new Date().toISOString() }, { user_id: V.id }]) {
+    const r = await admin.from("concern_records").update(patch).eq("id", record.id).select();
+    assert.match(r.error?.message ?? "", /immutable|owner mismatch|violates/, `고칠 수 없다: ${JSON.stringify(patch)}`);
+  }
+  const halfScrub = await admin.from("concern_records").update({ scrubbed_at: new Date().toISOString() }).eq("id", record.id);
+  assert.ok(halfScrub.error, "글을 비우지 않고 지운 것으로 표시할 수 없다");
+  const stillThere = await server.getConcernRecord(record.id);
+  assert.equal(stillThere?.question, work.question);
+  assert.equal(stillThere?.scrubbedAt, null);
+
+  // 4) 결제 → 리포트: 기존 개인 통합 리포트는 그대로, 고민 리포트는 별도 건
+  const paid = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: s1.order.orderNumber, paymentKey: `pk-${randomUUID()}`, amount: s1.order.amount });
+  if (paid.kind !== "paid") throw new Error();
+  const made = await ensureReport({ repo: server, generator: gen, now }, paid.order);
+  assert.equal(made?.status, "ready");
+  assert.ok(made?.content && isConcernReport(made.content));
+  assert.equal(made.content.basis.concern.recordId, record.id);
+  assert.equal(made.content.basis.concern.writtenAt, record.writtenAt);
+  assert.notEqual(made.id, baseReport?.id);
+  assert.equal(JSON.stringify((await server.getReportByOrder(buyPaid.order.id))?.content), baseJson, "기존 리포트는 덮어쓰지 않는다");
+  assert.deepEqual((await getConcernWorkspace(createSupabaseRepository(U.client), { userId: U.id, assessmentId: aid, issuing }))?.issue, { kind: "issued", recordId: record.id, generation: "ready" });
+
+  // 5) 고민을 고치면 새 저장본 → 별도 기록 · 별도 주문 (과거 기록은 그대로)
+  await saveContext(server, { userId: U.id, assessmentId: aid, raw: { ...work, situation: `${work.situation} 퇴근 후에도 생각이 나요.` }, agreed: true, now });
+  const next = await startConcernCheckout({ repo: server, now, issuing }, { userId: U.id, assessmentId: aid });
+  if (next.kind !== "order") throw new Error(next.kind);
+  assert.notEqual(next.record.id, record.id);
+  assert.notEqual(next.order.productId, s1.order.productId);
+  assert.equal((await server.getConcernRecord(record.id))?.situation, work.situation, "과거 기록은 그대로");
+  // 같은 기록에 대기 주문을 하나 더 직접 넣으면 DB 고유 조건이 막는다
+  const dup = await admin.from("orders").insert({ order_number: `ORD-DUP-${randomUUID().slice(0, 8)}`, user_id: U.id, assessment_id: aid, product_id: next.order.productId, amount: 4900, payment_env: "test" });
+  assert.equal(dup.error?.code, "23505");
+
+  // 6) 내용 지우기: 글만 비우고 기록 자리 · 주제 · 작성 시점 · 리포트는 남는다. 이미 지웠으면 그대로
+  await server.scrubConcernRecord(record.id, new Date().toISOString());
+  const scrubbed = await server.getConcernRecord(record.id);
+  assert.ok(scrubbed?.scrubbedAt);
+  assert.equal(scrubbed?.question, "");
+  assert.equal(scrubbed?.situation, "");
+  assert.equal(scrubbed?.topic, "work");
+  assert.equal(scrubbed?.writtenAt, record.writtenAt);
+  await server.scrubConcernRecord(record.id, new Date().toISOString()); // 두 번째는 아무 일도 없다
+  const reScrub = await admin.from("concern_records").update({ question: "다시 쓰기" }).eq("id", record.id);
+  assert.ok(reScrub.error, "지운 기록에는 다시 쓸 수 없다");
+  assert.ok((await server.getReportByOrder(paid.order.id))?.content, "리포트는 남는다");
+  // 지운 기록은 같은 작성 시점의 새 기록을 막지 않는다 (부분 고유 조건)
+  const reinsert = await server.insertConcernRecord({ ...concernInputOf({ topic: "work", question: "다시", situation: "", matched: "", differed: "", excerpt: "" }), userId: U.id, assessmentId: aid, writtenAt: record.writtenAt, agreedAt: record.agreedAt });
+  assert.equal(reinsert.ok, true);
+  const dupVersion = await server.insertConcernRecord({ ...concernInputOf({ topic: "work", question: "또", situation: "", matched: "", differed: "", excerpt: "" }), userId: U.id, assessmentId: aid, writtenAt: record.writtenAt, agreedAt: record.agreedAt });
+  assert.deepEqual(dupVersion, { ok: false, reason: "conflict" });
+
+  // 7) 요약 목록에는 적은 내용이 없다
+  const summaries = await server.listConcernRecordSummaries(U.id);
+  assert.ok(summaries.length >= 3);
+  assert.ok(summaries.every((x) => !("question" in x)));
+  await U.client.auth.signOut();
+  await V.client.auth.signOut();
+});
+
+test("고민 기록 테이블이 없어도(11번 적용 전) 기존 화면 · 결제는 그대로 동작하고, 발급만 '준비 중'으로 막힌다", async () => {
+  const U = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const now = () => new Date();
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "표없음" }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+  const buy = await startCheckout({ repo: server, now }, { userId: U.id, assessmentId: aid });
+  if (buy.kind !== "order") throw new Error();
+  const paid = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: buy.order.orderNumber, paymentKey: `pk-${randomUUID()}`, amount: buy.order.amount });
+  if (paid.kind !== "paid") throw new Error();
+  assert.equal((await ensureReport({ repo: server, generator: devReportGenerator, now }, paid.order))?.status, "ready");
+  await saveContext(server, { userId: U.id, assessmentId: aid, raw: { topic: "work", question: "이직할까요", situation: "연봉 이야기를 미뤄요" }, agreed: true, now });
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const psql = (q: string) => execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-q", "-c", q]);
+  psql("alter table public.concern_records rename to concern_records_hidden; notify pgrst, 'reload schema'");
+  await sleep(800);
+  try {
+    assert.deepEqual(await server.listConcernRecords(aid), []);
+    assert.equal(await server.getConcernRecord(randomUUID()), null);
+    assert.deepEqual(await server.listConcernRecordSummaries(U.id), []);
+    await server.scrubConcernRecord(randomUUID(), new Date().toISOString()); // 오류 없이 지나간다
+    // 고민 저장 · 지우기도 그대로 된다 (임시 저장본 정리가 표가 없어도 막지 않는다)
+    const edited = await saveContext(server, { userId: U.id, assessmentId: aid, raw: { topic: "work", question: "이직할까요", situation: "연봉 이야기를 계속 미뤄요" }, agreed: true, now });
+    assert.equal(edited.kind, "saved");
+    const issuing = { enabled: true } as const;
+    const ws = await getConcernWorkspace(createSupabaseRepository(U.client), { userId: U.id, assessmentId: aid, issuing });
+    assert.deepEqual(ws?.issue, { kind: "can-issue", priceKrw: 4900 });
+    assert.deepEqual(ws?.entries, []);
+    const started = await startConcernCheckout({ repo: server, now, issuing }, { userId: U.id, assessmentId: aid });
+    assert.deepEqual(started, { kind: "unavailable", reason: "not-ready" }, "표가 없으면 주문도 만들지 않는다");
+    const orders = await server.listOrdersForAssessment(aid);
+    assert.equal(orders.length, 1, "개인 통합 주문만 있다");
+    assert.equal((await getResultView(createSupabaseRepository(U.client), { userId: U.id, assessmentId: aid }))?.report?.status, "ready");
+    assert.equal(await deleteContext(server, { userId: U.id, assessmentId: aid }), true);
+  } finally {
+    psql("alter table public.concern_records_hidden rename to concern_records; notify pgrst, 'reload schema'");
+    await sleep(800);
+  }
+  assert.deepEqual(await server.listConcernRecords(aid), []);
+  await U.client.auth.signOut();
 });
 
 test("카카오 로그인: 실제 Supabase Auth를 거쳐 카카오로 가는 요청에 이메일 동의가 없다 (KOE205 회귀 방지)", async () => {
@@ -532,6 +694,8 @@ test("회원 탈퇴(10번 마이그레이션): 서버만 부를 수 있고, 그 
   await queueReport({ repo }, paidOrder);
   await runReport({ repo, generator: devReportGenerator, now: () => new Date() }, paidOrder);
   await repo.upsertContext({ assessmentId: paid.id, userId: W.id, topic: "work", question: "이직할까", situation: "", matched: "", differed: "", excerpt: "", agreedAt: new Date().toISOString() });
+  const concern = await repo.insertConcernRecord({ assessmentId: paid.id, userId: W.id, topic: "work", question: "이직할까", situation: "", matched: "", differed: "", excerpt: "", writtenAt: new Date().toISOString(), agreedAt: new Date().toISOString() });
+  assert.ok(concern.ok);
   await admin.from("user_regions").upsert({ user_id: W.id, province: "서울", district: "마포구" });
   const report = await repo.getReportByOrder(order.id);
   assert.equal(report?.status, "ready");
@@ -556,7 +720,8 @@ test("회원 탈퇴(10번 마이그레이션): 서버만 부를 수 있고, 그 
 
   const done = await repo.withdrawMemberData(W.id);
   assert.equal(done.ok, true);
-  assert.ok(done.ok && done.counts.reports === 1 && done.counts.personal_contexts === 1 && done.counts.feedback === 1 && done.counts.regions === 1);
+  assert.ok(done.ok && done.counts.reports === 1 && done.counts.personal_contexts === 1 && done.counts.concern_records === 1 && done.counts.feedback === 1 && done.counts.regions === 1);
+  assert.deepEqual(await repo.listConcernRecords(paid.id), [], "고민 기록 삭제");
 
   // 지워진 것
   assert.equal(await repo.getAssessment(free.id), null, "주문 없는 검사는 삭제");

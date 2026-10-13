@@ -56,7 +56,7 @@ test("탈퇴: 검사 결과 · 리포트 · 고민 입력은 지우고, 주문�
   assert.deepEqual(shell.answers, {});
   assert.doesNotMatch(JSON.stringify(shell), /구매한분|INFJ/);
   assert.equal([...s.mem.reports.values()].filter((r) => r.userId === ME).length, 0, "리포트 내용 삭제");
-  assert.equal(s.mem.contexts.size, 0, "나를 더 반영하기 입력 삭제");
+  assert.equal(s.mem.contexts.size, 0, "내 고민 자세히 알려주기 입력 삭제");
 
   const order = s.mem.orders.get(s.order.id)!;
   assert.equal(order.status, "paid", "주문은 남는다");

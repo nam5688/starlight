@@ -5,8 +5,9 @@ import type { Answers } from "../assessment/types.ts";
 import type { GatewayPayment, OrderStatus } from "../commerce/order.ts";
 import type { ReportStatus } from "../commerce/report.ts";
 import type { ConsentRecord, ConsentType } from "../membership/terms.ts";
+import type { ConcernRecord, ConcernRecordSummary, NewConcernRecord } from "../personalization/concern.ts";
 import type { PersonalContext, PersonalContextInput } from "../personalization/context.ts";
-import type { ReportContent } from "../report/generator.ts";
+import type { AnyReportContent } from "../report/generator.ts";
 import type { DataSource, FreeSummary } from "../report/types.ts";
 import type { SajuResult } from "../saju/engine.ts";
 
@@ -79,8 +80,8 @@ export type ReportRecord = {
   orderId: string;
   assessmentId: string;
   status: ReportStatus;
-  /** v1(FullReport, 개발용 규칙) 또는 v2(PersonalReportV2, AI 서술 + 근거) */
-  content: ReportContent | null;
+  /** v1(FullReport, 개발용 규칙) · v2(PersonalReportV2, AI 서술 + 근거) · 고민 반영(ConcernReportV1) */
+  content: AnyReportContent | null;
   generator: string | null;
   generatorVersion: string | null;
   attempts: number;
@@ -120,7 +121,7 @@ export type FunnelEventInput = { anonId: string; name: FunnelEventName; path: st
 export type FunnelEventRecord = FunnelEventInput & { id: number; createdAt: string };
 
 /** 지표 집계용 — 개인을 구분하는 값은 회원번호뿐이며 화면에는 합계만 보인다 */
-export type MetricsOrder = Pick<OrderRecord, "id" | "userId" | "assessmentId" | "status" | "amount" | "paymentEnv" | "createdAt" | "approvedAt"> & { acquisition: Acquisition | null };
+export type MetricsOrder = Pick<OrderRecord, "id" | "userId" | "assessmentId" | "productId" | "status" | "amount" | "paymentEnv" | "createdAt" | "approvedAt"> & { acquisition: Acquisition | null };
 export type MetricsReport = Pick<ReportRecord, "id" | "orderId" | "status" | "createdAt" | "readyAt">;
 export type FeedbackRecord = { reportId: string; userId: string; rating: number; createdAt: string; updatedAt: string };
 
@@ -200,11 +201,25 @@ export interface MiyuRepository {
     detail: Record<string, unknown>;
   }): Promise<void>;
 
-  /** 나를 더 반영하기 — 검사 결과 하나에 하나. 쓰기 · 지우기는 서비스에서 소유자를 확인한 뒤에만 */
+  /** 내 고민 자세히 알려주기 — 검사 결과 하나에 하나. 쓰기 · 지우기는 서비스에서 소유자를 확인한 뒤에만 */
   getContext(assessmentId: string): Promise<PersonalContext | null>;
   listContexts(userId: string): Promise<PersonalContextSummary[]>;
   upsertContext(context: NewPersonalContext): Promise<PersonalContext>;
   deleteContext(assessmentId: string): Promise<void>;
+
+  /**
+   * 고민 기록 — 고민 반영 리포트를 발급할 때 "그때의 고민"을 저장해 둔 것. 만든 뒤에는 고치지 않고, 고객이 내용을 지울 수만 있다.
+   * 같은 검사 결과의 같은 작성 시점(writtenAt)에는 (내용을 지운 기록을 빼고) 하나만 생긴다 (같은 저장본으로 두 번 발급을 시작해도 기록은 하나).
+   * 테이블이 없으면(DB 변경 11번 전) 조회는 빈 값, 저장은 오류(코드 42P01).
+   */
+  insertConcernRecord(record: NewConcernRecord): Promise<InsertResult<ConcernRecord>>;
+  getConcernRecord(id: string): Promise<ConcernRecord | null>;
+  /** 이 검사 결과의 고민 기록 — 최근 것이 먼저 */
+  listConcernRecords(assessmentId: string): Promise<ConcernRecord[]>;
+  /** 이 회원의 고민 기록 목록 (적은 내용은 담지 않는다) */
+  listConcernRecordSummaries(userId: string): Promise<ConcernRecordSummary[]>;
+  /** 내용만 지운다 (기록 자리와 주제 · 작성 시점 · 발급한 리포트는 남는다). 이미 지웠으면 그대로 */
+  scrubConcernRecord(id: string, at: string): Promise<void>;
 
   /** 서버 전용 (브라우저 권한으로는 읽을 수 없다) — 주문 소유자를 확인한 뒤에만 쓴다 */
   listPaymentEvents(orderId: string): Promise<PaymentEventRecord[]>;

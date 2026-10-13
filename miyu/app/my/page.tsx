@@ -9,8 +9,9 @@ import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, pageNarrow, textLink } from "@/components/ui/styles";
 import { retryReportAction } from "@/app/results/[id]/actions";
+import { formatDate, formatDateTime } from "@/components/ui/format";
 import { formatKrw } from "@/lib/config/product";
-import { ENTITLEMENT_LABEL, GENERATION_LABEL, getMyPage, PAYMENT_ENV_LABEL, type MyReportCard } from "@/lib/services/my-service";
+import { ENTITLEMENT_LABEL, GENERATION_LABEL, getMyPage, PAYMENT_ENV_LABEL, type MyConcernCard, type MyReportCard } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
@@ -71,7 +72,7 @@ async function MyContent() {
   // 결제 승인이 났는데 돌아오지 못한 주문이 있으면 응답 뒤에 결제사 기록과 맞춘다
   reconcileUserInBackground(member.userId);
 
-  const { cards, orders } = await getMyPage(await readRepository(), member.userId);
+  const { cards, concerns, orders } = await getMyPage(await readRepository(), member.userId);
   const paymentsReady = paymentConfig().ok;
   return (
     <>
@@ -89,6 +90,20 @@ async function MyContent() {
           </ul>
         )}
       </section>
+
+      {concerns.length > 0 && (
+        <section aria-labelledby="my-concerns" className="mt-10">
+          <h2 id="my-concerns" className="text-[18px] font-bold">
+            내 고민 반영 리포트
+          </h2>
+          <p className="mt-1 text-[13px] text-ink-3">개인 통합 리포트와 별도로 발급한 리포트입니다. 발급일 · 고민 주제로 구분하며, 이전 리포트는 새 리포트가 나와도 그대로 남습니다.</p>
+          <ul className="mt-3 border-t border-ink">
+            {concerns.map((c) => (
+              <ConcernRow key={c.recordId} card={c} />
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="my-orders" className="mt-10">
         <h2 id="my-orders" className="text-[18px] font-bold">
@@ -182,7 +197,48 @@ function Actions({ signedIn = false }: { signedIn?: boolean }) {
   );
 }
 
-const formatDate = (iso: string) => new Date(iso).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+/** 고민 반영 리포트 한 건: 발급일 · 고민 주제 · 고민을 쓴 시점 · 생성 상태 */
+function ConcernRow({ card }: { card: MyConcernCard }) {
+  const href = `/results/${card.assessmentId}/context/${card.recordId}`;
+  const small = "inline-flex h-10 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
+  const primary = `${small} bg-accent text-white hover:bg-accent-strong`;
+  const secondary = `${small} border border-line-strong bg-canvas text-ink hover:bg-mist`;
+  return (
+    <li className="border-b border-line py-4" data-testid="my-concern">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[13px] tabular-nums text-ink-3">발급일 {formatDate(card.issuedAt)}</span>
+        <StatusBadge>{card.entitlement === "refunded" ? "환불됨" : ENTITLEMENT_LABEL.purchased}</StatusBadge>
+        {card.generation !== "none" && <StatusBadge>{GENERATION_LABEL[card.generation]}</StatusBadge>}
+      </div>
+      <p className="mt-1.5 text-[16px] font-semibold">{card.topicLabel} 고민 리포트</p>
+      <p className="mt-0.5 text-[14px] text-ink-2">{card.subject}</p>
+      <p className="mt-0.5 text-[13px] text-ink-3">
+        고민 작성 시점 {formatDateTime(card.writtenAt)}
+        {card.contentScrubbed ? " · 적은 내용을 지움" : ""} · 주문번호 {card.orderNumber}
+      </p>
+      {card.entitlement === "purchased" && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {card.generation === "ready" ? (
+            <Link href={href} className={primary}>
+              이 고민이 반영된 리포트 보러가기
+            </Link>
+          ) : card.generation === "failed" ? (
+            <Link href={href} className={primary}>
+              같은 발급 건으로 다시 만들기
+            </Link>
+          ) : (
+            <Link href={href} className={secondary}>
+              생성 중 — 상태 보기
+            </Link>
+          )}
+          <Link href={`/results/${card.assessmentId}/context`} className={secondary}>
+            나의 고민 기록소
+          </Link>
+        </div>
+      )}
+    </li>
+  );
+}
 
 /** 리포트 한 건: 상품 · 대상 · 날짜 · 이용 권한 · 생성 상태와, 상태에 맞는 버튼만 */
 function ReportRow({ card, paymentsReady }: { card: MyReportCard; paymentsReady: boolean }) {
@@ -240,9 +296,9 @@ function ReportRow({ card, paymentsReady }: { card: MyReportCard; paymentsReady:
         )}
       </div>
       <p className="mt-2 text-[13px] text-ink-3">
-        나를 더 반영하기: {card.contextTopic ? topicLabel(card.contextTopic) : "적지 않음"} ·{" "}
+        내 고민 자세히 알려주기: {card.contextTopic ? topicLabel(card.contextTopic) : "작성 기록 없음"} ·{" "}
         <Link href={`${href}/context`} className="underline underline-offset-2">
-          {card.contextTopic ? "보기 · 고치기 · 지우기" : "적어 보기"}
+          나의 고민 기록소
         </Link>
       </p>
       {card.entitlement === "purchased" && card.generation === "failed" && (

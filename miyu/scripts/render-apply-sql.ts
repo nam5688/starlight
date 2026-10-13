@@ -7,7 +7,8 @@ import { buildApplySql } from "../lib/ops/apply-sql.ts";
 const dir = new URL("../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
 const FIRST = 4;
-const migrations = files.slice(FIRST - 1).map((name) => ({ name, sql: readFileSync(new URL(name, dir), "utf8") }));
+const LAST = 10; // 11번부터는 이 통합 파일에 넣지 않는다 (4~10번은 이미 적용이 끝난 묶음이고, 11번 이후는 파일 하나씩 따로 적용한다)
+const migrations = files.slice(FIRST - 1, LAST).map((name) => ({ name, sql: readFileSync(new URL(name, dir), "utf8") }));
 const checkSql = readFileSync(new URL("../supabase/check-migrations.sql", import.meta.url), "utf8");
 const out = buildApplySql({ migrations, checkSql, firstNo: FIRST });
 writeFileSync(new URL("../supabase/apply-4-to-10.sql", import.meta.url), out);

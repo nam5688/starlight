@@ -312,7 +312,7 @@ test("리포트 v2(AI 모의 모델): 일시 오류가 계속되면 failed, 다�
   assert.deepEqual(again?.content, ready.content);
 });
 
-test("나를 더 반영하기: 본인 결과에만 저장 · 수정 · 삭제, 동의 없이는 저장하지 않고 연락처는 가린다", async () => {
+test("내 고민 자세히 알려주기: 본인 결과에만 저장 · 수정 · 삭제, 동의 없이는 저장하지 않고 연락처는 가린다", async () => {
   const { mem, assessment } = await setup();
   const ids = { userId: USER, assessmentId: assessment.id };
   const raw = { topic: "marriage", question: "지금 사람과 결혼을 결정해도 될지", excerpt: "그 사람 번호는 010-2222-3333" };
@@ -345,7 +345,7 @@ test("나를 더 반영하기: 본인 결과에만 저장 · 수정 · 삭제, �
   assert.equal(await mem.repo.getContext(assessment.id), null);
 });
 
-test("나를 더 반영하기: AI 생성기는 생성 시점의 내용을 반영하고, 리포트를 만든 뒤 고치거나 지워도 구매한 리포트는 그대로다", async () => {
+test("내 고민 자세히 알려주기: AI 생성기는 생성 시점의 내용을 반영하고, 리포트를 만든 뒤 고치거나 지워도 구매한 리포트는 그대로다", async () => {
   const { mem, assessment } = await setup();
   await saveContext(mem.repo, { userId: USER, assessmentId: assessment.id, raw: { topic: "work", question: "이직을 해도 될지" }, agreed: true, now: () => TODAY });
   const started = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id });
@@ -367,7 +367,7 @@ test("나를 더 반영하기: AI 생성기는 생성 시점의 내용을 반영
   assert.equal(JSON.stringify(again?.content), before);
 });
 
-test("나를 더 반영하기: 개발용 규칙 생성기는 반영하지 않으므로 읽지도 않는다", async () => {
+test("내 고민 자세히 알려주기: 개발용 규칙 생성기는 반영하지 않으므로 읽지도 않는다", async () => {
   const { mem, assessment } = await setup();
   await saveContext(mem.repo, { userId: USER, assessmentId: assessment.id, raw: { topic: "love" }, agreed: true, now: () => TODAY });
   let reads = 0;

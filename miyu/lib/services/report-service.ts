@@ -1,7 +1,11 @@
 // 리포트 생성과 조회. 결제가 확인된 주문에만 만들고, 완성된 리포트는 다시 만들지 않는다.
 
 import { REPORT_GENERATING_STALE_MS, REPORT_GENERATION_TIMEOUT_MS, REPORT_MAX_ATTEMPTS, REPORT_RETRY_COOLDOWN_MS } from "../commerce/report.ts";
-import type { AiUsageSample, ReportGenerator, ReportInput } from "../report/generator.ts";
+import { isPersonalProduct, parseConcernProductId } from "../config/product.ts";
+import { concernInputOf } from "../personalization/concern.ts";
+import type { AiUsageSample, ConcernInput, ReportGenerator, ReportInput } from "../report/generator.ts";
+import { reportTexts } from "../report/concern/texts.ts";
+import { isConcernReport } from "../report/concern/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { PersonalContext } from "../personalization/context.ts";
 import { estimateCostKrw, type CapacityConfig } from "./capacity-service.ts";
@@ -108,8 +112,10 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
   };
   try {
     if (!assessment) throw new Error("검사 결과를 찾을 수 없습니다.");
-    // 나를 더 반영하기: 생성을 시작하는 시점의 내용을 쓴다 (반영하는 생성기일 때만 읽는다)
-    const context = generator.usesContext ? await repo.getContext(assessment.id) : null;
+    // 고민 반영 리포트는 발급할 때 저장해 둔 고민 기록으로 쓴다 (지금의 고민이 아니다). 개인 종합은 생성을 시작하는 시점의 고민을 쓴다 (반영하는 생성기일 때만 읽는다)
+    const recordId = parseConcernProductId(order.productId);
+    const concernInput = recordId ? await concernInputFor(repo, generator, order, assessment, recordId) : null;
+    const context = !recordId && generator.usesContext ? await repo.getContext(assessment.id) : null;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         // 실패 사유를 먼저 확정하고(경쟁에서 이기도록) 그다음 남은 AI 호출을 멈춘다
@@ -117,7 +123,8 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
         controller.abort();
       }, limit);
     });
-    const content = await Promise.race([generator.generate(reportInputOf(assessment, context), { signal: controller.signal, onUsage }), timeout]);
+    const run = concernInput ? generator.generateConcern!(concernInput, { signal: controller.signal, onUsage }) : generator.generate(reportInputOf(assessment, context), { signal: controller.signal, onUsage });
+    const content = await Promise.race([run, timeout]);
     const ready = await repo.updateReport(report.id, ["generating"], {
       status: "ready",
       content,
@@ -137,6 +144,44 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
     if (timer) clearTimeout(timer);
     await Promise.allSettled(pending);
   }
+}
+
+/**
+ * 고민 반영 리포트를 쓰는 데 필요한 값을 모은다 — 발급 당시의 고민 기록, 이미 준 개인 통합 리포트의 글, 이전에 발급한 고민 리포트.
+ * 모을 수 없으면(기록이 없거나 지워졌거나, 고민을 반영하지 못하는 생성기) 오류로 실패 처리한다 — 같은 발급 건으로 다시 시도할 수 있다.
+ */
+async function concernInputFor(repo: MiyuRepository, generator: ReportGenerator, order: OrderRecord, assessment: AssessmentRecord, recordId: string): Promise<ConcernInput> {
+  if (!generator.generateConcern) throw new Error("이 리포트 생성기는 고민 반영 리포트를 만들 수 없습니다.");
+  const record = await repo.getConcernRecord(recordId);
+  if (!record || record.userId !== order.userId || record.assessmentId !== order.assessmentId) throw new Error("고민 기록을 찾을 수 없습니다.");
+  if (record.scrubbedAt) throw new Error("고민 기록의 내용이 지워져 리포트를 만들 수 없습니다.");
+  const orders = await repo.listOrdersForAssessment(order.assessmentId);
+  const basePaid = orders.find((o) => o.status === "paid" && isPersonalProduct(o.productId));
+  const baseReport = basePaid ? await repo.getReportByOrder(basePaid.id) : null;
+  // 이미 준 개인 통합 리포트가 없어도(환불 등) 발급은 이미 결제된 건이므로 막지 않고, 중복 검사만 건너뛴다
+  const base = baseReport?.status === "ready" && baseReport.content ? reportTexts(baseReport.content) : null;
+
+  // 이전에 발급한 고민 리포트 (이번 기록보다 먼저 만든 것, 최근 3건)
+  const previous: ConcernInput["previous"] = [];
+  const records = await repo.listConcernRecords(order.assessmentId);
+  for (const r of records.filter((x) => x.id !== record.id && x.createdAt < record.createdAt)) {
+    if (previous.length >= 3) break;
+    const paid = orders.find((o) => o.status === "paid" && parseConcernProductId(o.productId) === r.id);
+    const rep = paid ? await repo.getReportByOrder(paid.id) : null;
+    if (rep?.status === "ready" && rep.content && isConcernReport(rep.content)) previous.push({ topic: r.topic, headline: rep.content.headline, texts: reportTexts(rep.content).all });
+  }
+
+  return {
+    nickname: assessment.nickname,
+    knownMbti: assessment.knownMbti,
+    summary: assessment.summary,
+    saju: assessment.saju,
+    gender: null,
+    concern: concernInputOf(record),
+    snapshot: { recordId: record.id, writtenAt: record.writtenAt },
+    base,
+    previous,
+  };
 }
 
 /** 가져가기 + 만들기를 한 번에 (백그라운드 작업에서 쓴다) */
@@ -187,7 +232,7 @@ export type ResultView = {
   paidOrder: OrderRecord | null;
   refunded: boolean;
   report: ReportRecord | null;
-  /** 나를 더 반영하기에 적은 내용 (없으면 null) */
+  /** 내 고민 자세히 알려주기에 적은 내용 (없으면 null) */
   context: PersonalContext | null;
 };
 
@@ -199,8 +244,9 @@ export async function getResultView(
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return null;
   const orders = await repo.listOrdersForAssessment(assessment.id);
-  const paidOrder = orders.find((o) => o.status === "paid") ?? null;
-  const refunded = !paidOrder && orders.some((o) => o.status === "refunded");
+  const personal = orders.filter((o) => isPersonalProduct(o.productId));
+  const paidOrder = personal.find((o) => o.status === "paid") ?? null;
+  const refunded = !paidOrder && personal.some((o) => o.status === "refunded");
   const [report, context] = await Promise.all([paidOrder ? repo.getReportByOrder(paidOrder.id) : null, repo.getContext(assessment.id)]);
   return { assessment, paidOrder, refunded, report, context };
 }
@@ -221,7 +267,7 @@ export async function listMyItems(repo: MiyuRepository, userId: string): Promise
   return assessments
     .filter((a) => a.userId === userId)
     .map((a) => {
-      const mine = orders.filter((o) => o.assessmentId === a.id);
+      const mine = orders.filter((o) => o.assessmentId === a.id && isPersonalProduct(o.productId));
       const paid = mine.find((o) => o.status === "paid");
       const report = paid ? reports.find((r) => r.orderId === paid.id) : undefined;
       return {

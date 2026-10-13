@@ -1,4 +1,4 @@
-// 실행: npm test — 나를 더 반영하기 입력 규칙
+// 실행: npm test — 내 고민 자세히 알려주기 입력 규칙
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { contextForPrompt, filledFields, normalizeContextInput, redactPersonalInfo } from "./context.ts";

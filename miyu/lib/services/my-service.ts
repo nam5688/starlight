@@ -2,12 +2,12 @@
 // 결제 상태(orders)와 리포트 생성 상태(reports)는 섞지 않는다: 결제했지만 생성에 실패한 고객에게 다시 구매하라고 하지 않는다.
 
 import type { OrderStatus } from "../commerce/order.ts";
-import { PERSONAL_REPORT } from "../config/product.ts";
+import { isPersonalProduct, parseConcernProductId, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
 import { RECONCILE_DEFAULTS } from "./reconcile-service.ts";
-import type { ContextTopic } from "../personalization/context.ts";
+import { topicLabel, type ContextTopic } from "../personalization/context.ts";
 
 export type Entitlement = "free" | "purchased" | "refunded";
 export type Generation = "none" | "in-progress" | "ready" | "failed";
@@ -24,8 +24,26 @@ export type MyReportCard = {
   generation: Generation;
   paidOrderNumber: string | null;
   source: DataSource;
-  /** 나를 더 반영하기에 적은 주제 (적지 않았으면 null) */
+  /** 내 고민 자세히 알려주기에 적은 주제 (적지 않았으면 null) */
   contextTopic: ContextTopic | null;
+};
+
+/** 내 고민 반영 리포트 한 건 — 발급일 · 고민 주제로 이전 리포트와 새 리포트를 구분해 보여 준다 */
+export type MyConcernCard = {
+  recordId: string;
+  assessmentId: string;
+  subject: string;
+  topic: ContextTopic;
+  topicLabel: string;
+  /** 반영한 고민을 쓴 시점 */
+  writtenAt: string;
+  /** 발급일 (결제 승인 시각) */
+  issuedAt: string;
+  entitlement: "purchased" | "refunded";
+  generation: Generation;
+  orderNumber: string;
+  /** 고객이 고민 기록의 내용을 지움 (리포트는 남아 있다) */
+  contentScrubbed: boolean;
 };
 
 export type MyOrderRow = {
@@ -41,8 +59,7 @@ export type MyOrderRow = {
   assessmentId: string;
 };
 
-const PRODUCT_NAMES: Record<string, string> = { [PERSONAL_REPORT.id]: PERSONAL_REPORT.name };
-export const productName = (id: string) => PRODUCT_NAMES[id] ?? id;
+export const productName = productNameOf;
 
 export const ENTITLEMENT_LABEL: Record<Entitlement, string> = {
   free: "무료 결과",
@@ -90,19 +107,20 @@ export function generationOf(report: Pick<ReportRecord, "status"> | null | undef
   return "in-progress";
 }
 
-export async function getMyPage(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<{ cards: MyReportCard[]; orders: MyOrderRow[] }> {
-  const [assessments, orders, reports, contexts] = await Promise.all([
+export async function getMyPage(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<{ cards: MyReportCard[]; concerns: MyConcernCard[]; orders: MyOrderRow[] }> {
+  const [assessments, orders, reports, contexts, records] = await Promise.all([
     repo.listAssessments(userId),
     repo.listOrdersForUser(userId),
     repo.listReportStatuses(userId),
     repo.listContexts(userId),
+    repo.listConcernRecordSummaries(userId),
   ]);
   const mineOrders = orders.filter((o) => o.userId === userId);
 
   const cards = assessments
     .filter((a) => a.userId === userId)
     .map((a): MyReportCard => {
-      const related = mineOrders.filter((o) => o.assessmentId === a.id);
+      const related = mineOrders.filter((o) => o.assessmentId === a.id && isPersonalProduct(o.productId));
       const paid = related.find((o) => o.status === "paid");
       const report = paid ? reports.find((r) => r.orderId === paid.id) : undefined;
       return {
@@ -118,6 +136,30 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
         contextTopic: contexts.find((c) => c.assessmentId === a.id)?.topic ?? null,
       };
     });
+
+  // 고민 반영 리포트 — 결제 완료 · 환불된 기록만 (결제 전 임시 저장본은 보이지 않는다)
+  const subjectOf = new Map(assessments.map((a) => [a.id, `${a.nickname} 님 · ${formatAssessmentBirth(a)}`]));
+  const concerns: MyConcernCard[] = [];
+  for (const r of records) {
+    const mine = mineOrders.filter((o) => parseConcernProductId(o.productId) === r.id);
+    const paid = mine.find((o) => o.status === "paid");
+    const order = paid ?? mine.find((o) => o.status === "refunded");
+    if (!order) continue;
+    concerns.push({
+      recordId: r.id,
+      assessmentId: r.assessmentId,
+      subject: subjectOf.get(r.assessmentId) ?? "",
+      topic: r.topic,
+      topicLabel: topicLabel(r.topic),
+      writtenAt: r.writtenAt,
+      issuedAt: order.approvedAt ?? order.createdAt,
+      entitlement: paid ? "purchased" : "refunded",
+      generation: paid ? generationOf(reports.find((x) => x.orderId === paid.id)) : "none",
+      orderNumber: order.orderNumber,
+      contentScrubbed: r.scrubbedAt !== null,
+    });
+  }
+  concerns.sort((x, y) => y.issuedAt.localeCompare(x.issuedAt));
 
   const rows = mineOrders
     .map(
@@ -135,7 +177,7 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
     )
     .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 
-  return { cards, orders: rows };
+  return { cards, concerns, orders: rows };
 }
 
 export type OrderTrace = {

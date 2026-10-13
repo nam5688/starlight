@@ -11,6 +11,44 @@ export const PERSONAL_REPORT = {
 } as const;
 
 /**
+ * 내 고민 반영 리포트 — 개인 통합 리포트를 이미 구매한 사람이 고민(내 고민 자세히 알려주기)을 적고, 그 고민으로 새 리포트를 따로 발급받는 상품.
+ * - 가격은 운영자가 지정한 가안이다 (2026-10-13, 새 고민이 충분히 다른 해석으로 나올 때). 여기서만 바꾼다.
+ * - 고민을 쓰고 · 고치고 · 저장하는 것은 무료이고, 기존 리포트는 그대로 보관된다. 발급할 때마다 결제한다.
+ * - 생성에 실패하면 같은 발급 건으로 다시 시도한다 (추가 결제 없음).
+ * - 최초 구매에 무료 발급을 몇 회 포함할지는 정해지지 않았다 — 지금은 포함하지 않는다 (필요하면 결제 없는 발급 경로를 따로 설계한다).
+ */
+export const CONCERN_REPORT = {
+  id: "concern-report",
+  name: "내 고민 반영 리포트",
+  priceKrw: 4900,
+  priceNote: "가안 · 기존 구매자 전용",
+} as const;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 고민 반영 리포트 주문의 상품 번호 — 고민 기록(발급 당시 고민의 저장본)마다 하나씩 갖는다.
+ * 같은 기록에는 결제 완료 · 결제 대기 주문이 하나만 생기므로(DB 고유 조건), 버튼을 여러 번 눌러도 한 건만 발급된다.
+ */
+export const concernProductId = (recordId: string) => `${CONCERN_REPORT.id}:${recordId}`;
+
+/** 상품 번호에서 고민 기록 번호를 꺼낸다. 고민 반영 리포트 주문이 아니면 null */
+export function parseConcernProductId(productId: string): string | null {
+  if (!productId.startsWith(`${CONCERN_REPORT.id}:`)) return null;
+  const id = productId.slice(CONCERN_REPORT.id.length + 1);
+  return UUID.test(id) ? id.toLowerCase() : null;
+}
+
+/** 개인 통합 리포트 주문인가 (고민 반영 리포트 주문과 구분 — 같은 검사 결과에 두 종류가 함께 붙는다) */
+export const isPersonalProduct = (productId: string) => productId === PERSONAL_REPORT.id;
+
+/** 상품 번호 → 화면에 보이는 상품 이름 */
+export function productNameOf(productId: string): string {
+  if (productId === PERSONAL_REPORT.id) return PERSONAL_REPORT.name;
+  return parseConcernProductId(productId) ? CONCERN_REPORT.name : productId;
+}
+
+/**
  * 무료 미리보기와 구매한 리포트의 범위 — 홈 · 안내 문구는 모두 이 표를 읽는다 (한 곳에서만 고친다).
  * free가 null이면 구매 후에만 보인다. 여기 적힌 것은 실제로 리포트에 들어 있어야 한다 (lib/report/preview.test.ts가 일부를 확인).
  */

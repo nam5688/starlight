@@ -3,6 +3,7 @@
 
 import type { Evidence } from "../evidence.ts";
 import { SECTION_PLAN, type ReportDraftV2 } from "../v2/types.ts";
+import { composeMockConcernDraft } from "../concern/mock-model.ts";
 import { ModelCallError, type TextModel } from "./model.ts";
 
 const TOPIC_FOR: Record<string, string[]> = {
@@ -106,7 +107,10 @@ export function createMockModel(opts: { failTimes?: number; invalidTimes?: numbe
         invalid--;
         return { text: '{"headline": "짧음"}', model: "mock-0" };
       }
-      return { text: JSON.stringify(composeMockDraft(req.messages[0].content)), model: "mock-0", usage: { inputTokens: 0, outputTokens: 0 } };
+      const user = req.messages[0].content;
+      // 고민 반영 리포트 요청(task: concern-report)에는 고민 리포트 형식으로 답한다
+      const draft = user.includes('"task":"concern-report"') ? composeMockConcernDraft(user) : composeMockDraft(user);
+      return { text: JSON.stringify(draft), model: "mock-0", usage: { inputTokens: 0, outputTokens: 0 } };
     },
   };
   return model;

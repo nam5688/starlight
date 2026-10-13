@@ -5,10 +5,11 @@ import { Suspense } from "react";
 import { TossCheckout } from "@/components/checkout/toss-checkout";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
-import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
+import { formatKrw, parseConcernProductId, productNameOf } from "@/lib/config/product";
 import { paymentConfig } from "@/server/env";
 import { readRepository, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
+import { resultPathOf } from "@/server/order-paths";
 import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = {
@@ -48,7 +49,11 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
   const order = await repo.getOrderByNumber(orderNumber);
   // 다른 회원의 주문은 있는지조차 알리지 않는다
   if (!order || order.userId !== userId) notFound();
-  if (order.status !== "pending") redirect(`/results/${order.assessmentId}`);
+  // 이미 끝난 주문은 결제 화면을 다시 열지 않고 돌아갈 화면으로 보낸다 (고민 반영 리포트는 결제 완료면 그 기록의 리포트)
+  if (order.status !== "pending") redirect(resultPathOf(order, { paid: order.status === "paid" }));
+  const productName = productNameOf(order.productId);
+  const isConcern = parseConcernProductId(order.productId) !== null;
+  const backPath = resultPathOf(order);
 
   // 본인 프로필(결제 구매자 키)이 빠져 있으면 서버가 채운다 — 테이블보다 먼저 가입한 회원
   let profile = await repo.getProfile(userId);
@@ -69,7 +74,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
   return (
     <>
       <dl className="mt-6 border-y border-line text-[15px]">
-        <Row label="상품">{PERSONAL_REPORT.name}</Row>
+        <Row label="상품">{productName}</Row>
         <Row label="결제 금액">
           <span className="font-bold tabular-nums">{formatKrw(order.amount)}</span>
         </Row>
@@ -88,13 +93,18 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
           clientKey={config.clientKey}
           customerKey={profile.paymentCustomerKey}
           orderId={order.orderNumber}
-          orderName={PERSONAL_REPORT.name}
+          orderName={productName}
           amount={order.amount}
         />
       </div>
+      {isConcern && (
+        <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
+          기존 개인 통합 리포트는 그대로 보관되고, 이 결제로는 지금 적어 둔 고민을 반영한 새 리포트가 따로 만들어집니다. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없습니다.
+        </p>
+      )}
       <p className="mt-6 text-[14px] text-ink-3">
-        <Link href={`/results/${order.assessmentId}`} className={textLink}>
-          결과 화면으로 돌아가기
+        <Link href={backPath} className={textLink}>
+          {isConcern ? "고민 기록소로 돌아가기" : "결과 화면으로 돌아가기"}
         </Link>
       </p>
     </>

@@ -2,7 +2,7 @@ import "server-only";
 import { combineNotifiers, createLogNotifier, createTelegramNotifier, TELEGRAM_REASON_HELP } from "@/lib/integrations/telegram/notifier";
 import { alertText, ALERT_ONCE_MS, raiseAlert, type Alert, type Notifier, type RaiseResult } from "@/lib/ops/alerts";
 import { redactSecrets, safeErrorMessage } from "@/lib/ops/redact";
-import { PERSONAL_REPORT } from "@/lib/config/product";
+import { productNameOf } from "@/lib/config/product";
 import type { OpsEventInput, OrderRecord } from "@/lib/services/ports";
 import { paymentConfig, telegramEnv } from "./env";
 import { now, writeRepository } from "./services";
@@ -51,7 +51,7 @@ const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
  * 고객 이름 · 생년월일 · 응답 · 고민은 담지 않는다 — 주문번호 · 금액 · 상품 이름만.
  */
 export async function notifyOrderEvent(kind: "paid" | "refunded", order: OrderRecord): Promise<void> {
-  const productName = order.productId === PERSONAL_REPORT.id ? PERSONAL_REPORT.name : order.productId;
+  const productName = productNameOf(order.productId);
   await alert(
     kind === "paid"
       ? {

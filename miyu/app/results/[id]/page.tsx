@@ -13,6 +13,7 @@ import { ContextPanel } from "@/components/results/context-panel";
 import { PurchasePanel } from "@/components/results/purchase-panel";
 import { SourceBadge } from "@/components/ui/source-badge";
 import { buttonSecondary, pageNarrow, pageWide } from "@/components/ui/styles";
+import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2 } from "@/lib/report/generator";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
@@ -70,6 +71,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
 
   if (view.paidOrder && report?.status === "ready" && report.content) {
     const content = report.content;
+    if (isConcernReport(content)) notFound(); // 개인 통합 리포트 주문에는 고민 반영 리포트가 붙지 않는다
     const feedback = await (await readRepository()).getFeedback(report.id);
     const footer = (
       <div className="space-y-4">

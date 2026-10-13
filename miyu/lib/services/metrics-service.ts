@@ -7,6 +7,7 @@
 // - 이름 · 생년월일 · 응답 · 고민 · 리포트 내용은 이 집계에 들어오지 않는다 (익명 방문 번호와 주문 · 리포트의 상태 · 금액뿐).
 // - 순이익은 결제 수수료 · 세금을 빼지 않은 단순 계산이다 (AI 비용만 뺀다).
 
+import { isPersonalProduct, parseConcernProductId } from "../config/product.ts";
 import type { FunnelEventRecord, MetricsOrder, MiyuRepository } from "./ports.ts";
 import { seoulDayStart } from "./capacity-service.ts";
 
@@ -38,6 +39,8 @@ export type Metrics = {
     testPaidCount: number;
     /** 같은 주문에 두 번째 승인 등 운영자 확인이 필요한 중복 결제 의심 */
     duplicateSuspects: number;
+    /** 위 매출 중 "내 고민 반영 리포트"(기존 구매자 추가 구매)가 차지하는 건수 · 순매출 — 첫 구매 단계 · 채널별 전환에는 넣지 않는다 */
+    concern: { paidCount: number; netKrw: number };
   };
   economics: {
     aiCostKrw: number;
@@ -91,6 +94,10 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   const liveRefunded = liveOrders.filter((o) => o.status === "refunded");
   const readyReports = reports.filter((r) => r.status === "ready");
   const liveOrderIds = new Set(liveOrders.map((o) => o.id));
+  // 첫 구매 단계 · 채널별 전환 · 재구매는 개인 통합 리포트 주문만 센다 (고민 반영 리포트는 기존 구매자의 추가 구매라서 섞으면 전환이 부풀려진다)
+  const livePersonal = liveOrders.filter((o) => isPersonalProduct(o.productId));
+  const personalOrderIds = new Set(livePersonal.map((o) => o.id));
+  const liveConcern = liveOrders.filter((o) => parseConcernProductId(o.productId) !== null);
 
   const funnel: FunnelStep[] = [
     { key: "visit", label: "유입 (방문)", count: uniq("visit"), basis: "방문 기록" },
@@ -98,9 +105,9 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
     { key: "analyze_complete", label: "검사 완료 · 무료 결과 확인", count: uniq("analyze_complete"), basis: "방문 기록" },
     { key: "saved", label: "로그인 · 결과 저장", count: savedCount, basis: "서버 기록", note: "저장된 검사 결과 수" },
     { key: "preview_view", label: "유료 맛보기(무료 결과 화면) 조회", count: uniq("preview_view"), basis: "방문 기록" },
-    { key: "checkout", label: "결제 시작", count: liveOrders.length, basis: "서버 기록", note: "실결제 주문 생성 수 (테스트 결제 제외)" },
-    { key: "paid", label: "결제 승인 (서버가 확인)", count: liveOrders.filter(approved).length, basis: "서버 기록", note: "환불된 건 포함, 환불은 아래 매출에서 뺌" },
-    { key: "report_ready", label: "리포트 완성", count: readyReports.filter((r) => liveOrderIds.has(r.orderId)).length, basis: "서버 기록" },
+    { key: "checkout", label: "결제 시작", count: livePersonal.length, basis: "서버 기록", note: "개인 통합 리포트 실결제 주문 생성 수 (테스트 결제 제외)" },
+    { key: "paid", label: "결제 승인 (서버가 확인)", count: livePersonal.filter(approved).length, basis: "서버 기록", note: "환불된 건 포함, 환불은 아래 매출에서 뺌" },
+    { key: "report_ready", label: "리포트 완성", count: readyReports.filter((r) => personalOrderIds.has(r.orderId)).length, basis: "서버 기록" },
     { key: "report_view", label: "리포트 열람", count: uniq("report_view"), basis: "방문 기록" },
   ];
 
@@ -110,6 +117,8 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   const refundedKrw = sum(liveRefunded);
   const netKrw = grossKrw - refundedKrw;
   const testPaidCount = orders.filter((o) => !isLive(o) && approved(o)).length;
+  const concernPaid = liveConcern.filter((o) => o.status === "paid");
+  const concernNet = sum(concernPaid);
   const duplicateSuspects = anomalies.filter((e) => /DUPLICATE/.test(e.message) || /DUPLICATE/.test(JSON.stringify(e.detail))).length;
 
   // ── AI 비용 (실결제 주문의 리포트에 쓴 호출만)
@@ -145,7 +154,7 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
       row(label).previews++;
     }
   }
-  for (const o of liveOrders) {
+  for (const o of livePersonal) {
     const r = row(orderSource(o));
     r.checkouts++;
     if (o.status === "paid") {
@@ -165,7 +174,7 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   }
   const returningVisitors = [...daysByAnon.values()].filter((d) => d.size >= 2).length;
   const ordersByUser = new Map<string, Set<string>>();
-  for (const o of livePaid) (ordersByUser.get(o.userId) ?? ordersByUser.set(o.userId, new Set()).get(o.userId)!).add(o.assessmentId);
+  for (const o of livePaid.filter((x) => isPersonalProduct(x.productId))) (ordersByUser.get(o.userId) ?? ordersByUser.set(o.userId, new Set()).get(o.userId)!).add(o.assessmentId);
   const repeatBuyers = [...ordersByUser.values()].filter((a) => a.size >= 2).length;
 
   const good = feedback.filter((f) => f.rating >= 4).length;
@@ -174,7 +183,7 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
     since,
     funnel,
     sources,
-    revenue: { grossKrw, refundedKrw, netKrw, paidCount, refundedCount: liveRefunded.length, testPaidCount, duplicateSuspects },
+    revenue: { grossKrw, refundedKrw, netKrw, paidCount, refundedCount: liveRefunded.length, testPaidCount, duplicateSuspects, concern: { paidCount: concernPaid.length, netKrw: concernNet } },
     economics: {
       aiCostKrw,
       avgAiCostPerPaidKrw: avgCost,

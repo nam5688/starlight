@@ -21,13 +21,20 @@ t as (
     to_regclass('public.ops_events')          is not null as ops_events,
     to_regclass('public.ai_usage')            is not null as ai_usage,
     to_regclass('public.funnel_events')       is not null as funnel_events,
-    to_regclass('public.report_feedback')     is not null as report_feedback
+    to_regclass('public.report_feedback')     is not null as report_feedback,
+    to_regclass('public.concern_records')     is not null as concern_records
 ),
 wd as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles'    and column_name = 'withdrawn_at') as profile_col,
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'assessments' and column_name = 'withdrawn_at') as assessment_col,
     exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'withdraw_member_data') as fn
+),
+-- 11번: 탈퇴 함수가 고민 기록 삭제를 포함하도록 갱신됐는가
+wd11 as (
+  select coalesce((select bool_or(pg_get_functiondef(p.oid) like '%concern_records%')
+                   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as fn_updated
 ),
 col as (
   select
@@ -113,5 +120,11 @@ select * from (
               when wd.profile_col or wd.assessment_col or wd.fn then '일부만' else '아직 안 함' end,
          '프로필 · 검사의 withdrawn_at 열 / 함수 withdraw_member_data'
   from wd
+  union all
+  select 11, '20261021000000_concern_records.sql',
+         case when t.concern_records and wd11.fn_updated then '적용됨'
+              when t.concern_records or wd11.fn_updated then '일부만' else '아직 안 함' end,
+         '표 concern_records / 탈퇴 함수에 고민 기록 삭제 포함: ' || wd11.fn_updated::text
+  from t, wd11
 ) r
 order by "번호";

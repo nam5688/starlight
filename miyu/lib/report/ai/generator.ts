@@ -9,12 +9,17 @@ import { buildReportExtras } from "../extras.ts";
 import { describePolicy } from "../../saju/policy.ts";
 import { sajuSection } from "../../saju/display.ts";
 import type { Evidence } from "../evidence.ts";
-import type { GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
+import { checkConcernDepth } from "../concern/depth.ts";
+import { alreadyProvidedOf, buildConcernRepairMessage, buildConcernUserMessage, CONCERN_PROMPT_VERSION, CONCERN_SYSTEM_PROMPT } from "../concern/prompt.ts";
+import type { ConcernDraftV1, ConcernReportV1 } from "../concern/types.ts";
+import { validateConcernDraft } from "../concern/validate.ts";
+import type { ConcernInput, GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
 import { buildRepairMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from "../v2/prompt.ts";
 import type { PersonalReportV2, ReportDraftV2 } from "../v2/types.ts";
 import { validateDraft } from "../v2/validate.ts";
-import { ModelCallError, type ModelMessage, type TextModel } from "./model.ts";
+import { createModelCaller } from "./model-caller.ts";
+import type { ModelMessage, TextModel } from "./model.ts";
 
 export type AiGeneratorOptions = {
   model: TextModel;
@@ -42,7 +47,7 @@ function seoulYm(d: Date) {
   return { year: s.getUTCFullYear(), month: s.getUTCMonth() + 1, iso: s.toISOString().slice(0, 10) };
 }
 
-export function buildEvidence(input: ReportInput, reference: { year: number; month: number }): Evidence[] {
+export function buildEvidence(input: Pick<ReportInput, "saju" | "gender" | "summary" | "knownMbti">, reference: { year: number; month: number }): Evidence[] {
   if (input.saju.status !== "ok") throw new Error("사주 계산 결과가 없어 리포트를 만들 수 없습니다.");
   return [...sajuEvidence(input.saju, { reference, gender: input.gender ?? null }), ...surveyEvidence(input.summary, input.knownMbti)];
 }
@@ -60,6 +65,19 @@ function fillName(draft: ReportDraftV2, name: string): ReportDraftV2 {
   };
 }
 
+function fillConcernName(draft: ConcernDraftV1, name: string): ConcernDraftV1 {
+  const fix = (s: string) => s.replaceAll("{name}", name);
+  return {
+    headline: fix(draft.headline),
+    understanding: draft.understanding.map((p) => ({ ...p, text: fix(p.text) })),
+    pattern: draft.pattern.map((p) => ({ ...p, text: fix(p.text) })),
+    situations: draft.situations.map((x) => ({ ...x, situation: fix(x.situation), reading: fix(x.reading), suggestion: fix(x.suggestion) })),
+    timeline: draft.timeline.map((t) => ({ ...t, theme: fix(t.theme), opportunity: fix(t.opportunity), caution: fix(t.caution) })),
+    differences: draft.differences.map((p) => ({ ...p, text: fix(p.text) })),
+    actions: draft.actions.map((a) => ({ ...a, situation: fix(a.situation), action: fix(a.action) })),
+  };
+}
+
 export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerator {
   const { model } = opts;
   const now = opts.now ?? (() => new Date());
@@ -67,53 +85,88 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
   const maxRepairs = opts.maxRepairs ?? 1;
   const maxRetries = opts.maxRetries ?? 2;
 
-  /** 호출 한 번. 일시 오류는 다시 부르고, 호출마다 사용 기록을 남긴다 (실패한 호출도 — 비용과 장애를 보기 위해) */
-  async function call(messages: ModelMessage[], ctx: GenerateContext) {
-    const sample = (extra: { outcome: "ok" | "invalid" | "timeout" | "error"; errorCode: string | null; started: number; usage?: { inputTokens: number; outputTokens: number } }) =>
-      ctx.onUsage?.({
-        provider: model.provider,
-        model: model.model,
-        promptVersion: PROMPT_VERSION,
-        inputTokens: extra.usage?.inputTokens ?? null,
-        outputTokens: extra.usage?.outputTokens ?? null,
-        latencyMs: Date.now() - extra.started,
-        outcome: extra.outcome,
-        errorCode: extra.errorCode,
-      });
-    for (let attempt = 0; ; attempt++) {
-      if (ctx.signal?.aborted) throw new ModelCallError("생성 시간이 초과되어 중단했습니다.", { retryable: false, code: "ABORTED" });
-      const started = Date.now();
-      // 호출 한 번의 제한 시간 + 바깥에서 오는 중단 신호를 합친다
-      const own = new AbortController();
-      let timedOut = false;
-      const timer = setTimeout(() => {
-        timedOut = true;
-        own.abort();
-      }, opts.callTimeoutMs ?? 120_000);
-      const signal = ctx.signal ? AbortSignal.any([own.signal, ctx.signal]) : own.signal;
-      try {
-        const result = await model.complete({ system: SYSTEM_PROMPT, messages, maxOutputTokens: opts.maxOutputTokens ?? 16000, signal });
-        return { result, started };
-      } catch (raw) {
-        const aborted = ctx.signal?.aborted === true;
-        const timeout = timedOut && !aborted;
-        const e = raw instanceof ModelCallError ? raw : new ModelCallError(timeout ? "AI 응답 시간이 초과되었습니다." : aborted ? "생성 시간이 초과되어 중단했습니다." : "AI 호출 오류", { retryable: timeout, code: timeout ? "TIMEOUT" : aborted ? "ABORTED" : "UNKNOWN" });
-        sample({ outcome: timeout || aborted ? "timeout" : "error", errorCode: timeout ? "TIMEOUT" : e.code, started });
-        if (e.retryable && !aborted && attempt < maxRetries) {
-          await sleep(2000 * 3 ** attempt);
-          continue;
-        }
-        throw e;
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-  }
+  const caller = createModelCaller({ model, maxRetries, sleep, maxOutputTokens: opts.maxOutputTokens, callTimeoutMs: opts.callTimeoutMs });
+  const spec = { system: SYSTEM_PROMPT, promptVersion: PROMPT_VERSION };
+  /** 호출 한 번 (일시 오류 재시도 · 사용 기록은 model-caller) */
+  const call = (messages: ModelMessage[], ctx: GenerateContext) => caller.call(messages, ctx, spec);
+  const concernSpec = { system: CONCERN_SYSTEM_PROMPT, promptVersion: CONCERN_PROMPT_VERSION };
 
   return {
     name: `ai:${model.provider}`,
     version: `${model.model}|${PROMPT_VERSION}|${SAJU_RULE_VERSION}`,
     usesContext: true,
+    async generateConcern(input: ConcernInput, ctx: GenerateContext = {}): Promise<ConcernReportV1> {
+      const ref = input.reference ? { ...input.reference, iso: seoulYm(now()).iso } : seoulYm(now());
+      const evidence = buildEvidence(input, ref);
+      const messages: ModelMessage[] = [
+        {
+          role: "user",
+          content: buildConcernUserMessage({
+            evidence,
+            referenceDate: ref.iso,
+            concern: input.concern,
+            alreadyProvided: input.base ? alreadyProvidedOf(input.base, input.nickname) : null,
+            previousConcerns: input.previous.map((p) => ({ topic: p.topic, headline: p.headline })),
+          }),
+        },
+      ];
+      const baseTexts = input.base?.all ?? [];
+      const previousTexts = input.previous.map((p) => p.texts);
+
+      let lastErrors: string[] = [];
+      for (let round = 0; round <= maxRepairs; round++) {
+        const called = await caller.call(messages, ctx, concernSpec);
+        const { result } = called;
+        const done = (outcome: "ok" | "invalid") => caller.recordResult(ctx, concernSpec, called, outcome, "VALIDATION");
+        const retry = (errors: string[]) => {
+          lastErrors = errors;
+          messages.push({ role: "assistant", content: result.text.slice(0, 20000) }, { role: "user", content: buildConcernRepairMessage(errors) });
+        };
+        let parsed: unknown;
+        try {
+          parsed = extractJson(result.text);
+        } catch {
+          done("invalid");
+          retry(["JSON 형식이 아닙니다. JSON 객체 하나만 출력해 주세요."]);
+          continue;
+        }
+        const checked = validateConcernDraft(parsed, evidence);
+        if (!checked.ok) {
+          done("invalid");
+          retry(checked.errors);
+          continue;
+        }
+        // 형식은 맞아도 고민이 반영되지 않았거나 이미 준 리포트와 같은 글이면 저장하지 않는다 (글자 수가 아니라 내용을 본다)
+        const depth = checkConcernDepth({ draft: checked.draft, concern: input.concern, baseTexts, previousTexts });
+        if (!depth.pass) {
+          done("invalid");
+          retry(depth.errors);
+          continue;
+        }
+        done("ok");
+        return {
+          kind: "concern-v1",
+          source: input.summary.source,
+          personName: input.nickname,
+          evidence,
+          basis: {
+            ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, CONCERN_PROMPT_VERSION],
+            referenceDate: ref.iso,
+            lines: input.saju.status === "ok" ? [`만세력 엔진 ${input.saju.engine.name} ${input.saju.engine.version}`, ...describePolicy(input.saju.options)] : [],
+            concern: {
+              recordId: input.snapshot.recordId,
+              topic: input.concern.topic,
+              topicLabel: topicLabel(input.concern.topic),
+              fields: filledFields(input.concern),
+              writtenAt: input.snapshot.writtenAt,
+            },
+            quality: { warnings: depth.warnings, coverage: Number(depth.metrics.coverage.toFixed(2)), novelty: Number(depth.metrics.novelty.toFixed(2)) },
+          },
+          ...fillConcernName(checked.draft, input.nickname),
+        };
+      }
+      throw new Error(`고민 리포트 검사 실패: ${lastErrors.slice(0, 3).join(" / ")}`);
+    },
     async generate(input, ctx = {}) {
       const ref = seoulYm(now());
       const evidence = buildEvidence(input, ref);
@@ -122,9 +175,9 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
 
       let lastErrors: string[] = [];
       for (let round = 0; round <= maxRepairs; round++) {
-        const { result, started } = await call(messages, ctx);
-        const done = (outcome: "ok" | "invalid") =>
-          ctx.onUsage?.({ provider: model.provider, model: model.model, promptVersion: PROMPT_VERSION, inputTokens: result.usage?.inputTokens ?? null, outputTokens: result.usage?.outputTokens ?? null, latencyMs: Date.now() - started, outcome, errorCode: outcome === "ok" ? null : "VALIDATION" });
+        const called = await call(messages, ctx);
+        const { result } = called;
+        const done = (outcome: "ok" | "invalid") => caller.recordResult(ctx, spec, called, outcome, "VALIDATION");
         let parsed: unknown;
         try {
           parsed = extractJson(result.text);

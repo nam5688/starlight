@@ -13,13 +13,13 @@ export function FailRecorder() {
   const code = params.get("code") ?? "";
   const message = params.get("message") ?? "";
   const orderId = params.get("orderId");
-  const [assessmentId, setAssessmentId] = useState<string | null>(null);
+  const [back, setBack] = useState<{ path: string | null; concern: boolean }>({ path: null, concern: false });
   const started = useRef(false);
 
   useEffect(() => {
     if (started.current || !orderId) return;
     started.current = true;
-    recordPaymentFailureAction({ orderId, code, message }).then((r) => setAssessmentId(r.assessmentId));
+    recordPaymentFailureAction({ orderId, code, message }).then((r) => setBack({ path: r.resultPath, concern: r.concern }));
   }, [orderId, code, message]);
 
   const canceled = USER_CANCEL_CODES.includes(code);
@@ -32,9 +32,9 @@ export function FailRecorder() {
       {!canceled && code && <p className="text-[13px] text-ink-3">오류 코드 {code}</p>}
       <p className="text-[14px] text-ink-3">결제가 완료되지 않았으므로 청구되지 않습니다.</p>
       <div className="flex flex-col gap-3 sm:flex-row">
-        {assessmentId ? (
-          <Link href={`/results/${assessmentId}`} className={buttonPrimary}>
-            다시 결제하기
+        {back.path ? (
+          <Link href={back.path} className={buttonPrimary}>
+            {back.concern ? "고민 기록소로 돌아가기" : "다시 결제하기"}
           </Link>
         ) : (
           <Link href="/my" className={buttonPrimary}>

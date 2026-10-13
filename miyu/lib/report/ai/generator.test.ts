@@ -200,7 +200,7 @@ test("형식 검사: 장이 빠지거나 실천 개수가 맞지 않으면 막�
   assert.ok(r.errors.some((e) => /actions: 2개/.test(e)));
 });
 
-// ---- 나를 더 반영하기 ----
+// ---- 내 고민 자세히 알려주기 ----
 
 const WORK_CONTEXT = {
   topic: "work" as const,
@@ -212,7 +212,7 @@ const WORK_CONTEXT = {
   updatedAt: "2026-10-12T01:00:00.000Z",
 };
 
-test("나를 더 반영하기: 고민을 AI 자료에 넣되 연락처는 가리고, 리포트에 '알려 주신 고민' 해석과 반영 항목(내용 없이)을 남긴다", async () => {
+test("내 고민 자세히 알려주기: 고민을 AI 자료에 넣되 연락처는 가리고, 리포트에 '알려 주신 고민' 해석과 반영 항목(내용 없이)을 남긴다", async () => {
   const model = createMockModel();
   const seen: string[] = [];
   const wrapped: TextModel = { provider: "mock", model: "mock-0", complete: (req) => (seen.push(req.messages[0].content), model.complete(req)) };
@@ -233,7 +233,7 @@ test("나를 더 반영하기: 고민을 AI 자료에 넣되 연락처는 가리
   assert.doesNotMatch(JSON.stringify(report.basis), /회사를 옮겨도/, "리포트 기준 정보에는 적은 내용을 담지 않는다");
 });
 
-test("나를 더 반영하기: 적지 않았으면 focus가 없고, AI 자료에도 context가 없다", async () => {
+test("내 고민 자세히 알려주기: 적지 않았으면 focus가 없고, AI 자료에도 context가 없다", async () => {
   const report = await createAiReportGenerator({ model: createMockModel(), now: NOW, sleep: noSleep }).generate(input());
   if (!("kind" in report)) throw new Error();
   assert.equal(report.focus, undefined);

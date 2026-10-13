@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ConsentRecord } from "../../membership/terms.ts";
+import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AssessmentRecord,
@@ -134,6 +135,24 @@ function toContext(r: Row): PersonalContext {
     agreedAt: r.agreed_at as string,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+  };
+}
+
+function toConcernRecord(r: Row): ConcernRecord {
+  return {
+    id: r.id as string,
+    userId: r.user_id as string,
+    assessmentId: r.assessment_id as string,
+    topic: r.topic as ConcernRecord["topic"],
+    question: (r.question as string) ?? "",
+    situation: (r.situation as string) ?? "",
+    matched: (r.matched as string) ?? "",
+    differed: (r.differed as string) ?? "",
+    excerpt: (r.excerpt as string) ?? "",
+    writtenAt: r.written_at as string,
+    agreedAt: r.agreed_at as string,
+    createdAt: r.created_at as string,
+    scrubbedAt: (r.scrubbed_at as string | null) ?? null,
   };
 }
 
@@ -398,7 +417,7 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       const data = await fetchPages("주문 집계 조회", limit, (from, to) => db.from("orders").select().gte("created_at", since).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
       return data.map((r) => {
         const o = toOrder(r);
-        return { id: o.id, userId: o.userId, assessmentId: o.assessmentId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null };
+        return { id: o.id, userId: o.userId, assessmentId: o.assessmentId, productId: o.productId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null };
       });
     },
 
@@ -620,6 +639,84 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     async deleteContext(assessmentId) {
       const { error } = await db.from("personal_contexts").delete().eq("assessment_id", assessmentId);
       if (error) fail("반영 정보 삭제", error);
+    },
+
+    async insertConcernRecord(c): Promise<InsertResult<ConcernRecord>> {
+      const { data, error, status } = await db
+        .from("concern_records")
+        .insert({
+          assessment_id: c.assessmentId,
+          user_id: c.userId,
+          topic: c.topic,
+          question: c.question,
+          situation: c.situation,
+          matched: c.matched,
+          differed: c.differed,
+          excerpt: c.excerpt,
+          written_at: c.writtenAt,
+          agreed_at: c.agreedAt,
+        })
+        .select()
+        .single();
+      if (error) {
+        if (error.code === UNIQUE_VIOLATION) return { ok: false, reason: "conflict" };
+        // 테이블이 없을 때 저장(.single)은 상태 404에 빈 오류가 온다
+        fail("고민 기록 저장", status === 404 && !error.code ? { code: "42P01", message: "concern_records 테이블이 없습니다" } : error);
+      }
+      return { ok: true, value: toConcernRecord(data) };
+    },
+
+    async getConcernRecord(id) {
+      const { data, error } = await db.from("concern_records").select().eq("id", id).maybeSingle();
+      if (error) {
+        if (error.code === "22P02" || isMissingTableError(error)) return null;
+        fail("고민 기록 조회", error);
+      }
+      return data ? toConcernRecord(data) : null;
+    },
+
+    async listConcernRecords(assessmentId) {
+      const { data, error } = await db.from("concern_records").select().eq("assessment_id", assessmentId).order("created_at", { ascending: false }).order("id", { ascending: false });
+      if (error) {
+        if (error.code === "22P02" || isMissingTableError(error)) return [];
+        fail("고민 기록 목록 조회", error);
+      }
+      return (data ?? []).map(toConcernRecord);
+    },
+
+    async listConcernRecordSummaries(userId) {
+      const { data, error } = await db
+        .from("concern_records")
+        .select("id, assessment_id, topic, written_at, created_at, scrubbed_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("고민 기록 요약 조회", error);
+      }
+      return (data ?? []).map((r) => ({
+        id: r.id as string,
+        assessmentId: r.assessment_id as string,
+        topic: r.topic as ConcernRecord["topic"],
+        writtenAt: r.written_at as string,
+        createdAt: r.created_at as string,
+        scrubbedAt: (r.scrubbed_at as string | null) ?? null,
+      }));
+    },
+
+    async scrubConcernRecord(id, at) {
+      // 지우는 것만 허용하는 DB 규칙(트리거)에 맞춰, 글을 비우고 지운 시각을 적는다 (이미 지웠으면 바뀌는 행이 없다)
+      const { error, status } = await db
+        .from("concern_records")
+        .update({ question: "", situation: "", matched: "", differed: "", excerpt: "", scrubbed_at: at })
+        .eq("id", id)
+        .is("scrubbed_at", null);
+      if (error) {
+        // 테이블이 없을 때 수정은 상태 404에 빈 오류가 온다 (조회는 PGRST205 코드가 있다)
+        if (isMissingTableError(error) || (status === 404 && !error.code)) return;
+        fail("고민 기록 내용 지우기", error);
+      }
     },
 
     async listPaymentEvents(orderId) {

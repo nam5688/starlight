@@ -89,12 +89,13 @@ SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
 | --- | --- | --- |
 | 3 | `20261013000000_profile_backfill.sql` | 테이블을 만들기 전에 가입한 회원의 빠진 프로필만 채웁니다 |
 | 4 | `20261014000000_payment_env.sql` | 주문에 결제 환경(내 테스트 키 / 토스 문서 예제 키 / 실결제)을 기록할 칸을 추가합니다 |
-| 5 | `20261015000000_personal_context.sql` | ‘나를 더 반영하기’(선택 입력)를 저장할 표를 만듭니다. 본인만 보고 · 고치고 · 지울 수 있습니다 |
+| 5 | `20261015000000_personal_context.sql` | ‘내 고민 자세히 알려주기’(선택 입력)를 저장할 표를 만듭니다. 본인만 보고 · 고치고 · 지울 수 있습니다 |
 | 6 | `20261016000000_ops_events.sql` | 운영 기록(결제 재확인 결과 · 오류번호 · 알림 이력) 표를 만듭니다. 서버만 읽고 쓰며 고치거나 지울 수 없습니다 |
 | 7 | `20261017000000_ai_usage.sql` | AI 호출 기록(횟수 · 토큰 · 예상 비용) 표와 색인을 만듭니다. 고객 정보는 담지 않습니다 |
 | 8 | `20261018000000_funnel_feedback.sql` | 방문 단계 기록 · 구매 후 만족도 표와, 주문에 유입 출처를 적을 칸을 추가합니다 |
 | 9 | `20261019000000_performance.sql` | 하루 AI 비용 합계 함수와 결제 재확인용 색인을 더합니다 |
 | 10 | `20261020000000_account_withdrawal.sql` | 회원 탈퇴(개인정보 삭제 + 주문 · 결제 기록만 분리 보관)를 처리하는 DB 함수를 더합니다. 실행만으로는 아무 데이터도 바뀌지 않습니다 |
+| 11 | `20261021000000_concern_records.sql` | ‘내 고민 자세히 알려주기’에서 새 리포트를 발급할 때 "그때의 고민"을 저장해 두는 표(고민 기록)를 만들고, 탈퇴 함수에 고민 기록 삭제를 더합니다. 기록은 만든 뒤 고쳐지지 않고 본인이 내용만 지울 수 있습니다. 실행만으로는 기존 데이터가 바뀌지 않습니다 |
 
 ```powershell
 Get-Content supabase\migrations\20261013000000_profile_backfill.sql -Raw -Encoding UTF8 | Set-Clipboard
@@ -105,12 +106,14 @@ Get-Content supabase\migrations\20261017000000_ai_usage.sql -Raw -Encoding UTF8 
 Get-Content supabase\migrations\20261018000000_funnel_feedback.sql -Raw -Encoding UTF8 | Set-Clipboard
 Get-Content supabase\migrations\20261019000000_performance.sql -Raw -Encoding UTF8 | Set-Clipboard
 Get-Content supabase\migrations\20261020000000_account_withdrawal.sql -Raw -Encoding UTF8 | Set-Clipboard
+Get-Content supabase\migrations\20261021000000_concern_records.sql -Raw -Encoding UTF8 | Set-Clipboard
 ```
 
 (여러 줄을 한꺼번에 붙여넣지 말고, **한 줄 실행 → SQL Editor에서 Run → 다음 줄** 순서로 합니다.)
 
-- 6~10번을 아직 안 했어도 결제 · 리포트 · MY는 그대로 동작합니다 (코드가 먼저 올라가고 DB 변경이 늦어도 주문 생성이 막히지 않도록 확인했습니다). 해당 번호를 적용하기 전에는 운영 기록 · AI 사용 기록 · 방문 단계 · 만족도가 쌓이지 않거나 집계가 비어 보일 뿐입니다. `/setup`의 DB 상태에서 `ops_events` 등으로 확인합니다.
-- 5번을 아직 안 했어도 다른 화면은 그대로 동작합니다. 다만 ‘나를 더 반영하기’ 저장이 "DB 변경 5번을 먼저 적용해야 합니다"라고 안내합니다. `/setup`의 DB 상태에서 `personal_contexts` 상태로도 확인할 수 있습니다.
+- 6~11번을 아직 안 했어도 결제 · 리포트 · MY는 그대로 동작합니다 (코드가 먼저 올라가고 DB 변경이 늦어도 주문 생성이 막히지 않도록 확인했습니다). 해당 번호를 적용하기 전에는 운영 기록 · AI 사용 기록 · 방문 단계 · 만족도가 쌓이지 않거나 집계가 비어 보일 뿐입니다. `/setup`의 DB 상태에서 `ops_events` 등으로 확인합니다.
+- 5번을 아직 안 했어도 다른 화면은 그대로 동작합니다. 다만 ‘내 고민 자세히 알려주기’ 저장이 "DB 변경 5번을 먼저 적용해야 합니다"라고 안내합니다. `/setup`의 DB 상태에서 `personal_contexts` 상태로도 확인할 수 있습니다.
+- 11번을 아직 안 했어도 결제 · 리포트 · MY와 고민을 적고 저장하는 것은 동작합니다. 새 리포트 발급만 "DB 변경 11번을 먼저 적용해야 합니다"로 막히고 결제는 시작되지 않습니다 (`/setup`에서 `concern_records` 상태로 확인).
 
 ## 3단계. 카카오 로그인 켜기
 

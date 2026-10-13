@@ -1,17 +1,11 @@
-import type { Evidence } from "@/lib/report/evidence";
-import { SECTION_PLAN, type Paragraph, type PersonalReportV2 } from "@/lib/report/v2/types";
+import { SECTION_PLAN, type PersonalReportV2 } from "@/lib/report/v2/types";
 import { BASE_TERMS, glossaryFor, withHanja } from "@/lib/saju/glossary";
 import { SajuChart } from "./detail-sections";
+import { EvidenceDetails, ParagraphBlock } from "./evidence-details";
 import { ReportToc } from "./toc";
 import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
 import { ActionList } from "./integrated-view";
 import { CoreSummaryTable, SCORE_NOTE, ScoreGroups, SectionTitle, TendencyBlock } from "./summary-blocks";
-
-const SOURCE_LABEL: Record<Evidence["source"], string> = {
-  saju: "사주 계산",
-  survey: "미유 응답",
-  self: "본인 입력",
-};
 
 /**
  * 개인 종합 리포트 v2 — 사주(원국 · 대운 · 세운) 중심의 인물 해석.
@@ -239,34 +233,5 @@ export function PersonalV2View({
         </section>
       </article>
     </div>
-  );
-}
-
-function ParagraphBlock({ paragraph, evidence }: { paragraph: Paragraph; evidence: Map<string, Evidence> }) {
-  return (
-    <div>
-      <p className="text-[16px] leading-[1.8] text-ink">{paragraph.text}</p>
-      <EvidenceDetails ids={paragraph.evidence} evidence={evidence} />
-    </div>
-  );
-}
-
-function EvidenceDetails({ ids, evidence }: { ids: string[]; evidence: Map<string, Evidence> }) {
-  const items = ids.map((i) => evidence.get(i)).filter((e): e is Evidence => Boolean(e));
-  if (!items.length) return null;
-  return (
-    <details className="group mt-2">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[13px] font-medium text-accent">
-        근거 보기 <span className="text-ink-3">({items.length})</span>
-      </summary>
-      <ul className="mt-2 space-y-1.5 border-l-2 border-line pl-3 text-[13px] leading-relaxed text-ink-2">
-        {items.map((e) => (
-          <li key={e.id}>
-            <span className="mr-1.5 font-medium text-ink-3">{SOURCE_LABEL[e.source]}</span>
-            {e.fact}
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }

@@ -24,7 +24,7 @@ function failingDb(code: string, opts: { emptySingle?: boolean } = {}): Supabase
   return { from: () => chain } as unknown as SupabaseClient;
 }
 
-test("나를 더 반영하기 테이블이 아직 없으면(DB 변경 5번 전) 조회는 '적은 내용 없음'으로 처리해 기존 화면이 멈추지 않는다", async () => {
+test("내 고민 자세히 알려주기 테이블이 아직 없으면(DB 변경 5번 전) 조회는 '적은 내용 없음'으로 처리해 기존 화면이 멈추지 않는다", async () => {
   for (const code of ["PGRST205", "42P01"]) {
     const repo = createSupabaseRepository(failingDb(code));
     assert.equal(await repo.getContext("00000000-0000-4000-8000-000000000001"), null, code);

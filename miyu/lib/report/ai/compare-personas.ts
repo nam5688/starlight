@@ -1,6 +1,6 @@
 // AI 품질 비교용 가상 인물 — 실제 고객이 아니다. 원국은 만세력 엔진이 계산하고, 응답은 개발용 문항에 가상으로 답한 값이다.
-// 일간 10종을 한 명씩 포함하도록 날짜를 고르고(엔진 계산), 성별 · 시각 유무 · 나를 더 반영하기 유무 · 응답 패턴이 섞이게 한다.
-// 앞의 2명은 1단계에서도 쓴다: 한 명은 나를 더 반영하기가 있고(적은 고민 반영 경로), 한 명은 없다.
+// 일간 10종을 한 명씩 포함하도록 날짜를 고르고(엔진 계산), 성별 · 시각 유무 · 내 고민 자세히 알려주기 유무 · 응답 패턴이 섞이게 한다.
+// 앞의 2명은 1단계에서도 쓴다: 한 명은 내 고민 자세히 알려주기가 있고(적은 고민 반영 경로), 한 명은 없다.
 import { ASSESSMENT_MODULES } from "../../assessment/modules/index.ts";
 import type { PersonalContextInput } from "../../personalization/context.ts";
 import { calculateSaju } from "../../saju/manseryeok-engine.ts";
@@ -23,7 +23,7 @@ const CONTEXTS: Partial<PersonalContextInput>[] = [
 ];
 
 const EMPTY_CONTEXT: Record<string, string> = { question: "", situation: "", matched: "", differed: "", excerpt: "" };
-/** 나를 더 반영하기를 넣는 인물 번호 (0부터) — 10명 중 4명 */
+/** 내 고민 자세히 알려주기를 넣는 인물 번호 (0부터) — 10명 중 4명 */
 const WITH_CONTEXT = [0, 3, 6, 9];
 
 export function buildPersonas(count: number): Persona[] {
@@ -49,7 +49,7 @@ export function buildPersonas(count: number): Persona[] {
     const ctx = withContext ? CONTEXTS[WITH_CONTEXT.indexOf(i)] : null;
     personas.push({
       id: `P${String(i + 1).padStart(2, "0")}`,
-      note: `${saju.dayMaster.stem}(${saju.dayMaster.stemHanja}) 일간 · ${gender === "female" ? "여성" : "남성"} · 태어난 시각 ${hourKnown ? "있음" : "모름"} · 나를 더 반영하기 ${withContext ? "있음" : "없음"}`,
+      note: `${saju.dayMaster.stem}(${saju.dayMaster.stemHanja}) 일간 · ${gender === "female" ? "여성" : "남성"} · 태어난 시각 ${hourKnown ? "있음" : "모름"} · 내 고민 자세히 알려주기 ${withContext ? "있음" : "없음"}`,
       input: {
         nickname: `가상인물${i + 1}`,
         knownMbti: i % 4 === 3 ? null : (["INFJ", "ENTP", "ISTJ", "ENFP"] as const)[i % 4],

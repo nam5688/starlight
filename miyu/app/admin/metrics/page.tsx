@@ -127,6 +127,9 @@ function Revenue({ m }: { m: Metrics }) {
         <Row label="순매출">
           <span className="font-semibold">{formatKrw(r.netKrw)}</span>
         </Row>
+        <Row label="이 중 고민 반영 리포트">
+          {r.concern.paidCount}건 · {formatKrw(r.concern.netKrw)} (기존 구매자의 추가 구매 — 위 첫 구매 단계 · 채널별 전환에는 넣지 않음)
+        </Row>
         <Row label="제외한 것">테스트 결제 {r.testPaidCount}건 (매출 아님) · 중복 결제 의심 {r.duplicateSuspects}건 (운영자 확인)</Row>
         <Row label="AI 비용 (실결제 리포트)">{e.pricingConfigured ? krw(e.aiCostKrw) : "토큰 단가 설정 전 — 비용 계산 안 함"}</Row>
         <Row label="한 건당 평균">

@@ -1,5 +1,5 @@
 // 회원 탈퇴 — 무엇이 지워지고 무엇이 남는지의 안내 문구와 보관 기간 (정책 확정 전 초안: docs/withdrawal-policy.md).
-// 실제 삭제는 DB 함수 withdraw_member_data(supabase/migrations/20261020000000_account_withdrawal.sql)가 한다.
+// 실제 삭제는 DB 함수 withdraw_member_data(supabase/migrations/20261020000000_account_withdrawal.sql, 11번에서 고민 기록 삭제 추가)가 한다.
 // 이 목록과 DB 함수의 처리가 같은지는 DB 테스트(supabase/tests/db.test.ts)가 확인한다.
 
 /** 확인 문구 — 입력창에 그대로 적어야 탈퇴가 진행된다 */
@@ -11,7 +11,7 @@ export const TRANSACTION_RETENTION_YEARS = 5;
 export const WITHDRAWAL_DELETED: readonly string[] = [
   "검사 결과: 닉네임 · 생년월일 · 출생시간 · MBTI · 검사 응답 · 사주 계산 결과",
   "구매한 리포트의 내용 (탈퇴 후에는 다시 볼 수 없고 복구할 수 없습니다)",
-  "나를 더 반영하기에 적은 고민 · 상황 · 대화 일부",
+  "내 고민 자세히 알려주기에 적은 고민 · 상황 · 대화 일부와, 새 리포트를 발급할 때 남긴 고민 기록(그때 적은 내용)",
   "리포트 만족도, 거주 · 활동 지역, 닉네임",
   "카카오 로그인 연결 정보 (같은 카카오 계정으로 다시 가입하면 새 계정이 만들어집니다)",
 ];

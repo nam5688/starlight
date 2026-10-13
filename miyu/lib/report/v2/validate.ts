@@ -6,7 +6,7 @@ import { SECTION_PLAN, type Paragraph, type ReportDraftV2 } from "./types.ts";
 export type ValidationResult = { ok: true; draft: ReportDraftV2 } | { ok: false; errors: string[] };
 
 /** 단정 · 진단 · 과장 표현과 구체적인 날짜 예언 */
-const FORBIDDEN: { re: RegExp; why: string }[] = [
+export const FORBIDDEN: { re: RegExp; why: string }[] = [
   { re: /정확도|적중률/, why: "정확도 · 적중률 표현" },
   { re: /진단(합니다|됩니다|입니다)|장애가 있/, why: "진단처럼 쓰는 표현" },
   { re: /100\s*%|틀림없|확실히 (일어|됩|합)|반드시 (일어|됩니다|하게 됩)/, why: "단정 표현" },
@@ -22,17 +22,17 @@ const FORBIDDEN: { re: RegExp; why: string }[] = [
 ];
 
 /** focus 첫 문단은 고객이 알려 준 내용임을 밝혀야 한다 */
-const CONTEXT_ATTRIBUTION = /(알려|말씀해|적어|남겨) 주신|말씀하신/;
+export const CONTEXT_ATTRIBUTION = /(알려|말씀해|적어|남겨) 주신|말씀하신/;
 
-const sentences = (text: string) =>
+export const sentences = (text: string) =>
   text
     .split(/(?<=[.!?。])\s+|\n+/)
     .map((s) => s.replace(/\s+/g, " ").trim())
     .filter((s) => s.length >= 12);
 
-const words = (s: string) => new Set(s.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 1));
+export const words = (s: string) => new Set(s.replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter((w) => w.length > 1));
 
-function overlap(a: string, b: string) {
+export function overlap(a: string, b: string) {
   const A = words(a);
   const B = words(b);
   if (!A.size || !B.size) return 0;
@@ -116,7 +116,7 @@ export function validateDraft(raw: unknown, evidence: Evidence[], opts: { hasCon
     }
   }
 
-  // 알려 주신 고민 (나를 더 반영하기)
+  // 알려 주신 고민 (내 고민 자세히 알려주기)
   if (opts.hasContext) {
     const focus = list<Paragraph>(d.focus, "focus", 1, 3);
     focus.forEach((p, i) => checkParagraph(p, `focus[${i}]`, 80, 700));

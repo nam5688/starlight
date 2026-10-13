@@ -33,11 +33,11 @@ export function ConfirmRunner() {
       const result = await confirmPaymentAction({ orderId, paymentKey, amount });
       setOffline(false);
       setOutcome(result);
-      if (result.kind === "paid") router.replace(`/results/${result.assessmentId}`);
+      if (result.kind === "paid") router.replace(result.resultPath);
     } catch {
       // 요청 자체가 서버에 닿지 않았거나 응답을 받지 못함 — 결제 결과는 아직 모른다
       setOffline(true);
-      setOutcome({ kind: "checking", assessmentId: null, orderNumber: orderId || null, errorId: null });
+      setOutcome({ kind: "checking", assessmentId: null, resultPath: null, orderNumber: orderId || null, errorId: null });
     } finally {
       setBusy(false);
     }
@@ -78,7 +78,7 @@ export function ConfirmRunner() {
   if (outcome?.kind === "paid") {
     return (
       <p role="status" className="mt-4 text-[16px] leading-relaxed text-ink-2">
-        결제가 확인되었습니다. 결과 화면으로 이동합니다.
+        결제가 확인되었습니다. 곧 리포트 화면으로 이동합니다.
       </p>
     );
   }
@@ -109,8 +109,8 @@ export function ConfirmRunner() {
           <button type="button" onClick={() => void run()} disabled={busy} className={buttonPrimary}>
             {busy ? "확인 중…" : "지금 다시 확인"}
           </button>
-          <Link href={outcome.assessmentId ? `/results/${outcome.assessmentId}` : "/my"} className={buttonSecondary}>
-            {outcome.assessmentId ? "결과 화면으로" : "MY로 가기"}
+          <Link href={outcome.resultPath ?? "/my"} className={buttonSecondary}>
+            {outcome.resultPath ? "돌아가기" : "MY로 가기"}
           </Link>
         </div>
       </div>
@@ -141,8 +141,8 @@ export function ConfirmRunner() {
       ) : (
         <p className="text-[14px] text-ink-3">승인되지 않은 결제는 청구되지 않습니다.</p>
       )}
-      <Link href={rejected?.assessmentId ? `/results/${rejected.assessmentId}` : "/my"} className={buttonSecondary}>
-        결과 화면으로 돌아가기
+      <Link href={rejected?.resultPath ?? "/my"} className={buttonSecondary}>
+        돌아가기
       </Link>
     </div>
   );

@@ -33,7 +33,7 @@ function candidate(key: string, opts: { invalidFirst?: boolean; usage?: { inputT
 }
 const approval = (stage = "stage-1", cap = 3000): CompareApproval => ({ stage, approvedCapKrw: cap, approvedOn: "2026-10-13" });
 
-test("가상 인물: 일간이 서로 다르고, 앞 2명은 나를 더 반영하기 있음 · 없음이 한 명씩이며, 실제 고객 정보가 없다", () => {
+test("가상 인물: 일간이 서로 다르고, 앞 2명은 내 고민 자세히 알려주기 있음 · 없음이 한 명씩이며, 실제 고객 정보가 없다", () => {
   const personas = buildPersonas(10);
   assert.equal(personas.length, 10);
   const stems = personas.map((p) => (p.input.saju.status === "ok" ? p.input.saju.dayMaster.stem : "?"));

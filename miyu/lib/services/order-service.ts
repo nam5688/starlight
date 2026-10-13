@@ -52,7 +52,8 @@ export async function startCheckout(
   const sale = await gateOpen(deps.gate, "start");
   if (!sale.open) return { kind: "sales-closed", reason: sale.reason };
 
-  for (const pending of orders.filter((o) => o.status === "pending")) {
+  // 같은 상품의 대기 주문만 대체한다 (고민 반영 리포트의 대기 주문은 건드리지 않는다)
+  for (const pending of orders.filter((o) => o.status === "pending" && o.productId === PERSONAL_REPORT.id)) {
     const canceled = await repo.updateOrder(pending.id, ["pending"], {
       status: "canceled",
       failureCode: "SUPERSEDED",
@@ -77,7 +78,8 @@ export async function startCheckout(
 
   // 동시에 두 번 눌러 다른 요청이 먼저 만든 경우: 그 주문을 쓴다
   const latest = await repo.listOrdersForAssessment(assessment.id);
-  const existing = latest.find((o) => o.status === "pending") ?? latest.find((o) => o.status === "paid");
+  const personal = latest.filter((o) => o.productId === PERSONAL_REPORT.id);
+  const existing = personal.find((o) => o.status === "pending") ?? personal.find((o) => o.status === "paid");
   if (!existing) throw new Error("주문을 만들지 못했습니다.");
   return existing.status === "paid" ? { kind: "already-paid", order: existing } : { kind: "order", order: existing };
 }

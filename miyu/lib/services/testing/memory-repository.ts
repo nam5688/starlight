@@ -3,6 +3,7 @@
 
 import { canTransition } from "../../commerce/order.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
+import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AiUsageRecord,
@@ -28,6 +29,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const events: { orderId: string; source: PaymentEventSource; status: string | null; detail: Record<string, unknown>; createdAt: string }[] = [];
   const consents = new Map<string, ConsentRecord[]>();
   const contexts = new Map<string, PersonalContext>();
+  const concernRecords = new Map<string, ConcernRecord>();
   const opsEvents: OpsEventRecord[] = [];
   const aiUsage: AiUsageRecord[] = [];
   const funnel: FunnelEventRecord[] = [];
@@ -57,7 +59,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const mine = (o: OrderRecord) => o.userId === userId;
       if ([...orders.values()].some((o) => mine(o) && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)) return { ok: false, reason: "pending-order" };
       if ([...reports.values()].some((r) => r.userId === userId && (r.status === "queued" || r.status === "generating"))) return { ok: false, reason: "report-in-progress" };
-      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, feedback: 0, regions: 0 };
+      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0 };
       for (const [k, f] of [...feedback]) {
         if (f.userId !== userId) continue;
         feedback.delete(k);
@@ -67,6 +69,11 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         if (c.userId !== userId) continue;
         contexts.delete(k);
         counts.personal_contexts++;
+      }
+      for (const [k, c] of [...concernRecords]) {
+        if (c.userId !== userId) continue;
+        concernRecords.delete(k);
+        counts.concern_records++;
       }
       for (const [k, r] of [...reports]) {
         if (r.userId !== userId) continue;
@@ -146,7 +153,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       }
       if (patch.status === "paid") {
         const otherPaid = [...orders.values()].some(
-          (x) => x.id !== orderId && x.assessmentId === current.assessmentId && x.status === "paid",
+          (x) => x.id !== orderId && x.assessmentId === current.assessmentId && x.productId === current.productId && x.status === "paid",
         );
         if (otherPaid) throw Object.assign(new Error("duplicate paid order"), { code: "23505" });
       }
@@ -168,7 +175,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         .filter((o) => o.createdAt >= since)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, limit)
-        .map((o) => ({ id: o.id, userId: o.userId, assessmentId: o.assessmentId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null }));
+        .map((o) => ({ id: o.id, userId: o.userId, assessmentId: o.assessmentId, productId: o.productId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null }));
     },
     async listReportsForMetrics(since, limit) {
       return [...reports.values()]
@@ -269,6 +276,31 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async deleteContext(assessmentId) {
       contexts.delete(assessmentId);
     },
+    async insertConcernRecord(c) {
+      // DB와 같은 규칙: 검사 결과의 주인만, 같은 작성 시점의 기록은 하나만 (내용을 지운 기록은 제외)
+      if (assessments.get(c.assessmentId)?.userId !== c.userId) throw new Error("concern record owner mismatch");
+      if ([...concernRecords.values()].some((x) => x.assessmentId === c.assessmentId && x.writtenAt === c.writtenAt && !x.scrubbedAt)) return { ok: false, reason: "conflict" };
+      const record: ConcernRecord = { ...c, id: id(), createdAt: new Date(now().getTime() + ++tick).toISOString(), scrubbedAt: null };
+      concernRecords.set(record.id, record);
+      return { ok: true, value: record };
+    },
+    async getConcernRecord(recordId) {
+      return concernRecords.get(recordId) ?? null;
+    },
+    async listConcernRecords(assessmentId) {
+      return [...concernRecords.values()].filter((c) => c.assessmentId === assessmentId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+    async listConcernRecordSummaries(userId) {
+      return [...concernRecords.values()]
+        .filter((c) => c.userId === userId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(({ id, assessmentId, topic, writtenAt, createdAt, scrubbedAt }) => ({ id, assessmentId, topic, writtenAt, createdAt, scrubbedAt }));
+    },
+    async scrubConcernRecord(recordId, at) {
+      const c = concernRecords.get(recordId);
+      if (!c || c.scrubbedAt) return;
+      concernRecords.set(recordId, { ...c, question: "", situation: "", matched: "", differed: "", excerpt: "", scrubbedAt: at });
+    },
     async listPaymentEvents(orderId) {
       return events.filter((e) => e.orderId === orderId).map(({ source, status, detail, createdAt }) => ({ source, status, detail, createdAt }));
     },
@@ -307,5 +339,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, opsEvents, aiUsage, funnel, feedback };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, opsEvents, aiUsage, funnel, feedback };
 }

@@ -7,7 +7,7 @@ import { buildApplySql } from "../lib/ops/apply-sql.ts";
 
 const dir = new URL("../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
-const migrations = files.slice(3).map((name) => ({ name, sql: readFileSync(new URL(name, dir), "utf8") }));
+const migrations = files.slice(3, 10).map((name) => ({ name, sql: readFileSync(new URL(name, dir), "utf8") }));
 const checkSql = readFileSync(new URL("../supabase/check-migrations.sql", import.meta.url), "utf8");
 const committed = readFileSync(new URL("../supabase/apply-4-to-10.sql", import.meta.url), "utf8");
 
