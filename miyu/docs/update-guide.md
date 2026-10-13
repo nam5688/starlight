@@ -214,6 +214,15 @@ SQL 파일은 `supabase/migrations` 폴더에 번호 순서로 있다. **무조�
 9. **채점:** `evaluation-sheet.md`로 채점하고 **끝나기 전에는 `key-open-after-scoring.json`을 열지 않는다.** 이 폴더는 저장소에 올라가지 않는다.
 10. **결과 보고:** 채점표와 `cost-and-checks.json`의 요약(건수 · 비용 · 형식 통과)만 알려 준다. 키 · 글 전체는 필요 없다. **4건으로는 순위를 정하지 않는다** — 작동하는지 · 비용이 예상대로인지 · 명백한 결함이 있는지만 본다.
 
+**Claude만 먼저 쓰기 (OpenAI 계정이 아직 없을 때)** — `--only A`를 붙인다. Claude 키(`ANTHROPIC_API_KEY`)만 있으면 되고, 생성은 가상 인물 2명 × Claude 1개 = **2건**이다 (예상 약 460원, 모두 고쳐 쓰기까지 가는 최악 약 2,080원, 한도는 같은 3,000원). 승인한 범위 안이다.
+
+```powershell
+node --env-file=.env.local scripts\run-ai-compare.ts --only A
+node --env-file=.env.local scripts\run-ai-compare.ts --stage stage-1 --only A --execute --approved-cap-krw 3000 --approved-on 2026-10-13
+```
+
+첫 줄은 호출 없는 확인, 둘째 줄이 실제 생성이다. **이름을 가린 비교는 아니다** — 글은 모두 `X`(= Claude)이고, 실제 미유 리포트 화면(`/dev/compare`)에서 읽는 방법은 같다. 한 모델만으로는 "작동하는지 · 비용 · 명백한 결함 · 읽을 만한지"를 볼 수 있을 뿐 모델 사이의 우열은 알 수 없다. 나중에 OpenAI 키를 넣고 `--only` 없이 4건 비교를 따로 할 수 있다 (그때는 새로 생성하므로 비용이 다시 든다).
+
 **키 입력 위치** — 새 `miyu` 폴더 안의 **`.env.local`** 파일이다 (`.env.example`이 아니다. `.env.local`은 Windows 탐색기에서 안 보이면 PowerShell로 연다).
 
 ```powershell

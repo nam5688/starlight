@@ -190,7 +190,11 @@ export async function runStage(opts: {
 }): Promise<StageResult> {
   checkApproval(opts.stage, opts.guard, opts.approval);
   const variant = opts.variant ?? "reading-v1";
-  const blindKey = assignBlind(opts.personas.map((p) => p.id), opts.candidates.map((c) => c.key), opts.blindSeed);
+  // 후보가 둘이면 인물마다 X · Y에 무작위로 가린다. 한 모델만 실행하면(--only) 가린 비교가 아니며 모든 글이 X다
+  const blindKey =
+    opts.candidates.length === 1
+      ? Object.fromEntries(opts.personas.map((p) => [p.id, { X: opts.candidates[0].key, Y: opts.candidates[0].key }]))
+      : assignBlind(opts.personas.map((p) => p.id), opts.candidates.map((c) => c.key), opts.blindSeed);
   const runs: CompareRun[] = [];
   let stoppedByBudget = false;
   const ratios: number[] = [];

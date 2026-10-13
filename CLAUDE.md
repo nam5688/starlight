@@ -46,7 +46,7 @@ node scripts/measure-saju-boundaries.ts   # 자시 · 지역 보정이 결과를
 node scripts/render-data-docs.ts          # 해석 규칙 이력(docs/saju-rules.md) · IPIP 개념 비교와 0.3 수정안(docs/assessment-ipip-review.md) 만들기
 node scripts/summarize-pilot.ts           # 시범 응답 정리: pilot-data/의 "검토 내용 복사" 글을 읽어 문항별 단서 요약(저장소에 올라가지 않는 폴더)
 node scripts/compare-ai-dry-run.ts        # AI 비교 비용 계산 (호출 없음) — 기본은 지금 제품의 읽기 구조(reading-v1) 지시문 길이, `--variant personal-v2 · philosophical-v0`도 가능
-node scripts/run-ai-compare.ts            # AI 비교 실행: 옵션 없으면 드라이런(호출 없음), `--execute`는 운영자가 승인 금액 · 날짜를 직접 적어야 시작 (승인 전 호출 0회)
+node scripts/run-ai-compare.ts            # AI 비교 실행: 옵션 없으면 드라이런(호출 없음), `--execute`는 운영자가 승인 금액 · 날짜를 직접 적어야 시작 (승인 전 호출 0회), `--only A|B`는 한 모델만(가린 비교 아님)
 node scripts/render-ai-stage1-preview.ts  # AI 비교 1단계 승인 전 미리보기(docs/ai-stage1-preview.html) 만들기 (호출 없음)
 node scripts/render-apply-sql.ts          # 마이그레이션 4~10번 통합 파일(supabase/apply-4-to-10.sql) 만들기
 ```

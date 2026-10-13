@@ -8,6 +8,7 @@
 //
 // 실행 (miyu 폴더, PowerShell — 키는 .env.local 에만 두고 채팅 · 화면에 붙여넣지 않는다):
 //   node --env-file=.env.local scripts/run-ai-compare.ts              # 드라이런 (호출 없음) — 키가 들어갔는지(있음 · 없음)도 보여 준다
+//   --only A                                                          # 한 모델만(A=Claude, B=GPT). 그 모델의 키만 있으면 되고 비용은 절반 정도이며, 이름을 가린 비교는 아니다
 //   node --env-file=.env.local scripts/run-ai-compare.ts --stage stage-1 --execute --approved-cap-krw 3000 --approved-on 2026-10-13
 //
 // 키(.env.local): ANTHROPIC_API_KEY (후보 A) · OPENAI_API_KEY (후보 B). 값은 이 스크립트가 출력하지 않는다.
@@ -31,18 +32,22 @@ const arg = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1
 const stageName = arg("--stage") ?? "stage-1";
 const variant = (arg("--variant") ?? "reading-v1") as CompareVariant;
 if (!["reading-v1", "personal-v2"].includes(variant)) throw new Error("--variant 은 reading-v1(기본) 또는 personal-v2만 쓸 수 있습니다.");
+const only = arg("--only");
+if (only !== undefined && only !== "A" && only !== "B") throw new Error("--only 는 A(Claude) 또는 B(GPT)만 쓸 수 있습니다.");
 const stage = COMPARE_STAGES.find((s) => s.name === stageName);
 if (!stage) throw new Error(`알 수 없는 단계: ${stageName} (${COMPARE_STAGES.map((s) => s.name).join(" · ")})`);
 const won = (x: number) => `${Math.round(x).toLocaleString("ko-KR")}원`;
 const now = new Date();
 const settings = { fxKrwPerUsd: DEFAULT_FX_KRW_PER_USD, surcharge: DEFAULT_SURCHARGE };
 const personas = buildPersonas(stage.personaCount);
+const chosen = AI_CANDIDATES.filter((c) => !only || c.key === only);
+const solo = chosen.length === 1;
 
-const plan = planStage({ stage: stage.name, capKrw: stage.capKrw, personas, candidates: AI_CANDIDATES.map((c) => ({ key: c.key, price: c.price })), settings, now, variant });
-console.log(`# ${stage.label}`);
+const plan = planStage({ stage: stage.name, capKrw: stage.capKrw, personas, candidates: chosen.map((c) => ({ key: c.key, price: c.price })), settings, now, variant });
+console.log(`# ${solo ? `${stage.label.split(":")[0]}: 가상 인물 ${personas.length}명 × ${chosen[0].company} 1개 = 생성 ${personas.length}건 (한 모델만 — 이름을 가린 비교가 아님)` : stage.label}`);
 console.log(`- 비교 대상: **개인 통합 리포트**(9,900원 상품) — ${variant === "reading-v1" ? "읽기 구조(reading-v1, 지금 제품 형식)" : "이전 형식(personal-v2)"}. 고민 반영 리포트(4,900원)는 이 비교에 넣지 않았다(지시문이 아직 옛 규칙이라 검증하지 않음).`);
 console.log("- 인물 1명은 '알려 준 고민'이 있어 개인 통합 리포트 안의 '알려 주신 고민까지 반영한 해석' 구역이 함께 나오지만, 그것이 고민 반영 리포트 상품은 아니다.");
-for (const c of AI_CANDIDATES) console.log(`- 후보 ${c.key}: ${c.company} ${c.modelId} (입력 $${c.price.inputUsdPerMTok} · 출력 $${c.price.outputUsdPerMTok} / 100만 토큰) — 생각 · 추론 강도 중간`);
+for (const c of chosen) console.log(`- 후보 ${c.key}: ${c.company} ${c.modelId} (입력 $${c.price.inputUsdPerMTok} · 출력 $${c.price.outputUsdPerMTok} / 100만 토큰) — 생각 · 추론 강도 중간`);
 console.log(`- 예상 비용(평소 수준): ${won(plan.expectedKrw)} · 모든 생성이 한 번에 끝나는 최악: ${won(plan.firstCallWorstKrw)} · 모두 고쳐 쓰기까지 가는 최악: ${won(plan.twoRoundWorstKrw)}`);
 console.log(`- 하드스톱 한도: ${won(stage.capKrw)} (환율 ${settings.fxKrwPerUsd.toLocaleString("ko-KR")}원/달러 · 여유율 ${Math.round((settings.surcharge - 1) * 100)}% 가정 — 실제 청구는 제공사 콘솔에서 확인)`);
 
@@ -63,12 +68,13 @@ if (!Number.isFinite(approvedCap) || !approvedOn || !/^\d{4}-\d{2}-\d{2}$/.test(
 }
 const keys = { A: process.env.ANTHROPIC_API_KEY, B: process.env.OPENAI_API_KEY } as const;
 console.log(`\n키 설정: 후보 A(ANTHROPIC_API_KEY) ${keys.A ? "있음" : "없음"} · 후보 B(OPENAI_API_KEY) ${keys.B ? "있음" : "없음"}`);
-if (!keys.A || !keys.B) {
-  console.error("중단: 두 후보의 키가 모두 필요합니다. .env.local 에 직접 입력한 뒤 다시 실행하세요. 아무것도 호출하지 않았습니다.");
+const missing = chosen.filter((c) => !keys[c.key]);
+if (missing.length > 0) {
+  console.error(`중단: ${missing.map((c) => `후보 ${c.key}(${c.key === "A" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY"})`).join(" · ")}의 키가 필요합니다. .env.local 에 직접 입력한 뒤 다시 실행하세요.${solo ? "" : " 한 모델만 먼저 실행하려면 --only A 또는 --only B 를 붙입니다."} 아무것도 호출하지 않았습니다.`);
   process.exit(1);
 }
 
-const candidates: CompareCandidate[] = AI_CANDIDATES.map((c) => ({
+const candidates: CompareCandidate[] = chosen.map((c) => ({
   key: c.key,
   price: c.price,
   model: c.key === "A" ? createAnthropicModel({ apiKey: keys.A!, model: c.modelId, effort: "medium" }) : createOpenAiModel({ apiKey: keys.B!, model: c.modelId, effort: "medium" }),
@@ -98,13 +104,13 @@ for (const run of result.runs) {
 }
 writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport)}`);
 
-const rows = personas.flatMap((p) => ["X", "Y"].map((b) => `| ${p.id} | ${b} |  |  |  |  |  |  |  |`)).join("\n");
+const rows = personas.flatMap((p) => (solo ? ["X"] : ["X", "Y"]).map((b) => `| ${p.id} | ${b} |  |  |  |  |  |  |  |`)).join("\n");
 writeFileSync(
   join(dir, "evaluation-sheet.md"),
   `# 채점표 — ${stage.label}
 
-후보 이름은 가려져 있습니다 (X · Y). 채점이 끝나기 전에는 \`key-open-after-scoring.json\` 을 열지 않습니다.
-사람이 쓴 예시(\`reference-사람이-쓴-예시.md\`)를 먼저 읽고 기준으로 삼습니다. **${stage.personaCount * 2}건으로는 순위를 정하지 않습니다** — 작동하는지 · 비용이 예상대로인지 · 명백한 결함이 있는지만 봅니다.
+${solo ? `이번에는 한 모델(${chosen[0].company})만 실행했습니다. 이름을 가린 비교가 아니며 글은 모두 X입니다.` : "후보 이름은 가려져 있습니다 (X · Y). 채점이 끝나기 전에는 `key-open-after-scoring.json` 을 열지 않습니다."}
+사람이 쓴 예시(\`reference-사람이-쓴-예시.md\`)를 먼저 읽고 기준으로 삼습니다. **${result.runs.length}건으로는 순위를 정하지 않습니다** — 작동하는지 · 비용이 예상대로인지 · 명백한 결함이 있는지만 봅니다.
 
 ## 먼저 확인 (있으면 그 후보는 지시문을 고쳐 다시 확인)
 
@@ -113,7 +119,7 @@ writeFileSync(
 - [ ] 상대의 마음 · 나이 · 직업 · 만날 날짜를 쓴 곳이 있는가
 - [ ] 본문에 사주 용어(일간 · 대운 등) · 점수 · 퍼센트가 나오는가
 
-## 1~5점 (인물마다 X · Y)
+## 1~5점 (인물마다 ${solo ? "X" : "X · Y"})
 
 | 인물 | 글 | 구체성 | 조건 · 상황 | 근거 일치 | 새로 알게 된 것 | 한국어 자연스러움 | 읽기 쉬움 | 구매 판단 | 메모 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -149,4 +155,4 @@ const ok = result.runs.filter((r) => r.status === "ok").length;
 console.log(`\n완료: 생성 ${ok}/${result.runs.length}건 · 쓴 비용 ${won(result.spentKrw)} (한도 ${won(stage.capKrw)})${result.stoppedByBudget ? " · 예산 하드스톱으로 일부 중단" : ""}`);
 for (const r of result.runs) console.log(`- ${r.persona} ${r.blind}: ${r.status}${r.errorCode ? ` (${r.errorCode})` : ""} · 호출 ${r.calls}회 · 첫 시도 형식 통과 ${r.firstPassValid === null ? "-" : r.firstPassValid ? "예" : "아니오"} · ${won(r.costKrw)}`);
 const runId = dir.split(/[\\/]/).pop();
-console.log(`\n결과 폴더: ${dir}\n실제 미유 리포트 화면으로 읽기: 이 PC에서 npm.cmd run dev 를 켠 뒤 http://localhost:3000/dev/compare/${runId} 을 연다 (이름이 가려진 X · Y).\n채점이 끝나기 전에는 key-open-after-scoring.json 을 열지 마세요.`);
+console.log(`\n결과 폴더: ${dir}\n실제 미유 리포트 화면으로 읽기: 이 PC에서 npm.cmd run dev 를 켠 뒤 http://localhost:3000/dev/compare/${runId} 을 연다 (${solo ? "한 모델만 실행해 글은 모두 X" : "이름이 가려진 X · Y"}).${solo ? "" : "\n채점이 끝나기 전에는 key-open-after-scoring.json 을 열지 마세요."}`);

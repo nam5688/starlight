@@ -17,7 +17,7 @@ export default function DevComparePage() {
       <StatusBadge>개발용 · 내 컴퓨터에서만 열림</StatusBadge>
       <h1 className="mt-3 text-[26px] font-bold tracking-tight md:text-[30px]">AI 비교 결과 읽기</h1>
       <p className="mt-2 text-[16px] leading-relaxed text-ink-2">
-        비교 실행(<code className="text-[14px]">scripts/run-ai-compare.ts</code>)이 만든 리포트를 실제 미유 리포트 화면으로 읽습니다. X · Y가 어느 AI인지는 가려져 있고, 채점이 끝난 뒤에 <code className="text-[14px]">key-open-after-scoring.json</code>을 엽니다.
+        비교 실행(<code className="text-[14px]">scripts/run-ai-compare.ts</code>)이 만든 리포트를 실제 미유 리포트 화면으로 읽습니다. 두 모델을 함께 실행했다면 X · Y가 어느 AI인지는 가려져 있고(채점이 끝난 뒤 <code className="text-[14px]">key-open-after-scoring.json</code>을 엽니다), 한 모델만 실행했다면 글은 모두 X입니다.
       </p>
       <Suspense fallback={<p className="mt-8 text-[16px] text-ink-2">불러오고 있어요.</p>}>
         <Runs />

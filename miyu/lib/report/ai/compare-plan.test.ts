@@ -199,3 +199,17 @@ test("가린 이름: 같은 씨앗이면 같고, 씨앗이 다르면 배정이 �
   assert.ok(xIsA >= 2 && xIsA <= 8, `A가 X인 인물 ${xIsA}명 — 한쪽으로 쏠리지 않음`);
   assert.throws(() => assignBlind(ids, ["A"], 1));
 });
+
+test("한 모델만 실행(--only): 인물마다 한 건씩 생성하고 모든 글이 X이며, 비용은 한도 안이다", async () => {
+  const solo = candidate("A");
+  const guard = new BudgetGuard({ capKrw: 3000, ...SETTINGS });
+  const res = await runStage({ stage: { name: "stage-1", capKrw: 3000 }, personas: buildPersonas(2), candidates: [solo], guard, approval: approval(), now: NOW, blindSeed: 1, sleep: noSleep });
+  assert.equal(res.runs.length, 2);
+  assert.ok(res.runs.every((r) => r.status === "ok" && r.blind === "X" && r.candidate === "A" && r.calls === 1));
+  assert.equal(solo.model.calls, 2);
+  assert.ok(res.spentKrw > 0 && res.spentKrw <= 3000);
+  const plan = planStage({ stage: "stage-1", capKrw: 3000, personas: buildPersonas(2), candidates: [{ key: "A", price: PRICE }], settings: SETTINGS, now: NOW });
+  const both = planStage({ stage: "stage-1", capKrw: 3000, personas: buildPersonas(2), candidates: [{ key: "A", price: PRICE }, { key: "B", price: PRICE }], settings: SETTINGS, now: NOW });
+  assert.equal(plan.rows.length, 2);
+  assert.ok(Math.abs(plan.expectedKrw * 2 - both.expectedKrw) < 1e-6, "한 모델 비용은 두 모델의 절반");
+});

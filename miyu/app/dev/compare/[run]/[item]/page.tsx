@@ -31,7 +31,7 @@ async function Report({ params }: Pick<PageProps<"/dev/compare/[run]/[item]">, "
     <>
       <div className="mx-auto w-full max-w-[720px] px-5 pt-5 pb-4 md:pt-10">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge>개발용 · 이름을 가린 비교 · {item}</StatusBadge>
+          <StatusBadge>개발용 · AI 비교 결과 · {item}</StatusBadge>
         </div>
         <h1 className="mt-3 text-[22px] leading-snug font-bold tracking-tight md:text-[26px]">{report.personName} 님의 개인 통합 리포트</h1>
         <p className="mt-2 text-[14px] leading-[1.7] text-ink-3">
