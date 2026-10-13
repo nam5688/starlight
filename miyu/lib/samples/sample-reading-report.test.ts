@@ -29,7 +29,7 @@ const bodyTexts = () => [
     b.detailExample ?? "",
     b.watch ?? "",
     b.caveat ?? "",
-    ...(b.traits ?? []).flatMap((t) => [t.name, t.shinesShort, t.burdenShort, t.shines, t.burden]),
+    ...(b.traits ?? []).flatMap((t) => [t.name, t.shinesShort, t.burdenShort, t.shines, t.burden, t.example]),
     ...(b.comfort ? [...b.comfort.comfortable, ...b.comfort.clash, b.comfort.note] : []),
     ...(b.reactionFlow ? [b.reactionFlow.when, ...b.reactionFlow.steps.flatMap((s) => [s.label, s.text]), b.reactionFlow.helpful] : []),
   ]),
@@ -63,7 +63,7 @@ test("리포트 예시: 본문은 쉬운 말이다 — 사주 용어와 점수 �
     assert.doesNotMatch(t, JARGON, `본문에 사주 용어: ${t.slice(0, 30)}`);
     assert.doesNotMatch(t, /\d{2,3}\s*점|백분위|\(\d{2}\)/, `본문에 점수: ${t.slice(0, 30)}`);
   }
-  const paragraphs = [...R.blocks.flatMap((b) => [b.summary, b.example ?? "", ...b.details, b.watch ?? "", b.reactionFlow?.helpful ?? ""]), R.flow.summary, R.flow.cardText];
+  const paragraphs = [...R.blocks.flatMap((b) => [b.summary, b.example ?? "", ...b.details, b.watch ?? "", b.reactionFlow?.helpful ?? "", ...(b.traits ?? []).flatMap((t) => [t.shines, t.burden, t.example])]), R.flow.summary, R.flow.cardText];
   for (const p of paragraphs) assert.ok(sentences(p).length <= 3, `한 문단이 ${sentences(p).length}문장 — ${p.slice(0, 20)}`);
   // 대운은 처음 한 번만 뜻을 붙이고(10년 단위의 큰 흐름), 이후 본문에서는 풀어 쓰거나 괄호 없이 쓴다
   const withGloss = bodyTexts().filter((t) => /대운/.test(t) && /10년 단위/.test(t)).length;
@@ -89,7 +89,7 @@ test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강�
   assert.doesNotMatch(bodyTexts().join("\n"), /힘이 되는 때|부담이 되는 때/);
 });
 
-test("리포트 예시: 강점과 부담은 특징 3개를 짧은 문구로 줄여 보이고, 문구는 자세한 풀이의 문장과 같은 뜻이다", () => {
+test("리포트 예시: '내가 강한 포인트 / 내가 힘들 수 있는 포인트'는 특징 3개를 짧은 문구로 줄여 보이고, 접힘 안에서 특징마다 풀이 · 예시를 나눠 쓴다", () => {
   const b = R.blocks.find((x) => x.id === "strength-burden")!;
   assert.equal(b.traits?.length, 3);
   assert.deepEqual(b.traits!.map((t) => t.name), ["꼼꼼하게 다듬기", "상대 반응 살피기", "가까운 사람에게 기대기"]);
@@ -97,8 +97,15 @@ test("리포트 예시: 강점과 부담은 특징 3개를 짧은 문구로 줄�
     assert.ok(t.name.length <= 12 && t.shinesShort.length <= 14 && t.burdenShort.length <= 16, `${t.name}: 카드 문구가 길다`);
     assert.ok(t.shines.length > t.shinesShort.length && t.burden.length > t.burdenShort.length, `${t.name}: 풀이 문장이 문구보다 자세해야 한다`);
     assert.doesNotMatch(t.shines + t.burden, /나쁘|잘못|문제가 있/, `${t.name}: 좋고 나쁨 표현`);
+    assert.ok(t.example.length >= 20 && sentences(t.example).length <= 2, `${t.name}: 예시는 한두 문장`);
   }
-  assert.ok(b.example, "일상 예시는 접힘 안에 있어야 한다");
+  // 예시는 특징마다 다른 장면이다 (같은 장면을 되풀이하지 않는다) — 블록 전체 예시는 따로 두지 않는다
+  assert.equal(new Set(b.traits!.map((t) => t.example)).size, 3);
+  assert.equal(b.example, undefined);
+  // 화면 이름표는 "강점 · 부담" 대신 쉬운 말
+  assert.match(b.topic, /강한 포인트/);
+  assert.doesNotMatch(bodyTexts().join("\n"), /강점과 부담|부담이 되는|조절이 필요할 때/);
+  assert.deepEqual(R.summary.filter((s) => s.kind !== "flow").map((s) => s.label), ["내가 강한 포인트", "내가 힘들 수 있는 포인트"]);
 });
 
 test("리포트 예시: 지금 지나는 큰 흐름 타임라인은 서윤의 사주 계산에서 나왔고(글로 지어내지 않았다), 카드 문구의 기간과 맞는다", () => {

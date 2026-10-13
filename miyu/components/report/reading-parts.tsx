@@ -2,8 +2,11 @@ import { AdjustIcon, ChevronIcon, FlowIcon, InfoIcon, StrengthIcon } from "@/com
 import type { LuckSlot, ReadingBasis, ReadingBlock, ReadingSummaryCard, ReadingTrait } from "@/lib/report/reading/types";
 
 // 읽기 구조 리포트의 부품. 크기: 카드 제목 17px · 본문 16px(줄 간격 1.7) · 보조 설명 13~14px.
-// 색: 강점 · 잘 쓰일 때 = positive, 주의 · 조절이 필요할 때 = caution, 현재 위치 · 링크 = accent. 색은 작은 이름표 · 핵심 구절 · 구분선에만 쓰고,
+// 색: 내가 강한 포인트 = positive, 내가 힘들 수 있는 포인트 = caution, 현재 위치 · 링크 = accent. 색은 작은 이름표 · 핵심 구절 · 구분선에만 쓰고,
 // 뜻은 항상 글자와 아이콘이 함께 전한다(색만으로 구분하지 않는다). 카드 안에 카드를 넣지 않는다.
+
+/** 특징 카드와 일상 예시에서 같이 쓰는 이름표 */
+export const TRAIT_LABEL = { strong: "내가 강한 포인트", hard: "내가 힘들 수 있는 포인트" } as const;
 
 const KIND = {
   strength: { Icon: StrengthIcon, label: "text-positive", band: "before:bg-positive" },
@@ -43,7 +46,7 @@ export function Fold({ label, children, wide = false }: { label: string; childre
         <span>{label}</span>
         <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="border-t border-line px-4 py-4">{children}</div>
+      <div className="border-t border-line px-4 py-5">{children}</div>
     </details>
   );
 }
@@ -72,46 +75,64 @@ export function CaveatNote({ text }: { text: string }) {
   );
 }
 
-/** 강점과 부담 — 한 줄 문구로 줄인 카드 (모바일은 세로로 쌓고 이름표는 왼쪽, PC는 가로 3칸) */
+/** 내가 강한 포인트 / 내가 힘들 수 있는 포인트 — 특징마다 칸을 둘로 나눈 카드 (모바일은 세로, PC는 가로 3칸) */
 export function TraitCards({ traits }: { traits: ReadingTrait[] }) {
   return (
     <ul className="mt-5 grid gap-3 md:grid-cols-3">
       {traits.map((t) => (
-        <li key={t.name} className="rounded-xl border border-line bg-canvas px-4 py-3.5">
-          <p className="text-[17px] leading-snug font-bold tracking-tight">{t.name}</p>
-          <dl className="mt-2.5 grid grid-cols-[8.25rem_minmax(0,1fr)] gap-x-2 gap-y-2 border-t border-line pt-2.5 md:grid-cols-1 md:gap-y-2.5">
-            <dt className="flex items-start gap-1.5 pt-[3px] text-[13px] font-semibold text-positive md:pt-0">
-              <StrengthIcon className="mt-px size-4 shrink-0" />
-              잘 쓰일 때
-            </dt>
-            <dd className="text-[15px] leading-snug md:-mt-1.5">{t.shinesShort}</dd>
-            <dt className="flex items-start gap-1.5 pt-[3px] text-[13px] font-semibold text-caution md:pt-0">
-              <AdjustIcon className="mt-px size-4 shrink-0" />
-              조절이 필요할 때
-            </dt>
-            <dd className="text-[15px] leading-snug md:-mt-1.5">{t.burdenShort}</dd>
-          </dl>
+        <li key={t.name} className="overflow-hidden rounded-xl border border-line bg-canvas">
+          <p className="px-4 pt-3.5 pb-3 text-[17px] leading-snug font-bold tracking-tight">{t.name}</p>
+          <div className="border-t border-line px-4 py-3">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-positive">
+              <StrengthIcon />
+              {TRAIT_LABEL.strong}
+            </p>
+            <p className="mt-1 text-[15px] leading-snug">{t.shinesShort}</p>
+          </div>
+          <div className="border-t border-line px-4 py-3">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-caution">
+              <AdjustIcon />
+              {TRAIT_LABEL.hard}
+            </p>
+            <p className="mt-1 text-[15px] leading-snug">{t.burdenShort}</p>
+          </div>
         </li>
       ))}
     </ul>
   );
 }
 
-/** 접힘 안에서 보이는 특징별 풀이 (카드의 한 줄을 문장으로 풀어 쓴 것) */
+/**
+ * 일상 예시 보기 — 특징마다 구분선으로 나누고, 안에서도 "강한 포인트 · 힘들 수 있는 포인트 · 예를 들면"을 칸으로 띄운다.
+ * 왼쪽 가이드줄(청록 · 황토 · 회색)로 칸이 구분되며, 줄 색만이 아니라 이름표 글자로도 뜻을 전한다.
+ */
 export function TraitSentences({ traits }: { traits: ReadingTrait[] }) {
   return (
-    <ul className="space-y-4">
+    <ul className="divide-y divide-line">
       {traits.map((t) => (
-        <li key={t.name}>
-          <p className="text-[15px] font-semibold">{t.name}</p>
-          <p className="mt-1 text-[15px] leading-[1.7]">
-            <span className="font-semibold text-positive">잘 쓰일 때 </span>
-            {t.shines}
-          </p>
-          <p className="mt-1 text-[15px] leading-[1.7]">
-            <span className="font-semibold text-caution">조절이 필요할 때 </span>
-            {t.burden}
-          </p>
+        <li key={t.name} className="py-6 first:pt-0 last:pb-0">
+          <p className="text-[17px] leading-snug font-bold tracking-tight">{t.name}</p>
+
+          <div className="mt-4 border-l-[3px] border-positive pl-3.5">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-positive">
+              <StrengthIcon />
+              {TRAIT_LABEL.strong}
+            </p>
+            <p className="mt-1.5 text-[15px] leading-[1.75]">{t.shines}</p>
+          </div>
+
+          <div className="mt-5 border-l-[3px] border-caution pl-3.5">
+            <p className="flex items-center gap-1.5 text-[13px] font-semibold text-caution">
+              <AdjustIcon />
+              {TRAIT_LABEL.hard}
+            </p>
+            <p className="mt-1.5 text-[15px] leading-[1.75]">{t.burden}</p>
+          </div>
+
+          <div className="mt-5 border-l-[3px] border-line-strong pl-3.5">
+            <p className="text-[13px] font-semibold text-ink-3">예를 들면</p>
+            <p className="mt-1.5 text-[15px] leading-[1.75] text-ink-2">{t.example}</p>
+          </div>
         </li>
       ))}
     </ul>
@@ -251,7 +272,7 @@ export function LuckTimelineCard({ timeline, text, reference }: { timeline: Luck
   );
 }
 
-/** 접어 둔 "분석 근거" — 사주 계산 결과와 전통 해석 규칙을 나누고, 응답 · 다르게 나온 부분 · 아직 확인되지 않은 것을 적는다 */
+/** 접어 둔 "분석 근거" — 사주 계산 결과와 전통 해석 규칙을 나누고, 응답 · 다르게 나온 부분 · 아직 확인되지 않은 것을 칸으로 나누어 적는다 */
 export function BasisList({ basis }: { basis: ReadingBasis }) {
   const groups: { label: string; items: string[]; note?: string }[] = [
     { label: "사주 계산 결과", items: basis.computed, note: "만세력 엔진이 계산한 값입니다." },
@@ -261,14 +282,12 @@ export function BasisList({ basis }: { basis: ReadingBasis }) {
     { label: "다른 가능성 · 아직 확인되지 않은 것", items: basis.unknown },
   ];
   return (
-    <div className="space-y-4">
+    <div className="divide-y divide-line">
       {groups.map((g) => (
-        <div key={g.label}>
-          <p className="text-[13px] font-semibold text-ink-2">
-            {g.label}
-            {g.note && <span className="ml-2 font-normal text-ink-3">{g.note}</span>}
-          </p>
-          <ul className="mt-1.5 space-y-1.5 border-l-2 border-line pl-3 text-[14px] leading-[1.65] text-ink-2">
+        <div key={g.label} className="py-5 first:pt-0 last:pb-0">
+          <p className="text-[14px] font-semibold text-ink">{g.label}</p>
+          {g.note && <p className="mt-0.5 text-[13px] leading-[1.6] text-ink-3">{g.note}</p>}
+          <ul className="mt-3 space-y-3 border-l-2 border-line pl-3.5 text-[14px] leading-[1.7] text-ink-2">
             {g.items.map((t) => (
               <li key={t}>{t}</li>
             ))}
@@ -282,7 +301,7 @@ export function BasisList({ basis }: { basis: ReadingBasis }) {
 /** 본문 문단 — 한 문단 2~3문장, 문장마다 줄을 바꾸지 않는다 */
 export function Paragraphs({ items }: { items: string[] }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {items.map((p) => (
         <p key={p} className="text-[16px] leading-[1.75]">
           {p}
@@ -295,9 +314,11 @@ export function Paragraphs({ items }: { items: string[] }) {
 /** 살펴볼 점 — 접힘 안의 마지막 한 덩어리 */
 export function WatchNote({ text }: { text: string }) {
   return (
-    <div className="mt-4 border-l-[3px] border-accent pl-3">
-      <p className="text-[13px] font-semibold text-accent">살펴볼 점</p>
-      <p className="mt-1 text-[15px] leading-[1.7]">{text}</p>
+    <div className="mt-6 border-t border-line pt-5">
+      <div className="border-l-[3px] border-accent pl-3.5">
+        <p className="text-[13px] font-semibold text-accent">살펴볼 점</p>
+        <p className="mt-1.5 text-[15px] leading-[1.75]">{text}</p>
+      </div>
     </div>
   );
 }

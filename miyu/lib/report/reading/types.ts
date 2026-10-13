@@ -24,8 +24,8 @@ export type ReadingBasis = {
 /** 첫 화면 요약 카드 — 강점 · 주의할 점 · 지금의 흐름 */
 export type ReadingSummaryCard = { kind: "strength" | "caution" | "flow"; label: string; keyword: string; note: string };
 
-/** 강점과 부담 카드 — short는 카드에 보이는 짧은 말, shines · burden은 접어 둔 자세한 풀이 */
-export type ReadingTrait = { name: string; shinesShort: string; burdenShort: string; shines: string; burden: string };
+/** "내가 강한 포인트 / 내가 힘들 수 있는 포인트" 카드 — short는 카드에 보이는 짧은 말, shines · burden · example은 접어 둔 일상 예시 */
+export type ReadingTrait = { name: string; shinesShort: string; burdenShort: string; shines: string; burden: string; /** 이 특징의 가상의 장면 한두 문장 */ example: string };
 
 export type ReadingGroupId = "me" | "relation" | "work";
 

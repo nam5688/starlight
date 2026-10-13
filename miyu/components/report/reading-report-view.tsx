@@ -151,37 +151,39 @@ export function ReadingReportView({
 
             <FoldRow>
               <Fold label="자세한 풀이" wide>
-                <div className="space-y-5">
+                <div className="divide-y divide-line [&>div]:py-6 [&>div:first-child]:pt-0 [&>div:last-child]:pb-0">
                   <div>
-                    <p className="text-[15px] font-semibold">시기별로 읽으면</p>
-                    <ul className="mt-2 divide-y divide-line">
+                    <p className="text-[16px] font-bold">시기별로 읽으면</p>
+                    <ul className="mt-3 space-y-5">
                       {report.flow.periods.map((p) => (
-                        <li key={p.period} className="py-3">
-                          <p className="text-[14px] font-semibold text-ink-2">{p.period}</p>
-                          <p className="mt-1 text-[15px] leading-[1.7]">{p.theme}</p>
-                          <p className="mt-1 text-[15px] leading-[1.7] text-ink-2">{p.watch}</p>
+                        <li key={p.period} className="border-l-[3px] border-line-strong pl-3.5">
+                          <p className="text-[13px] font-semibold text-ink-3">{p.period}</p>
+                          <p className="mt-1.5 text-[15px] leading-[1.75]">{p.theme}</p>
+                          <p className="mt-2 text-[15px] leading-[1.75] text-ink-2">{p.watch}</p>
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <p className="text-[15px] font-semibold">응답으로 본 가능성</p>
-                    <p className="mt-0.5 text-[13px] text-ink-3">{report.flow.scenarioNote}</p>
-                    <ul className="mt-2 divide-y divide-line">
+                    <p className="text-[16px] font-bold">응답으로 본 가능성</p>
+                    <p className="mt-0.5 text-[13px] leading-[1.6] text-ink-3">{report.flow.scenarioNote}</p>
+                    <ul className="mt-3 space-y-5">
                       {report.flow.scenarios.map((s) => (
-                        <li key={s.when} className="py-3">
-                          <p className="text-[15px] leading-snug font-semibold">{s.when}</p>
-                          <p className="mt-1 flex gap-2 text-[15px] leading-[1.7]">
-                            <ArrowIcon className="mt-[7px] size-3.5 shrink-0 text-ink-3" />
-                            <span>{s.then}</span>
+                        <li key={s.when} className="border-l-[3px] border-accent pl-3.5">
+                          <p className="text-[13px] font-semibold text-accent">이런 모습이 이어지면</p>
+                          <p className="mt-1 text-[15px] leading-[1.7] font-semibold">{s.when}</p>
+                          <p className="mt-3 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
+                            <ArrowIcon className="size-3.5" />
+                            이렇게 될 수 있습니다
                           </p>
+                          <p className="mt-1 text-[15px] leading-[1.75]">{s.then}</p>
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <p className="text-[15px] font-semibold">연구 통계</p>
-                    <p className="mt-1 text-[14px] leading-[1.7] text-ink-2">{report.flow.statistics}</p>
+                    <p className="text-[16px] font-bold">연구 통계</p>
+                    <p className="mt-2 text-[14px] leading-[1.75] text-ink-2">{report.flow.statistics}</p>
                   </div>
                 </div>
               </Fold>
@@ -291,17 +293,14 @@ function BlockView({ block: b, id, showTopic }: { block: ReadingBlock; id: strin
       <FoldRow>
         {hasFoldA && (
           <Fold label={b.traits ? "일상 예시 보기" : "자세한 풀이"}>
-            {b.traits && (
-              <>
-                <TraitSentences traits={b.traits} />
-                {b.example && <ExampleBox text={b.example} variant="line" />}
-              </>
-            )}
+            {b.traits && <TraitSentences traits={b.traits} />}
             {b.details.length > 0 && <Paragraphs items={b.details} />}
             {b.reactionFlow && (
-              <div className={b.details.length > 0 ? "mt-4 border-l-[3px] border-line-strong pl-3" : "border-l-[3px] border-line-strong pl-3"}>
-                <p className="text-[13px] font-semibold text-ink-3">이럴 때 도움이 되는 것</p>
-                <p className="mt-1 text-[15px] leading-[1.7] text-ink-2">{b.reactionFlow.helpful}</p>
+              <div className={`${b.details.length > 0 ? "mt-6 border-t border-line pt-5" : ""}`}>
+                <div className="border-l-[3px] border-line-strong pl-3.5">
+                  <p className="text-[13px] font-semibold text-ink-3">이럴 때 도움이 되는 것</p>
+                  <p className="mt-1.5 text-[15px] leading-[1.75] text-ink-2">{b.reactionFlow.helpful}</p>
+                </div>
               </div>
             )}
             {b.detailExample && <ExampleBox text={b.detailExample} variant="line" />}
