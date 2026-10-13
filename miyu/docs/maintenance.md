@@ -36,6 +36,7 @@
 규칙:
 - **사주 계산은 엔진 결과만 쓴다.** AI가 생년월일로 원국을 지어내지 않는다.
 - 해석 규칙 · 지시문을 바꾸면 `npm test`의 관련 테스트(근거 ID 검사 · 표현 검사 · 미리보기 일관성)가 통과해야 한다.
+- 해석 규칙(`lib/saju/interpret/rules.ts` · `lib/report/survey-evidence.ts`)을 바꾸거나 새 근거 ID를 만들면 `lib/saju/interpret/rule-meta.ts`의 조건 · 예외 · 버전도 함께 고친다(빠뜨리면 `rule-meta.test.ts`가 알려 준다). 그다음 `node scripts/render-data-docs.ts`로 `docs/saju-rules.md`를 다시 만든다. 전문가 검토 없이 검토 상태를 "검토 완료"로 바꾸지 않는다.
 - 문구는 모두 **초안 · 전문가 검토 전**이다. 전문가가 검토하면 버전 이름의 `-draft`를 떼고 검토 기록을 `docs/`에 남긴다.
 
 ## 3. 코드 구조 — 서로 섞이지 않게 나눈 경계

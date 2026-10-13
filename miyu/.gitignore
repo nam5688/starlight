@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 시범 인터뷰 · 시범 응답 원본(실제 사람의 응답) — 저장소 · 운영 DB에 올리지 않는다 (docs/data-sources.md)
+/pilot-data/
+# 외부 공개 응답 데이터 원본 — 이용 조건이 확인되기 전에는 내려받지 않고, 내려받더라도 저장소에 올리지 않는다
+/external-data/
