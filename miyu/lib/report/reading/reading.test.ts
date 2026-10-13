@@ -182,6 +182,17 @@ test("형식 검사: 구성 · 글자 수 · 문장 수 · 예시 위치 · 되�
   assert.ok(errorsOf((d) => (d.flow.scenarios[0].then = "상대는 별일 없다고 느끼는데 혼자 지치게 됩니다.")).some((e) => /가능성으로/.test(e)));
 });
 
+test("형식 검사: 해요체로 쓴 사건 예언 · 단정 · 진단 · 나이대 · 원인 좁히기도 막고, 공유용 카드에 실리는 핵심 문장 · 카드에는 이름을 쓰지 않는다", () => {
+  for (const bad of ["올해 안에 결혼하게 될 거예요.", "곧 이별할 거예요.", "반드시 좋은 일이 생겨요.", "이건 불안 진단이에요.", "30대에는 크게 달라질 수 있어요.", "그건 불안 때문에 생기는 일이에요."]) {
+    assert.ok(errorsOf((d) => (d.blocks[0].watch = `${bad} 적어 보면 도움이 될 수 있어요.`)).length > 0, `통과하면 안 되는 문장: ${bad}`);
+  }
+  // 부정 안내 · 일상 표현은 막지 않는다
+  for (const okText of ["이건 진단이 아니에요. 참고로 읽어 주세요.", "그 때문에 늦어질 수 있어요."]) assert.deepEqual(errorsOf((d) => (d.blocks[0].watch = `${okText} 적어 보면 도움이 될 수 있어요.`)).filter((e) => /watch/.test(e) && /쓰지 않는 표현|나이|원인/.test(e)), [], okText);
+  assert.ok(errorsOf((d) => (d.headline = "{name} 님은 다듬어서 내놓는 사람이에요.")).some((e) => /headline: 이름을 쓰지 않습니다/.test(e)));
+  assert.ok(errorsOf((d) => (d.cards.strength.note = "{name} 님은 배운 걸 정리해서 말할 때 힘이 나요.")).some((e) => /cards.strength.note: 이름을 쓰지 않습니다/.test(e)));
+  assert.ok(!errorsOf((d) => (d.blocks[0].summary = "{name} 님은 새로운 일 앞에서 위험은 없는지 먼저 살펴보는 편이에요. 익숙한 방식이 편한 사람이에요.")).some((e) => /이름을 쓰지 않습니다/.test(e)), "다른 글에서는 가끔 이름을 불러도 된다");
+});
+
 test("형식 검사: 알려 준 고민이 없는데 focus · '알려 주신'을 쓰면 막고, 있는데 빠지거나 말해 준 내용임을 밝히지 않으면 막는다", () => {
   assert.ok(errorsOf((d) => (d.focus = [{ text: "알려 주신 고민을 반영하면 결정 앞에서 기준을 먼저 정하는 것이 도움이 될 수 있습니다. ".repeat(2), evidence: ["saju.daymaster"] }])).some((e) => /알려 주신 고민이 없는데 focus/.test(e)));
   assert.ok(errorsOf((d) => (d.blocks[0].watch = "알려 주신 내용처럼 한 가지로 정하기보다 상황마다 적어 보면 좋습니다. 다시 살펴봅니다.")).some((e) => /알려 주신/.test(e)));

@@ -76,16 +76,16 @@ export const TALK_COPY = {
   askMore: "더 보고 싶은 이야기를 골라 주세요.",
   opening: (chip: string) => `‘${chip}’ 이야기부터 해 볼게요.`,
   openingMore: (chip: string) => `이어서 ‘${chip}’ 이야기예요.`,
-  afterExample: "이런 장면이 떠오르나요? 맞는 부분도, 아닌 부분도 있을 수 있어요.",
+  afterExample: "맞는 부분도, 아닌 부분도 있을 수 있어요.",
   afterDetail: "여기까지가 자세한 풀이예요.",
   basisIntro: "이 풀이는 아래 자료를 보고 썼어요. 사주 계산은 만세력 엔진이 한 값이고, 해석 규칙은 아직 검증된 사실이 아니에요.",
-  differ: "맞지 않는 부분이 있을 수 있어요. 대화로 풀이를 함께 고쳐 가는 기능은 아직 준비 중이에요. 지금은 어느 부분이 어떤 상황에서 달랐는지 직접 적어 두세요. 리포트 맨 아래 ‘지금 확인해 볼 것’의 마지막 항목에 방법이 있어요.",
+  differ: "맞지 않는 부분이 있을 수 있어요. 대화로 풀이를 함께 고쳐 가는 기능은 아직 준비 중이에요. 지금은 어느 부분이 어떤 상황에서 달랐는지 직접 적어 두세요. 나중에 해석을 다시 살펴볼 때 기준이 돼요.",
   concernPending: "지금 고민을 대화로 이어 가는 기능은 아직 준비 중이에요.",
-  concernPendingLink: "고민을 적고 새 리포트를 받는 건 ‘나의 고민 기록소’에서 할 수 있어요.",
+  concernPendingLink: "고민을 적어 두는 건 ‘나의 고민 기록소’에서 할 수 있어요.",
   allDone: "준비한 풀이를 모두 둘러봤어요. 전체 내용은 리포트에서 언제든 다시 볼 수 있어요.",
   freeQuestion: "자유롭게 질문하기 · 준비 중",
   freeQuestionPending: "자유 질문은 준비 중이에요. 지금은 버튼으로 이어 볼 수 있어요.",
-  buttons: { example: "예를 들어줘", detail: "더 자세히 알려줘", basis: "이렇게 분석한 이유", differ: "내 경우는 달라", concern: "고민 말하기", pickTopic: "다른 주제 고르기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
+  buttons: { example: "예를 들어줘", detail: "더 자세히 알려줘", basis: "이렇게 분석한 이유", differ: "내 경우는 달라", concern: "고민 말하기", pickTopic: "다른 주제 고르기", next: "다음 풀이", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
 
 const CHIP: Record<string, string> = {

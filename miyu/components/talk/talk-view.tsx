@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, StrengthIcon } from "@/components/ui/icons";
-import { answerBubbles, extraBubbles, TALK_COPY, type TalkBubble, type TalkGroup, type TalkModel, type TalkTopic } from "@/lib/report/reading/talk";
+import { answerBubbles, extraBubbles, nextTopic, TALK_COPY, type TalkBubble, type TalkGroup, type TalkModel, type TalkTopic } from "@/lib/report/reading/talk";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
 
@@ -26,6 +26,9 @@ type Props = {
   contextHref?: string;
 };
 
+/** 폰 크기 틀로 보이는 조건(넓고 충분히 높은 화면)의 반대 — 이때는 화면 전체를 쓴다 (globals.css의 chat-frame 조건과 같아야 한다) */
+const OVERLAY_QUERY = "not all and (min-width: 768px) and (min-height: 600px)";
+
 const delayFor = (s: Say) => (s.kind === "text" ? Math.min(1000, (s.muted ? 240 : 360) + s.text.length * 8) : s.kind === "headline" ? 520 : 680);
 
 const chipBase = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-4 py-2 text-[15px] font-semibold transition-colors";
@@ -43,6 +46,7 @@ const pending = <span className="text-[13px] font-medium text-ink-3">· 준비 �
 export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, contextHref }: Props) {
   const { topics, groups, name } = model;
   const byId = new Map(topics.map((t) => [t.id, t]));
+  const noteId = useId();
   const seq = useRef(10);
   const [log, setLog] = useState<Item[]>([
     { id: 0, from: "miyu", say: { kind: "text", text: TALK_COPY.intro(name) } },
@@ -65,19 +69,20 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
   const reduceMotion = useRef(false);
   const acted = useRef(false);
   const shownLen = useRef(log.length);
+  /** 위로 올려 읽는 중이 아닐 때만 새 말풍선을 따라 내려간다 */
+  const stick = useRef(true);
+  /** 모션을 줄이는 설정에서 한꺼번에 도착한 답의 첫 말풍선 — 그 줄부터 보이게 한다 */
+  const anchor = useRef<number | null>(null);
+  const pumpRef = useRef<() => void>(() => {});
 
   const stopTimer = () => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
   };
-  useEffect(() => {
-    reduceMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    return stopTimer;
-  }, []);
 
   // 모바일에서는 화면 전체를 대화가 차지한다 — 뒤쪽 머리글 · 안내 · 푸터는 키보드 · 보조기기 초점에서 빼고, 뒤쪽 화면이 같이 스크롤되지 않게 한다
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
+    const mq = window.matchMedia(OVERLAY_QUERY);
     let locked: Element[] = [];
     const release = () => {
       for (const el of locked) el.removeAttribute("inert");
@@ -88,7 +93,7 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
       release();
       const root = rootRef.current;
       if (!mq.matches || !root) return;
-      for (const el of Array.from(document.body.querySelectorAll(":scope > a, :scope > header, :scope > footer, :scope > div"))) {
+      for (const el of Array.from(document.body.querySelectorAll(":scope > [data-site-chrome]"))) {
         if (el.contains(root) || el.hasAttribute("inert")) continue;
         el.setAttribute("inert", "");
         locked.push(el);
@@ -116,15 +121,26 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
     timer.current = window.setTimeout(() => {
       const item = toItem(queue.current.shift()!);
       setLog((l) => [...l, item]);
-      pump();
+      pumpRef.current();
     }, delayFor(queue.current[0]));
   };
+
+  useEffect(() => {
+    pumpRef.current = pump;
+  });
+  useEffect(() => {
+    reduceMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // 화면을 숨겼다가 다시 보여 줄 때(Next의 화면 보존) 효과가 정리되며 타이머가 멈추므로, 남은 말이 있으면 다시 이어서 보낸다
+    if (queue.current.length > 0 && timer.current === null) pumpRef.current();
+    return stopTimer;
+  }, []);
 
   /** 미유의 말을 차례로 보낸다 — 하나씩 "입력 중"을 보이고 도착한다 (모션을 줄이는 설정이면 한꺼번에) */
   const say = (...items: Say[]) => {
     acted.current = true;
     if (reduceMotion.current) {
       const made = items.map(toItem);
+      anchor.current = made[0]?.id ?? null;
       setLog((l) => [...l, ...made]);
       return;
     }
@@ -140,24 +156,31 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
   };
   const echo = (text: string) => {
     const item: Item = { id: ++seq.current, from: "me", text };
+    stick.current = true;
     setLog((l) => [...l, item]);
   };
 
-  // 새 말이 도착하면 아래로 — 화면보다 긴 그림 · 표는 첫 줄부터 보이게 한다. 대화가 끝나면 선택지로 초점을 옮긴다
+  // 새 말이 도착하면 아래로 — 위로 올려 읽는 중이면 따라가지 않고, 화면보다 긴 그림 · 표와 한꺼번에 도착한 답은 첫 줄부터 보이게 한다
+  const showFromTop = (box: HTMLElement, el: HTMLElement, behavior: ScrollBehavior) => box.scrollTo({ top: el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8, behavior });
   useEffect(() => {
     if (log.length === shownLen.current && !typing) return;
     const grew = log.length !== shownLen.current;
     shownLen.current = log.length;
     const box = scrollRef.current;
-    if (!box) return;
+    if (!box || !stick.current) return;
     const behavior = reduceMotion.current ? "auto" : "smooth";
-    const last = grew ? box.querySelector<HTMLElement>(`[data-msg="${log[log.length - 1].id}"]`) : null;
-    if (last && last.offsetHeight > box.clientHeight - 32) last.scrollIntoView({ block: "start", behavior });
+    const find = (id: number) => box.querySelector<HTMLElement>(`[data-msg="${id}"]`);
+    const anchorEl = anchor.current !== null ? find(anchor.current) : null;
+    anchor.current = null;
+    const last = grew ? find(log[log.length - 1].id) : null;
+    if (anchorEl) showFromTop(box, anchorEl, behavior);
+    else if (last && last.offsetHeight > box.clientHeight - 32) showFromTop(box, last, behavior);
     else box.scrollTo({ top: box.scrollHeight, behavior });
   }, [log, typing]);
+  // 대화가 끝나면 선택지로 초점을 옮긴다 (누른 버튼이 사라져 초점이 몸통으로 빠지는 것을 막는다)
   useEffect(() => {
     if (!typing && acted.current) optionsRef.current?.focus({ preventScroll: true });
-  }, [typing]);
+  }, [typing, log]);
 
   const mark = (id: string, what: Extra | "differ") => setUsed((u) => ({ ...u, [id]: new Set(u[id] ?? []).add(what) }));
 
@@ -166,6 +189,7 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
     echo(echoText);
     say({ kind: "text", text: more ? TALK_COPY.openingMore(t.chip) : TALK_COPY.opening(t.chip) }, ...answerBubbles(t), { kind: "text", text: done ? TALK_COPY.allDone : TALK_COPY.askNext });
     setOpened((o) => new Set(o).add(t.id));
+    setUsed((u) => (u[t.id] ? { ...u, [t.id]: new Set() } : u));
     setCurrent(t.id);
     setPicking(false);
   };
@@ -202,11 +226,12 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
   const group = current ? groups.find((g) => g.topicIds.includes(current)) : null;
   const siblings = group ? group.topicIds.map((id) => byId.get(id)!).filter((t) => t.id !== current && !opened.has(t.id)) : [];
   const allDone = opened.size === topics.length;
+  const next = siblings.length === 0 ? nextTopic(topics, current, opened) : null;
 
   return (
     <div
       ref={rootRef}
-      className="fixed inset-x-0 top-0 z-40 flex h-dvh flex-col bg-canvas md:static md:z-auto md:mx-auto md:my-8 md:h-[min(800px,calc(100dvh-9rem))] md:w-[420px] md:overflow-hidden md:rounded-[28px] md:border md:border-line-strong"
+      className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh w-full max-w-[560px] flex-col border-x border-line bg-canvas chat-frame:static chat-frame:z-auto chat-frame:my-8 chat-frame:h-[max(560px,min(800px,calc(100dvh-9rem)))] chat-frame:w-[420px] chat-frame:overflow-hidden chat-frame:rounded-[28px] chat-frame:border chat-frame:border-line-strong"
     >
       <header className="flex items-center gap-2 border-b border-line bg-canvas px-2 py-2">
         <Link href={reportHref} aria-label="전체 리포트로 돌아가기" className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
@@ -221,7 +246,16 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
         </div>
       </header>
 
-      <div ref={scrollRef} role="log" aria-label="미유와의 대화" aria-live="polite" className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-page px-3 py-4">
+      <div
+        ref={scrollRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+        }}
+        role="log"
+        aria-label="미유와의 대화"
+        aria-live="polite"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-page px-3 py-4">
         {log.map((m, i) => {
           const sameSender = i > 0 && log[i - 1].from === m.from;
           return (
@@ -247,7 +281,7 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
         )}
       </div>
 
-      <div ref={optionsRef} tabIndex={-1} aria-label="이어서 고르기" className="max-h-[min(14.5rem,36dvh)] min-h-[3.75rem] overflow-y-auto border-t border-line bg-canvas px-3 pt-2.5 pb-2 outline-none">
+      <div ref={optionsRef} tabIndex={-1} role="group" aria-label="이어서 고르기" className="max-h-[min(14.5rem,36dvh)] min-h-[3.75rem] overflow-y-auto border-t border-line bg-canvas px-3 pt-2.5 pb-2 outline-none">
         {typing ? (
           <div className="flex min-h-11 items-center justify-between gap-3">
             <p className="text-[14px] text-ink-3">미유가 답하고 있어요</p>
@@ -306,6 +340,12 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
                 <ArrowIcon className="size-4" />
               </button>
             ))}
+            {next && (
+              <button type="button" onClick={() => openTopic(next, TALK_COPY.buttons.next, true)} className={chipPrimary}>
+                {TALK_COPY.buttons.next} · {next.chip}
+                <ArrowIcon className="size-4" />
+              </button>
+            )}
             <button type="button" onClick={backToPick} className={chip}>
               {TALK_COPY.buttons.pickTopic}
             </button>
@@ -323,14 +363,14 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
           type="text"
           disabled
           aria-label={TALK_COPY.freeQuestion}
-          aria-describedby="talk-free-note"
+          aria-describedby={noteId}
           placeholder={TALK_COPY.freeQuestion}
           className="h-11 min-w-0 flex-1 rounded-full border border-line bg-mist px-4 text-[15px] placeholder:text-ink-3 disabled:cursor-not-allowed"
         />
         <button type="button" disabled aria-label="보내기 (준비 중)" className="grid size-11 shrink-0 place-items-center rounded-full bg-mist text-ink-3 disabled:cursor-not-allowed">
           <ArrowIcon className="size-5 -rotate-90" />
         </button>
-        <span id="talk-free-note" className="sr-only">
+        <span id={noteId} className="sr-only">
           {TALK_COPY.freeQuestionPending}
         </span>
       </div>

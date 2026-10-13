@@ -302,7 +302,7 @@ export function ReadingReportView({
         </section>
 
         <section aria-labelledby={id("data")} className="mt-12">
-          <h2 id={id("data")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
+          <h2 id={id("data")} className={`border-t-2 border-accent pt-3 text-[18px] font-bold ${SCROLL_MARGIN}`}>
             내 분석 데이터
           </h2>
           <FoldRow>

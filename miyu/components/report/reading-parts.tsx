@@ -254,7 +254,7 @@ export function LuckTimelineCard({ timeline, text, reference, className = "mt-5"
         <div
           className="grid grid-cols-3 gap-1"
           role="img"
-          aria-label={`이전 ${fmtMonth(timeline[0].from)}부터, 지금 ${fmtMonth(cur.from)}부터 ${fmtMonth(cur.to)}까지, 다음 ${fmtMonth(timeline[timeline.length - 1].to)}까지. ${reference.year}년 ${reference.month}월 기준으로 지금 흐름이 시작된 지 ${elapsedText} 지났습니다.`}
+          aria-label={`이전 ${fmtMonth(timeline[0].from)}부터, 지금 ${fmtMonth(cur.from)}부터 ${fmtMonth(cur.to)}까지, 다음 ${fmtMonth(timeline[timeline.length - 1].to)}까지. ${reference.year}년 ${reference.month}월 기준으로 지금 시기가 시작된 지 ${elapsedText} 지났어요.`}
         >
           {timeline.map((s) => (
             <div key={s.role} className="relative h-2 rounded-full bg-track">

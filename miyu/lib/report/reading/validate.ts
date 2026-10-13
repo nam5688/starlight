@@ -137,6 +137,11 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
     if (k !== "flow") text((c as { note?: string }).note, `cards.${k}.note`, L.card.noteMin, L.card.noteMax);
   }
 
+  // 핵심 문장 · 카드는 공유용 카드 이미지에 그대로 실린다 — 이름을 쓰지 않는다 (이름은 다른 글에서만 가끔)
+  for (const [where, v] of [["headline", d.headline], ["cards.strength.note", d.cards?.strength?.note], ["cards.strength.keyword", d.cards?.strength?.keyword], ["cards.caution.note", d.cards?.caution?.note], ["cards.caution.keyword", d.cards?.caution?.keyword], ["cards.flow.keyword", d.cards?.flow?.keyword]] as const) {
+    if (isString(v) && /\{name\}|\s님[은는이가을를의]?(?![가-힣])/.test(v)) errors.push(`${where}: 이름을 쓰지 않습니다 (공유용 카드 이미지에 그대로 실립니다)`);
+  }
+
   // 주제 5개
   const blocks = list<NonNullable<ReadingDraftV1["blocks"]>[number]>(d.blocks, "blocks", BLOCK_PLAN.length, BLOCK_PLAN.length);
   for (const plan of BLOCK_PLAN) {

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 backdrop-blur">
+    <header data-site-chrome="" className="sticky top-0 z-30 border-b border-line bg-canvas/95 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-5 md:h-16 md:px-8">
         <Link href="/" className="flex items-baseline gap-2" aria-label="ME:U 미유 홈">
           <span className="text-[19px] font-bold tracking-tight">ME:U</span>

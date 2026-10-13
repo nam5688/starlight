@@ -32,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col text-[16px] leading-relaxed">
         <a
           href="#main"
+          data-site-chrome=""
           className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-canvas focus:px-4 focus:py-2 focus:shadow"
         >
           본문으로 건너뛰기

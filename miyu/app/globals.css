@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* 대화 화면이 가운데 폰 크기 틀로 보이는 조건(넓고 충분히 높은 화면) — components/talk/talk-view.tsx의 OVERLAY_QUERY와 같은 기준 */
+@custom-variant chat-frame (@media (min-width: 768px) and (min-height: 600px));
+
 /*
   ME:U 디자인 토큰 (운영자 2026-10-13 팔레트)
   - 바탕: 밝은 회색 페이지(page) 위에 흰 면(canvas) · 구분용 연한 회색(mist)
