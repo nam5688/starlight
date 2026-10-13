@@ -2,6 +2,7 @@
 // "이런 순간이 있다면 이 경향 때문일 수 있다"는 조건 표현으로 쓰고, 단정하지 않는다.
 // 점수 숫자는 문장에 쓰지 않는다. 무료 미리보기는 첫 상황의 짧은 라벨만 보여 주고 나머지는 구매 후 공개.
 // 문구는 초안 — 전문가 검토 전.
+// "돈을 쓰고 모을 때" 상황은 두지 않는다 — 돈에 관한 응답을 받지 않으므로 신중함 · 새로움 점수를 돈 쓰는 습관으로 옮겨 말하면 '돈 응답 없음'이라는 본문 안내와 어긋난다.
 
 import type { FreeSummary } from "./types.ts";
 
@@ -9,7 +10,6 @@ export const SITUATION_PLAN = [
   { id: "work", title: "일하고 공부할 때" },
   { id: "close", title: "가까운 사람과 지낼 때" },
   { id: "decision", title: "새로운 선택 앞에서" },
-  { id: "money", title: "돈을 쓰고 모을 때" },
   { id: "conflict", title: "갈등이나 스트레스가 올 때" },
 ] as const;
 
@@ -208,35 +208,6 @@ function decision(s: Scores): Variant {
   );
 }
 
-function money(s: Scores): Variant {
-  if (s.caution >= HI)
-    return v(
-      "손실과 변수를 미리 챙김",
-      "지나친 절약이나 기회를 놓칠 수 있음",
-      "돈을 쓰기 전에 ‘나중에 필요하면 어쩌지’를 먼저 떠올리는 편이라면 이 경향 때문일 수 있어요.",
-      "큰 지출 전에 여러 번 따져 보고 비상 상황을 대비합니다. 돈이 새는 일이 적은 편이에요.",
-      "대비가 지나치면 필요한 곳에도 쓰지 못하고 기회를 놓쳤다는 아쉬움이 남을 수 있어요.",
-      "한 달에 ‘나를 위해 마음 편히 쓰는 금액’을 미리 정해 두세요.",
-    );
-  if (s.caution <= LO && s.novelty >= HI)
-    return v(
-      "새로운 기회에 먼저 반응함",
-      "기분이나 호기심으로 쓰는 돈이 늘 수 있음",
-      "끌리는 것을 보면 일단 써 보는 편이라면 이 경향 때문일 수 있어요.",
-      "새로운 경험과 기회에 돈을 쓰는 데 주저하지 않아 좋은 기회를 먼저 잡기도 합니다.",
-      "기분이나 호기심으로 쓰는 돈이 쌓이면 정작 필요한 때 부족할 수 있어요.",
-      "큰 지출은 하루 두고 보고, 자동으로 먼저 모으는 금액을 정해 두세요.",
-    );
-  return v(
-    "상황에 맞춰 쓰고 모으는 균형",
-    "목표 금액이 없으면 흐름대로 쓰게 됨",
-    "크게 아끼지도 크게 쓰지도 않고 그때그때 맞춰 온 편이라면 이 경향 때문일 수 있어요.",
-    "필요한 곳에는 쓰고 아낄 곳은 아끼는 균형이 있습니다. 극단적으로 치우치지 않아요.",
-    "뚜렷한 목표가 없으면 흐름대로 쓰다가 모이는 돈이 적을 수 있어요.",
-    "모으고 싶은 목표 금액과 시기를 한 줄로 적어 두세요.",
-  );
-}
-
 function conflict(s: Scores): Variant {
   if (s.avoidance >= HI)
     return v(
@@ -266,7 +237,7 @@ function conflict(s: Scores): Variant {
   );
 }
 
-const BUILDERS: Record<SituationId, (s: Scores) => Variant> = { work, close, decision, money, conflict };
+const BUILDERS: Record<SituationId, (s: Scores) => Variant> = { work, close, decision, conflict };
 
 /** 응답 경향에서 상황별 잘하는 점 · 주의할 점을 만든다 (같은 응답이면 항상 같은 결과) */
 export function buildSituations(summary: Pick<FreeSummary, "temperament" | "relationship">): Situation[] {

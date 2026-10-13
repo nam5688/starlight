@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ResultHeader } from "@/components/report/result-header";
 import { TalkView } from "@/components/talk/talk-view";
 import { buildTalkModel } from "@/lib/report/reading/talk";
 import { sampleReport } from "@/lib/samples/sample-report";
@@ -17,8 +16,7 @@ export default function SampleTalkPage() {
   const model = buildTalkModel(report, { tendencyName: sampleReport.tendency.name });
   return (
     <main className="bg-page">
-      <ResultHeader kicker="대화로 풀어보기" title={`${report.personName} 님의 분석 이야기`} subtitle="가상 인물의 리포트를 한 주제씩 대화하듯 풀어 봅니다." source={report.source} meta="가상 인물 예시 · 실제 검사 · 만세력 계산 결과가 아닙니다" />
-      <TalkView model={model} dateLabel="예시" reportHref="/report/sample" />
+      <TalkView model={model} dateLabel="예시" reportHref="/report/sample" dataHref="/report/sample#data" subtitle="개발용 샘플 · 가상 인물 예시예요. 실제 검사 · 만세력 계산 결과가 아니에요." />
     </main>
   );
 }

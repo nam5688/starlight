@@ -99,14 +99,6 @@ export function layoutCard(card: TalkCard, o: CardLayoutOptions): { ops: CardOp[
   ops.push({ type: "rect", x: MARGIN, y, w: inner, h: 2, color: "line" });
   y += 34;
 
-  // 기질 · 성격 · 관계 경향 한 줄씩
-  for (const row of card.rows) {
-    text(row.label, MARGIN, y, 26, 600, "ink-3");
-    y += Math.round(26 * LH) + 2;
-    block(row.text, MARGIN, inner, 34, 600, "ink");
-    y += 26;
-  }
-
   // 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 — 칸마다 왼쪽에 띠
   const box = (c: { label: string; keyword: string; note: string }, face: CardColor, band: CardColor, tone: CardColor) => {
     const pad = 32;

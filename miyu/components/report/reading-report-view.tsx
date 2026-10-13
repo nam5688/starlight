@@ -80,7 +80,7 @@ export function ReadingReportView({
     ...(focus.length ? [{ id: id("focus"), label: "내 고민" }] : []),
     ...GROUPS.filter((g) => report.blocks.some((b) => b.group === g.id)).map((g) => ({ id: id(g.section), label: g.label })),
     { id: id(report.flow.id), label: "앞으로의 시기" },
-    ...(hasExtras ? [{ id: id("extras"), label: "더 살펴보기" }] : []),
+    ...(hasExtras ? [{ id: id("extras"), label: "더 알아보기" }] : []),
   ];
 
   return (
@@ -252,13 +252,33 @@ export function ReadingReportView({
         </section>
 
         {hasExtras && extras && (
-          <div id={id("extras")} className={`mt-12 space-y-12 ${SCROLL_MARGIN}`}>
-            {extras.plain && <PlainReadingSection plain={extras.plain} id={id("x-plain")} />}
-            {extras.questions.length > 0 && <QuestionsSection questions={extras.questions} id={id("x-questions")} />}
-            {extras.situations.length > 0 && <SituationsSection situations={extras.situations} id={id("x-situations")} />}
-            {extras.partner && <PartnerSection partner={extras.partner} id={id("x-partner")} />}
-            {extras.items && <ItemsSection items={extras.items} id={id("x-items")} />}
-          </div>
+          <section id={id("extras")} aria-labelledby={id("extras-h")} className={`mt-12 ${SCROLL_MARGIN}`}>
+            <h2 id={id("extras-h")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
+              더 알아보기
+            </h2>
+            <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">위 풀이에서 이어서 궁금할 때만 열어 보세요. 앞에서 한 이야기는 되풀이하지 않고, 원국 질문 · 상황별 풀이 · 어울리는 관계 조건 · 보완 아이템을 따로 모았습니다.</p>
+            <FoldRow>
+              <Fold label="더 알아보기 열기" hint="원국 질문과 답 · 상황별 풀이 · 어울리는 관계 조건 · 보완 아이템 · 바로 해볼 3가지" wide>
+                <div className="space-y-12">
+                  {extras.plain && <PlainReadingSection plain={extras.plain} id={id("x-plain")} />}
+                  {extras.questions.length > 0 && <QuestionsSection questions={extras.questions} id={id("x-questions")} />}
+                  {extras.situations.length > 0 && <SituationsSection situations={extras.situations} id={id("x-situations")} />}
+                  {extras.partner && <PartnerSection partner={extras.partner} id={id("x-partner")} />}
+                  {extras.items && <ItemsSection items={extras.items} id={id("x-items")} />}
+                  {extras.starterActions.length > 0 && (
+                    <section aria-labelledby={id("x-starter")}>
+                      <h3 id={id("x-starter")} className="text-[16px] font-bold">
+                        바로 해볼 3가지
+                      </h3>
+                      <div className="mt-3">
+                        <ActionList actions={extras.starterActions} />
+                      </div>
+                    </section>
+                  )}
+                </div>
+              </Fold>
+            </FoldRow>
+          </section>
         )}
 
         <section aria-labelledby={id("actions")} className="mt-12">
@@ -266,12 +286,6 @@ export function ReadingReportView({
             지금 확인해 볼 것
           </h2>
           <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">정답을 정하는 목록이 아니라, 위의 해석이 나에게 맞는지 확인해 볼 수 있는 작은 행동입니다.</p>
-          {extras && extras.starterActions.length > 0 && (
-            <div className="mt-5">
-              <h3 className="mb-3 text-[15px] font-semibold text-ink-2">바로 해볼 3가지</h3>
-              <ActionList actions={extras.starterActions} />
-            </div>
-          )}
           <ul className="mt-4 space-y-2">
             {report.actions.map((a) => (
               <li key={a.title}>

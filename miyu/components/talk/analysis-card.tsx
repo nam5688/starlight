@@ -4,7 +4,7 @@ import { CARD_DISCLAIMER, type TalkCard } from "@/lib/report/reading/talk";
 
 /**
  * 분석 카드 한 장 — 대화 맨 앞에 보이고, 같은 내용이 이미지로 저장된다(card-image.ts).
- * 이름 · 분석일 · 대표 경향 · 핵심 해석 · 성향 요약 · 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 · 사용한 정보.
+ * 이름 · 분석일 · 대표 경향 · 핵심 해석 · 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 · 사용한 정보 — 주제마다 같은 말을 되풀이하지 않도록 이 정도만 담는다.
  * 점수 그래프 · 정확도는 넣지 않는다.
  */
 export function AnalysisCard({ card, name, dateLabel }: { card: TalkCard; name: string; dateLabel: string }) {
@@ -28,15 +28,6 @@ export function AnalysisCard({ card, name, dateLabel }: { card: TalkCard; name: 
         </p>
       )}
       <p className="mt-3 text-[21px] leading-[1.4] font-bold tracking-tight">{card.headline}</p>
-
-      <dl className="mt-4 divide-y divide-line border-y border-line">
-        {card.rows.map((r) => (
-          <div key={r.label} className="py-3">
-            <dt className="text-[13px] font-semibold text-ink-3">{r.label}</dt>
-            <dd className="mt-0.5 text-[16px] leading-[1.55] font-semibold">{r.text}</dd>
-          </div>
-        ))}
-      </dl>
 
       <ul className="mt-4 space-y-2.5">
         {boxes.map(({ c, Icon, tone, face, band }) => (

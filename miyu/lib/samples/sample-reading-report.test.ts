@@ -143,7 +143,7 @@ test("리포트 예시: 원인을 하나로 좁혀 말하지 않고, 막는 표�
   for (const y of years) assert.ok(["2026", "2027", "2028", "2024", "2034"].includes(y), `계산되지 않은 해 ${y}`);
   assert.match(R.flow.caveat, /예측이 아니(며|고)/);
   assert.match(R.flow.scenarioNote, /예측이 아(닙니다|니에요)/);
-  assert.match(R.flow.statistics, /사용하지 않았습니다/);
+  assert.match(R.flow.statistics, /(쓰지|사용하지) 않았(습니다|어요)/);
 });
 
 test("리포트 예시: 없는 자료(알려 준 고민 · 상대 자료 · 연구 통계)는 '없음'으로 밝히고 만들어 채우지 않는다 — 돈 부분은 응답 자료가 없다고 쓴다", () => {
@@ -152,7 +152,9 @@ test("리포트 예시: 없는 자료(알려 준 고민 · 상대 자료 · 연�
   for (const i of R.inputs.filter((x) => x.status === "none")) assert.deepEqual(i.usedIn, [], i.name);
   assert.doesNotMatch(allTexts().join("\n"), /알려 주신/, "고민을 알려 주지 않은 인물에게 '알려 주신'");
   const money = R.blocks.find((s) => s.id === "work-money")!;
-  assert.match([...money.details, money.caveat ?? ""].join(" "), /응답이 없어/);
+  // 고정 안내(plan.ts)에 한 번만 쓴다 — 본문 문단에서 되풀이하지 않는다
+  assert.match(money.caveat ?? "", /응답 자료 없이/);
+  assert.doesNotMatch(money.details.join(" "), /응답이 없어|응답 자료 없이/);
   assert.ok(money.basis.unknown.some((u) => /응답 자료가 없습니다/.test(u)));
   const love = R.blocks.find((s) => s.id === "love")!;
   assert.match(love.caveat ?? "", /상대 자료: 없음/);

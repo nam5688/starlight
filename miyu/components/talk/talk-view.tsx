@@ -2,246 +2,413 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { BasisList, CaveatNote, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
+import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, StrengthIcon } from "@/components/ui/icons";
-import { nextTopic, TALK_COPY, type TalkModel, type TalkPiece, type TalkTopic } from "@/lib/report/reading/talk";
+import { answerBubbles, extraBubbles, TALK_COPY, type TalkBubble, type TalkGroup, type TalkModel, type TalkTopic } from "@/lib/report/reading/talk";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
 
 type Extra = "example" | "detail" | "basis";
-type Msg =
-  | { id: number; from: "me"; text: string }
-  | { id: number; from: "miyu"; kind: "text"; text: string; link?: { href: string; label: string } }
-  | { id: number; from: "miyu"; kind: "card" }
-  | { id: number; from: "miyu"; kind: "answer"; topicId: string }
-  | { id: number; from: "miyu"; kind: "extra"; topicId: string; which: Extra };
-
-type NewMsg = Msg extends infer M ? (M extends unknown ? Omit<M, "id"> : never) : never;
+/** 미유가 보내는 말 하나 — 저장된 리포트의 글을 나눈 말풍선(TalkBubble), 분석 카드, 링크가 달린 안내 */
+type Say = TalkBubble | { kind: "card" } | { kind: "link"; text: string; href: string; label: string };
+type Item = { id: number; from: "me"; text: string } | { id: number; from: "miyu"; say: Say };
 
 type Props = {
   model: TalkModel;
   dateLabel: string;
   /** 전체 리포트 화면 */
   reportHref: string;
+  /** 리포트의 "내 분석 데이터"(원국 · 오행 · 응답 환산값) 위치 */
+  dataHref: string;
+  /** 머리글 아래 한 줄 — 가상 인물 예시인지 저장된 리포트인지 */
+  subtitle: string;
   /** 나의 고민 기록소 (없으면 링크를 보이지 않는다) */
   contextHref?: string;
 };
 
+const delayFor = (s: Say) => (s.kind === "text" ? Math.min(1000, (s.muted ? 240 : 360) + s.text.length * 8) : s.kind === "headline" ? 520 : 680);
+
+const chipBase = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-4 py-2 text-[15px] font-semibold transition-colors";
+const chip = `${chipBase} border-line-strong bg-canvas text-ink hover:bg-mist`;
+const chipAccent = `${chipBase} border-accent/40 bg-accent-soft text-accent-strong hover:border-accent`;
+const chipPrimary = `${chipBase} border-transparent bg-accent text-white hover:bg-accent-strong`;
+const pending = <span className="text-[13px] font-medium text-ink-3">· 준비 중</span>;
+
 /**
- * 대화로 풀어보기(1단계) — 분석 카드 → 주제 고르기 → 짧은 풀이 → 예시 · 자세히 · 분석 근거 · 다음 풀이.
- * 모두 저장된 리포트의 글을 보여 주며 AI를 부르지 않는다. 자유 질문 · "내 경우는 달라"는 아직 준비 중이라고 밝힌다.
- * 대화는 이 화면 안에서만 이어지고 저장하지 않는다 (새로고침하면 처음부터).
+ * 대화로 풀어보기(1단계) — 휴대폰 채팅 앱처럼: 분석 카드 한 장 → 큰 주제 고르기 → 짧은 말풍선이 하나씩 도착 → [예시] [자세히] [분석 이유] 답장 버튼.
+ * 모두 저장된 리포트의 글을 문장 단위로 나눠 보여 주며 AI를 부르지 않는다. 자유 질문 · "내 경우는 달라" · 고민 말하기는 아직 준비 중이라고 밝힌다.
+ * 대화는 이 화면 안에서만 이어지고 저장하지 않는다 (새로고침하면 처음부터). 모션을 줄이는 설정이면 말풍선이 한꺼번에 나타난다.
+ * 모바일에서는 화면 전체를 쓰고(뒤쪽 화면은 비활성), PC에서는 가운데에 폰 화면 크기의 틀로 보인다.
  */
-export function TalkView({ model, dateLabel, reportHref, contextHref }: Props) {
-  const { topics, name } = model;
+export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, contextHref }: Props) {
+  const { topics, groups, name } = model;
   const byId = new Map(topics.map((t) => [t.id, t]));
-  const seq = useRef(2);
-  const [log, setLog] = useState<Msg[]>([
-    { id: 0, from: "miyu", kind: "text", text: TALK_COPY.intro(name) },
-    { id: 1, from: "miyu", kind: "card" },
-    { id: 2, from: "miyu", kind: "text", text: TALK_COPY.askTopic },
+  const seq = useRef(10);
+  const [log, setLog] = useState<Item[]>([
+    { id: 0, from: "miyu", say: { kind: "text", text: TALK_COPY.intro(name) } },
+    { id: 1, from: "miyu", say: { kind: "card" } },
+    { id: 2, from: "miyu", say: { kind: "text", text: TALK_COPY.notice, muted: true } },
+    { id: 3, from: "miyu", say: { kind: "text", text: TALK_COPY.askTopic } },
   ]);
+  const [typing, setTyping] = useState(false);
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [used, setUsed] = useState<Record<string, Set<Extra | "differ">>>({});
   const [current, setCurrent] = useState<string | null>(null);
   const [picking, setPicking] = useState(true);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
-  const scrollTo = useRef<number | null>(null);
+  const queue = useRef<Say[]>([]);
+  const timer = useRef<number | null>(null);
+  const running = useRef(false);
+  const reduceMotion = useRef(false);
+  const acted = useRef(false);
+  const shownLen = useRef(log.length);
 
-  // 새 말풍선이 생기면 그 첫 줄부터 보이게 하고, 다음 선택지로 키보드 초점을 옮긴다
+  const stopTimer = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  };
   useEffect(() => {
-    const id = scrollTo.current;
-    if (id === null) return;
-    scrollTo.current = null;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    document.getElementById(`talk-msg-${id}`)?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
-    optionsRef.current?.focus({ preventScroll: true });
-  }, [log]);
+    reduceMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return stopTimer;
+  }, []);
 
-  const append = (...msgs: NewMsg[]) => {
-    const withIds = msgs.map((m) => ({ ...m, id: ++seq.current })) as Msg[];
-    scrollTo.current = withIds.find((m) => m.from === "miyu")?.id ?? withIds[0].id;
-    setLog((l) => [...l, ...withIds]);
+  // 모바일에서는 화면 전체를 대화가 차지한다 — 뒤쪽 머리글 · 안내 · 푸터는 키보드 · 보조기기 초점에서 빼고, 뒤쪽 화면이 같이 스크롤되지 않게 한다
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    let locked: Element[] = [];
+    const release = () => {
+      for (const el of locked) el.removeAttribute("inert");
+      locked = [];
+      document.documentElement.style.overflow = "";
+    };
+    const apply = () => {
+      release();
+      const root = rootRef.current;
+      if (!mq.matches || !root) return;
+      for (const el of Array.from(document.body.querySelectorAll(":scope > a, :scope > header, :scope > footer, :scope > div"))) {
+        if (el.contains(root) || el.hasAttribute("inert")) continue;
+        el.setAttribute("inert", "");
+        locked.push(el);
+      }
+      document.documentElement.style.overflow = "hidden";
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      release();
+    };
+  }, []);
+
+  const toItem = (say: Say): Item => ({ id: ++seq.current, from: "miyu", say });
+
+  const pump = () => {
+    if (queue.current.length === 0) {
+      running.current = false;
+      setTyping(false);
+      return;
+    }
+    running.current = true;
+    setTyping(true);
+    timer.current = window.setTimeout(() => {
+      const item = toItem(queue.current.shift()!);
+      setLog((l) => [...l, item]);
+      pump();
+    }, delayFor(queue.current[0]));
   };
 
-  const openTopic = (t: TalkTopic) => {
-    append({ from: "me", text: `${t.number}. ${t.chip}` }, { from: "miyu", kind: "text", text: TALK_COPY.opening(t.number, t.chip) }, { from: "miyu", kind: "answer", topicId: t.id });
+  /** 미유의 말을 차례로 보낸다 — 하나씩 "입력 중"을 보이고 도착한다 (모션을 줄이는 설정이면 한꺼번에) */
+  const say = (...items: Say[]) => {
+    acted.current = true;
+    if (reduceMotion.current) {
+      const made = items.map(toItem);
+      setLog((l) => [...l, ...made]);
+      return;
+    }
+    queue.current.push(...items);
+    if (!running.current) pump();
+  };
+  const skip = () => {
+    stopTimer();
+    running.current = false;
+    const rest = queue.current.splice(0).map(toItem);
+    setTyping(false);
+    setLog((l) => [...l, ...rest]);
+  };
+  const echo = (text: string) => {
+    const item: Item = { id: ++seq.current, from: "me", text };
+    setLog((l) => [...l, item]);
+  };
+
+  // 새 말이 도착하면 아래로 — 화면보다 긴 그림 · 표는 첫 줄부터 보이게 한다. 대화가 끝나면 선택지로 초점을 옮긴다
+  useEffect(() => {
+    if (log.length === shownLen.current && !typing) return;
+    const grew = log.length !== shownLen.current;
+    shownLen.current = log.length;
+    const box = scrollRef.current;
+    if (!box) return;
+    const behavior = reduceMotion.current ? "auto" : "smooth";
+    const last = grew ? box.querySelector<HTMLElement>(`[data-msg="${log[log.length - 1].id}"]`) : null;
+    if (last && last.offsetHeight > box.clientHeight - 32) last.scrollIntoView({ block: "start", behavior });
+    else box.scrollTo({ top: box.scrollHeight, behavior });
+  }, [log, typing]);
+  useEffect(() => {
+    if (!typing && acted.current) optionsRef.current?.focus({ preventScroll: true });
+  }, [typing]);
+
+  const mark = (id: string, what: Extra | "differ") => setUsed((u) => ({ ...u, [id]: new Set(u[id] ?? []).add(what) }));
+
+  const openTopic = (t: TalkTopic, echoText: string, more: boolean) => {
+    const done = opened.size + (opened.has(t.id) ? 0 : 1) === topics.length;
+    echo(echoText);
+    say({ kind: "text", text: more ? TALK_COPY.openingMore(t.chip) : TALK_COPY.opening(t.chip) }, ...answerBubbles(t), { kind: "text", text: done ? TALK_COPY.allDone : TALK_COPY.askNext });
     setOpened((o) => new Set(o).add(t.id));
     setCurrent(t.id);
     setPicking(false);
   };
-
-  const mark = (id: string, what: Extra | "differ") => setUsed((u) => ({ ...u, [id]: new Set(u[id] ?? []).add(what) }));
-
+  const pickGroup = (g: TalkGroup) => {
+    const target = g.topicIds.map((id) => byId.get(id)!).find((t) => !opened.has(t.id)) ?? byId.get(g.topicIds[0])!;
+    openTopic(target, g.chip, false);
+  };
   const openExtra = (t: TalkTopic, which: Extra) => {
-    const label = TALK_COPY.buttons[which];
-    const after = which === "example" ? TALK_COPY.afterExample : which === "detail" ? TALK_COPY.afterDetail : null;
-    append({ from: "me", text: label }, ...(which === "basis" ? [{ from: "miyu" as const, kind: "text" as const, text: TALK_COPY.basisIntro }] : []), { from: "miyu", kind: "extra", topicId: t.id, which }, ...(after ? [{ from: "miyu" as const, kind: "text" as const, text: after }] : []));
+    echo(TALK_COPY.buttons[which]);
+    say(
+      ...(which === "basis" ? [{ kind: "text", text: TALK_COPY.basisIntro } as const] : []),
+      ...extraBubbles(t, which),
+      ...(which === "example" ? [{ kind: "text", text: TALK_COPY.afterExample } as const] : which === "detail" ? [{ kind: "text", text: TALK_COPY.afterDetail } as const] : []),
+    );
     mark(t.id, which);
   };
-
   const differ = (t: TalkTopic) => {
-    append({ from: "me", text: TALK_COPY.buttons.differ }, { from: "miyu", kind: "text", text: TALK_COPY.differ });
+    echo(TALK_COPY.buttons.differ);
+    say({ kind: "text", text: TALK_COPY.differ });
     mark(t.id, "differ");
   };
-
   const concern = () => {
-    append({ from: "me", text: TALK_COPY.buttons.concern }, { from: "miyu", kind: "text", text: TALK_COPY.concernPending, ...(contextHref ? { link: { href: contextHref, label: TALK_COPY.concernPendingLink } } : {}) });
+    echo(TALK_COPY.buttons.concern);
+    say(contextHref ? { kind: "link", text: `${TALK_COPY.concernPending} ${TALK_COPY.concernPendingLink}`, href: contextHref, label: "나의 고민 기록소로 가기" } : { kind: "text", text: TALK_COPY.concernPending });
+  };
+  const backToPick = () => {
+    echo(TALK_COPY.buttons.pickTopic);
+    say({ kind: "text", text: TALK_COPY.askMore });
+    setPicking(true);
   };
 
-  const next = nextTopic(topics, current, opened);
-  const allDone = opened.size === topics.length;
   const cur = current ? byId.get(current) : null;
   const usedHere = (current && used[current]) || new Set<Extra | "differ">();
-
-  const chip = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border border-line-strong bg-canvas px-4 py-2 text-[15px] font-semibold text-ink transition-colors hover:bg-mist";
-  const chipPrimary = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-accent px-4 py-2 text-[15px] font-semibold text-white transition-colors hover:bg-accent-strong";
+  const group = current ? groups.find((g) => g.topicIds.includes(current)) : null;
+  const siblings = group ? group.topicIds.map((id) => byId.get(id)!).filter((t) => t.id !== current && !opened.has(t.id)) : [];
+  const allDone = opened.size === topics.length;
 
   return (
-    <div className="mx-auto w-full max-w-[720px] px-5 pb-20">
-      <div role="log" aria-label="미유와의 대화" aria-live="polite" className="space-y-4">
-        {log.map((m) => (
-          <div key={m.id} id={`talk-msg-${m.id}`} className="scroll-mt-20">
-            {m.from === "me" ? <MeBubble text={m.text} /> : <MiyuBlock msg={m} byId={byId} model={model} dateLabel={dateLabel} />}
+    <div
+      ref={rootRef}
+      className="fixed inset-x-0 top-0 z-40 flex h-dvh flex-col bg-canvas md:static md:z-auto md:mx-auto md:my-8 md:h-[min(800px,calc(100dvh-9rem))] md:w-[420px] md:overflow-hidden md:rounded-[28px] md:border md:border-line-strong"
+    >
+      <header className="flex items-center gap-2 border-b border-line bg-canvas px-2 py-2">
+        <Link href={reportHref} aria-label="전체 리포트로 돌아가기" className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
+          <ArrowIcon className="size-5 rotate-180" />
+        </Link>
+        <Avatar className="size-10 text-[17px]" />
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[17px] leading-tight font-bold">
+            미유<span className="sr-only"> · {name} 님의 분석 이야기</span>
+          </h1>
+          <p className="line-clamp-2 text-[13px] leading-snug text-ink-3">{subtitle}</p>
+        </div>
+      </header>
+
+      <div ref={scrollRef} role="log" aria-label="미유와의 대화" aria-live="polite" className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-page px-3 py-4">
+        {log.map((m, i) => {
+          const sameSender = i > 0 && log[i - 1].from === m.from;
+          return (
+            <div key={m.id} data-msg={m.id} className={i === 0 ? "" : sameSender ? "mt-1.5" : "mt-4"}>
+              {m.from === "me" ? <MeBubble text={m.text} /> : <MiyuRow say={m.say} first={!sameSender} model={model} dateLabel={dateLabel} />}
+            </div>
+          );
+        })}
+        {typing && (
+          <div className={log[log.length - 1]?.from === "miyu" ? "mt-1.5" : "mt-4"}>
+            <div className="flex items-start gap-2">
+              <div className="w-8 shrink-0">{log[log.length - 1]?.from !== "miyu" && <Avatar className="size-8 text-[14px]" />}</div>
+              <div className="rounded-2xl rounded-tl-md border border-line bg-canvas px-4 py-3.5">
+                <span className="sr-only">미유가 입력하고 있어요</span>
+                <span aria-hidden="true" className="flex gap-1.5">
+                  {[0, 1, 2].map((i) => (
+                    <span key={i} className="size-2 rounded-full bg-ink-3 motion-safe:animate-pulse" style={{ animationDelay: `${i * 180}ms` }} />
+                  ))}
+                </span>
+              </div>
+            </div>
           </div>
-        ))}
+        )}
       </div>
 
-      <div ref={optionsRef} tabIndex={-1} aria-label="다음 선택" className="mt-5 outline-none">
-        {picking ? (
-          <div>
-            <p className="mb-2 text-[13px] font-semibold text-ink-3">고르면 이어서 풀어 드려요</p>
-            <div className="flex flex-wrap gap-2">
-              {topics.map((t) => (
-                <button key={t.id} type="button" onClick={() => openTopic(t)} className={chip}>
-                  <span className="grid size-6 place-items-center rounded-md bg-accent-soft text-[13px] font-bold text-accent-strong tabular-nums">{t.number}</span>
-                  {t.chip}
-                  {opened.has(t.id) && <span className="text-[13px] font-medium text-ink-3">· 봤어요</span>}
-                </button>
-              ))}
-              <button type="button" onClick={concern} className={chip}>
-                {TALK_COPY.buttons.concern}
-                <span className="text-[13px] font-medium text-ink-3">· 준비 중</span>
+      <div ref={optionsRef} tabIndex={-1} aria-label="이어서 고르기" className="max-h-[min(14.5rem,36dvh)] min-h-[3.75rem] overflow-y-auto border-t border-line bg-canvas px-3 pt-2.5 pb-2 outline-none">
+        {typing ? (
+          <div className="flex min-h-11 items-center justify-between gap-3">
+            <p className="text-[14px] text-ink-3">미유가 답하고 있어요</p>
+            <button type="button" onClick={skip} className="min-h-11 px-1 text-[14px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">
+              바로 모두 보기
+            </button>
+          </div>
+        ) : picking ? (
+          <div className="flex flex-wrap gap-2">
+            {groups.map((g) => (
+              <button key={g.id} type="button" onClick={() => pickGroup(g)} className={chip}>
+                {g.chip}
+                {g.topicIds.every((id) => opened.has(id)) && <span className="text-[13px] font-medium text-ink-3">· 봤어요</span>}
               </button>
-            </div>
+            ))}
+            <button type="button" onClick={concern} className={chip}>
+              {TALK_COPY.buttons.concern}
+              {pending}
+            </button>
+            <Link href={dataHref} className={chip}>
+              {TALK_COPY.buttons.data}
+              <ArrowIcon className="size-4" />
+            </Link>
+            {allDone && (
+              <Link href={reportHref} className={chipPrimary}>
+                {TALK_COPY.buttons.fullReport}
+              </Link>
+            )}
           </div>
         ) : cur ? (
-          <div>
-            <p className="mb-2 text-[13px] font-semibold text-ink-3">{allDone ? TALK_COPY.allDone : TALK_COPY.askNext}</p>
-            <div className="flex flex-wrap gap-2">
-              {cur.example.length > 0 && !usedHere.has("example") && (
-                <button type="button" onClick={() => openExtra(cur, "example")} className={chip}>
-                  {TALK_COPY.buttons.example}
-                </button>
-              )}
-              {cur.detail.length > 0 && !usedHere.has("detail") && (
-                <button type="button" onClick={() => openExtra(cur, "detail")} className={chip}>
-                  {TALK_COPY.buttons.detail}
-                </button>
-              )}
-              {cur.basis && !usedHere.has("basis") && (
-                <button type="button" onClick={() => openExtra(cur, "basis")} className={chip}>
-                  {TALK_COPY.buttons.basis}
-                </button>
-              )}
-              {!usedHere.has("differ") && (
-                <button type="button" onClick={() => differ(cur)} className={chip}>
-                  {TALK_COPY.buttons.differ}
-                  <span className="text-[13px] font-medium text-ink-3">· 준비 중</span>
-                </button>
-              )}
-              {next && (
-                <button type="button" onClick={() => openTopic(next)} className={chipPrimary}>
-                  다음 풀이 · {next.number}. {next.chip}
-                  <ArrowIcon className="size-4" />
-                </button>
-              )}
-              <button type="button" onClick={() => setPicking(true)} className={chip}>
-                {TALK_COPY.buttons.pickTopic}
+          <div className="flex flex-wrap gap-2">
+            {cur.example.length > 0 && !usedHere.has("example") && (
+              <button type="button" onClick={() => openExtra(cur, "example")} className={chip}>
+                {TALK_COPY.buttons.example}
               </button>
-              {allDone && (
-                <Link href={reportHref} className={chipPrimary}>
-                  {TALK_COPY.buttons.fullReport}
-                </Link>
-              )}
-            </div>
+            )}
+            {cur.detail.length > 0 && !usedHere.has("detail") && (
+              <button type="button" onClick={() => openExtra(cur, "detail")} className={chip}>
+                {TALK_COPY.buttons.detail}
+              </button>
+            )}
+            {cur.basis && !usedHere.has("basis") && (
+              <button type="button" onClick={() => openExtra(cur, "basis")} className={chip}>
+                {TALK_COPY.buttons.basis}
+              </button>
+            )}
+            {!usedHere.has("differ") && (
+              <button type="button" onClick={() => differ(cur)} className={chip}>
+                {TALK_COPY.buttons.differ}
+                {pending}
+              </button>
+            )}
+            {siblings.map((t) => (
+              <button key={t.id} type="button" onClick={() => openTopic(t, t.chip, true)} className={chipAccent}>
+                {t.chip}
+                <ArrowIcon className="size-4" />
+              </button>
+            ))}
+            <button type="button" onClick={backToPick} className={chip}>
+              {TALK_COPY.buttons.pickTopic}
+            </button>
+            {allDone && (
+              <Link href={reportHref} className={chipPrimary}>
+                {TALK_COPY.buttons.fullReport}
+              </Link>
+            )}
           </div>
         ) : null}
       </div>
 
-      <div className="mt-6 rounded-xl border border-dashed border-line-strong px-4 py-3.5">
-        <p className="text-[15px] font-semibold text-ink-2">
-          {TALK_COPY.freeQuestion} <span className="ml-1 text-[13px] font-medium text-ink-3">준비 중</span>
-        </p>
-        <p className="mt-0.5 text-[13px] leading-[1.6] text-ink-3">{TALK_COPY.freeQuestionPending}</p>
+      <div className="flex items-center gap-2 border-t border-line bg-canvas px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <input
+          type="text"
+          disabled
+          aria-label={TALK_COPY.freeQuestion}
+          aria-describedby="talk-free-note"
+          placeholder={TALK_COPY.freeQuestion}
+          className="h-11 min-w-0 flex-1 rounded-full border border-line bg-mist px-4 text-[15px] placeholder:text-ink-3 disabled:cursor-not-allowed"
+        />
+        <button type="button" disabled aria-label="보내기 (준비 중)" className="grid size-11 shrink-0 place-items-center rounded-full bg-mist text-ink-3 disabled:cursor-not-allowed">
+          <ArrowIcon className="size-5 -rotate-90" />
+        </button>
+        <span id="talk-free-note" className="sr-only">
+          {TALK_COPY.freeQuestionPending}
+        </span>
       </div>
-
-      <p className="mt-6 text-[13px] leading-[1.7] text-ink-3">
-        이 대화는 저장된 리포트의 풀이를 나눠서 보여 드리는 것이며 AI가 새로 쓰지 않습니다. 사주 해석과 앞날에 대한 이야기는 과학적으로 검증된 개인 예측이 아니며 실제 사건과 결과를 보장하지 않습니다.
-      </p>
-      <p className="mt-3">
-        <Link href={reportHref} className="inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">
-          {TALK_COPY.buttons.fullReport}
-          <ArrowIcon className="size-4" />
-        </Link>
-      </p>
     </div>
+  );
+}
+
+function Avatar({ className }: { className: string }) {
+  return (
+    <span aria-hidden="true" className={`grid shrink-0 place-items-center rounded-xl bg-accent-soft font-bold text-accent-strong ${className}`}>
+      미
+    </span>
   );
 }
 
 function MeBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <p className="max-w-[85%] rounded-2xl rounded-tr-md bg-accent px-4 py-2.5 text-[15px] leading-[1.55] font-semibold text-white">{text}</p>
+      <p className="max-w-[85%] rounded-2xl rounded-tr-md bg-accent px-3.5 py-2.5 text-[15px] leading-[1.5] font-semibold text-white">{text}</p>
     </div>
   );
 }
 
-function MiyuBlock({ msg, byId, model, dateLabel }: { msg: Exclude<Msg, { from: "me" }>; byId: Map<string, TalkTopic>; model: TalkModel; dateLabel: string }) {
-  const bubble = "max-w-full rounded-2xl rounded-tl-md border border-line bg-canvas px-4 py-3.5";
+const bubble = "rounded-2xl rounded-tl-md border border-line bg-canvas px-3.5 py-2.5";
+
+function MiyuRow({ say, first, model, dateLabel }: { say: Say; first: boolean; model: TalkModel; dateLabel: string }) {
   return (
-    <div>
-      <p className="mb-1 text-[13px] font-semibold text-ink-3">미유</p>
-      {msg.kind === "text" && (
-        <div className={`${bubble} inline-block`}>
-          <p className="text-[16px] leading-[1.65]">{msg.text}</p>
-          {msg.link && (
-            <p className="mt-1.5">
-              <Link href={msg.link.href} className="text-[15px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">
-                {msg.link.label}
-              </Link>
-            </p>
-          )}
-        </div>
-      )}
-      {msg.kind === "card" && (
+    <div className="flex items-start gap-2">
+      <div className="w-8 shrink-0">{first && <Avatar className="size-8 text-[14px]" />}</div>
+      <div className="min-w-0 flex-1">
+        <Content say={say} model={model} dateLabel={dateLabel} />
+      </div>
+    </div>
+  );
+}
+
+function Content({ say, model, dateLabel }: { say: Say; model: TalkModel; dateLabel: string }) {
+  switch (say.kind) {
+    case "card":
+      return (
         <div>
           <AnalysisCard card={model.card} name={model.name} dateLabel={dateLabel} />
           <CardActions card={model.card} name={model.name} dateLabel={dateLabel} />
         </div>
-      )}
-      {msg.kind === "answer" && <AnswerBubble topic={byId.get(msg.topicId)!} className={bubble} />}
-      {msg.kind === "extra" && <ExtraBubble topic={byId.get(msg.topicId)!} which={msg.which} className={bubble} />}
-    </div>
-  );
-}
-
-function AnswerBubble({ topic: t, className }: { topic: TalkTopic; className: string }) {
-  return (
-    <div className={className}>
-      <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
-        <span className="grid size-6 place-items-center rounded-md bg-accent-soft text-[13px] font-bold text-accent-strong tabular-nums">{t.number}</span>
-        {t.title}
-      </p>
-      <h3 className="mt-1.5 text-[19px] leading-snug font-bold tracking-tight">{t.headline}</h3>
-      <div className="mt-2 space-y-3">
-        {t.summary.map((s) => (
-          <Prose key={s} text={s} className="text-[16px] leading-[1.7]" />
-        ))}
-      </div>
-      {t.traits && (
-        <ul className="mt-4 divide-y divide-line rounded-lg border border-line">
-          {t.traits.map((x) => (
+      );
+    case "text":
+      if (say.muted) return <Prose text={say.text} className="px-1 text-[13px] leading-[1.6] text-ink-3" />;
+      return (
+        <div className={`${bubble} inline-block max-w-full`}>
+          {say.label && <p className="mb-0.5 text-[13px] font-semibold text-ink-3">{say.label}</p>}
+          <Prose text={say.text} className="text-[16px] leading-[1.6]" />
+        </div>
+      );
+    case "link":
+      return (
+        <div className={`${bubble} inline-block max-w-full`}>
+          <Prose text={say.text} className="text-[16px] leading-[1.6]" />
+          <p className="mt-1">
+            <Link href={say.href} className="inline-flex min-h-11 items-center text-[15px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">
+              {say.label}
+            </Link>
+          </p>
+        </div>
+      );
+    case "headline":
+      return (
+        <div className={`${bubble} inline-block max-w-full`}>
+          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
+            <span className="grid size-5 place-items-center rounded bg-accent-soft text-[12px] font-bold text-accent-strong tabular-nums">{say.number}</span>
+            {say.title}
+          </p>
+          <p className="mt-1 text-[18px] leading-snug font-bold tracking-tight">{say.text}</p>
+        </div>
+      );
+    case "traits":
+      return (
+        <ul className="divide-y divide-line rounded-2xl rounded-tl-md border border-line bg-canvas">
+          {say.traits.map((x) => (
             <li key={x.name} className="px-3.5 py-3">
               <p className="text-[16px] font-bold">{x.name}</p>
               <p className="mt-1.5 flex items-start gap-1.5 text-[14px] leading-snug">
@@ -259,39 +426,18 @@ function AnswerBubble({ topic: t, className }: { topic: TalkTopic; className: st
             </li>
           ))}
         </ul>
-      )}
-      {t.timeline && <LuckTimelineCard timeline={t.timeline.slots} text={t.timeline.text} reference={t.timeline.reference} />}
-      {t.caveat && <CaveatNote text={t.caveat} />}
-    </div>
-  );
-}
-
-function ExtraBubble({ topic: t, which, className }: { topic: TalkTopic; which: Extra; className: string }) {
-  return (
-    <div className={className}>
-      <p className="text-[13px] font-semibold text-ink-3">
-        {t.number}. {t.chip} · {which === "example" ? "예를 들면" : which === "detail" ? "자세히" : "분석 근거"}
-      </p>
-      <div className="mt-2">{which === "basis" ? t.basis && <BasisList basis={t.basis} /> : <Pieces items={which === "example" ? t.example : t.detail} />}</div>
-    </div>
-  );
-}
-
-function Pieces({ items }: { items: TalkPiece[] }) {
-  return (
-    <div className="space-y-4">
-      {items.map((p, i) => {
-        if (p.kind === "para")
-          return (
-            <div key={i} className={p.label ? "border-l-[3px] border-line-strong pl-3.5" : ""}>
-              {p.label && <p className="text-[13px] font-semibold text-ink-3">{p.label}</p>}
-              <Prose text={p.text} className="mt-0.5 text-[15px] leading-[1.75]" />
-            </div>
-          );
-        if (p.kind === "note") return <Prose key={i} text={p.text} className="text-[13px] leading-[1.6] text-ink-3" />;
-        if (p.kind === "flow") return <ReactionStepper key={i} flow={{ when: p.when, steps: p.steps, helpful: p.helpful }} />;
-        return <ComfortPair key={i} comfort={{ comfortable: p.comfortable, clash: p.clash, note: p.note }} />;
-      })}
-    </div>
-  );
+      );
+    case "timeline":
+      return <LuckTimelineCard className="" timeline={say.slots} text={say.text} reference={say.reference} />;
+    case "flow":
+      return <ReactionStepper compact className="" flow={{ when: say.when, steps: say.steps, helpful: say.helpful }} />;
+    case "comfort":
+      return <ComfortPair compact className="" comfort={{ comfortable: say.comfortable, clash: say.clash, note: say.note }} />;
+    case "basis":
+      return (
+        <div className={`${bubble} w-full`}>
+          <BasisList basis={say.basis} />
+        </div>
+      );
+  }
 }

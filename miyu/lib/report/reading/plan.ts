@@ -72,7 +72,7 @@ export const BLOCK_CAVEAT: Partial<Record<ReadingBlockId, (name: string) => stri
 export const comfortNote = (name: string) => `${name} 님이 편안해할 관계의 조건이에요. 상대의 나이나 직업 같은 건 사주로 알 수 없어서 다루지 않아요.`;
 export const FLOW_CAVEAT = "전통 해석으로 본 시기와, 응답에서 읽은 가능성이에요. 어떤 일이 일어난다는 예측이 아니고, 실제 일이나 결과를 보장하지 않아요.";
 export const SCENARIO_NOTE = "응답에서 읽은 가능성이고, 그렇게 된다는 예측이 아니에요.";
-export const STATISTICS_NOTE = "이번 리포트에는 연구 통계를 사용하지 않았습니다. 출처와 조사 대상 · 조건이 확인된 통계가 없습니다. 또 집단의 통계를 한 사람의 앞날 확률로 바꿀 수 없습니다.";
+export const STATISTICS_NOTE = "이번 리포트에는 연구 통계를 쓰지 않았어요. 출처와 조사 대상 · 조건이 확인된 통계가 없고, 집단의 통계를 한 사람의 앞날 확률로 바꿀 수도 없어요.";
 export const RULE_DRAFT_NOTE = "사주 해석 규칙은 전문가 검토 전 초안이며, 일상에서 실제로 어떻게 나타나는지는 확인하지 못했습니다.";
 export const SCORE_NOTE = "괄호 안 숫자는 응답 환산값(0~100)이며 백분위가 아닙니다. 개발용 예시 문항입니다.";
 

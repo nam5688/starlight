@@ -237,7 +237,7 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { prev
         </table>
         <p className="mt-3">
           <Link href={ctaHref} className={cta}>
-            5가지 상황 모두 보기
+            4가지 상황 모두 보기
           </Link>
         </p>
       </section>

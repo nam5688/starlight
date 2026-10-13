@@ -78,7 +78,7 @@ test("공개 범위: 핵심 요약 2개, 질문 2개, 실천 1개, 첫 상황 �
   assert.ok(p.questions.shown.length <= 2 && p.questions.shown.length + p.questions.lockedCount >= 3);
   assert.ok(p.action.shown && p.action.lockedCount === 2);
   assert.equal(p.situations.filter((s) => s.strengthLabel).length, 1);
-  assert.equal(p.situations.length, 5);
+  assert.equal(p.situations.length, 4);
   assert.equal(p.mbti.axes.length, 4);
   assert.equal(p.saju.status, "ok");
   if (p.saju.status !== "ok") return;
@@ -130,7 +130,7 @@ test("일관성: 미리보기에 보이는 모든 것이 구매한 리포트(개
           // 답을 약속한 질문마다 구매한 리포트에 그 답이 되는 부분이 실제로 있어야 한다
           if (a.id === "partner" || a.id === "years") assert.ok(extras.partner && (a.id === "partner" ? extras.partner.fits.length > 0 : true), `${label}: ${a.id}`);
           if (a.id === "elements") assert.ok(extras.plain && extras.plain.elements.some((e) => e.domains), `${label}: 오행별 관계 · 일 · 선택 풀이`);
-          if (a.id === "work" || a.id === "close" || a.id === "repeat") assert.ok(extras.situations.length === 5 && extras.situations.every((s) => s.tip.length > 0), `${label}: 상황별`);
+          if (a.id === "work" || a.id === "close" || a.id === "repeat") assert.ok(extras.situations.length === 4 && extras.situations.every((s) => s.tip.length > 0), `${label}: 상황별`);
           if (a.id === "stress") assert.ok(base.core.stressTrigger.length > 0);
           if (a.id === "actions") assert.equal(extras.starterActions.length, 3);
         }
@@ -151,7 +151,7 @@ test("사주 계산이 안 된 경우에도 미리보기는 만들어지고, 사
   assert.equal(p.saju.status, "not-ready");
   assert.equal(p.questions.shown.length, 0);
   assert.ok(!p.locked.some((f) => ["questions", "partner", "items"].includes(f.id)), "만들 수 없는 항목은 약속하지 않는다");
-  assert.equal(p.situations.length, 5);
+  assert.equal(p.situations.length, 4);
 });
 
 test("개인별: 원국이 다르면 풀이 · 질문 · 보완 아이템 · 관계 조건이 달라지고, 같은 입력이면 항상 같다", () => {

@@ -108,7 +108,7 @@ export function QuestionsSection({ questions, id }: { questions: ReportExtras["q
 export function SituationsSection({ situations, id }: { situations: ReportExtras["situations"]; id: string }) {
   return (
     <section aria-labelledby={id}>
-      <SectionTitle id={id} note="응답에서 나타난 경향을 일 · 가까운 관계 · 선택 · 돈 · 갈등의 다섯 상황으로 풀었습니다. ‘~라면 이 경향 때문일 수 있어요’라는 뜻이며 단정이 아닙니다.">
+      <SectionTitle id={id} note="응답에서 나타난 경향을 일 · 가까운 관계 · 선택 · 갈등의 네 상황으로 풀었습니다. ‘~라면 이 경향 때문일 수 있어요’라는 뜻이며 단정이 아닙니다.">
         상황별 잘하는 점 · 주의할 점
       </SectionTitle>
       <FoldRow>

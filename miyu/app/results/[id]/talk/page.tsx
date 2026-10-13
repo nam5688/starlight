@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
-import { ResultHeader } from "@/components/report/result-header";
 import { TalkView } from "@/components/talk/talk-view";
 import { PageFallback } from "@/components/ui/page-fallback";
 import { pageNarrow } from "@/components/ui/styles";
@@ -56,10 +55,5 @@ async function TalkContent({ params }: Pick<PageProps<"/results/[id]/talk">, "pa
   const content = report.content;
   const model = buildTalkModel(content);
   const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
-  return (
-    <>
-      <ResultHeader kicker="대화로 풀어보기" title={`${assessment.nickname} 님의 분석 이야기`} subtitle="저장된 리포트를 한 주제씩 대화하듯 풀어 봅니다." source={content.source} meta={`검사일 ${created} · 저장된 리포트`} />
-      <TalkView model={model} dateLabel={created} reportHref={`/results/${id}`} contextHref={`/results/${id}/context`} />
-    </>
-  );
+  return <TalkView model={model} dateLabel={created} reportHref={`/results/${id}`} dataHref={`/results/${id}#r-data`} contextHref={`/results/${id}/context`} subtitle={`저장된 리포트 · 검사일 ${created}${content.source === "sample" ? " · 개발용 샘플" : ""}`} />;
 }

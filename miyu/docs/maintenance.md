@@ -30,6 +30,7 @@
 | 응답 근거 규칙 | `lib/report/survey-evidence.ts` | `SURVEY_RULE_VERSION` | 리포트 `basis.ruleVersions` |
 | **개인 통합 리포트(읽기 구조)의 구성 · 글자 수 한도 · 고정 안내 문구 · 쉬운 말 규칙** | `lib/report/reading/plan.ts` (예시 화면 · 지시문 · 검사가 모두 이 값을 읽는다) | 지시문 버전 `READING_PROMPT_VERSION` (`lib/report/reading/prompt.ts`) | 리포트 `generated.ruleVersions` · `reports.generator_version` (모델 이름과 함께) |
 | AI 지시문 — 읽기 구조(기본) | `lib/report/reading/prompt.ts` | `READING_PROMPT_VERSION` | 위와 같다. 고치면 `reading.test.ts`와 `sample-reading-report.test.ts`가 예시 · 생성기 · 검사가 같은 기준인지 확인한다 |
+| 대화로 풀어보기의 고정 문구 · 묶음 이름 · 말풍선 나누기 | `lib/report/reading/talk.ts` (`TALK_COPY` · `GROUPS` · `BUBBLE_PAIR_MAX`) · 화면 `components/talk/talk-view.tsx` | 없음(저장된 리포트의 글을 나눠 보일 뿐 새 글을 쓰지 않는다) | 저장하지 않는다. 고치면 `talk.test.ts`가 "모든 말풍선이 저장된 리포트의 글인지"를 확인한다 |
 | AI 지시문 — 이전 형식(이미 저장된 리포트 · 비교용) | `lib/report/v2/prompt.ts` | `PROMPT_VERSION` | 리포트 `basis.ruleVersions` · `reports.generator_version` (모델 이름과 함께) |
 | 원국 쉬운 풀이 · 상황 · 관계 조건 · 질문 · 보완 아이템 | `lib/saju/plain.ts` · `lib/report/{situations,partner,questions,starter-actions}.ts` · `lib/saju/items.ts` | `EXTRAS_VERSION` (`lib/report/extras.ts`) | 리포트 `extras.version` |
 | 무료 미리보기 구조 | `lib/report/preview.ts` | `PREVIEW_VERSION` | (저장하지 않음 — 보여 줄 때 서버가 만든다) |

@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
-import { buildTalkModel, CARD_DISCLAIMER, nextTopic, TALK_COPY, type TalkPiece, type TalkTopic } from "./talk.ts";
+import { answerBubbles, buildTalkModel, CARD_DISCLAIMER, extraBubbles, nextTopic, TALK_COPY, toBubbles, type TalkBubble, type TalkPiece, type TalkTopic } from "./talk.ts";
+import { splitSentences } from "./line-breaks.ts";
 import { layoutCard, wrapText, type Measure } from "./talk-card.ts";
 import type { IntegratedReadingReport } from "./types.ts";
 
@@ -74,11 +75,12 @@ test("알려 준 고민이 있을 때만 '알려 주신 고민' 주제가 생기
   assert.doesNotMatch(JSON.stringify(m.card), /알려 주신 고민을 반영하면/);
 });
 
-test("분석 카드: 핵심 문장 · 성향 요약 3줄 · 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 · 사용한 정보 — 생년월일 · 점수는 없다", () => {
+test("분석 카드: 핵심 문장 · 대표 경향 · 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 · 사용한 정보만 — 주제별 한 줄 요약 · 생년월일 · 점수는 없다", () => {
   const { card } = buildTalkModel(R, { tendencyName: "확인추구형" });
   assert.equal(card.headline, R.headline);
   assert.equal(card.tendency, "확인추구형");
-  assert.deepEqual(card.rows.map((r) => r.label), ["생각과 행동 방식", "가까운 관계", "일과 돈"]);
+  // 같은 특징을 카드 · 요약 · 주제에서 되풀이하지 않도록, 주제별 한 줄 요약(이전 rows)은 카드에 넣지 않는다
+  assert.ok(!("rows" in card));
   assert.deepEqual([card.strength.label, card.caution.label, card.flow.label], ["장점", "단점이 될 수 있는 부분", "지금 나의 시기"]);
   assert.ok(card.inputs.length >= 3 && card.inputs.every((s) => !/없음|입력하지 않았/.test(s)));
   assert.ok(card.inputs.some((s) => s.includes("개발용 문항")), "개발용 문항은 개발용이라고 밝힌다");
@@ -142,4 +144,60 @@ test("카드 배치: 모든 글이 이미지 안에 들어가고 높이는 글�
   const longer = layoutCard({ ...card, headline: `${card.headline} ${card.headline} ${card.headline}` }, { variant: "save", measure, name: "서윤", dateLabel: "예시" });
   assert.ok(longer.height > a.height, "글이 길어지면 카드가 길어진다 (글을 자르지 않는다)");
   assert.equal(a.ops[0].type, "rect", "바탕이 맨 먼저");
+});
+
+const norm = (t: string) => t.replace(/\s+/g, " ").trim();
+const bubbleText = (b: TalkBubble): string[] =>
+  b.kind === "text" ? [b.text] : b.kind === "headline" ? [b.text] : b.kind === "traits" ? b.traits.flatMap((t) => [t.shinesShort, t.burdenShort]) : b.kind === "timeline" ? [b.text] : b.kind === "flow" ? [b.when, b.helpful, ...b.steps.map((x) => x.text)] : b.kind === "comfort" ? [...b.comfortable, ...b.clash, b.note] : [];
+
+test("첫 화면 묶음: [내 성향] [연애 · 관계] [일 · 돈] [앞으로의 시기] — 모든 주제가 어느 묶음엔가 들어 있고, 번호는 칩에 붙이지 않는다", () => {
+  const m = buildTalkModel(R);
+  assert.deepEqual(m.groups.map((g) => g.chip), ["내 성향", "연애 · 관계", "일 · 돈", "앞으로의 시기"]);
+  assert.deepEqual(m.groups[0].topicIds, ["tendency", "strength-burden", "values"], "내 성향 안에서 장점 · 단점이 될 수 있는 부분, 중요하게 여기는 것이 이어진다");
+  assert.deepEqual(m.groups.flatMap((g) => g.topicIds).sort(), m.topics.map((t) => t.id).sort(), "빠지거나 겹치는 주제가 없다");
+  assert.ok(m.groups.every((g) => !/\d/.test(g.chip)));
+  // 알려 준 고민이 있으면 그 주제도 묶음으로 보인다
+  const withFocus = buildTalkModel({ ...R, focus: [{ text: "알려 주신 고민을 반영하면, 답을 기다리는 시간이 길게 느껴질 수 있습니다.", evidence: ["saju.daymaster"] }] });
+  assert.equal(withFocus.groups.at(-1)?.chip, "알려 주신 고민");
+});
+
+test("말풍선 나누기: 문장 단위로 끊고 짧은 두 문장만 묶으며, 글자는 바꾸지 않는다", () => {
+  for (const topic of buildTalkModel(R).topics) {
+    for (const text of contentOf(topic)) {
+      const parts = toBubbles(text);
+      assert.equal(parts.join(" "), norm(text), `글자가 바뀌었다: ${text.slice(0, 30)}`);
+      assert.ok(parts.every((p) => splitSentences(p).length <= 2), "한 말풍선은 두 문장까지");
+    }
+  }
+  assert.deepEqual(toBubbles("짧아요. 이것도 짧아요. 이 문장은 조금 더 길어서 앞의 문장과 같은 말풍선에 들어가지 않을 만큼 길게 이어서 쓴 문장이에요."), ["짧아요. 이것도 짧아요.", "이 문장은 조금 더 길어서 앞의 문장과 같은 말풍선에 들어가지 않을 만큼 길게 이어서 쓴 문장이에요."]);
+  assert.deepEqual(toBubbles(""), []);
+});
+
+test("대화 말풍선은 모두 저장된 리포트의 글에서 나온다 — 답 · 예시 · 자세히 · 근거 어느 것도 새로 쓰지 않는다 (AI 호출 없음)", () => {
+  const pool = [...allStrings(R)].map(norm);
+  for (const t of buildTalkModel(R).topics) {
+    const all = [...answerBubbles(t), ...extraBubbles(t, "example"), ...extraBubbles(t, "detail")];
+    for (const b of all) for (const text of bubbleText(b)) assert.ok(pool.some((p) => p.includes(norm(text))), `${t.id}: 저장된 글에 없는 말풍선 — ${text.slice(0, 30)}`);
+    const basis = extraBubbles(t, "basis");
+    assert.deepEqual(basis.length ? (basis[0] as { basis: unknown }).basis : null, t.basis);
+    // 답은 결론 한 줄로 시작하고, 말풍선은 주제 번호 · 이름이 붙은 제목 하나뿐이다
+    const a = answerBubbles(t);
+    assert.equal(a[0].kind, "headline");
+    assert.equal(a.filter((b) => b.kind === "headline").length, 1);
+  }
+  const m = buildTalkModel(R);
+  const by = (id: string) => m.topics.find((t) => t.id === id)!;
+  assert.ok(answerBubbles(by("strength-burden")).some((b) => b.kind === "traits"), "특징 주제는 장점 · 단점이 될 수 있는 부분 카드");
+  assert.ok(answerBubbles(by("flow")).some((b) => b.kind === "timeline"), "시기는 계산된 기간 그림");
+  assert.ok(extraBubbles(by("love"), "example").some((b) => b.kind === "flow") && extraBubbles(by("love"), "detail").some((b) => b.kind === "comfort"));
+  // 안내(caveat · 예측이 아님)는 작은 안내 말풍선으로 남는다
+  assert.ok(answerBubbles(by("love")).some((b) => b.kind === "text" && b.muted), "자료 없음 안내");
+});
+
+test("대화 속 고정 문구: 친구에게 말하듯 해요체이고, 풀이 내용 · 사주 용어 · 합쇼체가 없다", () => {
+  const copy = Object.entries(TALK_COPY).flatMap(([, v]) => (typeof v === "string" ? [v] : typeof v === "function" ? [v("서윤"), v("연애 · 관계")].filter((x) => typeof x === "string") : Object.values(v)));
+  for (const t of copy) assert.doesNotMatch(String(t), /습니다|합니다|입니다|됩니다/, `합쇼체: ${t}`);
+  assert.equal(TALK_COPY.buttons.concern, "고민 말하기");
+  assert.match(TALK_COPY.freeQuestion, /준비 중/);
+  assert.match(TALK_COPY.notice, /AI가 새로 쓰는 글이 아니고/);
 });

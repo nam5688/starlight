@@ -125,7 +125,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     { id: "core", title: "핵심 요약 나머지 2가지", teaser: "스트레스를 받기 쉬운 상황 · 바로 적용해볼 행동" },
     { id: "scores", title: "기질 · 관계(애착) 점수와 그 의미", teaser: "4가지 기질과 가까운 관계에서의 반응" },
     { id: "detail", title: "상세 분석", teaser: "근거와 한계를 함께 적은 분석" },
-    { id: "situations", title: "상황별 잘하는 점 · 주의할 점 상세", teaser: "일 · 관계 · 선택 · 돈 · 갈등 5가지 상황" },
+    { id: "situations", title: "상황별 잘하는 점 · 주의할 점 상세", teaser: "일 · 관계 · 선택 · 갈등 4가지 상황" },
     ...(qs.length ? [{ id: "questions", title: `내 원국에서 나온 질문 ${qs.length}개의 답`, teaser: "질문마다 쉬운 말로 풀어 드립니다" }] : []),
     ...(extras.partner ? [{ id: "partner", title: "어울리는 관계 조건", teaser: "편안한 상대의 성향과 관계 주제가 두드러지는 해" }] : []),
     ...(extras.items ? [{ id: "items", title: "보완 아이템", teaser: "색 · 소재 · 공간 · 습관" }] : []),

@@ -163,14 +163,14 @@ export function TraitSentences({ traits }: { traits: ReadingTrait[] }) {
 }
 
 /** 편안하게 느끼는 조건 / 부딪히기 쉬운 상황 — 상대 없이 보는 관계 스타일 */
-export function ComfortPair({ comfort }: { comfort: NonNullable<ReadingBlock["comfort"]> }) {
+export function ComfortPair({ comfort, compact = false, className = "mt-4" }: { comfort: NonNullable<ReadingBlock["comfort"]>; /** 좁은 칸(대화 말풍선 안)에서는 세로로만 쌓는다 */ compact?: boolean; className?: string }) {
   const lists = [
     { title: "편안하게 느끼는 조건", items: comfort.comfortable, Icon: StrengthIcon, tone: "text-positive" },
     { title: "부딪히기 쉬운 상황", items: comfort.clash, Icon: AdjustIcon, tone: "text-caution" },
   ];
   return (
-    <div className="mt-4">
-      <div className="grid gap-3 md:grid-cols-2">
+    <div className={className}>
+      <div className={compact ? "grid gap-3" : "grid gap-3 md:grid-cols-2"}>
         {lists.map((l) => (
           <div key={l.title} className="rounded-xl border border-line bg-canvas p-4">
             <p className={`flex items-center gap-1.5 text-[14px] font-semibold ${l.tone}`}>
@@ -193,20 +193,20 @@ export function ComfortPair({ comfort }: { comfort: NonNullable<ReadingBlock["co
 }
 
 /** 상대의 반응이 이어지는 모습 — 단계 그림 (모바일은 세로, PC는 가로) */
-export function ReactionStepper({ flow }: { flow: NonNullable<ReadingBlock["reactionFlow"]> }) {
+export function ReactionStepper({ flow, compact = false, className = "mt-5" }: { flow: NonNullable<ReadingBlock["reactionFlow"]>; /** 좁은 칸(대화 말풍선 안)에서는 세로로만 쌓는다 */ compact?: boolean; className?: string }) {
   return (
-    <div className="mt-5 rounded-xl border border-line bg-canvas p-4 md:p-5">
+    <div className={`${className} rounded-xl border border-line bg-canvas p-4 ${compact ? "" : "md:p-5"}`}>
       <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent">
         <FlowIcon />
         반응이 이어지는 모습
       </p>
       <p className="mt-1 text-[17px] leading-snug font-bold tracking-tight">{flow.when}</p>
-      <ol className="mt-4 md:grid md:grid-cols-4 md:gap-4">
+      <ol className={compact ? "mt-4" : "mt-4 md:grid md:grid-cols-4 md:gap-4"}>
         {flow.steps.map((s, i) => (
-          <li key={s.label} className="group/step relative flex gap-3 pb-4 last:pb-0 md:block md:pb-0">
+          <li key={s.label} className={compact ? "group/step relative flex gap-3 pb-4 last:pb-0" : "group/step relative flex gap-3 pb-4 last:pb-0 md:block md:pb-0"}>
             <span className="relative z-10 grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft text-[13px] font-bold text-accent-strong tabular-nums">{i + 1}</span>
-            <span className="absolute top-8 bottom-0 left-3.5 w-px bg-line-strong group-last/step:hidden md:top-3.5 md:right-[-1rem] md:bottom-auto md:left-8 md:h-px md:w-auto" aria-hidden="true" />
-            <div className="min-w-0 pt-0.5 md:mt-2 md:pt-0">
+            <span className={compact ? "absolute top-8 bottom-0 left-3.5 w-px bg-line-strong group-last/step:hidden" : "absolute top-8 bottom-0 left-3.5 w-px bg-line-strong group-last/step:hidden md:top-3.5 md:right-[-1rem] md:bottom-auto md:left-8 md:h-px md:w-auto"} aria-hidden="true" />
+            <div className={compact ? "min-w-0 pt-0.5" : "min-w-0 pt-0.5 md:mt-2 md:pt-0"}>
               <p className="text-[13px] font-semibold text-ink-3">{s.label}</p>
               <p className="text-[15px] leading-snug">{s.text}</p>
             </div>
@@ -221,7 +221,7 @@ const fmtMonth = (s: string) => s.replace("-", ".");
 const monthIndex = (s: string) => Number(s.slice(0, 4)) * 12 + Number(s.slice(5, 7));
 
 /** 지금 지나는 시기 — 계산된 기간으로 이전 · 지금 · 다음을 한 줄에 놓고 현재 위치를 표시한다. 곡선 · 점수는 그리지 않는다 */
-export function LuckTimelineCard({ timeline, text, reference }: { timeline: LuckSlot[]; text: string; reference: { year: number; month: number } }) {
+export function LuckTimelineCard({ timeline, text, reference, className = "mt-5" }: { timeline: LuckSlot[]; text: string; reference: { year: number; month: number }; className?: string }) {
   const cur = timeline.find((s) => s.role === "current");
   if (!cur) return null;
   const pct = Math.round((cur.progress ?? 0) * 100);
@@ -232,7 +232,7 @@ export function LuckTimelineCard({ timeline, text, reference }: { timeline: Luck
   const others = timeline.filter((s) => s.role !== "current");
   const NAME = { previous: "이전", current: "지금", next: "다음" } as const;
   return (
-    <div className="mt-5 rounded-xl border border-line bg-canvas p-4 md:p-5">
+    <div className={`${className} rounded-xl border border-line bg-canvas p-4 md:p-5`}>
       <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent">
         <FlowIcon />
         지금 나의 시기 · 10년 단위

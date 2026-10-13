@@ -49,7 +49,7 @@ test("보완 아이템: 없거나 적은 기운(수 · 화 · 금)만, 고르게
   assert.equal(itemSuggestions(flat).items.length, 5, "모두 같으면 모두 나열하지 않고 가장 적은 기운들");
 });
 
-test("상황별: 5가지 상황 모두 잘하는 점 · 주의할 점 · 장면 · 해볼 것이 있고, 응답이 달라지면 내용이 달라진다", () => {
+test("상황별: 4가지 상황 모두 잘하는 점 · 주의할 점 · 장면 · 해볼 것이 있고, 응답이 달라지면 내용이 달라진다", () => {
   const sets = [(i: number) => (i % 5) + 1, () => 5, () => 1, (i: number) => (i % 2 ? 5 : 1), (i: number) => (i < 8 ? 5 : 2)];
   const seen = new Set<string>();
   for (const f of sets) {
