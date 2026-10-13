@@ -202,7 +202,7 @@ SQL 파일은 `supabase/migrations` 폴더에 번호 순서로 있다. **무조�
 3. **`.env.local`에 OpenAI 키 입력** — 아래 "키 입력 위치".
 4. **Claude API 계정 · 결제 · 키** — Claude 구독이 아니라 Claude Console(platform.claude.com)에서 한다. 같은 순서.
 5. **`.env.local`에 Claude 키 입력.**
-6. **비용 확인(호출 없음):** 새 `miyu` 폴더에서 PowerShell로 `node scripts\run-ai-compare.ts` — 모델 · 예상 비용 · 한도가 나오고 "호출하지 않았습니다"로 끝나면 정상이다.
+6. **비용 · 키 입력 확인(호출 없음):** 새 `miyu` 폴더에서 PowerShell로 `node --env-file=.env.local scripts\run-ai-compare.ts` — 모델 · 예상 비용 · 한도와 "키 입력 확인: 후보 A 있음 · 후보 B 있음"이 나오고 "호출하지 않았습니다"로 끝나면 정상이다 (키 값은 나오지 않는다).
 7. **실제 생성 4건:**
 
    ```powershell
