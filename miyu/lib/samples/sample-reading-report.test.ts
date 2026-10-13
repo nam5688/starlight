@@ -67,11 +67,11 @@ test("리포트 예시: 본문은 쉬운 말이다 — 사주 용어와 점수 �
   }
   const paragraphs = [...R.blocks.flatMap((b) => [b.summary, b.example ?? "", ...b.details, b.watch ?? "", b.reactionFlow?.helpful ?? "", ...(b.traits ?? []).flatMap((t) => [t.shines, t.burden, t.example])]), R.flow.summary, R.flow.cardText];
   for (const p of paragraphs) assert.ok(sentences(p).length <= 3, `한 문단이 ${sentences(p).length}문장 — ${p.slice(0, 20)}`);
-  // 대운 · 세운도 본문에는 쓰지 않는다 — "10년 단위의 큰 흐름" · "그해의 흐름"처럼 풀어 쓰고 용어는 근거에만 둔다
-  assert.ok(bodyTexts().some((t) => /10년 단위의 큰 흐름/.test(t)), "대운은 쉬운 말로 풀어 쓴다");
+  // 대운 · 세운도 본문에는 쓰지 않는다 — "10년 단위의 시기" · "그해의 분위기"처럼 풀어 쓰고 용어는 근거에만 둔다
+  assert.ok(bodyTexts().some((t) => /10년 단위의 시기/.test(t)), "대운은 쉬운 말로 풀어 쓴다");
 });
 
-test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강점 · 주의할 점 · 현재 흐름), 주제마다 요약 2문장 이하 · 예시 1개, 제목과 같은 말을 되풀이하지 않는다", () => {
+test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강점 · 주의할 점 · 지금 나의 시기), 주제마다 요약 2문장 이하 · 예시 1개, 제목과 같은 말을 되풀이하지 않는다", () => {
   assert.deepEqual(R.summary.map((s) => s.kind), ["strength", "caution", "flow"]);
   assert.ok(R.headline.length <= 36, `첫 화면 핵심 문장이 길다 (${R.headline.length}자)`);
   for (const s of R.summary) assert.ok(s.keyword.length <= 18 && s.note.length <= 60, `${s.kind} 카드가 길다`);
@@ -90,7 +90,7 @@ test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강�
   assert.doesNotMatch(bodyTexts().join("\n"), /힘이 되는 때|부담이 되는 때/);
 });
 
-test("리포트 예시: '내가 강한 포인트 / 내가 힘들 수 있는 포인트'는 특징 3개를 짧은 문구로 줄여 보이고, 접힘 안에서 특징마다 풀이 · 예시를 나눠 쓴다", () => {
+test("리포트 예시: '장점 / 단점이 될 수 있는 부분'는 특징 3개를 짧은 문구로 줄여 보이고, 접힘 안에서 특징마다 풀이 · 예시를 나눠 쓴다", () => {
   const b = R.blocks.find((x) => x.id === "strength-burden")!;
   assert.equal(b.traits?.length, 3);
   assert.deepEqual(b.traits!.map((t) => t.name), ["꼼꼼하게 다듬기", "상대 반응 살피기", "가까운 사람에게 기대기"]);
@@ -104,19 +104,19 @@ test("리포트 예시: '내가 강한 포인트 / 내가 힘들 수 있는 포�
   assert.equal(new Set(b.traits!.map((t) => t.example)).size, 3);
   assert.equal(b.example, undefined);
   // 화면 이름표는 "강점 · 부담" 대신 쉬운 말
-  assert.match(b.topic, /강한 포인트/);
+  assert.match(b.topic, /장점/);
   assert.doesNotMatch(bodyTexts().join("\n"), /강점과 부담|부담이 되는|조절이 필요할 때/);
-  assert.deepEqual(R.summary.filter((s) => s.kind !== "flow").map((s) => s.label), ["내가 강한 포인트", "내가 힘들 수 있는 포인트"]);
+  assert.deepEqual(R.summary.filter((s) => s.kind !== "flow").map((s) => s.label), ["장점", "단점이 될 수 있는 부분"]);
 });
 
-test("리포트 예시: 지금 지나는 큰 흐름 타임라인은 서윤의 사주 계산에서 나왔고(글로 지어내지 않았다), 카드 문구의 기간과 맞는다", () => {
+test("리포트 예시: 지금 지나는 시기 타임라인은 서윤의 사주 계산에서 나왔고(글로 지어내지 않았다), 카드 문구의 기간과 맞는다", () => {
   assert.deepEqual(R.timeline, luckTimeline(SAMPLE_CHART, R.timelineReference));
   assert.deepEqual(R.timeline.map((s) => s.role), ["previous", "current", "next"]);
   const cur = R.timeline.find((s) => s.role === "current")!;
   assert.ok(cur.progress! > 0 && cur.progress! < 1);
   const dot = (s: string) => s.replace("-", ".");
   const flowCard = R.summary.find((s) => s.kind === "flow")!;
-  assert.ok(flowCard.note.includes(dot(cur.from)) && flowCard.note.includes(dot(cur.to)), `현재 흐름 카드의 기간이 계산(${cur.from}~${cur.to})과 다르다`);
+  assert.ok(flowCard.note.includes(dot(cur.from)) && flowCard.note.includes(dot(cur.to)), `지금 나의 시기 카드의 기간이 계산(${cur.from}~${cur.to})과 다르다`);
   // 근거에 적은 대운 기간도 같은 계산이다
   const [fy, fm] = cur.from.split("-").map(Number);
   const [ty, tm] = cur.to.split("-").map(Number);
@@ -195,6 +195,6 @@ test("리포트 예시: 내용 차이 검사(조건 · 범용 문장 · 겹침 �
 });
 
 test("리포트 예시: 고정 문구(이름표 · 안내)는 실제 생성과 같은 코드(plan.ts)의 것이다", () => {
-  assert.deepEqual(R.summary.map((s) => s.label), ["내가 강한 포인트", "내가 힘들 수 있는 포인트", "현재 흐름"]);
+  assert.deepEqual(R.summary.map((s) => s.label), ["장점", "단점이 될 수 있는 부분", "지금 나의 시기"]);
   assert.match(R.blocks.find((b) => b.id === "love")!.caveat!, /상대 자료: 없음/);
 });

@@ -17,7 +17,7 @@ export function renderReadingMarkdown(r: IntegratedReadingReport): string {
     p(`## ${b.topic}`, `### ${b.headline}`);
     p(b.summary);
     if (b.example) p(`예를 들면: ${b.example}`);
-    if (b.traits) for (const t of b.traits) p(`**${t.name}** (강한 포인트: ${t.shinesShort} / 힘들 수 있는 포인트: ${t.burdenShort})`, `- 강한 포인트: ${t.shines}`, `- 힘들 수 있는 포인트: ${t.burden}`, `- 예: ${t.example}`);
+    if (b.traits) for (const t of b.traits) p(`**${t.name}** (장점: ${t.shinesShort} / 단점이 될 수 있는 부분: ${t.burdenShort})`, `- 장점: ${t.shines}`, `- 단점이 될 수 있는 부분: ${t.burden}`, `- 예: ${t.example}`);
     if (b.comfort) p("편안한 조건", ...b.comfort.comfortable.map((x) => `- ${x}`), "부딪히는 방식", ...b.comfort.clash.map((x) => `- ${x}`));
     if (b.reactionFlow) p(`반응이 이어지는 모습 (${b.reactionFlow.when})`, ...b.reactionFlow.steps.map((s, i) => `${i + 1}. ${s.label}: ${s.text}`), `도움이 되는 것: ${b.reactionFlow.helpful}`);
     for (const d of b.details) p(d);

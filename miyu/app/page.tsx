@@ -257,11 +257,11 @@ function ConnectDiagram() {
       <ul className="space-y-2 text-[15px]">
         <li className="flex items-center gap-2 font-semibold text-positive">
           <StrengthIcon />
-          내가 강한 포인트
+          장점
         </li>
         <li className="flex items-center gap-2 font-semibold text-caution">
           <AdjustIcon />
-          내가 힘들 수 있는 포인트
+          단점이 될 수 있는 부분
         </li>
         <li className="flex items-center gap-2 font-semibold text-accent-strong">
           <FlowIcon />

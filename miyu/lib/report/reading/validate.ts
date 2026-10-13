@@ -15,9 +15,9 @@ export function periodRefs(evidence: Evidence[]): PeriodRef[] {
   const out: PeriodRef[] = [];
   const idsOf = (prefix: string) => evidence.filter((e) => e.period && (e.id === prefix || e.id.startsWith(`${prefix}.`))).map((e) => e.id);
   const current = idsOf("saju.daeun.current");
-  if (current.length) out.push({ ref: "current", label: "지금 지나는 큰 흐름", ids: current });
+  if (current.length) out.push({ ref: "current", label: "지금 지나는 시기", ids: current });
   const next = idsOf("saju.daeun.next");
-  if (next.length) out.push({ ref: "next", label: "다음 큰 흐름", ids: next });
+  if (next.length) out.push({ ref: "next", label: "다음 시기", ids: next });
   const years = [...new Set(evidence.filter((e) => e.period).map((e) => /^saju\.seun\.(\d{4})/.exec(e.id)?.[1]).filter((y): y is string => Boolean(y)))].sort();
   for (const y of years) out.push({ ref: `y${y}`, label: `${y}년`, ids: idsOf(`saju.seun.${y}`) });
   return out;
@@ -28,8 +28,8 @@ export function periodRefs(evidence: Evidence[]): PeriodRef[] {
  * 고민 반영 리포트가 시기 이름을 그대로 저장하던 것을 같은 규칙으로 맞춘다.
  */
 export function plainPeriodLabel(label: string): string {
-  if (/^현재 대운/.test(label)) return "지금 지나는 큰 흐름";
-  if (/^다음 대운/.test(label)) return "다음 큰 흐름";
+  if (/^현재 대운/.test(label)) return "지금 지나는 시기";
+  if (/^다음 대운/.test(label)) return "다음 시기";
   const year = /^(\d{4})년/.exec(label);
   return year ? `${year[1]}년` : label;
 }
@@ -127,7 +127,7 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
   text(d.headline, "headline", L.headline.min, L.headline.max);
 
   // 첫 화면 카드 3개
-  for (const [k, label] of [["strength", "내가 강한 포인트"], ["caution", "내가 힘들 수 있는 포인트"], ["flow", "현재 흐름"]] as const) {
+  for (const [k, label] of [["strength", "장점"], ["caution", "단점이 될 수 있는 부분"], ["flow", "지금 나의 시기"]] as const) {
     const c = d.cards?.[k];
     if (!c) {
       errors.push(`cards.${k}(${label}): 카드가 없습니다.`);
@@ -198,9 +198,9 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
     ids(b.evidence, `${w}.evidence`, { needSaju: true });
   }
 
-  // 앞으로의 흐름
+  // 앞으로의 시기
   const f = d.flow;
-  if (!f) errors.push("flow: 앞으로의 흐름이 없습니다.");
+  if (!f) errors.push("flow: 앞으로의 시기이 없습니다.");
   else {
     text(f.headline, "flow.headline", L.blockHeadline.min, L.flow.headlineMax);
     paragraphLike(f.summary, "flow.summary", L.flow.summaryMin, L.flow.summaryMax, 2);

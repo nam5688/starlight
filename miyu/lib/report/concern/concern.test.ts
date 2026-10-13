@@ -299,7 +299,7 @@ test("고민 리포트 생성: 저장되는 시기 이름은 쉬운 말이고(�
   const report = await createAiReportGenerator({ model: createMockModel(), now: NOW, sleep: noSleep }).generateConcern!(concernInput());
   assert.ok(report.timeline.length >= 1);
   for (const t of report.timeline) {
-    assert.match(t.period, /^(지금 지나는 큰 흐름|다음 큰 흐름|\d{4}년)$/, t.period);
+    assert.match(t.period, /^(지금 지나는 시기|다음 시기|\d{4}년)$/, t.period);
     assert.doesNotMatch(`${t.theme} ${t.opportunity} ${t.caution}`, JARGON);
   }
   assert.ok(report.evidence.some((e) => e.period && /대운/.test(e.period.label)), "근거 목록(접어 둔 근거)에는 원래 이름이 있다");

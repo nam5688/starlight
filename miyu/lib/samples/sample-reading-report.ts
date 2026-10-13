@@ -5,7 +5,7 @@
 // 실제 AI 생성과 같은 기준이다 — 이 예시는 실제 생성기가 쓰는 검사(reading/validate.ts)를 그대로 통과해야 하고(sample-reading-report.test.ts),
 // 고정 문구(안내 · 이름표)는 reading/plan.ts의 것을 그대로 쓰며, 생성기가 받는 근거 목록(사주 · 응답 행동 경향 · 입력한 MBTI)에 없는 내용은 쓰지 않았다.
 // 기본 화면은 결론 한 줄 + 요약 2문장 + 예시 1개이고, 나머지는 눌러서 보는 "자세한 풀이"에 둔다. 같은 말을 제목 · 요약 · 본문에서 되풀이하지 않는다.
-// "지금 지나는 큰 흐름" 타임라인은 글로 쓰지 않고 서윤의 사주 계산 결과(luckTimeline)에서 만든다.
+// "지금 지나는 시기" 타임라인은 글로 쓰지 않고 서윤의 사주 계산 결과(luckTimeline)에서 만든다.
 import { BLOCK_CAVEAT, CARD_LABEL, comfortNote, FLOW_CAVEAT, RULE_DRAFT_NOTE, SCENARIO_NOTE, SCORE_NOTE, STATISTICS_NOTE } from "../report/reading/plan.ts";
 import type { IntegratedReadingReport, ReadingBlockId, ReadingDraftV1 } from "../report/reading/types.ts";
 import { luckTimeline } from "../saju/interpret/rules.ts";
@@ -25,10 +25,10 @@ export const sampleReadingReport: IntegratedReadingReport = {
     { kind: "flow", label: CARD_LABEL.flow, keyword: "성과와 표현이 주제인 10년", note: "2024.08부터 2034.07까지, 지금은 그 앞부분을 지나고 있습니다." },
   ],
   inputs: [
-    { name: "사주", status: "used", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운입니다. 해석 규칙은 전문가 검토 전 초안입니다.", usedIn: ["생각과 행동 방식", "강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 흐름"] },
+    { name: "사주", status: "used", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운입니다. 해석 규칙은 전문가 검토 전 초안입니다.", usedIn: ["생각과 행동 방식", "장점과 단점이 될 수 있는 부분", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 시기"] },
     { name: "MBTI", status: "used", note: "본인이 입력한 INFJ입니다. 참고값으로만 봤으며 공식 MBTI 검사 결과가 아닙니다.", usedIn: ["생각과 행동 방식"] },
-    { name: "기질 · 성격", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["생각과 행동 방식", "강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 흐름"] },
-    { name: "가까운 관계에서의 반응(애착 경향)", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "앞으로의 흐름"] },
+    { name: "기질 · 성격", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["생각과 행동 방식", "장점과 단점이 될 수 있는 부분", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 시기"] },
+    { name: "가까운 관계에서의 반응(애착 경향)", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["장점과 단점이 될 수 있는 부분", "중요하게 여기는 것", "가까운 관계", "앞으로의 시기"] },
     { name: "알려 준 고민 · 상황", status: "none", note: "입력하지 않았습니다. 특정 고민 없이 쓴 종합 해석입니다.", usedIn: [] },
     { name: "상대 자료", status: "none", note: "없습니다. 관계 부분은 서윤 님의 사주와 응답만으로 읽었습니다.", usedIn: [] },
     { name: "연구 통계", status: "none", note: "사용하지 않았습니다.", usedIn: [] },
@@ -74,9 +74,9 @@ export const sampleReadingReport: IntegratedReadingReport = {
     {
       id: "strength-burden",
       group: "me",
-      topic: "강한 포인트와 힘들 수 있는 포인트",
+      topic: "장점과 단점이 될 수 있는 부분",
       headline: "같은 모습이 힘이 될 때도, 힘들 때도 있습니다",
-      summary: "서윤 님의 특징 세 가지를 내가 강한 포인트와 힘들 수 있는 포인트로 나눠 봤습니다. 힘들 수 있는 때는 특징이 나쁘다는 뜻이 아니라, 환경과 조건이 맞지 않을 때 생기는 일입니다.",
+      summary: "서윤 님의 특징 세 가지를 장점과 단점이 될 수 있는 부분으로 나눠 봤습니다. 단점이 될 수 있는 때는 특징이 나쁘다는 뜻이 아니라, 환경과 조건이 맞지 않을 때 생기는 일입니다.",
       traits: [
         {
           name: "꼼꼼하게 다듬기",
@@ -210,7 +210,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
       example: "새 프로젝트를 맡았을 때, 처음 며칠은 자료를 읽고 정리하느라 조용할 수 있습니다. 구조가 잡히면 빠르게 결과물을 내놓는 모습일 수 있습니다. 그 사이 아무 반응이 없으면 ‘잘하고 있나’가 신경 쓰일 수 있고요.",
       details: [
         "말과 글, 정리된 자료처럼 ‘배운 것을 다듬어 내놓는’ 일과 이어서 읽는 구조입니다. 새 일을 맡으면 익숙한 방식을 선호하고, 시작 전에 위험과 변수를 먼저 살피는 쪽으로 응답했습니다. 반대로 반응이 거의 없는 환경에서는 의욕이 떨어질 수 있습니다.",
-        "돈에 관해서는 이번에 받은 응답이 없어 사주의 시기 해석만 참고했습니다. 지금 지나는 10년 단위의 큰 흐름은 현실적인 성과 · 수입 · 관리가 주제가 되는 시기로 읽힙니다. 실제 수입이 늘거나 줄어든다는 뜻은 아닙니다.",
+        "돈에 관해서는 이번에 받은 응답이 없어 사주의 시기 해석만 참고했습니다. 지금 지나는 10년 단위의 시기은 현실적인 성과 · 수입 · 관리가 주제가 되는 시기로 읽힙니다. 실제 수입이 늘거나 줄어든다는 뜻은 아닙니다.",
       ],
       watch: "일을 시작할 때 두 가지를 미리 정해 두면 좋습니다. ‘어디까지 파악되면 시작할지’와 ‘중간 결과를 누구에게 보여 줄지’입니다. 준비가 길어지거나 반응을 기다리는 시간이 줄 수 있습니다.",
       caveat: BLOCK_CAVEAT["work-money"]!("서윤"),
@@ -235,11 +235,11 @@ export const sampleReadingReport: IntegratedReadingReport = {
   ],
   flow: {
     id: "flow",
-    topic: "앞으로의 흐름",
+    topic: "앞으로의 시기",
     headline: "2026~2028년, 내 방식에서 결과물로",
     summary: "2026~2028년은 두 가지 주제가 차례로 두드러지는 시기로 읽힙니다. ‘내 방식대로 해 보는 일’과 ‘표현하고 결과물을 내는 일’입니다.",
     caveat: FLOW_CAVEAT,
-    cardText: "지금은 현실적인 성과 · 수입 · 관리와, 표현하고 새로 시도하는 일이 주제가 되는 큰 흐름 안에 있습니다. 결과물을 만드는 일과 그것을 정리하고 관리하는 일을 함께 챙길 시기로 볼 수 있습니다.",
+    cardText: "지금은 현실적인 성과 · 수입 · 관리와, 표현하고 새로 시도하는 일이 주제가 되는 시기 안에 있습니다. 결과물을 만드는 일과 그것을 정리하고 관리하는 일을 함께 챙길 시기로 볼 수 있습니다.",
     years: [
       { year: "2026", theme: "내 방식을 지키는 일과 함께하는 일의 균형" },
       { year: "2027", theme: "내 방식으로 해 본 것을 결과물로 남기는 해" },
@@ -247,7 +247,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
     ],
     periods: [
       {
-        period: "지금 지나는 큰 흐름",
+        period: "지금 지나는 시기",
         theme: "현실적인 성과 · 수입 · 관리가 주제로 떠오르고, 표현하고 새로 시도하는 일이 늘어나는 시기로 읽습니다.",
         watch: "지금 하고 있는 일 가운데 결과물로 이어지는 것과 정리가 필요한 것을 나눠 살펴볼 수 있습니다.",
       },
@@ -308,7 +308,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
  */
 export function sampleReadingAsDraft(): ReadingDraftV1 {
   const R = sampleReadingReport;
-  const refOf = (period: string) => (period === "지금 지나는 큰 흐름" ? "current" : period === "다음 큰 흐름" ? "next" : `y${period.replace("년", "")}`);
+  const refOf = (period: string) => (period === "지금 지나는 시기" ? "current" : period === "다음 시기" ? "next" : `y${period.replace("년", "")}`);
   const common = ["saju.spouse-palace", "survey.anxiety.high"];
   return {
     headline: R.headline,

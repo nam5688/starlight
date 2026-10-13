@@ -28,8 +28,8 @@ export const BLOCK_PLAN: BlockPlan[] = [
   {
     id: "strength-burden",
     group: "me",
-    topic: "강한 포인트와 힘들 수 있는 포인트",
-    ask: "이 사람의 특징 세 가지가 어떤 때 강하게 쓰이고(강한 포인트) 어떤 때 힘들어지는가(힘들 수 있는 포인트). 특징마다 가상의 장면 하나",
+    topic: "장점과 단점이 될 수 있는 부분",
+    ask: "이 사람의 특징 세 가지가 어떤 때 강하게 쓰이고(장점) 어떤 때 힘들어지는가(단점이 될 수 있는 부분). 특징마다 가상의 장면 하나",
     traits: true,
     example: false,
   },
@@ -57,7 +57,7 @@ export const BLOCK_PLAN: BlockPlan[] = [
   },
 ];
 
-export const FLOW_TOPIC = "앞으로의 흐름";
+export const FLOW_TOPIC = "앞으로의 시기";
 
 /**
  * 코드가 채우는 고정 문구 — AI가 쓰지 않는다. 예시 화면(sample-reading-report.ts)도 같은 문구를 가져다 쓴다(예시와 실제 생성이 어긋나지 않게).
@@ -77,7 +77,7 @@ export const RULE_DRAFT_NOTE = "사주 해석 규칙은 전문가 검토 전 초
 export const SCORE_NOTE = "괄호 안 숫자는 응답 환산값(0~100)이며 백분위가 아닙니다. 개발용 예시 문항입니다.";
 
 /** 첫 화면 카드 이름 */
-export const CARD_LABEL = { strength: "내가 강한 포인트", caution: "내가 힘들 수 있는 포인트", flow: "현재 흐름" } as const;
+export const CARD_LABEL = { strength: "장점", caution: "단점이 될 수 있는 부분", flow: "지금 나의 시기" } as const;
 
 /** 글자 · 문장 수 한도 — 검사(validate.ts) · 지시문(prompt.ts) · 모의 작성기 · 예시 테스트가 모두 이 값을 쓴다 */
 export const READING_LIMITS = {

@@ -64,9 +64,9 @@ export function composeMockReading(userMessage: string): ReadingDraftV1 {
   const periods = payload.periods.slice(0, 3);
   const periodIds = periods.flatMap((p) => p.evidence.slice(0, 1));
   const flow: ReadingDraftV1["flow"] = {
-    headline: "앞으로의 흐름 모의 결론입니다",
-    summary: `${M} 앞으로의 흐름 요약 자리입니다. 흐름 요약은 실제 AI가 계산된 시기를 읽고 씁니다.`,
-    cardText: `${M} 지금 지나는 흐름의 설명 자리입니다. 이 설명은 실제 AI가 연결되면 쉬운 말로 채워집니다.`,
+    headline: "앞으로의 시기 모의 결론입니다",
+    summary: `${M} 앞으로의 시기 요약 자리입니다. 시기 요약은 실제 AI가 계산된 시기를 읽고 씁니다.`,
+    cardText: `${M} 지금 지나는 시기의 설명 자리입니다. 이 설명은 실제 AI가 연결되면 쉬운 말로 채워집니다.`,
     years: years.map((p) => ({ year: p.ref.slice(1), theme: `${M} ${p.label} 한 줄 자리` })),
     periods: periods.map((p) => ({ ref: p.ref, theme: `${M} ${p.label}에 두드러지는 주제를 쓰는 자리입니다.`, watch: `${M} ${p.label}에 살펴볼 점 자리입니다.` })),
     scenarios: [
@@ -79,9 +79,9 @@ export function composeMockReading(userMessage: string): ReadingDraftV1 {
   const draft: ReadingDraftV1 = {
     headline: `${M} 근거 안에서 쓴 통합 해석 초안`,
     cards: {
-      strength: { keyword: `${M} 강점`, note: `${M} 강한 포인트를 쓰는 자리입니다.` },
-      caution: { keyword: `${M} 주의`, note: `${M} 힘들 수 있는 포인트를 쓰는 자리입니다.` },
-      flow: { keyword: `${M} 흐름` },
+      strength: { keyword: `${M} 강점`, note: `${M} 장점을 쓰는 자리입니다.` },
+      caution: { keyword: `${M} 주의`, note: `${M} 단점이 될 수 있는 부분을 쓰는 자리입니다.` },
+      flow: { keyword: `${M} 시기` },
     },
     blocks,
     flow,

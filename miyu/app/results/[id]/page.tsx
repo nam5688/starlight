@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ReportFeedback } from "@/components/results/report-feedback";
+import { ArrowIcon } from "@/components/ui/icons";
 import { Track } from "@/components/analytics/track";
 import { ClearAnalyzeDraft } from "@/components/analyze/clear-draft";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
@@ -103,6 +104,17 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
           source={content.source}
           meta={`검사일 ${created} · 저장된 리포트`}
         />
+        {isReadingReport(content) && (
+          <div className="mx-auto w-full max-w-[720px] px-5 pb-1">
+            <Link href={`/results/${assessment.id}/talk`} className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-accent/40 bg-accent-soft px-4 py-2.5 transition-colors hover:border-accent">
+              <span>
+                <span className="block text-[16px] font-bold text-accent-strong">대화로 풀어보기</span>
+                <span className="block text-[13px] leading-[1.5] text-ink-2">분석 카드를 저장하고, 궁금한 주제부터 한 번에 하나씩 읽어요.</span>
+              </span>
+              <ArrowIcon className="size-5 shrink-0 text-accent-strong" />
+            </Link>
+          </div>
+        )}
         {isReadingReport(content) ? (
           <ReadingReportView report={content} idPrefix="r-" footer={footer} />
         ) : isPersonalV2(content) ? (

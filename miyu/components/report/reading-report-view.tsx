@@ -1,4 +1,4 @@
-import { ArrowIcon } from "@/components/ui/icons";
+import { ArrowIcon, ChevronIcon } from "@/components/ui/icons";
 import { basisFor } from "@/lib/report/reading/assemble";
 import type { IntegratedReadingReport, ReadingBlock, ReadingGroupId } from "@/lib/report/reading/types";
 import type { SajuSection, ScoreRow } from "@/lib/report/types";
@@ -45,6 +45,7 @@ export function ReadingReportView({
   report,
   saju,
   scores,
+  tendencyName,
   idPrefix = "",
   footer,
 }: {
@@ -53,12 +54,22 @@ export function ReadingReportView({
   saju?: SajuSection;
   /** 응답 환산값 막대 — 실제 리포트는 저장된 report.base에서 만든다 (예시 화면만 따로 넘긴다) */
   scores?: { title: string; rows: ScoreRow[] }[];
+  /** 대표 경향 이름(~형, 후보 이름) — 실제 리포트는 저장된 report.base에서 읽는다 (예시 화면만 따로 넘긴다) */
+  tendencyName?: string;
   idPrefix?: string;
   footer?: React.ReactNode;
 }) {
   const id = (name: string) => `${idPrefix}${name}`;
   const chart = saju ?? report.saju;
   const scoreGroups = scores ?? (report.base ? [{ title: "기질 · 성격", rows: report.base.temperament }, { title: "가까운 관계 반응(애착 경향)", rows: report.base.relationship }] : []);
+  const tendency = tendencyName ?? report.base?.tendency.name;
+  // 큰 주제에 붙이는 번호 — 주제 5개 다음이 "앞으로의 시기"
+  const numberOf = new Map(report.blocks.map((b, i) => [b.id, i + 1]));
+  const flowNumber = report.blocks.length + 1;
+  const rangeOf = (g: ReadingGroupId) => {
+    const ns = report.blocks.filter((b) => b.group === g).map((b) => numberOf.get(b.id)!);
+    return ns.length === 0 ? "" : ns.length === 1 ? `${ns[0]}` : `${ns[0]}~${ns[ns.length - 1]}`;
+  };
   const extras = report.extras;
   const focus = report.focus ?? [];
   const hasExtras = Boolean(extras && (extras.plain || extras.questions.length || extras.situations.length || extras.partner || extras.items));
@@ -68,7 +79,7 @@ export function ReadingReportView({
     { id: id("summary"), label: "전체 요약" },
     ...(focus.length ? [{ id: id("focus"), label: "내 고민" }] : []),
     ...GROUPS.filter((g) => report.blocks.some((b) => b.group === g.id)).map((g) => ({ id: id(g.section), label: g.label })),
-    { id: id(report.flow.id), label: "미래 흐름" },
+    { id: id(report.flow.id), label: "앞으로의 시기" },
     ...(hasExtras ? [{ id: id("extras"), label: "더 살펴보기" }] : []),
   ];
 
@@ -81,7 +92,14 @@ export function ReadingReportView({
           <h2 id={id("headline")} className="text-[13px] font-semibold text-accent">
             핵심 해석
           </h2>
-          <p className="mt-1.5 text-[22px] leading-[1.4] font-bold tracking-tight md:text-[28px]">{report.headline}</p>
+          {tendency && (
+            <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="inline-flex items-center rounded-md bg-accent-soft px-2.5 py-1 text-[15px] font-bold text-accent-strong">{tendency}</span>
+              <span className="text-[13px] text-ink-3">나의 대표 경향</span>
+            </p>
+          )}
+          <p className="mt-2 text-[22px] leading-[1.4] font-bold tracking-tight md:text-[28px]">{report.headline}</p>
+          {tendency && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 이름이며, 진단이나 평생 가는 유형이 아닙니다.</p>}
           <SummaryCards cards={report.summary} />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <a href={`#${id("tendency")}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-accent px-3 text-[15px] font-semibold text-white transition-colors hover:bg-accent-strong">
@@ -92,18 +110,16 @@ export function ReadingReportView({
             </a>
           </div>
 
-          <details className="group mt-4">
-            <summary className="flex min-h-11 cursor-pointer list-none items-start justify-between gap-3 py-1.5 [&::-webkit-details-marker]:hidden">
-              <span className="text-[14px] leading-[1.6] text-ink-2">
-                <span className="font-semibold text-ink">참고한 자료</span> {used.join(" · ")}
-                <span className="mx-1.5 text-ink-3">/</span>
-                <span className="font-semibold text-ink">없음</span> {none.join(" · ")}
-              </span>
-              <span className="flex shrink-0 items-center gap-0.5 pt-0.5 text-[13px] font-semibold text-accent">
-                <span className="group-open:hidden">자세히</span>
-                <span className="hidden group-open:inline">접기</span>
+          <details className="group mt-3">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-end [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex h-9 items-center gap-1 rounded-full border border-line-strong bg-canvas pr-2.5 pl-3.5 text-[13px] font-semibold text-ink-2 transition-colors hover:bg-mist">
+                참고한 자료 {used.length}개
+                <ChevronIcon className="size-4 transition-transform group-open:rotate-180" />
               </span>
             </summary>
+            <p className="mb-2 text-[13px] leading-[1.6] text-ink-3">
+              <span className="font-semibold text-ink-2">쓰지 않은 것</span> {none.join(" · ") || "없음"} — 자료가 없는 부분은 만들어 채우지 않았습니다.
+            </p>
             <ul className="divide-y divide-line rounded-lg border border-line bg-canvas text-[14px]">
               {report.inputs.map((i) => (
                 <li key={i.name} className="grid gap-0.5 px-4 py-3 md:grid-cols-[170px_minmax(0,1fr)] md:gap-4">
@@ -151,11 +167,12 @@ export function ReadingReportView({
           return (
             <section key={g.id} id={id(g.section)} aria-labelledby={id(`${g.section}-h`)} className={`mt-12 ${SCROLL_MARGIN}`}>
               <h2 id={id(`${g.section}-h`)} className="flex items-baseline justify-between gap-3 border-t-2 border-accent pt-3 text-[18px] font-bold">
-                {g.label}
+                <span>{g.label}</span>
+                <span className="text-[13px] font-semibold text-ink-3 tabular-nums">{rangeOf(g.id)}</span>
               </h2>
               <div className="mt-6 space-y-10 [&>article+article]:border-t [&>article+article]:border-line [&>article+article]:pt-10">
                 {blocks.map((b) => (
-                  <BlockView key={b.id} block={b} id={id(b.id)} showTopic={blocks.length > 1} />
+                  <BlockView key={b.id} block={b} id={id(b.id)} number={numberOf.get(b.id)!} />
                 ))}
               </div>
             </section>
@@ -163,10 +180,14 @@ export function ReadingReportView({
         })}
 
         <section id={id(report.flow.id)} aria-labelledby={id(`${report.flow.id}-h`)} className={`mt-12 ${SCROLL_MARGIN}`}>
-          <h2 id={id(`${report.flow.id}-h`)} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
-            미래 흐름
+          <h2 id={id(`${report.flow.id}-h`)} className="flex items-baseline justify-between gap-3 border-t-2 border-accent pt-3 text-[18px] font-bold">
+            <span>앞으로의 시기</span>
           </h2>
           <article className="mt-6">
+            <p className="mb-0.5 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
+              <NumberBadge n={flowNumber} />
+              {report.flow.topic}
+            </p>
             <h3 className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">{report.flow.headline}</h3>
             <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
             <CaveatNote text={report.flow.caveat} />
@@ -328,11 +349,14 @@ export function ReadingReportView({
 }
 
 /** 주제 하나 — 이름표 → 결론(제목) → 요약 2문장 → (그림) → 예시 1개 → 조건 한 줄 → 접힘 두 개 */
-function BlockView({ block: b, id, showTopic }: { block: ReadingBlock; id: string; showTopic: boolean }) {
+function BlockView({ block: b, id, number }: { block: ReadingBlock; id: string; number: number }) {
   const hasFoldA = b.details.length > 0 || b.traits || b.reactionFlow || b.detailExample || b.watch;
   return (
     <article id={id} aria-labelledby={`${id}-h`} className={SCROLL_MARGIN}>
-      {showTopic && <p className="mb-0.5 text-[13px] font-semibold text-ink-3">{b.topic}</p>}
+      <p className="mb-0.5 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
+        <NumberBadge n={number} />
+        {b.topic}
+      </p>
       <h3 id={`${id}-h`} className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">
         {b.headline}
       </h3>
@@ -366,5 +390,14 @@ function BlockView({ block: b, id, showTopic }: { block: ReadingBlock; id: strin
         </Fold>
       </FoldRow>
     </article>
+  );
+}
+
+/** 큰 주제 번호 — 어디까지 읽었는지 알 수 있게 주제마다 붙인다 (색만이 아니라 숫자로 구분) */
+function NumberBadge({ n }: { n: number }) {
+  return (
+    <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-[13px] font-bold text-accent-strong tabular-nums" aria-label={`주제 ${n}`}>
+      {n}
+    </span>
   );
 }

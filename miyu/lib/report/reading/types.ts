@@ -28,7 +28,7 @@ export type ReadingBasis = {
 /** 첫 화면 요약 카드 — 강점 · 주의할 점 · 지금의 흐름 */
 export type ReadingSummaryCard = { kind: "strength" | "caution" | "flow"; label: string; keyword: string; note: string };
 
-/** "내가 강한 포인트 / 내가 힘들 수 있는 포인트" 카드 — short는 카드에 보이는 짧은 말, shines · burden · example은 접어 둔 일상 예시 */
+/** "장점 / 단점이 될 수 있는 부분" 카드 — short는 카드에 보이는 짧은 말, shines · burden · example은 접어 둔 일상 예시 */
 export type ReadingTrait = { name: string; shinesShort: string; burdenShort: string; shines: string; burden: string; /** 이 특징의 가상의 장면 한두 문장 */ example: string };
 
 export type ReadingGroupId = "me" | "relation" | "work";
@@ -67,7 +67,7 @@ export type ReadingFlow = {
   headline: string;
   summary: string;
   caveat: string;
-  /** 지금 지나는 큰 흐름 카드의 쉬운 설명 2~3문장 */
+  /** 지금 지나는 시기 카드의 쉬운 설명 2~3문장 */
   cardText: string;
   /** 해마다 한 줄 */
   years: { year: string; theme: string }[];
@@ -101,7 +101,7 @@ export type IntegratedReadingReport = {
   inputs: ReadingInput[];
   blocks: ReadingBlock[];
   flow: ReadingFlow;
-  /** 지금 지나는 큰 흐름 타임라인 — 사용자의 사주 계산 결과(luckTimeline)로 만든다. 기준 월은 timelineReference */
+  /** 지금 지나는 시기 타임라인 — 사용자의 사주 계산 결과(luckTimeline)로 만든다. 기준 월은 timelineReference */
   timeline: LuckSlot[];
   timelineReference: { year: number; month: number };
   /** 다음 행동 체크리스트 */
@@ -140,7 +140,7 @@ export type ReadingBlockDraft = {
   headline: string;
   /** 요약 1~2문장 — 제목을 되풀이하지 않는다 */
   summary: string;
-  /** 쉬운 예시 (강한 포인트 블록은 특징마다 따로 있고, 가까운 관계는 반응 단계 그림이 그 자리를 맡는다) */
+  /** 쉬운 예시 (장점 블록은 특징마다 따로 있고, 가까운 관계는 반응 단계 그림이 그 자리를 맡는다) */
   example?: string;
   /** 자세한 풀이 — 문단마다 2~3문장 */
   details: string[];
@@ -154,7 +154,7 @@ export type ReadingBlockDraft = {
 export type ReadingFlowDraft = {
   headline: string;
   summary: string;
-  /** 지금 지나는 큰 흐름 카드의 쉬운 설명 2~3문장 */
+  /** 지금 지나는 시기 카드의 쉬운 설명 2~3문장 */
   cardText: string;
   years: { year: string; theme: string }[];
   /** ref는 사용자 메시지의 periods 목록에서 고른다 (current · next · y2026 …) */
@@ -166,7 +166,7 @@ export type ReadingFlowDraft = {
 export type ReadingDraftV1 = {
   /** 이 사람의 핵심 해석 한 문장 */
   headline: string;
-  /** 현재 흐름 카드의 기간 문장은 계산 결과로 코드가 붙인다 — AI는 주제 한 줄(keyword)만 쓴다 */
+  /** 지금 나의 시기 카드의 기간 문장은 계산 결과로 코드가 붙인다 — AI는 주제 한 줄(keyword)만 쓴다 */
   cards: { strength: { keyword: string; note: string }; caution: { keyword: string; note: string }; flow: { keyword: string } };
   blocks: ReadingBlockDraft[];
   flow: ReadingFlowDraft;

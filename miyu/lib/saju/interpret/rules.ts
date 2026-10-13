@@ -98,7 +98,7 @@ function ym(d: { year: number; month: number }) {
   return `${d.year}-${String(d.month).padStart(2, "0")}`;
 }
 
-/** 대운 한 칸 — 화면의 "지금 지나는 큰 흐름" 타임라인용 (계산 결과와 위 GROUP_RULE의 주제 이름만 쓰고 새 해석을 만들지 않는다) */
+/** 대운 한 칸 — 화면의 "지금 지나는 시기" 타임라인용 (계산 결과와 위 GROUP_RULE의 주제 이름만 쓰고 새 해석을 만들지 않는다) */
 export type LuckSlot = {
   role: "previous" | "current" | "next";
   /** 예: 신미(辛未) */

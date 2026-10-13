@@ -4,7 +4,7 @@ import { lineGroups } from "@/lib/report/reading/line-breaks";
 import type { LuckSlot, ReadingBasis, ReadingBlock, ReadingSummaryCard, ReadingTrait } from "@/lib/report/reading/types";
 
 // 읽기 구조 리포트의 부품. 크기: 카드 제목 17px · 본문 16px(줄 간격 1.7) · 보조 설명 13~14px.
-// 색: 내가 강한 포인트 = positive, 내가 힘들 수 있는 포인트 = caution, 현재 위치 · 링크 = accent. 색은 작은 이름표 · 핵심 구절 · 구분선에만 쓰고,
+// 색: 장점 = positive, 단점이 될 수 있는 부분 = caution, 현재 위치 · 링크 = accent. 색은 작은 이름표 · 핵심 구절 · 구분선에만 쓰고,
 // 뜻은 항상 글자와 아이콘이 함께 전한다(색만으로 구분하지 않는다). 카드 안에 카드를 넣지 않는다.
 
 /**
@@ -26,7 +26,7 @@ export function Prose({ text, className, as: Tag = "p" }: { text: string; classN
 }
 
 /** 특징 카드와 일상 예시에서 같이 쓰는 이름표 */
-export const TRAIT_LABEL = { strong: "내가 강한 포인트", hard: "내가 힘들 수 있는 포인트" } as const;
+export const TRAIT_LABEL = { strong: "장점", hard: "단점이 될 수 있는 부분" } as const;
 
 const KIND = {
   strength: { Icon: StrengthIcon, label: "text-positive", band: "before:bg-positive" },
@@ -34,7 +34,7 @@ const KIND = {
   flow: { Icon: FlowIcon, label: "text-accent", band: "before:bg-accent" },
 } as const;
 
-/** 첫 화면 요약 카드 3개 — 강점 · 주의할 점 · 현재 흐름 */
+/** 첫 화면 요약 카드 3개 — 강점 · 주의할 점 · 지금 나의 시기 */
 export function SummaryCards({ cards }: { cards: ReadingSummaryCard[] }) {
   return (
     <ul className="mt-5 grid gap-3 md:grid-cols-3">
@@ -98,7 +98,7 @@ export function CaveatNote({ text }: { text: string }) {
   );
 }
 
-/** 내가 강한 포인트 / 내가 힘들 수 있는 포인트 — 특징마다 칸을 둘로 나눈 카드 (모바일은 세로, PC는 가로 3칸) */
+/** 장점 / 단점이 될 수 있는 부분 — 특징마다 칸을 둘로 나눈 카드 (모바일은 세로, PC는 가로 3칸) */
 export function TraitCards({ traits }: { traits: ReadingTrait[] }) {
   return (
     <ul className="mt-5 grid gap-3 md:grid-cols-3">
@@ -126,7 +126,7 @@ export function TraitCards({ traits }: { traits: ReadingTrait[] }) {
 }
 
 /**
- * 일상 예시 보기 — 특징마다 구분선으로 나누고, 안에서도 "강한 포인트 · 힘들 수 있는 포인트 · 예를 들면"을 칸으로 띄운다.
+ * 일상 예시 보기 — 특징마다 구분선으로 나누고, 안에서도 "장점 · 단점이 될 수 있는 부분 · 예를 들면"을 칸으로 띄운다.
  * 왼쪽 가이드줄(청록 · 황토 · 회색)로 칸이 구분되며, 줄 색만이 아니라 이름표 글자로도 뜻을 전한다.
  */
 export function TraitSentences({ traits }: { traits: ReadingTrait[] }) {
@@ -220,7 +220,7 @@ export function ReactionStepper({ flow }: { flow: NonNullable<ReadingBlock["reac
 const fmtMonth = (s: string) => s.replace("-", ".");
 const monthIndex = (s: string) => Number(s.slice(0, 4)) * 12 + Number(s.slice(5, 7));
 
-/** 지금 지나는 큰 흐름 — 계산된 기간으로 이전 · 지금 · 다음을 한 줄에 놓고 현재 위치를 표시한다. 곡선 · 점수는 그리지 않는다 */
+/** 지금 지나는 시기 — 계산된 기간으로 이전 · 지금 · 다음을 한 줄에 놓고 현재 위치를 표시한다. 곡선 · 점수는 그리지 않는다 */
 export function LuckTimelineCard({ timeline, text, reference }: { timeline: LuckSlot[]; text: string; reference: { year: number; month: number } }) {
   const cur = timeline.find((s) => s.role === "current");
   if (!cur) return null;
@@ -235,8 +235,9 @@ export function LuckTimelineCard({ timeline, text, reference }: { timeline: Luck
     <div className="mt-5 rounded-xl border border-line bg-canvas p-4 md:p-5">
       <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent">
         <FlowIcon />
-        지금 지나는 큰 흐름 · 10년 단위
+        지금 나의 시기 · 10년 단위
       </p>
+      <p className="mt-1 text-[13px] leading-[1.6] text-ink-3">사주에서는 사람마다 10년 단위로 분위기가 바뀐다고 봐요. 지금이 그 10년 중 어디쯤인지 보여 드려요.</p>
       <p className="mt-1.5 text-[22px] leading-snug font-bold tracking-tight tabular-nums">
         {fmtMonth(cur.from)} — {fmtMonth(cur.to)}
       </p>
@@ -274,7 +275,7 @@ export function LuckTimelineCard({ timeline, text, reference }: { timeline: Luck
           ))}
         </div>
         <p className="mt-2 text-[13px] text-ink-3">
-          {reference.year}년 {reference.month}월 기준, 이 흐름이 시작된 지 {elapsedText} 지난 지점입니다.
+          {reference.year}년 {reference.month}월 기준, 이 시기가 시작된 지 {elapsedText} 지난 지점입니다.
         </p>
       </div>
 
