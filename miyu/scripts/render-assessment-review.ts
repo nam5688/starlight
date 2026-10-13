@@ -4,46 +4,58 @@
 //       node scripts/render-assessment-review.ts --fragment <경로>  → 게시용 조각(<title> + 스타일 + 본문 + 스크립트)
 import { writeFileSync } from "node:fs";
 import {
+  CLEAR_DISTANCE,
   contribution,
+  coverage,
   DOMAIN_LABEL,
   DRAFT_CONTENT_VERSION,
   DRAFT_ITEMS,
   DRAFT_SCORING_VERSION,
+  HOLD_TEXT,
   indicatorCounts,
   MANY_SKIPPED,
   MIN_INDICATORS,
   NA_OPTION_TEXT,
   PERSPECTIVE_IDS,
   PERSPECTIVES,
-  CLEAR_DISTANCE,
-  SLIGHT_DISTANCE,
+  UNCLEAR_TEXT,
   type Domain,
   type DraftItem,
   type DraftOption,
-  type PerspectiveId,
 } from "../lib/assessment/drafts/situational-draft.ts";
-import { summarizeReliability, SIM_NA_RATE, SIM_PEOPLE } from "../lib/assessment/drafts/reliability-summary.ts";
+import { levelOf, SIM_NA_RATE, SIM_PEOPLE, summarizeReliability, versionOf } from "../lib/assessment/drafts/reliability-summary.ts";
 import type { SimReport } from "../lib/assessment/drafts/reliability-sim.ts";
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const f2 = (x: number) => x.toFixed(2);
 const signed = (x: number) => (x > 0 ? `+${x.toFixed(2)}` : x.toFixed(2));
-const range = (xs: number[], fmt: (x: number) => string) => `${fmt(Math.min(...xs))}~${fmt(Math.max(...xs))}`;
+const range = (xs: number[], fmt: (x: number) => string) => {
+  const lo = fmt(Math.min(...xs));
+  const hi = fmt(Math.max(...xs));
+  return lo === hi ? lo : `${lo}~${hi}`;
+};
 const DOMAINS: Domain[] = ["temperament", "character", "relation"];
 const DOMAIN_SHORT: Record<Domain, string> = { temperament: "기질", character: "성격", relation: "관계" };
 const counts = indicatorCounts();
-const totalIndicators = PERSPECTIVE_IDS.reduce((n, p) => n + counts[p], 0);
-const perspectivesOf = (item: DraftItem) => PERSPECTIVE_IDS.filter((p) => item.options.some((o) => o.w[p] !== undefined));
+const cov = coverage();
+const readableIds = new Set(cov.readable);
 
 // ───────── 문항 탭 ─────────
 
+const KIND: Record<DraftItem["kind"], string> = { feeling: "마음의 크기", behavior: "행동 · 방식", reason: "같은 행동의 이유" };
+
 function readingOf(item: DraftItem, o: DraftOption) {
-  const rows = (Object.entries(o.w) as [PerspectiveId, number][]).map(([p, w]) => {
-    const side = w > 0 ? PERSPECTIVES[p].high : PERSPECTIVES[p].low;
-    const c = contribution(item, o.id, p);
-    return `<li><span class="pid">${p}</span><span class="pname">${esc(PERSPECTIVES[p].name)}</span><span class="side ${w > 0 ? "up" : "down"}">${w > 0 ? "높은 쪽" : "낮은 쪽"} · ${Math.abs(w) === 2 ? "크게" : "조금"}</span><span class="sidetext">${esc(side)}</span><span class="contrib" title="이 문항의 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 ${c === null ? "—" : signed(c)}</span></li>`;
-  });
+  const rows: string[] = [];
+  if (o.unscored) {
+    rows.push(`<li><span class="pid">${item.primary}</span><span class="pname">${esc(PERSPECTIVES[item.primary].name)}</span><span class="side down">점수에 넣지 않음</span><span class="sidetext">같은 행동이어도 이유가 다른 답입니다. 이 관점의 증거로 쓰지 않고 이유만 따로 남깁니다.</span></li>`);
+  } else {
+    const w = o.w[item.primary] as number;
+    const side = w > 0 ? PERSPECTIVES[item.primary].high : PERSPECTIVES[item.primary].low;
+    const c = contribution(item, o.id, item.primary);
+    rows.push(`<li><span class="pid">${item.primary}</span><span class="pname">${esc(PERSPECTIVES[item.primary].name)}</span><span class="side ${w > 0 ? "up" : "down"}">${w > 0 ? "높은 쪽" : "낮은 쪽"} · ${Math.abs(w) === 2 ? "크게" : "조금"}</span><span class="sidetext">${esc(side)}</span><span class="contrib" title="이 문항에서 점수를 주는 선택지를 모두 같은 확률로 고르는 사람을 0으로 맞춘 값 (−1~+1)">기여값 ${c === null ? "—" : signed(c)}</span></li>`);
+  }
+  if (o.reason) rows.push(`<li><span class="reason">이유 기록: ${esc(o.reason)}</span></li>`);
   return `<ul class="reading">${rows.join("")}</ul>`;
 }
 
@@ -53,11 +65,8 @@ function itemHtml(item: DraftItem) {
       (o) => `<li class="opt"><span class="letter">${o.id.toUpperCase()}</span><div class="opt-body"><p class="opt-text">${esc(o.text)}</p><div class="analyst">${readingOf(item, o)}</div></div></li>`,
     )
     .join("");
-  const touched = perspectivesOf(item)
-    .map((p) => `<span class="pid" title="${esc(PERSPECTIVES[p].name)}">${p}</span>`)
-    .join("");
   return `<article class="item" id="item-${item.id}" data-id="${item.id}" data-domain="${item.domain}">
-  <header class="item-head"><span class="qid">${item.id}</span><span class="topic">${esc(item.topic)}</span><span class="dom dom-${item.domain}">${DOMAIN_SHORT[item.domain]}</span><span class="touch analyst">영향을 주는 관점 ${touched}</span></header>
+  <header class="item-head"><span class="qid">${item.id}</span><span class="topic">${esc(item.topic)}</span><span class="dom dom-${item.domain}">${DOMAIN_SHORT[item.domain]}</span><span class="touch analyst">주로 보는 관점 <span class="pid" title="${esc(PERSPECTIVES[item.primary].name)}">${item.primary}</span> · 장면 ${esc(item.scene)} · ${KIND[item.kind]}</span></header>
   <p class="stem">${esc(item.stem)}</p>
   <p class="purpose analyst"><b>이 문항으로 알고 싶은 것</b> ${esc(item.purpose)}</p>
   <ol class="opts">${options}<li class="opt na"><span class="letter">—</span><div class="opt-body"><p class="opt-text">${esc(NA_OPTION_TEXT)}</p><p class="na-note analyst">점수에 넣지 않습니다 (억지로 고르게 하지 않기 위한 선택지).</p></div></li></ol>
@@ -87,7 +96,7 @@ function itemsTab() {
   </div>
   <label class="switch"><input type="checkbox" id="respondent-view"> <span>응답자 화면처럼 보기 (점수 방향 숨김)</span></label>
 </div>
-<p class="hint">각 문항을 읽고 <b>괜찮음 · 고쳐야 함 · 빼기</b> 중 하나를 누르고, 필요하면 한 줄 메모를 적어 주세요. 표시는 이 브라우저에만 저장되고, <b>검토 메모</b> 탭에서 글로 모아 채팅에 붙여넣을 수 있습니다. 선택지 아래의 <b>점수 방향</b>은 운영자 설명용이며 응답자에게는 보이지 않습니다.</p>
+<p class="hint">각 문항을 읽고 <b>괜찮음 · 고쳐야 함 · 빼기</b> 중 하나를 누르고, 필요하면 한 줄 메모를 적어 주세요. 표시는 이 브라우저에만 저장되고, <b>검토 메모</b> 탭에서 글로 모아 채팅에 붙여넣을 수 있습니다. 선택지 아래의 <b>점수 방향</b>은 운영자 설명용이며 응답자에게는 보이지 않습니다. <b>문항 하나는 관점 하나만 봅니다.</b> 같은 행동이어도 이유가 다를 수 있는 문항(Q19 · Q20 · Q22)은 이유가 다른 답을 점수에 넣지 않습니다.</p>
 ${groups}`;
 }
 
@@ -104,8 +113,8 @@ function scoringTab() {
     })
     .join("");
   // 예시 2: 가상 응답자 한 명의 T1 점수
-  const t1Items = DRAFT_ITEMS.filter((i) => perspectivesOf(i).includes("T1"));
-  const pattern = [0, 0, 1, 0, 2];
+  const t1Items = DRAFT_ITEMS.filter((i) => i.primary === "T1");
+  const pattern = [0, 0, 1];
   const picks = t1Items.map((item, n) => {
     const sorted = [...item.options].sort((a, b) => (b.w.T1 ?? 0) - (a.w.T1 ?? 0));
     const o = sorted[Math.min(pattern[n] ?? 0, sorted.length - 1)];
@@ -114,16 +123,25 @@ function scoringTab() {
   const mean = picks.reduce((n, p) => n + p.c, 0) / picks.length;
   const score = Math.round(50 + 50 * mean);
   const dist = Math.abs(score - 50);
-  const band = dist >= CLEAR_DISTANCE ? "뚜렷" : dist >= SLIGHT_DISTANCE ? "약간" : "고르게";
+  const clear = dist >= CLEAR_DISTANCE;
   const pickRows = picks.map((p) => `<tr><td>${p.item.id} ${esc(p.item.topic)}</td><td>${p.o.id.toUpperCase()}</td><td class="num">${signed(p.c)}</td></tr>`).join("");
+  // 예시 3: 이유가 다른 답
+  const q20 = DRAFT_ITEMS.find((i) => i.id === "Q20")!;
+  const q20Rows = q20.options
+    .map((o) => {
+      const c = contribution(q20, o.id, "C3");
+      return `<tr><td>${o.id.toUpperCase()}</td><td>${esc(o.text)}</td><td>${o.reason ? esc(o.reason) : "—"}</td><td class="num">${c === null ? "점수에 넣지 않음" : signed(c)}</td></tr>`;
+    })
+    .join("");
 
   return `<h2>답이 점수가 되는 과정</h2>
 <ol class="steps">
-  <li><b>선택지마다 방향이 정해져 있습니다.</b> 한 선택지는 최대 2개 관점에 "높은 쪽 / 낮은 쪽"과 세기(조금=1, 크게=2)를 줍니다. 문항 탭의 점수 방향이 이 표입니다.</li>
-  <li><b>문항마다 가운데를 맞춥니다.</b> 그 문항의 선택지 네 개를 같은 확률로 고르는 사람이 0이 되도록 빼고, 가장 먼 선택지가 ±1이 되게 맞춥니다. 선택지가 한쪽으로 치우쳐 쓰인 문항도 점수를 한쪽으로 끌지 않게 하기 위해서입니다. 이 값이 <b>기여값</b>(−1~+1)입니다.</li>
-  <li><b>관점마다 평균을 냅니다.</b> 그 관점에 점수를 주는 문항 중 <b>답한 문항</b>의 기여값 평균을 0~100으로 옮깁니다 (50이 가운데). <b>"해당 없음"은 평균에 넣지 않습니다.</b></li>
-  <li><b>정도를 세 칸으로 나눕니다.</b> 가운데(50)에서 ${CLEAR_DISTANCE} 이상 떨어지면 <b>뚜렷</b>, ${SLIGHT_DISTANCE}~${CLEAR_DISTANCE}는 <b>약간</b>, ${SLIGHT_DISTANCE} 미만은 <b>고르게</b>(어느 쪽으로도 기울지 않음)입니다.</li>
-  <li><b>답한 문항이 ${MIN_INDICATORS}개 미만이면 그 관점은 판단을 보류합니다.</b> 억지로 분류하지 않습니다. 건너뛴 문항이 ${MANY_SKIPPED}개 이상이면 해석을 줄이고 다시 답하기를 권합니다.</li>
+  <li><b>문항 하나는 관점 하나만 봅니다.</b> 선택지는 그 문항의 주된 관점에만 "높은 쪽 / 낮은 쪽"과 세기(조금=1, 크게=2)를 줍니다. (초안 0.1은 한 선택지가 최대 2~3개 관점에 점수를 줘서 문항 30개가 지표 62개가 되었고, 같은 응답이 여러 관점에 겹쳐 반영됐습니다.) 문항 탭의 점수 방향이 이 표입니다.</li>
+  <li><b>같은 행동이어도 이유가 다르면 점수에 넣지 않습니다.</b> 예를 들어 "급한 날 부탁을 받고 도왔다"는 행동이 상대 사정을 고려해서일 수도, 거절하기 어려워서일 수도 있습니다. 목표 관점(상대 필요를 함께 놓음)의 이유가 아닌 답은 점수에 넣지 않고 이유만 남깁니다 (예시 3).</li>
+  <li><b>문항마다 가운데를 맞춥니다.</b> 그 문항에서 점수를 주는 선택지를 같은 확률로 고르는 사람이 0이 되도록 빼고, 가장 먼 선택지가 ±1이 되게 맞춥니다. 이 값이 <b>기여값</b>(−1~+1)입니다.</li>
+  <li><b>관점마다 평균을 냅니다.</b> 그 관점을 주로 보는 문항 중 <b>답한 문항</b>의 기여값 평균을 0~100으로 옮깁니다 (50이 가운데). <b>"해당 없음"과 이유가 다른 답은 평균에 넣지 않습니다.</b></li>
+  <li><b>읽는 방법은 두 가지뿐입니다.</b> 가운데(50)에서 ${CLEAR_DISTANCE} 이상 떨어지면 <b>뚜렷한 높음 · 뚜렷한 낮음</b>, 아니면 <b>"${UNCLEAR_TEXT}"</b>입니다. "약간 ~한 편"처럼 방향을 억지로 붙이지 않습니다.</li>
+  <li><b>점수가 나온 문항이 ${MIN_INDICATORS}개 미만이면 그 관점은 "${HOLD_TEXT}"합니다.</b> 지금 30문항은 서로 다른 문항 ${MIN_INDICATORS}개 이상으로 읽을 수 있는 관점이 13개 중 ${cov.readable.length}개(${cov.readable.join(" · ")})뿐이고, 나머지 ${cov.needMore.length}개는 문항이 모자라 보류합니다. 건너뛴 문항이 ${MANY_SKIPPED}개 이상이면 해석을 줄이고 다시 답하기를 권합니다.</li>
 </ol>
 
 <h2>예시 1 — 한 문항이 만드는 기여값 (Q02 · 새로움에 끌리는 정도)</h2>
@@ -131,9 +149,13 @@ function scoringTab() {
 <p class="small">정해 둔 방향이 +1인 선택지도, 같은 문항의 다른 선택지가 +2이면 기여값은 +0.5로 낮아집니다. 선택지끼리의 차이를 보는 방식이기 때문입니다.</p>
 
 <h2>예시 2 — 가상 응답자 한 명의 "새로움에 끌리는 정도" 점수</h2>
-<p class="small">실제 응답이 아니라 설명을 위해 고른 가상의 응답입니다. 새로움(T1)에 점수를 주는 문항 ${picks.length}개에 아래처럼 답했다고 합니다.</p>
+<p class="small">실제 응답이 아니라 설명을 위해 고른 가상의 응답입니다. 새로움(T1)을 주로 보는 문항 ${picks.length}개에 아래처럼 답했다고 합니다.</p>
 <div class="tablewrap"><table><thead><tr><th>문항</th><th>고른 선택지</th><th class="num">기여값</th></tr></thead><tbody>${pickRows}<tr class="sum"><td colspan="2">평균 ${signed(mean)} → 0~100으로 옮기면</td><td class="num"><b>${score}</b></td></tr></tbody></table></div>
-<p>가운데(50)에서 ${dist} 떨어져 있어 <b>${band}</b> 칸입니다. 리포트에서는 숫자보다 <b>"${esc(PERSPECTIVES.T1.high)} 쪽으로 ${band === "뚜렷" ? "뚜렷하게 가까운" : band === "약간" ? "약간 기운" : "치우치지 않은"} 편"</b>처럼 방향과 정도로 씁니다. 이 점수는 응답에서 나온 환산값이고, 백분위나 정확도가 아니며, 높고 낮음이 좋고 나쁨도 아닙니다.</p>
+<p>가운데(50)에서 ${dist} 떨어져 있어 ${clear ? `<b>뚜렷한 방향</b>입니다. 리포트에서는 숫자보다 <b>"${esc(PERSPECTIVES.T1.high)} 쪽에 가까운 응답"</b>처럼 방향으로 씁니다.` : `<b>"${UNCLEAR_TEXT}"</b>입니다. 이때는 방향을 붙이지 않습니다.`} 이 점수는 응답에서 나온 환산값이고, 백분위나 정확도가 아니며, 높고 낮음이 좋고 나쁨도 아닙니다.</p>
+
+<h2>예시 3 — 같은 행동, 다른 이유 (Q20 · 급한 날의 부탁)</h2>
+<div class="tablewrap"><table><thead><tr><th>선택지</th><th>응답자가 보는 문장</th><th>이유</th><th class="num">상대 필요 관점 기여값</th></tr></thead><tbody>${q20Rows}</tbody></table></div>
+<p class="small">"거절하기 어려워서 돕는다"를 고른 사람은 이 문항이 "상대의 필요를 함께 놓는 정도"의 증거가 되지 않고, 그 이유만 본인의 응답으로 남습니다. 여러 문항에서 이 이유를 고르면 그 관점은 점수가 모자라 읽지 않습니다.</p>
 
 <h2>점수를 읽을 때 지키는 규칙</h2>
 <ul class="rules">
@@ -141,6 +163,7 @@ function scoringTab() {
   <li>사주와 응답을 합산하지 않습니다. 응답 때문에 사주 원국이나 운의 시기를 바꾸지 않고, 둘이 다르면 상황별 차이로 설명합니다.</li>
   <li>공식 MBTI · TCI · 애착검사의 문항을 가져오지 않았고, 그 점수나 유형으로 환산하지 않습니다. 이 질문의 이름은 "미유 성향 질문"입니다.</li>
   <li>"상황에 따라 다름"을 사람마다 판정하지 않습니다 (부족한 점 탭 참고). 상황 차이는 본인이 문항별로 다르게 답한 내용을 그대로 보여 주는 방식으로 설명합니다.</li>
+  <li>측정하지 않은 성향(읽을 수 없는 관점)을 있는 것처럼 쓰지 않습니다. 12유형은 별도 검증 전까지 화면에 연결하지 않습니다.</li>
   <li>문항 · 채점 규칙에는 버전을 붙입니다. 지금 초안은 문항 <code>${DRAFT_CONTENT_VERSION}</code> · 채점 <code>${DRAFT_SCORING_VERSION}</code>이고, 실제 검사 화면에는 연결하지 않았습니다.</li>
 </ul>`;
 }
@@ -148,87 +171,100 @@ function scoringTab() {
 // ───────── 관점 탭 ─────────
 
 function viewsTab() {
-  return DOMAINS.map((d) => {
-    const rows = PERSPECTIVE_IDS.filter((p) => PERSPECTIVES[p].domain === d)
-      .map((p) => {
-        const items = DRAFT_ITEMS.filter((i) => perspectivesOf(i).includes(p)).map((i) => i.id);
-        const own = DRAFT_ITEMS.filter((i) => i.domain === d && perspectivesOf(i).includes(p)).length;
-        return `<tr><td><span class="pid">${p}</span></td><td><b>${esc(PERSPECTIVES[p].name)}</b><br><span class="small">${esc(PERSPECTIVES[p].purpose)}</span></td><td>${esc(PERSPECTIVES[p].high)}</td><td>${esc(PERSPECTIVES[p].low)}</td><td class="num">${counts[p]}</td><td class="small">${items.join(" ")}<br>자기 영역 ${own}개</td></tr>`;
-      })
-      .join("");
-    return `<h2>${DOMAIN_LABEL[d]}</h2><div class="tablewrap"><table class="views"><thead><tr><th></th><th>관점과 쓰임</th><th>높은 쪽</th><th>낮은 쪽</th><th class="num">지표 수</th><th>점수를 주는 문항</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  }).join("") + `<p class="small">지표 수는 그 관점에 점수를 주는 문항의 수입니다 (한 문항이 선택지에 따라 1~2개 관점에 점수를 줍니다). 높은 쪽 · 낮은 쪽은 좋고 나쁨이 아니라 방향입니다. 대표 경향 12유형 설계가 쓰는 7개 관점은 T1 · T2 · T4 · T5 · C1 · C3 · C4입니다.</p>`;
+  return (
+    DOMAINS.map((d) => {
+      const rows = PERSPECTIVE_IDS.filter((p) => PERSPECTIVES[p].domain === d)
+        .map((p) => {
+          const items = DRAFT_ITEMS.filter((i) => i.primary === p).map((i) => `${i.id}(${esc(i.scene)})`);
+          const v = PERSPECTIVES[p];
+          return `<tr><td><span class="pid">${p}</span></td><td><b>${esc(v.name)}</b><br><span class="small">${esc(v.means)}</span></td><td>${esc(v.high)}<br><span class="small">↔ ${esc(v.low)}</span></td><td class="small">${esc(v.notThis)}</td><td class="small">${esc(v.vs)}</td><td class="num">${counts[p]}</td><td class="small">${readableIds.has(p) ? "읽을 수 있음" : `보류 (+${MIN_INDICATORS - counts[p]}문항 필요)`}<br>${items.join(" ")}</td></tr>`;
+        })
+        .join("");
+      return `<h2>${DOMAIN_LABEL[d]}</h2><div class="tablewrap"><table class="views"><thead><tr><th></th><th>관점이 가리키는 것</th><th>높은 쪽 ↔ 낮은 쪽</th><th>비슷해 보이지만 이 관점이 아닌 것</th><th>이웃 관점과의 구분</th><th class="num">문항 수</th><th>상태 · 문항(장면)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join("") +
+    `<p class="small">문항 수는 그 관점을 <b>주로</b> 보는 문항의 수입니다 (문항 하나 = 관점 하나). 높은 쪽 · 낮은 쪽은 좋고 나쁨이 아니라 방향입니다. 대표 경향 12유형 설계가 쓰는 7개 관점은 T1 · T2 · T4 · T5 · C1 · C3 · C4이고, 이 중 지금 읽을 수 있는 것은 T1 · C1 · C4뿐이라 12유형은 계산할 수 없습니다.</p>`
+  );
 }
 
 // ───────── 부족한 점 탭 ─────────
 
 const sim = summarizeReliability();
-const lvl = (name: string): SimReport => sim.levels.find((l) => l.name === name)!.report;
-const low = lvl("낮음");
-const mid = lvl("보통");
-const high = lvl("높음");
+const v1 = versionOf(sim, "v01");
+const v2 = versionOf(sim, "v02");
+const v3 = versionOf(sim, "v02plus");
+const mid1 = levelOf(v1, "보통");
+const mid2 = levelOf(v2, "보통");
+const mid3 = levelOf(v3, "보통");
+const high1 = levelOf(v1, "높음");
+const readable = (r: SimReport) => r.perspectives.filter((p) => p.indicators >= 3);
+const meanOf = (xs: number[]) => xs.reduce((n, v) => n + v, 0) / xs.length;
 
 function limitsTab() {
-  const fewest = PERSPECTIVE_IDS.filter((p) => counts[p] === Math.min(...PERSPECTIVE_IDS.map((q) => counts[q])));
-  const sit0 = sim.situational[0];
-  const sit1 = sim.situational[1];
-  const summaryRows = sim.levels
-    .map((l) => {
-      const r = l.report;
-      return `<tr><td>${l.name}<br><span class="small">${esc(l.note)}</span></td><td class="num">${range(r.perspectives.map((p) => p.retestCorrelation), f2)}</td><td class="num">${range(r.perspectives.map((p) => p.directionAgree), pct)}</td><td class="num">${range(r.perspectives.map((p) => p.classAgree), pct)}</td><td class="num">${pct(r.sevenSignAll)}</td></tr>`;
+  const sit = v2.situational[0];
+  const sitStrict = v2.situational[v2.situational.length - 1];
+  const st1 = mid1.structure;
+  const st2 = mid2.structure;
+  const st3 = mid3.structure;
+  const structRows = [
+    ["0.1 (동결본)", st1],
+    ["0.2 (현재)", st2],
+    ["0.2 + 후보 9문항 (미정)", st3],
+  ]
+    .map(([name, st]) => {
+      const s = st as typeof st1;
+      return `<tr><td>${name as string}</td><td class="num">${s.items}</td><td class="num">${s.indicators}</td><td class="num">${s.itemsByPerspectiveCount.one}/${s.itemsByPerspectiveCount.two}/${s.itemsByPerspectiveCount.threePlus}</td><td class="num">${s.readableByDistinctItems.length}개</td></tr>`;
     })
     .join("");
-  const perspRows = PERSPECTIVE_IDS.map((id, i) => {
-    const a = low.perspectives[i];
-    const b = mid.perspectives[i];
-    return `<tr><td><span class="pid">${id}</span> ${esc(a.name)}</td><td class="num">${a.indicators}</td><td class="num">${f2(a.retestCorrelation)}</td><td class="num">${f2(b.retestCorrelation)}</td><td class="num">${pct(b.directionAgree)}</td></tr>`;
-  }).join("");
-  const naRows = sim.naSensitivity.map((n) => `<tr><td class="num">${pct(n.naRate)}</td><td class="num">${pct(n.meanHold)}</td><td class="num">${pct(n.worstHold)}</td></tr>`).join("");
-  const cc = mid.crossCorrelation;
+  const summaryRows = [v1, v2, v3]
+    .map((v) => {
+      const r = levelOf(v, "보통");
+      const rd = readable(r);
+      return `<tr><td>${v.short}</td><td class="num">${rd.length}개</td><td class="num">${range(rd.map((p) => p.retestCorrelation), f2)}</td><td class="num">${range(rd.map((p) => p.directionAgree), pct)}</td><td class="num">${pct(meanOf(rd.map((p) => p.holdRate)))}</td><td class="num">${pct(meanOf(rd.map((p) => p.unclearRate)))}</td><td class="num">${r.sevenSignAllSame === null ? "계산 불가" : pct(r.sevenSignAllSame)}</td><td class="num">${r.typeAgreement.computable ? `${pct(r.typeAgreement.sameGivenBothReal)} (분류 못 함 ${pct(r.typeAgreement.shares.insufficient)})` : "분류 불가"}</td></tr>`;
+    })
+    .join("");
+  const naRows = v2.naSensitivity.map((n) => `<tr><td class="num">${pct(n.naRate)}</td><td class="num">${pct(n.meanHold)}</td><td class="num">${pct(n.worstHold)}</td></tr>`).join("");
+  const c1 = mid1.crossCorrelation;
+  const c2 = mid2.crossCorrelation;
 
-  return `<div class="notice"><b>이 탭의 숫자는 실제 사람의 응답이 아닙니다.</b> 가상 응답자 ${SIM_PEOPLE.toLocaleString("ko-KR")}명이 "자기 성향대로 얼마나 일관되게 고르는가(응답 일관성)"를 낮음 · 보통 · 높음으로 가정하고 답한 결과입니다 (해당 없음 ${pct(SIM_NA_RATE)}). 같은 사람이 같은 성향으로 다시 답한다고 두었으므로 <b>실제 재응답 일치는 이보다 낮을 가능성이 큽니다.</b> "30문항이 정확하다"는 증거가 아니라 <b>문항 구조가 허용하는 한계</b>입니다. 실제 신뢰도는 시범 응답으로만 알 수 있습니다.</div>
+  return `<div class="notice"><b>이 탭의 숫자는 실제 사람의 응답이 아닙니다.</b> 가상 응답자 ${SIM_PEOPLE.toLocaleString("ko-KR")}명이 "자기 성향대로 얼마나 일관되게 고르는가(응답 일관성)"를 가정하고 답한 결과입니다 (해당 없음 ${pct(SIM_NA_RATE)}). 같은 사람이 같은 성향으로 다시 답한다고 두었고, 같은 행동의 다른 이유는 들어 있지 않아 <b>실제 재응답 일치는 이보다 낮을 가능성이 큽니다.</b> "문항이 정확하다"는 증거가 아니라 <b>문항 구조가 허용하는 한계</b>입니다. 실제 신뢰도는 시범 인터뷰와 시범 응답으로만 알 수 있습니다.</div>
 
 <h2>한 줄 결론</h2>
-<p class="lead">30문항 · 13관점(지표 ${totalIndicators}개)으로는 <b>관점별 "어느 쪽에 가까운가"와 정도</b>까지만 읽기로 합니다. <b>12유형 같은 이름 하나, 점수의 작은 차이, "상황에 따라 다름" 판정</b>은 읽지 않습니다. 12유형을 맞추려고 억지로 분류하지 않습니다. 아래 숫자는 가상 응답으로 계산한 문항 구조의 한계이며, 이 질문의 실제 신뢰도나 정확도가 아닙니다. 실제 값은 시범 응답으로 확인합니다.</p>
+<p class="lead">A안은 <b>최종 검사 확정이 아니라 시범용</b>입니다. 30문항으로는 13개 관점 중 <b>${cov.readable.length}개만</b> 읽을 수 있습니다. 읽을 수 있는 관점에서도 <b>뚜렷한 방향</b>만 쓰고, 뚜렷하지 않으면 "${UNCLEAR_TEXT}"이라고 씁니다. <b>12유형은 별도 검증 전까지 보류</b>합니다. 먼저 몇 사람이 질문을 직접 풀고 "왜 이 답을 골랐는지" 말해 보는 인터뷰로 문항을 고친 뒤, 모자란 관점만 보강합니다.</p>
 
-<h2>응답 일관성별로 본 13개 관점</h2>
-<div class="tablewrap"><table><thead><tr><th>응답 일관성(가정)</th><th class="num">재응답 점수 상관</th><th class="num">방향 일치</th><th class="num">세 구분 일치</th><th class="num">7개 관점의 높음/낮음이 모두 같음</th></tr></thead><tbody>${summaryRows}</tbody></table></div>
-<p class="small">범위는 13개 관점 중 가장 낮은 값~가장 높은 값입니다. <b>재응답 점수 상관</b>은 같은 사람이 두 번 답한 점수끼리의 상관(1에 가까울수록 같음), <b>방향 일치</b>는 두 번 모두 높음/낮음이 나온 사람 중 같은 방향인 몫, <b>세 구분 일치</b>는 높음 · 고르게 · 낮음이 두 번 같은 몫, 마지막 열은 대표 경향 12유형이 쓰는 7개 관점의 방향이 모두 같은 사람의 몫입니다.</p>
+<h2>1. 문항 30개는 지표 30개가 아니었습니다</h2>
+<div class="tablewrap narrow"><table><thead><tr><th>버전</th><th class="num">문항</th><th class="num">지표</th><th class="num">관점 1/2/3개 이상인 문항</th><th class="num">3문항 이상으로 읽을 수 있는 관점</th></tr></thead><tbody>${structRows}</tbody></table></div>
+<p class="small">0.1은 문항 30개가 지표 ${st1.indicators}개였습니다. 문항 하나의 응답이 두 관점(가끔 세 관점)에 함께 반영돼 13개 관점 점수가 독립적인 측정이 아니었습니다 (가상 응답에서 성향이 서로 독립인데도 새로움–대비 점수의 상관 ${f2(c1.max.r)}, 평균 ${f2(c1.meanAbs)}). 0.2는 문항마다 관점 하나만 봐서 이 얽힘이 사라졌지만(최대 ${f2(c2.max.r)}), 관점마다 문항이 줄어 읽을 수 있는 관점이 ${st2.readableByDistinctItems.length}개로 줄었습니다.</p>
 
-<h2>읽기로 하는 것 · 읽지 않기로 하는 것</h2>
-<div class="two">
-  <div><h3>읽기로 하는 것</h3><ul class="rules">
-    <li><b>관점별 방향 (높은 쪽 / 낮은 쪽).</b> 가상 응답에서 응답 일관성을 보통으로 가정하면 방향이 나온 사람의 ${range(mid.perspectives.map((p) => p.directionAgree), pct)}가 다시 답해도 같은 방향이었습니다. 실제 사람의 재응답 일치가 아니며, 실제로는 이보다 낮을 수 있습니다.</li>
-    <li>기질 · 성격 · 관계를 <b>영역별로 따로</b> 보여 주는 설계.</li>
-  </ul></div>
-  <div><h3>읽지 않기로 하는 것</h3><ol class="rules">
-    <li><b>점수의 작은 차이</b> (58과 62). 보통일 때 재응답 점수 상관 ${range(mid.perspectives.map((p) => p.retestCorrelation), f2)}, 낮으면 ${range(low.perspectives.map((p) => p.retestCorrelation), f2)}입니다.</li>
-    <li><b>"약간"과 "고르게"의 경계.</b> 세 구분이 두 번 같은 몫이 보통일 때 ${range(mid.perspectives.map((p) => p.classAgree), pct)}뿐입니다.</li>
-    <li><b>12유형 이름.</b> 7개 관점의 높음/낮음이 모두 같게 나오는 사람이 보통일 때 ${pct(mid.sevenSignAll)}, 높아도 ${pct(high.sevenSignAll)}입니다. 같은 사람이 다시 답하면 다른 이름이 나올 가능성이 더 큽니다.</li>
-    <li><b>"상황에 따라 다름" 판정.</b> 지금 규칙은 한결같은 가상 응답자의 ${pct(sit0.falseFlag)}(관점에 따라 최대 ${pct(sit0.worstFalseFlag)})에도 붙고, 정말 상황에 따라 달라지는 가상 응답자에는 ${pct(sit0.detected)}에만 붙습니다. 엄격하게(${sit1.rule.spread} · ${sit1.rule.minEach}) 하면 오탐은 ${pct(sit1.falseFlag)}지만 탐지도 ${pct(sit1.detected)}로 무너집니다. 그래서 판정에 쓰지 않고, 본인이 문항별로 다르게 답한 내용을 그대로 보여 줍니다.</li>
-  </ol></div>
-</div>
+<h2>2. 7개 방향 전체 일치와 실제 12유형 일치는 다른 값입니다</h2>
+<div class="tablewrap"><table><thead><tr><th>버전 (응답 일관성 보통)</th><th class="num">읽을 수 있는 관점</th><th class="num">재응답 점수 상관</th><th class="num">방향 일치</th><th class="num">평균 보류</th><th class="num">평균 뚜렷하지 않음</th><th class="num">7개 방향이 두 번 모두 같음</th><th class="num">12유형 분류 결과가 같음</th></tr></thead><tbody>${summaryRows}</tbody></table></div>
+<p class="small">0.1에서 7개 방향이 모두 같은 사람은 ${pct(mid1.sevenSignAllSame ?? 0)}(응답 일관성 높음 ${pct(high1.sevenSignAllSame ?? 0)})였고, 분류 규칙을 그대로 적용한 12유형 결과가 같은 몫은 ${pct(mid1.typeAgreement.sameGivenBothReal)}였습니다. 두 값은 세는 대상이 달라 바꿔 쓸 수 없습니다. 0.2의 30문항은 7개 관점 중 3개만 읽혀 분류가 불가능하고, 39문항으로 늘려도 문항 하나만 건너뛰면 분류하지 못해 분류가 나오는 응답이 ${pct(1 - mid3.typeAgreement.shares.insufficient)}뿐입니다. <b>12유형은 별도 검증 전까지 보류합니다.</b></p>
 
-<h2>30문항으로 부족한 부분</h2>
+<h2>3. "약간 · 고르게"는 읽지 않습니다</h2>
+<p>읽는 규칙은 두 단계뿐입니다. 가운데(50)에서 ${CLEAR_DISTANCE} 이상이면 뚜렷한 방향, 아니면 "${UNCLEAR_TEXT}". 문항이 모자란 관점은 "${HOLD_TEXT}". 이전 문서에 함께 있던 "경계는 읽지 않는다"와 "뚜렷 · 약간 · 고르게로 쓴다"는 문장은 이 규칙으로 정리했습니다.</p>
+
+<h2>4. 읽지 않기로 하는 것</h2>
 <ol class="rules">
-  <li><b>재응답이 가장 흔들리는 관점.</b> 응답 일관성이 낮을 때 가장 낮은 세 관점은 ${[...low.perspectives].sort((x, y) => x.retestCorrelation - y.retestCorrelation).slice(0, 3).map((p) => `${p.id} ${esc(p.name)}(${f2(p.retestCorrelation)})`).join(" · ")}입니다. 지표 수가 적다고 항상 더 흔들리는 것은 아닙니다 (지표가 가장 적은 관점은 ${fewest.join(" · ")}로 ${counts[fewest[0]]}개). 이 관점들이 문항을 고치거나 더하는 우선순위입니다.</li>
-  <li><b>응답 일관성이 낮으면 지금 지표 수로는 부족합니다.</b> 재응답 상관 0.7에 관점당 ${range(low.perspectives.map((p) => p.neededFor70), (x) => String(Math.ceil(x)))}개, 0.8에 ${range(low.perspectives.map((p) => p.neededFor80), (x) => String(Math.ceil(x)))}개가 필요합니다 (지금 4~7개). 보통이면 대체로 충분합니다. 결국 <b>사람들이 얼마나 일관되게 답하는지는 시범 응답으로만 알 수 있습니다.</b></li>
-  <li><b>13개 관점은 30문항에 비해 많습니다.</b> 한 문항이 두 관점에 함께 점수를 주기 때문에, 성향이 서로 독립인 가상 응답자에서도 관점끼리 점수가 같이 움직입니다 (평균 ${f2(cc.meanAbs)}, 가장 큰 쌍 ${cc.max.a}–${cc.max.b} ${f2(cc.max.r)}).${cc.max.a === "T1" && cc.max.b === "T2" ? " 새로움(T1)과 대비(T2)는 12유형 설계가 \"실제로 반대로 움직인다\"고 가정한 값(−0.4)과 같은 크기라서, 시범 응답에서 이 상관이 나와도 사람의 특성인지 문항 구조 때문인지 구분할 수 없습니다." : ""}</li>
-  <li><b>해당 없음이 많아지면 관점이 보류됩니다.</b> 응답한 지표가 ${MIN_INDICATORS}개 미만이면 보류하기 때문입니다.</li>
+  <li><b>점수의 작은 차이</b> (58과 62). 읽을 수 있는 관점의 재응답 점수 상관이 보통일 때 ${range(readable(mid2).map((p) => p.retestCorrelation), f2)}입니다.</li>
+  <li><b>12유형 이름.</b> 위 2번.</li>
+  <li><b>"상황에 따라 다름" 판정.</b> 지금 규칙은 한결같은 가상 응답자의 ${pct(sit.falseFlag)}(관점에 따라 최대 ${pct(sit.worstFalseFlag)})에도 붙고, 정말 상황에 따라 달라지는 가상 응답자에는 ${pct(sit.detected)}에 붙습니다. 엄격하게(${sitStrict.rule.spread} · ${sitStrict.rule.minEach}) 하면 오탐은 ${pct(sitStrict.falseFlag)}지만 탐지도 ${pct(sitStrict.detected)}로 무너집니다. 그래서 판정에 쓰지 않고, 본인이 문항별로 다르게 답한 내용을 그대로 보여 줍니다.</li>
+  <li><b>측정하지 않은 관점.</b> 문항이 모자라 보류한 8개 관점(${cov.needMore.map((n) => n.id).join(" · ")})은 있는 것처럼 쓰지 않습니다.</li>
 </ol>
+
+<h2>5. 해당 없음이 많아지면 관점이 보류됩니다</h2>
+<p>서로 다른 문항 3개로 읽는 관점은 한 문항만 건너뛰어도 보류됩니다 (0.2, 응답 일관성 보통).</p>
 <div class="tablewrap narrow"><table><thead><tr><th class="num">해당 없음 비율(가정)</th><th class="num">보류되는 관점의 평균</th><th class="num">가장 많이 보류되는 관점</th></tr></thead><tbody>${naRows}</tbody></table></div>
+<p class="small">이유가 다른 답(점수에 넣지 않음)을 고르는 사람이 많은 관점(C3 · R1)은 보류가 더 늘어납니다. 가상 응답은 이 비율을 가정으로 두었으므로 실제 값은 시범에서 봅니다.</p>
 
-<h2>어느 관점이 얼마나 흔들리나</h2>
-<details><summary>13개 관점 표 펼치기</summary>
-<div class="tablewrap"><table><thead><tr><th>관점</th><th class="num">지표 수</th><th class="num">재응답 상관 (일관성 낮음)</th><th class="num">재응답 상관 (보통)</th><th class="num">방향 일치 (보통)</th></tr></thead><tbody>${perspRows}</tbody></table></div></details>
+<h2>6. 보강 후보 9문항 (연결하지 않음)</h2>
+<p>읽을 수 없는 8개 관점만 채우는 후보입니다: ${cov.needMore.map((n) => `${n.id}(+${n.short})`).join(" · ")}. 시범 전에 확정하지 않습니다. 후보를 더해도 관점마다 문항이 ${MIN_INDICATORS}개뿐이라 안정적으로 읽는다는 뜻이 아닙니다. 문항 · 확인할 점은 <code>docs/assessment-design-v1.md</code> 11장에 있습니다.</p>
 
-<h2>읽는 범위 — A안으로 진행 (운영자 결정)</h2>
+<h2>읽는 범위 — A안은 시범용 (운영자 결정)</h2>
 <div class="tablewrap"><table class="choices"><thead><tr><th>선택</th><th>내용</th><th>장점</th><th>단점</th></tr></thead><tbody>
-<tr class="rec"><td><b>A. 30문항 유지 + 읽는 범위를 좁힘 (결정됨)</b></td><td>관점별 방향과 정도(뚜렷 · 약간 · 고르게)만 리포트에 씁니다. 12유형 이름 · 점수의 작은 차이 · 상황 판정은 쓰지 않습니다. 실제 사람 응답으로 시범 후 결정합니다.</td><td>바로 시범 가능, 문항 수 부담 없음</td><td>"나는 이런 유형"이라는 짧은 이름은 줄 수 없음</td></tr>
-<tr><td><b>B. 36~40문항으로 늘림 (지금은 하지 않음)</b></td><td>지표가 적거나 흔들리는 관점에 문항을 더해 관점당 5~6개 이상으로 맞춥니다.</td><td>방향 · 정도의 안정이 올라감</td><td>응답 시간이 늘고 끝까지 답하는 사람이 줄 수 있음</td></tr>
-<tr><td><b>C. 관점을 9~10개로 줄임 (지금은 하지 않음)</b></td><td>비슷한 관점을 합치거나 우선순위가 낮은 관점을 뺍니다.</td><td>같은 문항 수로 관점당 지표가 늘어남</td><td>설명 폭이 줄고 관점의 뜻이 뭉개질 수 있음</td></tr>
+<tr class="rec"><td><b>A. 30문항 유지 + 읽는 범위를 좁힘 (결정됨 · 시범용)</b></td><td>읽을 수 있는 관점의 뚜렷한 방향만 리포트에 씁니다. 12유형 이름 · 점수의 작은 차이 · 상황 판정은 쓰지 않습니다. 실제 사람 응답으로 시범 후 결정합니다.</td><td>바로 시범 가능, 문항 수 부담 없음</td><td>13개 관점을 다 말할 수 없음(읽을 수 있는 것 ${cov.readable.length}개)</td></tr>
+<tr><td><b>B. 모자란 관점만 보강 (지금은 하지 않음)</b></td><td>읽을 수 없는 8개 관점에 한해 후보 문항을 시범 인터뷰 결과를 보고 더하거나 바꿉니다.</td><td>읽을 수 있는 관점이 늘어남</td><td>응답 시간이 늘고, 3문항은 여전히 최소선</td></tr>
+<tr><td><b>C. 관점을 줄임 (지금은 하지 않음)</b></td><td>비슷한 관점을 합치거나 우선순위가 낮은 관점을 뺍니다.</td><td>같은 문항 수로 관점당 문항이 늘어남</td><td>설명 폭이 줄고 관점의 뜻이 뭉개질 수 있음</td></tr>
 </tbody></table></div>
-<p class="small">시범에서 확인할 것: ① 같은 사람의 재응답 일치 ② 관점 간 상관(위 가상 값보다 큰지) ③ 문항별 해당 없음 비율 ④ 끝까지 답한 비율. 이 결과를 보기 전에는 12유형을 화면에 연결하지 않습니다. 이 계산이 정하지 못하는 것: 문항이 정말 그 성향을 재는지(타당도), 같은 문장을 사람마다 다르게 읽는 정도.</p>`;
+<p class="small">순서: ① 몇 사람이 풀어 보고 왜 이 답을 골랐는지 말해 본다 (풀어보기 화면의 검토 모드) → ② 문항을 고친다 → ③ 모자란 관점만 보강한다 → ④ 고친 문항으로 다시 시범 응답을 받는다. 이 계산이 정하지 못하는 것: 문항이 정말 그 성향을 재는지(타당도), 같은 문장을 사람마다 다르게 읽는 정도, 같은 행동의 다른 이유가 실제로 얼마나 나뉘는지.</p>`;
 }
 
 // ───────── 메모 탭 ─────────
@@ -237,7 +273,7 @@ function memoTab() {
   return `<h2>검토 메모</h2>
 <p class="hint">문항 탭에서 누른 표시와 한 줄 메모가 아래에 모입니다. <b>복사</b>를 눌러 채팅에 붙여넣으면 제가 그대로 읽고 문항을 고칩니다. 이 표시는 이 브라우저에만 저장됩니다 (다른 기기와 공유되지 않음).</p>
 <div class="summary" id="memo-summary" aria-live="polite"></div>
-<p class="small">읽는 범위는 A안(30문항 유지, 방향 · 정도만 읽기, 13관점과 12유형은 실제 시범 응답을 보고 조정)으로 정해졌습니다. 기질 · 성격 · 가까운 관계 영역은 모두 유지합니다.</p>
+<p class="small">읽는 범위는 A안(30문항 유지, 읽을 수 있는 관점의 뚜렷한 방향만 읽기, 13관점과 12유형은 시범 인터뷰 · 응답을 보고 조정)으로 정해졌습니다. A안은 최종 검사가 아니라 시범용입니다. 기질 · 성격 · 가까운 관계 영역은 모두 유지합니다.</p>
 <label class="note-label" for="overall">전체 의견 (선택)</label>
 <textarea id="overall" rows="4" maxlength="1500" placeholder="예: 관계 영역 문항이 연애 상황에만 치우친 것 같아요."></textarea>
 <div class="actions"><button type="button" class="primary" id="copy-btn">검토 내용 복사</button><button type="button" id="clear-btn">표시 모두 지우기</button><span id="copy-status" class="small" role="status"></span></div>
@@ -295,6 +331,7 @@ p,li{text-wrap:pretty}
 .opt-text{margin:0}
 .na-note{margin:2px 0 0;font-size:.82rem;color:var(--ink-3)}
 .reading{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.reason{font-size:.82rem;color:var(--ink-3)}
 .reading li{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline;font-size:.84rem;color:var(--ink-3)}
 .pname{color:var(--ink-2);font-weight:600}
 .side{font-weight:700}
@@ -425,7 +462,7 @@ const SCRIPT = `
   // 메모
   function memoText(){
     var lines=['[미유 성향 질문 검토 · 문항 ${DRAFT_CONTENT_VERSION}]'];
-    lines.push('방향: A안 (30문항 유지, 13관점 · 12유형은 시범 응답을 보고 조정). 채점 방향을 본 뒤의 두 번째 검토입니다.');
+    lines.push('방향: A안은 최종 검사가 아니라 시범용 (30문항 유지, 13관점 · 12유형은 시범 인터뷰 · 응답을 보고 조정). 채점 방향을 본 뒤의 두 번째 검토입니다.');
     ['fix','drop','ok'].forEach(function(k){
       var list=ITEMS.filter(function(i){return state.marks[i.id]===k;});
       lines.push('');

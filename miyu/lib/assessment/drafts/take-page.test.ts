@@ -51,3 +51,10 @@ test("외부 주소로 보내거나 불러오지 않는다 (답은 이 브라우
   const html = takeStandalone();
   assert.doesNotMatch(html, /fetch\(|XMLHttpRequest|sendBeacon|WebSocket|<script[^>]+src=|<link[^>]+href=|https?:\/\//);
 });
+
+test("검토 모드에 인터뷰 칸이 있다: 질문을 어떻게 이해했는지 · 왜 이 답을 골랐는지 · 같은 행동을 다른 이유로도 할 수 있는지 — 복사할 글에도 들어가고, 실명 · 연락처를 적지 말라고 알린다", () => {
+  const html = takeFragment();
+  for (const text of ["이 질문을 어떻게 이해했나요?", "왜 이 답을 골랐나요?", "같은 행동을 다른 이유로도 할 수 있나요?", "질문을 이해한 방식 · 고른 이유", "실명 · 연락처는 적지 마세요", "시범용"]) assert.ok(html.includes(text), text);
+  // 인터뷰 칸도 채점 방향 · 관점 이름을 싣지 않는다 (위 테스트가 전체 화면을 검사한다)
+  assert.doesNotMatch(html, /\bunscored\b|reason:/);
+});

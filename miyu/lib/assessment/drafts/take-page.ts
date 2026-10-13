@@ -1,6 +1,7 @@
 // 미유 성향 질문 "풀어보기" 화면 — 채점 방향 · 관점 이름 · 문항의 의도(운영자 설명)가 화면과 코드에 들어 있지 않다.
 // 처음 풀 때 점수 방향이 보이면 답이 유도되므로, 이 화면에는 질문과 선택지 글만 싣는다 (take-page.test.ts가 검사한다).
-// 흐름: 소개 → 한 문항씩 풀기(답 · 문항별 시간만 기록) → 완료 → 검토 모드(문항별 의견: 정답이 뻔했나 · 둘 다 나 같았나 · 뜻을 몰랐나 · 고르고 싶은 답이 없었나).
+// 흐름: 소개 → 한 문항씩 풀기(답 · 문항별 시간만 기록) → 완료 → 검토 모드(문항별 의견: 정답이 뻔했나 · 둘 다 나 같았나 · 뜻을 몰랐나 · 고르고 싶은 답이 없었나
+// + 인터뷰 칸 세 개: 질문을 어떻게 이해했나 · 왜 이 답을 골랐나 · 같은 행동을 다른 이유로도 하나). 시범 인터뷰(docs/assessment-pilot-protocol.md)는 이 칸을 같이 보며 묻는다.
 // 채점 방향을 본 뒤의 두 번째 검토는 별도의 검토 화면(render-assessment-review.ts)에서 한다.
 // 표시 · 답은 보는 사람의 브라우저에만 저장된다. 이 화면은 결과를 계산하지 않는다 (가상이 아닌 실제 응답을 점수로 바꾸는 것은 시범 단계에서).
 import { DRAFT_CONTENT_VERSION, DRAFT_ITEMS, DOMAIN_LABEL, NA_OPTION_TEXT } from "./situational-draft.ts";
@@ -90,6 +91,10 @@ button{font:inherit}
 .seg button[aria-pressed="true"][data-mark="fix"]{background:var(--danger);color:var(--bg)}
 .seg button[aria-pressed="true"][data-mark="drop"]{background:var(--ink-3);color:var(--bg)}
 .rline{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:8px}
+.talk{margin:12px 0 4px;padding:10px 12px;background:var(--mist);border-radius:4px}
+.talk .lab{margin:8px 0 4px}
+.talk .lab:first-child{margin-top:0}
+.note.wide{display:block;width:100%}
 .note{flex:1 1 14rem;min-width:0;font:inherit;font-size:.9rem;padding:6px 8px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink)}
 textarea{width:100%;font:inherit;font-size:.9rem;padding:8px;border:1px solid var(--line-strong);border-radius:4px;background:var(--bg);color:var(--ink);resize:vertical}
 .summary{margin:12px 0;padding:12px 14px;background:var(--mist);border-radius:4px;font-size:.92rem}
@@ -136,7 +141,8 @@ const BODY = `<div class="wrap">
 <section class="screen" id="screen-review" hidden>
   <h2>검토 모드 — 문항별 첫인상 의견</h2>
   <p class="note-box">문항을 다시 읽고, 해당하는 것만 표시해 주세요. 표시할 게 없는 문항은 비워 두면 됩니다.<br>
-  <b>정답이 뻔해 보였어요</b>: 어느 선택지가 "좋은 답"처럼 보여서 솔직하게 고르기 어려웠다 · <b>둘 이상이 다 나 같았어요</b>: 선택지 둘 이상이 모두 나에게 해당했다 · <b>뜻을 모르겠어요</b>: 질문이나 선택지의 말이 어렵거나 애매했다 · <b>고르고 싶은 답이 없었어요</b>: 내 행동이 어떤 선택지와도 달랐다.</p>
+  <b>정답이 뻔해 보였어요</b>: 어느 선택지가 "좋은 답"처럼 보여서 솔직하게 고르기 어려웠다 · <b>둘 이상이 다 나 같았어요</b>: 선택지 둘 이상이 모두 나에게 해당했다 · <b>뜻을 모르겠어요</b>: 질문이나 선택지의 말이 어렵거나 애매했다 · <b>고르고 싶은 답이 없었어요</b>: 내 행동이 어떤 선택지와도 달랐다.<br>
+  문항마다 있는 세 칸(질문을 어떻게 이해했는지 · 왜 이 답을 골랐는지 · 같은 행동을 다른 이유로도 할 수 있는지)은 <b>같은 답이어도 이유가 사람마다 다를 수 있는지</b>를 보기 위한 것입니다. 적고 싶은 것만 적으세요. 실명 · 연락처는 적지 마세요.</p>
   <div class="tabs" role="tablist" aria-label="검토 모드">
     <button type="button" class="tab" role="tab" id="rtab-items" data-rtab="items" aria-selected="true">문항별 의견</button>
     <button type="button" class="tab" role="tab" id="rtab-memo" data-rtab="memo" aria-selected="false">복사할 글</button>
@@ -234,8 +240,8 @@ function script() {
   $('edit-answers').addEventListener('click',function(){state.idx=0;save();show('take');renderTake();});
 
   // ── 검토 모드 ──
-  function rv(id){if(!state.review[id])state.review[id]={obvious:false,obviousPick:'',multi:false,multiPicks:[],unclear:false,nothing:false,mark:'',note:''};return state.review[id];}
-  function touched(id){var r=state.review[id];return !!(r&&(r.obvious||r.multi||r.unclear||r.nothing||r.mark||r.note));}
+  function rv(id){if(!state.review[id])state.review[id]={obvious:false,obviousPick:'',multi:false,multiPicks:[],unclear:false,nothing:false,mark:'',note:'',understood:'',why:'',other:''};var r=state.review[id];if(r.understood===undefined){r.understood='';r.why='';r.other='';}return r;}
+  function touched(id){var r=state.review[id];return !!(r&&(r.obvious||r.multi||r.unclear||r.nothing||r.mark||r.note||r.understood||r.why||r.other));}
   var rfilter='all';
   function optText(it,id){if(id==='na')return DATA.na;var o=it.options.filter(function(x){return x.id===id;})[0];return o?o.text:'';}
   function buildReview(){
@@ -279,6 +285,13 @@ function script() {
       flag('unclear','뜻을 모르겠어요 (메모에 어느 부분인지 적어 주세요)');
       flag('nothing','고르고 싶은 답이 없었어요');
       art.appendChild(flags);
+      var talk=el('div','talk');
+      [['understood','이 질문을 어떻게 이해했나요? (내 말로 한 줄)','예: 친구가 갑자기 부르면 내가 어떻게 하는지 묻는 것 같았어요'],['why','왜 이 답을 골랐나요?','예: 비슷한 일이 얼마 전에 있었어요'],['other','같은 행동을 다른 이유로도 할 수 있나요? 그렇다면 어떤 이유인가요?','예: 나는 약속 때문에 한 것이지만, 걱정돼서 하는 사람도 있을 것 같아요']].forEach(function(f){
+        var lab=el('label','lab',f[1]);var inp=document.createElement('input');inp.type='text';inp.className='note wide';inp.maxLength=200;inp.id='rt-'+it.id+'-'+f[0];inp.placeholder=f[2];inp.value=r[f[0]]||'';inp.autocomplete='off';inp.setAttribute('aria-label',f[1]);
+        inp.addEventListener('input',function(){r[f[0]]=inp.value;save();refreshCounts();});
+        lab.htmlFor=inp.id;talk.appendChild(lab);talk.appendChild(inp);
+      });
+      art.appendChild(talk);
       var line=el('div','rline');
       var seg=el('div','seg');
       [['ok','괜찮음'],['fix','고쳐야 함'],['drop','빼기']].forEach(function(m){
@@ -332,7 +345,7 @@ function script() {
   // ── 복사할 글 ──
   function memoText(){
     var L=['[미유 성향 질문 풀어보기 · 첫인상 검토 · 문항 '+DATA.version+']'];
-    L.push('방향: A안(30문항 유지, 관점 · 12유형은 시범 응답을 보고 조정). 이 글은 문항을 고치기 위한 첫인상 의견입니다.');
+    L.push('방향: A안은 최종 검사가 아니라 시범용(30문항 유지, 관점 · 12유형은 시범 응답을 보고 조정). 이 글은 문항을 고치기 위한 의견과 질문을 이해한 방식입니다.');
     L.push('답한 문항 '+answered()+'/'+ITEMS.length+' · 걸린 시간 '+fmt(totalMs())+' · 해당 없음 '+naCount()+'개');
     if(state.code){
       L.push('');
@@ -349,6 +362,9 @@ function script() {
     group('고르고 싶은 답이 없던 문항',function(r){return r.nothing;},function(){return '';});
     group('고쳐야 함',function(r){return r.mark==='fix';},function(){return '';});
     group('빼기',function(r){return r.mark==='drop';},function(){return '';});
+    var talked=ITEMS.filter(function(i){var r=rv(i.id);return r.understood||r.why||r.other;});
+    L.push('');L.push('질문을 이해한 방식 · 고른 이유 ('+talked.length+')');
+    talked.forEach(function(i){var r=rv(i.id);var parts=[];if(r.understood)parts.push('이해: '+r.understood);if(r.why)parts.push('고른 이유: '+r.why);if(r.other)parts.push('다른 이유: '+r.other);L.push('- '+i.id+' '+i.topic+' — '+parts.join(' / '));});
     var ok=ITEMS.filter(function(i){return rv(i.id).mark==='ok';}).map(function(i){return i.id;});
     L.push('');L.push('괜찮음 ('+ok.length+'): '+(ok.join(', ')||'없음'));
     var noteOnly=ITEMS.filter(function(i){var r=rv(i.id);return r.note&&!r.obvious&&!r.multi&&!r.unclear&&!r.nothing&&r.mark!=='fix'&&r.mark!=='drop';});

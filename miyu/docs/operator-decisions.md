@@ -7,7 +7,7 @@
 | 결정 | 왜 지금인가 | 어떻게 정하나 |
 | --- | --- | --- |
 | **AI 비교 생성 예산 승인** (1단계 생성 4건 · 3,000원 한도부터, **아직 승인하지 않음**) | 유료 상품의 품질은 실제 AI가 써 봐야 알 수 있다. 지금 구매자가 받는 것은 개발용 규칙 문장이다 | [`ai-quality-comparison-plan.md`](./ai-quality-comparison-plan.md) 8장. 승인하면 두 회사 API 계정(소액 충전)을 만드는 것부터 안내한다. 2단계(20건 · 8,000원)는 1단계 결과를 본 뒤 따로 |
-| **자체 문항 초안 검토** (읽는 범위는 **A안으로 결정됨**) | 지금 문항은 개발용 예시다. 검토 후 검사 화면에 적용한다 | **먼저 [`assessment-take.html`](./assessment-take.html)(채점 방향 숨김)로 직접 풀고** 검토 모드의 글을 전달한 뒤, [`assessment-review.html`](./assessment-review.html)에서 두 번째 검토를 한다 (`update-guide.md` 6장). 30문항 · 13관점의 한계는 [`assessment-reliability-sim.md`](./assessment-reliability-sim.md) |
+| **자체 문항 초안 검토** (읽는 범위는 **A안으로 결정됨**) | 지금 문항은 개발용 예시다. 검토 후 검사 화면에 적용한다 | **먼저 [`assessment-take.html`](./assessment-take.html)(채점 방향 숨김)로 직접 풀고** 검토 모드의 글을 전달한 뒤, [`assessment-review.html`](./assessment-review.html)에서 두 번째 검토를 한다 (`update-guide.md` 6장). 30문항 · 13관점의 한계는 [`assessment-reliability-sim.md`](./assessment-reliability-sim.md), 0.1 → 0.2로 고친 내용은 [`assessment-design-review-2.md`](./assessment-design-review-2.md). **A안은 시범용이다 — 먼저 몇 사람이 풀고 이유를 말하는 인터뷰**([`assessment-pilot-protocol.md`](./assessment-pilot-protocol.md))**를 한다** |
 
 ## 2. 대표 경향 12가지 — 이름 · 구분 기준 · 예시 결과
 
