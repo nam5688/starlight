@@ -223,6 +223,14 @@ node --env-file=.env.local scripts\run-ai-compare.ts --stage stage-1 --only A --
 
 첫 줄은 호출 없는 확인, 둘째 줄이 실제 생성이다. **이름을 가린 비교는 아니다** — 글은 모두 `X`(= Claude)이고, 실제 미유 리포트 화면(`/dev/compare`)에서 읽는 방법은 같다. 한 모델만으로는 "작동하는지 · 비용 · 명백한 결함 · 읽을 만한지"를 볼 수 있을 뿐 모델 사이의 우열은 알 수 없다. 나중에 OpenAI 키를 넣고 `--only` 없이 4건 비교를 따로 할 수 있다 (그때는 새로 생성하므로 비용이 다시 든다).
 
+**리허설 (키 · 비용 없이 흐름만 시험)** — 키를 넣기 전에 "생성 → 파일 저장 → 화면에서 읽기"가 끝까지 도는지 보고 싶을 때 쓴다.
+
+```powershell
+node scripts\run-ai-compare.ts --rehearsal
+```
+
+네트워크를 쓰지 않고 키도 필요 없으며 비용은 0원이다. 글은 **모의 글(실제 AI 글이 아니다)**이고 결과 폴더 이름이 `rehearsal-`로 시작한다. `/dev/compare`에서 같은 모양으로 열려 화면을 미리 확인할 수 있다. 실제 생성과 달리 AI 품질에 대해서는 아무것도 알려 주지 않는다.
+
 **키 입력 위치** — 새 `miyu` 폴더 안의 **`.env.local`** 파일이다 (`.env.example`이 아니다. `.env.local`은 Windows 탐색기에서 안 보이면 PowerShell로 연다).
 
 ```powershell

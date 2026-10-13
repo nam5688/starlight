@@ -8,6 +8,7 @@
 //
 // 실행 (miyu 폴더, PowerShell — 키는 .env.local 에만 두고 채팅 · 화면에 붙여넣지 않는다):
 //   node --env-file=.env.local scripts/run-ai-compare.ts              # 드라이런 (호출 없음) — 키가 들어갔는지(있음 · 없음)도 보여 준다
+//   --rehearsal                                                       # 리허설: 네트워크 · 키 · 비용 없이 같은 흐름(생성 → 파일 저장 → 화면용 원본)을 모의 글로 끝까지 돈다. 결과 폴더 이름이 rehearsal-로 시작한다
 //   --only A                                                          # 한 모델만(A=Claude, B=GPT). 그 모델의 키만 있으면 되고 비용은 절반 정도이며, 이름을 가린 비교는 아니다
 //   node --env-file=.env.local scripts/run-ai-compare.ts --stage stage-1 --execute --approved-cap-krw 3000 --approved-on 2026-10-13
 //
@@ -24,6 +25,7 @@ import { BudgetGuard, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE } from "../lib/r
 import { buildPersonas } from "../lib/report/ai/compare-personas.ts";
 import { type CompareCandidate, type CompareVariant, planStage, runStage } from "../lib/report/ai/compare-plan.ts";
 import { isReadingReport } from "../lib/report/generator.ts";
+import { composeMockReading } from "../lib/report/reading/mock-model.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
 import { sampleReadingReport } from "../lib/samples/sample-reading-report.ts";
 
@@ -32,6 +34,7 @@ const arg = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1
 const stageName = arg("--stage") ?? "stage-1";
 const variant = (arg("--variant") ?? "reading-v1") as CompareVariant;
 if (!["reading-v1", "personal-v2"].includes(variant)) throw new Error("--variant 은 reading-v1(기본) 또는 personal-v2만 쓸 수 있습니다.");
+const rehearsal = args.includes("--rehearsal");
 const only = arg("--only");
 if (only !== undefined && only !== "A" && only !== "B") throw new Error("--only 는 A(Claude) 또는 B(GPT)만 쓸 수 있습니다.");
 const stage = COMPARE_STAGES.find((s) => s.name === stageName);
@@ -54,30 +57,50 @@ console.log(`- 하드스톱 한도: ${won(stage.capKrw)} (환율 ${settings.fxKr
 // 키가 들어갔는지(있음 · 없음)만 보여 준다 — 값은 출력하지 않고, 이 확인으로는 어떤 호출도 하지 않는다. .env.local 을 읽으려면 node --env-file=.env.local 로 실행한다
 console.log(`- 키 입력 확인: 후보 A(ANTHROPIC_API_KEY) ${process.env.ANTHROPIC_API_KEY ? "있음" : "없음"} · 후보 B(OPENAI_API_KEY) ${process.env.OPENAI_API_KEY ? "있음" : "없음"}${process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY ? "" : " (아직 키를 넣지 않았거나 --env-file=.env.local 없이 실행했습니다)"}`);
 
-if (!args.includes("--execute")) {
+if (!args.includes("--execute") && !rehearsal) {
   console.log("\n호출하지 않았습니다 (승인 전 드라이런). 실행하려면 운영자가 승인한 뒤 --execute 와 승인 금액 · 날짜를 직접 적어야 합니다.");
   process.exit(0);
 }
+if (rehearsal && args.includes("--execute")) {
+  console.error("중단: --rehearsal 과 --execute 는 함께 쓰지 않습니다 (리허설은 호출하지 않습니다).");
+  process.exit(1);
+}
+if (rehearsal && variant !== "reading-v1") {
+  console.error("중단: 리허설은 reading-v1 지시문에서만 쓸 수 있습니다.");
+  process.exit(1);
+}
 
-// ── 여기부터는 운영자가 승인한 뒤에만 ──
-const approvedCap = Number(arg("--approved-cap-krw"));
-const approvedOn = arg("--approved-on");
+// ── 여기부터는 운영자가 승인한 뒤에만 (리허설은 네트워크 · 키 없이 모의 응답으로 같은 흐름만 시험한다) ──
+const approvedCap = rehearsal ? stage.capKrw : Number(arg("--approved-cap-krw"));
+const approvedOn = rehearsal ? "2026-10-13" : arg("--approved-on");
 if (!Number.isFinite(approvedCap) || !approvedOn || !/^\d{4}-\d{2}-\d{2}$/.test(approvedOn)) {
   console.error("\n중단: 실제 호출에는 운영자가 승인한 금액과 날짜를 함께 적어야 합니다 (--approved-cap-krw 3000 --approved-on 2026-10-13). 아무것도 호출하지 않았습니다.");
   process.exit(1);
 }
 const keys = { A: process.env.ANTHROPIC_API_KEY, B: process.env.OPENAI_API_KEY } as const;
-console.log(`\n키 설정: 후보 A(ANTHROPIC_API_KEY) ${keys.A ? "있음" : "없음"} · 후보 B(OPENAI_API_KEY) ${keys.B ? "있음" : "없음"}`);
-const missing = chosen.filter((c) => !keys[c.key]);
+if (!rehearsal) console.log(`\n키 설정: 후보 A(ANTHROPIC_API_KEY) ${keys.A ? "있음" : "없음"} · 후보 B(OPENAI_API_KEY) ${keys.B ? "있음" : "없음"}`);
+const missing = rehearsal ? [] : chosen.filter((c) => !keys[c.key]);
 if (missing.length > 0) {
   console.error(`중단: ${missing.map((c) => `후보 ${c.key}(${c.key === "A" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY"})`).join(" · ")}의 키가 필요합니다. .env.local 에 직접 입력한 뒤 다시 실행하세요.${solo ? "" : " 한 모델만 먼저 실행하려면 --only A 또는 --only B 를 붙입니다."} 아무것도 호출하지 않았습니다.`);
   process.exit(1);
 }
 
+/** 리허설용 가짜 fetch — 제공사 응답 모양으로 모의 글을 돌려준다 (네트워크를 쓰지 않는다) */
+function rehearsalFetch(kind: "anthropic" | "openai") {
+  return async (_url: string, init: { body: string }) => {
+    const body = JSON.parse(init.body) as { messages?: { content: string }[]; input?: { content: string }[] };
+    const text = JSON.stringify(composeMockReading((body.messages ?? body.input)![0].content));
+    const usage = { input_tokens: 15000, output_tokens: 8000 };
+    const json = kind === "anthropic" ? { content: [{ type: "text", text }], usage } : { output: [{ type: "message", content: [{ type: "output_text", text }] }], usage };
+    return { ok: true, status: 200, json: async () => json };
+  };
+}
+if (rehearsal) console.log("\n리허설: 네트워크 · 키 · 비용 없이 모의 글로 같은 흐름을 끝까지 시험합니다 (실제 AI 글이 아닙니다).");
+
 const candidates: CompareCandidate[] = chosen.map((c) => ({
   key: c.key,
   price: c.price,
-  model: c.key === "A" ? createAnthropicModel({ apiKey: keys.A!, model: c.modelId, effort: "medium" }) : createOpenAiModel({ apiKey: keys.B!, model: c.modelId, effort: "medium" }),
+  model: c.key === "A" ? createAnthropicModel({ apiKey: keys.A ?? "rehearsal", model: c.modelId, effort: "medium", ...(rehearsal ? { fetch: rehearsalFetch("anthropic") as never } : {}) }) : createOpenAiModel({ apiKey: keys.B ?? "rehearsal", model: c.modelId, effort: "medium", ...(rehearsal ? { fetch: rehearsalFetch("openai") as never } : {}) }),
 }));
 const guard = new BudgetGuard({ capKrw: stage.capKrw, ...settings });
 const blindSeed = Number(approvedOn.replaceAll("-", ""));
@@ -92,18 +115,50 @@ try {
 }
 
 const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\..*/, "").replace("T", "-");
-const dir = join("pilot-data", "ai-compare", `${stage.name}-${stamp}`);
+const dir = join("pilot-data", "ai-compare", `${rehearsal ? "rehearsal-" : ""}${stage.name}-${stamp}`);
 mkdirSync(join(dir, "blind"), { recursive: true });
 mkdirSync(join(dir, "reports"), { recursive: true });
 
+// 저장 1단계 — 돈을 쓰고 받은 원본부터 먼저 남긴다 (이 뒤의 읽기용 파일을 만들다 오류가 나도 결과를 잃지 않게)
 for (const run of result.runs) {
   if (!run.report || !isReadingReport(run.report)) continue;
-  writeFileSync(join(dir, "blind", `${run.persona}-${run.blind}.md`), renderReadingMarkdown(run.report));
   // 실제 미유 리포트 화면에서 읽기 위한 원본 (개발용 화면 /dev/compare 가 읽는다). 후보 이름은 담기지 않는다
   writeFileSync(join(dir, "reports", `${run.persona}-${run.blind}.json`), JSON.stringify(run.report));
 }
-writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport)}`);
+writeFileSync(join(dir, "key-open-after-scoring.json"), JSON.stringify(result.blindKey, null, 2));
+writeFileSync(
+  join(dir, "cost-and-checks.json"),
+  JSON.stringify(
+    {
+      stage: result.stage,
+      variant,
+      spentKrw: Math.round(result.spentKrw * 100) / 100,
+      stoppedByBudget: result.stoppedByBudget,
+      estimateRatio: result.estimateRatio,
+      crossPersonOverlap: result.crossPersonOverlap,
+      runs: result.runs.map(({ report: _report, ...rest }) => ({ ...rest, hasReport: _report !== null })),
+    },
+    null,
+    2,
+  ),
+);
 
+// 저장 2단계 — 읽기 · 채점용 파일. 하나가 실패해도 이미 저장한 원본은 그대로이고 나머지를 계속 만든다
+const safely = (what: string, fn: () => void) => {
+  try {
+    fn();
+  } catch (e) {
+    console.error(`경고: ${what} 파일을 만들지 못했습니다 (${e instanceof Error ? e.message : "알 수 없는 오류"}). 원본(reports 폴더 · cost-and-checks.json)은 저장돼 있습니다.`);
+  }
+};
+safely("이름을 가린 글", () => {
+  for (const run of result.runs) {
+    if (!run.report || !isReadingReport(run.report)) continue;
+    writeFileSync(join(dir, "blind", `${run.persona}-${run.blind}.md`), renderReadingMarkdown(run.report));
+  }
+});
+safely("사람이 쓴 예시", () => writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport)}`));
+safely("채점표", () => {
 const rows = personas.flatMap((p) => (solo ? ["X"] : ["X", "Y"]).map((b) => `| ${p.id} | ${b} |  |  |  |  |  |  |  |`)).join("\n");
 writeFileSync(
   join(dir, "evaluation-sheet.md"),
@@ -133,23 +188,7 @@ ${rows}
 합격 기준은 \`docs/ai-quality-comparison-plan.md\` 6장(결과를 보기 전에 고정한 값)을 따릅니다. 읽기 쉬움은 새 읽기 구조를 위해 더한 항목이라 기존 합격 기준(4.0)에는 넣지 않고 기록만 합니다.
 `,
 );
-writeFileSync(join(dir, "key-open-after-scoring.json"), JSON.stringify(result.blindKey, null, 2));
-writeFileSync(
-  join(dir, "cost-and-checks.json"),
-  JSON.stringify(
-    {
-      stage: result.stage,
-      variant,
-      spentKrw: Math.round(result.spentKrw * 100) / 100,
-      stoppedByBudget: result.stoppedByBudget,
-      estimateRatio: result.estimateRatio,
-      crossPersonOverlap: result.crossPersonOverlap,
-      runs: result.runs.map(({ report: _report, ...rest }) => ({ ...rest, hasReport: _report !== null })),
-    },
-    null,
-    2,
-  ),
-);
+});
 
 const ok = result.runs.filter((r) => r.status === "ok").length;
 console.log(`\n완료: 생성 ${ok}/${result.runs.length}건 · 쓴 비용 ${won(result.spentKrw)} (한도 ${won(stage.capKrw)})${result.stoppedByBudget ? " · 예산 하드스톱으로 일부 중단" : ""}`);
