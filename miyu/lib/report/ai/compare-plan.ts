@@ -43,8 +43,11 @@ export type CompareApproval = {
 
 /** 출력 토큰의 평소 수준 — 이전 계획의 6,000~14,000토큰 중간값. 비용 "예상"에만 쓴다 (한도는 최대치로 지킨다) */
 export const TYPICAL_OUTPUT_TOKENS = 10_000;
-/** 생성기가 쓰는 출력 토큰 최대치 (lib/report/ai/generator.ts의 기본값과 같다) */
-export const MAX_OUTPUT_TOKENS = 16_000;
+/**
+ * 비교 실행에서 쓰는 출력 토큰 최대치. 두 회사 모두 생각 · 추론 토큰이 최대 출력에 합산된다(공식 문서) — 16,000으로는 글이 중간에 잘릴 위험이 있어 24,000으로 올렸다.
+ * 비용은 실제로 쓴 만큼만 나가고 한도(승인 금액)는 그대로이며, 최대치는 호출 전에 최악 비용을 잡는 데만 쓴다.
+ */
+export const MAX_OUTPUT_TOKENS = 24_000;
 /** 형식 검사에 실패해 한 번 고쳐 쓸 때 붙는 안내문 추정 (글자) */
 const REPAIR_NOTE_CHARS = 600;
 

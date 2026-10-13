@@ -70,7 +70,7 @@ export class BudgetExceededError extends ModelCallError {
 export type Reservation = { id: number; provider: string; label: string; price: ModelPrice; worstKrw: number; settled: boolean };
 
 /** 어댑터가 "요청이 모델 생성에 닿지 않았다"고 보증하는 오류 코드 — 이 경우만 청구 없음으로 본다 */
-export const NOT_BILLED_CODES: ReadonlySet<string> = new Set(["RATE_LIMITED", "AUTH", "INVALID_REQUEST", "BUDGET_EXCEEDED"]);
+export const NOT_BILLED_CODES: ReadonlySet<string> = new Set(["RATE_LIMITED", "AUTH", "BILLING", "INVALID_REQUEST", "BUDGET_EXCEEDED"]);
 
 export class BudgetGuard {
   readonly settings: BudgetSettings;

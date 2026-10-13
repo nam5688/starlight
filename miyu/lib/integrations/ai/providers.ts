@@ -3,11 +3,15 @@
 // 승인 기록 없이는 scripts/run-ai-compare.ts가 시작하지 않는다. 테스트는 가짜 fetch만 쓴다(실제 네트워크 호출 없음).
 // 비밀키는 이 파일 밖(환경변수)에서 받아 요청 머리글에만 넣는다. 오류 문구 · 기록에는 키 · 요청 본문 · 응답 본문을 넣지 않는다.
 //
-// 확인한 것과 못 한 것(2026-10-13):
-//  · Anthropic: 요청 형식(POST /v1/messages · x-api-key · anthropic-version · thinking.adaptive · output_config.effort)은 공식 문서(제공된 API 안내)에서 확인했다.
-//  · OpenAI: 모델 문서(gpt-6.1-sol)에서 Responses API 지원 · reasoning.effort(기본 medium)를, 이전 안내 문서에서 instructions · input · store를 확인했다.
-//    max_output_tokens · usage.input_tokens/output_tokens · 응답 status는 문서 본문을 읽지 못했고 이 API의 오래된 필드명을 쓴다 — 첫 승인 호출에서 실제 응답으로 확인한다.
-//    사용량을 읽지 못하면 비용은 최악 비용으로 계산된다(BudgetGuard) — 한도를 넘지 않는다.
+// 공식 문서로 확인한 것 (2026-10-13, 유료 호출 없이 문서만):
+//  · Anthropic(platform.claude.com/docs): 모델 ID claude-sonnet-5-5 · 입력 $2 / 출력 $10 (100만 토큰) · 기본 생각 적응형 · 기본 강도 high(우리는 medium을 명시) ·
+//    요청 model · max_tokens · system · messages · thinking{type:"adaptive"} · output_config.effort(low~max) · 응답 content[](text · thinking) · usage.input_tokens/output_tokens ·
+//    stop_reason(end_turn · max_tokens · refusal …) · 생각 토큰은 출력으로 과금되고 max_tokens에 합산된다. 헤더 x-api-key · anthropic-version: 2023-06-01은 공식 오류 문서의 예시에서 확인.
+//  · OpenAI(developers.openai.com): 모델 gpt-6.1-sol은 Responses API 지원 · 입력 $2 / 출력 $10 · reasoning.effort(low · medium · high · xhigh · max, 기본 medium) ·
+//    요청 instructions · input · max_output_tokens(보이는 글 + 추론 토큰 포함) · store · 응답 output[](message → content[] → output_text) · usage.input_tokens/output_tokens/
+//    output_tokens_details.reasoning_tokens · status(completed · incomplete · failed …) · incomplete_details.reason(max_output_tokens …).
+//  · 확인하지 못한 것: OpenAI의 오류 응답에서 실패한 요청의 청구 여부(문서에 없음 — 그래서 429 · 인증 · 요청 오류만 청구 없음으로 보고 서버 오류는 최악 비용으로 센다),
+//    두 회사의 실제 응답이 이 코드와 한 글자도 다르지 않은지(첫 승인 호출의 결과로 확인 — 다르면 재시도 없이 멈춘다).
 import { ModelCallError, type ModelRequest, type ModelResult, type TextModel } from "../../report/ai/model.ts";
 
 export type Effort = "low" | "medium" | "high";
@@ -24,13 +28,20 @@ type CommonOptions = {
   timeoutMs?: number;
 };
 
-/** 제공사 응답 코드 → 오류. 응답 본문은 읽지 않는다(문구에 넣지 않음). 429 · 인증 · 요청 오류는 모델 생성에 닿지 않았으므로 청구 없음으로 본다 */
+/**
+ * 제공사 응답 코드 → 오류. 응답 본문은 읽지 않는다(문구에 넣지 않음).
+ * 공식 오류 문서(Anthropic: 400 · 401 · 402 결제 · 403 · 404 · 413 · 429 · 500 · 504 · 529, OpenAI: 400 · 401 · 403 · 429 · 500 · 503)로 확인한 분류다.
+ * 요청이 모델 생성에 닿지 않은 오류(속도 제한 · 인증 · 결제 · 잘못된 요청)는 청구 없음으로, 서버 오류 · 시간 초과(생성에 닿았을 수 있음)는 청구 없음으로 보증하지 않는다.
+ */
 export function providerError(provider: string, status: number): ModelCallError {
-  if (status === 429) return new ModelCallError(`${provider} 속도 제한 (429)`, { retryable: true, code: "RATE_LIMITED" });
-  if (status === 401 || status === 403) return new ModelCallError(`${provider} 인증 실패 (${status}) — 키 또는 권한을 확인하세요`, { retryable: false, code: "AUTH" });
-  if (status === 400 || status === 404 || status === 413 || status === 422) return new ModelCallError(`${provider} 요청 오류 (${status})`, { retryable: false, code: "INVALID_REQUEST" });
-  // 5xx · 529(과부하): 다시 하면 될 수 있다. 생성에 닿았는지 알 수 없으므로 청구 없음으로 보증하지 않는다
-  return new ModelCallError(`${provider} 일시 오류 (${status})`, { retryable: status >= 500, code: `HTTP_${status}` });
+  // 429: 속도 제한이거나 사용 한도 · 잔액 문제다. 한도 문제는 다시 해도 같지만(재시도는 2번까지, 청구 없음) 원인을 안내한다
+  if (status === 429) return new ModelCallError(`${provider} 속도 제한 또는 사용 한도 (429) — 계속 나오면 잔액과 월 사용 한도를 확인하세요`, { retryable: true, code: "RATE_LIMITED" });
+  if (status === 401 || status === 403) return new ModelCallError(`${provider} 인증 실패 (${status}) — 키 · 권한 · 지역 제한을 확인하세요`, { retryable: false, code: "AUTH" });
+  if (status === 402) return new ModelCallError(`${provider} 결제 설정 문제 (402) — 결제 수단과 잔액을 확인하세요`, { retryable: false, code: "BILLING" });
+  // 408 · 5xx(500 · 503 · 504 · 529 과부하): 다시 하면 될 수 있다. 생성에 닿았는지 알 수 없다
+  if (status === 408 || status >= 500) return new ModelCallError(`${provider} 일시 오류 (${status})`, { retryable: true, code: `HTTP_${status}` });
+  // 그 밖의 4xx(400 · 404 · 409 · 413 · 422 …): 요청 자체의 문제 — 지출 한도에 닿아도 Anthropic은 400을 돌려준다
+  return new ModelCallError(`${provider} 요청 오류 (${status}) — 모델 이름 · 요청 형식 · 사용 한도를 확인하세요`, { retryable: false, code: "INVALID_REQUEST" });
 }
 
 async function post(provider: string, url: string, headers: Record<string, string>, body: unknown, opts: CommonOptions, request: ModelRequest) {

@@ -12,6 +12,7 @@
 //
 // 키(.env.local): ANTHROPIC_API_KEY (후보 A) · OPENAI_API_KEY (후보 B). 값은 이 스크립트가 출력하지 않는다.
 // 결과 폴더: pilot-data/ai-compare/<단계>-<시각>/ (저장소에 올라가지 않는 폴더)
+//   reports/<인물>-X.json · -Y.json : 실제 미유 리포트 화면(개발용 /dev/compare)이 읽는 원본
 //   blind/<인물>-X.md · -Y.md : 이름을 가린 글   evaluation-sheet.md : 채점표
 //   key-open-after-scoring.json : X · Y가 어느 후보인지 (채점이 끝난 뒤에 연다)   cost-and-checks.json : 비용 · 토큰 · 검사 결과(글 내용 없음)
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -39,7 +40,8 @@ const personas = buildPersonas(stage.personaCount);
 
 const plan = planStage({ stage: stage.name, capKrw: stage.capKrw, personas, candidates: AI_CANDIDATES.map((c) => ({ key: c.key, price: c.price })), settings, now, variant });
 console.log(`# ${stage.label}`);
-console.log(`- 지시문: ${variant === "reading-v1" ? "개인 통합 리포트(읽기 구조, 지금 제품 형식)" : "개인 종합 리포트 v2(이전 형식)"}`);
+console.log(`- 비교 대상: **개인 통합 리포트**(9,900원 상품) — ${variant === "reading-v1" ? "읽기 구조(reading-v1, 지금 제품 형식)" : "이전 형식(personal-v2)"}. 고민 반영 리포트(4,900원)는 이 비교에 넣지 않았다(지시문이 아직 옛 규칙이라 검증하지 않음).`);
+console.log("- 인물 1명은 '알려 준 고민'이 있어 개인 통합 리포트 안의 '알려 주신 고민까지 반영한 해석' 구역이 함께 나오지만, 그것이 고민 반영 리포트 상품은 아니다.");
 for (const c of AI_CANDIDATES) console.log(`- 후보 ${c.key}: ${c.company} ${c.modelId} (입력 $${c.price.inputUsdPerMTok} · 출력 $${c.price.outputUsdPerMTok} / 100만 토큰) — 생각 · 추론 강도 중간`);
 console.log(`- 예상 비용(평소 수준): ${won(plan.expectedKrw)} · 모든 생성이 한 번에 끝나는 최악: ${won(plan.firstCallWorstKrw)} · 모두 고쳐 쓰기까지 가는 최악: ${won(plan.twoRoundWorstKrw)}`);
 console.log(`- 하드스톱 한도: ${won(stage.capKrw)} (환율 ${settings.fxKrwPerUsd.toLocaleString("ko-KR")}원/달러 · 여유율 ${Math.round((settings.surcharge - 1) * 100)}% 가정 — 실제 청구는 제공사 콘솔에서 확인)`);
@@ -73,7 +75,8 @@ const blindSeed = Number(approvedOn.replaceAll("-", ""));
 
 let result;
 try {
-  result = await runStage({ stage: { name: stage.name, capKrw: stage.capKrw }, personas, candidates, guard, approval: { stage: stage.name, approvedCapKrw: approvedCap, approvedOn }, now, variant, blindSeed });
+  // 호출 한 번의 제한 시간: 긴 글 + 생각 · 추론 시간을 고려해 5분 (기본 2분이면 정상 응답도 시간 초과로 끊겨 비용만 나간다)
+  result = await runStage({ stage: { name: stage.name, capKrw: stage.capKrw }, personas, candidates, guard, approval: { stage: stage.name, approvedCapKrw: approvedCap, approvedOn }, now, variant, blindSeed, callTimeoutMs: 300_000 });
 } catch (e) {
   console.error(`중단: ${e instanceof Error ? e.message : "알 수 없는 오류"}`);
   process.exit(1);
@@ -82,10 +85,13 @@ try {
 const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\..*/, "").replace("T", "-");
 const dir = join("pilot-data", "ai-compare", `${stage.name}-${stamp}`);
 mkdirSync(join(dir, "blind"), { recursive: true });
+mkdirSync(join(dir, "reports"), { recursive: true });
 
 for (const run of result.runs) {
   if (!run.report || !isReadingReport(run.report)) continue;
   writeFileSync(join(dir, "blind", `${run.persona}-${run.blind}.md`), renderReadingMarkdown(run.report));
+  // 실제 미유 리포트 화면에서 읽기 위한 원본 (개발용 화면 /dev/compare 가 읽는다). 후보 이름은 담기지 않는다
+  writeFileSync(join(dir, "reports", `${run.persona}-${run.blind}.json`), JSON.stringify(run.report));
 }
 writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport)}`);
 
@@ -139,4 +145,5 @@ writeFileSync(
 const ok = result.runs.filter((r) => r.status === "ok").length;
 console.log(`\n완료: 생성 ${ok}/${result.runs.length}건 · 쓴 비용 ${won(result.spentKrw)} (한도 ${won(stage.capKrw)})${result.stoppedByBudget ? " · 예산 하드스톱으로 일부 중단" : ""}`);
 for (const r of result.runs) console.log(`- ${r.persona} ${r.blind}: ${r.status}${r.errorCode ? ` (${r.errorCode})` : ""} · 호출 ${r.calls}회 · 첫 시도 형식 통과 ${r.firstPassValid === null ? "-" : r.firstPassValid ? "예" : "아니오"} · ${won(r.costKrw)}`);
-console.log(`\n결과 폴더: ${dir}\n채점이 끝나기 전에는 key-open-after-scoring.json 을 열지 마세요.`);
+const runId = dir.split(/[\\/]/).pop();
+console.log(`\n결과 폴더: ${dir}\n실제 미유 리포트 화면으로 읽기: 이 PC에서 npm.cmd run dev 를 켠 뒤 http://localhost:3000/dev/compare/${runId} 을 연다 (이름이 가려진 X · Y).\n채점이 끝나기 전에는 key-open-after-scoring.json 을 열지 마세요.`);

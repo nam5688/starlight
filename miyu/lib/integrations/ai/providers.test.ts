@@ -76,12 +76,13 @@ test("사용량을 읽지 못하면 usage가 없다 — 예산 관리기가 최�
   assert.ok(guard.spentKrw > 0, "사용량을 모르면 최악 비용을 쓴 것으로 센다");
 });
 
-test("오류 응답: 속도 제한은 재시도 · 청구 없음, 인증 · 요청 오류는 재시도 없음 · 청구 없음, 서버 오류는 재시도하되 청구 없음으로 보증하지 않는다", () => {
+test("오류 응답: 속도 제한은 재시도 · 청구 없음, 인증 · 결제 · 요청 오류는 재시도 없음 · 청구 없음, 서버 오류는 재시도하되 청구 없음으로 보증하지 않는다", () => {
   const rate = providerError("X", 429);
   assert.deepEqual([rate.retryable, rate.code], [true, "RATE_LIMITED"]);
   for (const s of [401, 403]) assert.deepEqual([providerError("X", s).retryable, providerError("X", s).code], [false, "AUTH"]);
-  for (const s of [400, 404, 413, 422]) assert.deepEqual([providerError("X", s).retryable, providerError("X", s).code], [false, "INVALID_REQUEST"]);
-  for (const s of [500, 502, 503, 529]) {
+  assert.deepEqual([providerError("X", 402).retryable, providerError("X", 402).code], [false, "BILLING"]);
+  for (const s of [400, 404, 409, 413, 422]) assert.deepEqual([providerError("X", s).retryable, providerError("X", s).code], [false, "INVALID_REQUEST"]);
+  for (const s of [408, 500, 502, 503, 504, 529]) {
     const e = providerError("X", s);
     assert.equal(e.retryable, true);
     assert.equal(e.code, `HTTP_${s}`);
