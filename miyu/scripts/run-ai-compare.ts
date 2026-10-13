@@ -149,7 +149,7 @@ writeFileSync(
       estimateRatio: result.estimateRatio,
       crossPersonOverlap: result.crossPersonOverlap,
       // 글 내용(attempts[].text)은 여기에 싣지 않는다 — 걸린 이유(errors)만. 글은 failed/ 폴더에 따로 둔다
-      runs: result.runs.map(({ report: _report, attempts, ...rest }) => ({ ...rest, attempts: attempts.map(({ text: _text, ...a }) => a), hasReport: _report !== null })),
+      runs: result.runs.map(({ report, attempts, ...rest }) => ({ ...rest, attempts: attempts.map((a) => ({ round: a.round, errors: a.errors })), hasReport: report !== null })),
     },
     null,
     2,

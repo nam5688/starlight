@@ -144,9 +144,9 @@ export function ReadingReportView({
             </h2>
             <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">
               {report.generated?.context
-                ? `최근 알려 주신 내용(${report.generated.context.topicLabel}${report.generated.context.fields.length ? ` · ${report.generated.context.fields.join(", ")}` : ""})을 반영해 해석의 초점과 예시를 골랐습니다. `
-                : "알려 주신 고민을 반영해 해석의 초점과 예시를 골랐습니다. "}
-              사주 계산은 그대로이며, 알려 주신 이야기를 사주로 알아낸 것이 아닙니다.
+                ? `최근 알려 주신 내용(${report.generated.context.topicLabel}${report.generated.context.fields.length ? ` · ${report.generated.context.fields.join(", ")}` : ""})을 반영해 해석의 초점과 예시를 골랐어요. `
+                : "알려 주신 고민을 반영해 해석의 초점과 예시를 골랐어요. "}
+              사주 계산은 그대로이고, 알려 주신 이야기를 사주로 알아낸 것은 아니에요.
             </p>
             <div className="mt-4">
               <Paragraphs items={focus.map((f) => f.text)} />
@@ -231,7 +231,7 @@ export function ReadingReportView({
                           <Prose text={s.when} className="mt-1 text-[15px] leading-[1.7] font-semibold" />
                           <p className="mt-3 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
                             <ArrowIcon className="size-3.5" />
-                            이렇게 될 수 있습니다
+                            이렇게 될 수 있어요
                           </p>
                           <Prose text={s.then} className="mt-1 text-[15px] leading-[1.75]" />
                         </li>
@@ -256,7 +256,7 @@ export function ReadingReportView({
             <h2 id={id("extras-h")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
               더 알아보기
             </h2>
-            <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">위 풀이에서 이어서 궁금할 때만 열어 보세요. 앞에서 한 이야기는 되풀이하지 않고, 원국 질문 · 상황별 풀이 · 어울리는 관계 조건 · 보완 아이템을 따로 모았습니다.</p>
+            <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">위 풀이에서 이어서 궁금할 때만 열어 보세요. 앞에서 한 이야기는 되풀이하지 않고, 사주 여덟 글자에 대한 질문 · 상황별 풀이 · 어울리는 관계 조건 · 보완 아이템만 따로 모았어요.</p>
             <FoldRow>
               <Fold label="더 알아보기 열기" hint="원국 질문과 답 · 상황별 풀이 · 어울리는 관계 조건 · 보완 아이템 · 바로 해볼 3가지" wide>
                 <div className="space-y-12">
@@ -285,7 +285,7 @@ export function ReadingReportView({
           <h2 id={id("actions")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
             지금 확인해 볼 것
           </h2>
-          <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">정답을 정하는 목록이 아니라, 위의 해석이 나에게 맞는지 확인해 볼 수 있는 작은 행동입니다.</p>
+          <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">정답을 정하는 목록이 아니라, 위의 해석이 나에게 맞는지 확인해 볼 수 있는 작은 행동이에요.</p>
           <ul className="mt-4 space-y-2">
             {report.actions.map((a) => (
               <li key={a.title}>

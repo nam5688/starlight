@@ -275,7 +275,7 @@ export function LuckTimelineCard({ timeline, text, reference, className = "mt-5"
           ))}
         </div>
         <p className="mt-2 text-[13px] text-ink-3">
-          {reference.year}년 {reference.month}월 기준, 이 시기가 시작된 지 {elapsedText} 지난 지점입니다.
+          {reference.year}년 {reference.month}월 기준, 이 시기가 시작된 지 {elapsedText} 지난 지점이에요.
         </p>
       </div>
 
