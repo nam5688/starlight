@@ -7,7 +7,7 @@
 | 바꾸려는 것 | 고칠 파일 | 고친 뒤 확인 |
 | --- | --- | --- |
 | **가격** · 상품 이름 | `lib/config/product.ts`의 `PERSONAL_REPORT` | 결제 금액은 서버가 이 값으로 정한다. 이미 만들어진 주문은 그때의 금액 그대로. `npm run check` |
-| **고민 반영 리포트 가격** · 상품 이름 (내 고민 자세히 알려주기 → 새 리포트 발급) | `lib/config/product.ts`의 `CONCERN_REPORT` | 가안 4,900원. 발급 버튼 문구 · 결제 금액이 이 값을 읽는다. 이미 만들어진 주문은 그때의 금액 그대로. 무료 발급 횟수는 정해지지 않았고 코드에도 없다 ([`concern-records.md`](./concern-records.md) 6장) |
+| **고민 반영 리포트 가격** · 상품 이름 (내 고민 자세히 알려주기 → 새 리포트 발급) | `lib/config/product.ts`의 `CONCERN_REPORT` | 4,900원(운영자 확정 2026-10-13). 발급 버튼 문구 · 결제 금액이 이 값을 읽는다. 이미 만들어진 주문은 그때의 금액 그대로. 무료 발급 횟수는 정해지지 않았고 코드에도 없다 ([`concern-records.md`](./concern-records.md) 6장) |
 | **무료 / 유료 범위 표** (홈의 비교표 · 가격 상자 · 안내 문구) | `lib/config/product.ts`의 `REPORT_SCOPE` | 홈 화면 표가 이 표를 읽는다. 표에 적은 것은 실제 리포트에 있어야 한다 — `lib/report/preview.test.ts`가 일부를 확인 |
 | 무료 미리보기에서 보이는 항목 · 잠금 질문 | `lib/report/preview.ts` | 잠긴 내용은 이 파일이 만든 값에 **없어야** 한다 (테스트가 확인). 질문을 늘리면 구매 리포트에 그 답이 있어야 한다 |
 | 홈 · 안내 화면 문구 | `app/page.tsx` · `components/home/*` | 가격 · 범위는 위 파일을 읽으므로 여기서 고치지 않는다 |
