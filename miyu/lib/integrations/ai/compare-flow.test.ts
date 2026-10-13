@@ -79,6 +79,22 @@ test("한도가 모자라면 남은 요청은 보내지 않는다 (승인한 금
   assert.ok(res.runs.some((r) => r.status === "skipped-budget"));
 });
 
+test("검사에 걸려 실패하면 걸린 이유와 그때의 글이 남는다 — 돈을 쓰고도 왜 실패했는지 모르는 일이 없게 (이유 문구에는 키 · 요청 본문이 없다)", async () => {
+  const bad = '{"headline":"너무 짧은 제목","blocks":[]}';
+  const f = async () => ({ ok: true, status: 200, json: async () => ({ content: [{ type: "text", text: bad }], usage: { input_tokens: 15000, output_tokens: 3000 } }) });
+  const list: CompareCandidate[] = [{ key: "A", price: AI_CANDIDATES[0].price, model: createAnthropicModel({ apiKey: "k-secret-NOT-REAL", model: AI_CANDIDATES[0].modelId, fetch: f as never }) }];
+  const guard = new BudgetGuard({ capKrw: 3000, ...SETTINGS });
+  const res = await runStage({ stage: { name: "stage-1", capKrw: 3000 }, personas: buildPersonas(1), candidates: list, guard, approval: { stage: "stage-1", approvedCapKrw: 3000, approvedOn: "2026-10-13" }, now: NOW, blindSeed: 1, sleep: async () => {} });
+  const run = res.runs[0];
+  assert.equal(run.status, "failed");
+  assert.equal(run.calls, 2, "처음 응답 + 고쳐 쓴 응답");
+  assert.equal(run.attempts.length, 2);
+  assert.ok(run.attempts.every((a) => a.errors.length > 0 && a.text === bad));
+  assert.match(run.errorMessage ?? "", /리포트 형식 검사 실패/);
+  assert.doesNotMatch(`${run.errorMessage} ${JSON.stringify(run.attempts.map((a) => a.errors))}`, /k-secret/);
+  assert.ok(run.costKrw > 0, "응답은 받았으므로 비용은 기록된다");
+});
+
 test("블라인드 평가용 글: 예시 리포트를 마크다운으로 옮기면 본문만 담고(분석 근거 · 내부 근거 ID 없음) 모든 주제와 행동이 들어 있다", () => {
   const md = renderReadingMarkdown(sampleReadingReport);
   assert.match(md, /^# 서윤 님의 개인 통합 리포트/);

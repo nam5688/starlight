@@ -195,6 +195,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           const done = (outcome: "ok" | "invalid") => caller.recordResult(ctx, spec, called, outcome, "VALIDATION");
           const retry = (errors: string[]) => {
             lastReadingErrors = errors;
+            ctx.onAttempt?.({ round, errors, text: result.text });
             messages.push({ role: "assistant", content: result.text.slice(0, 20000) }, { role: "user", content: buildReadingRepairMessage(errors) });
           };
           let parsed: unknown;

@@ -134,6 +134,13 @@ export type CompareRun = {
   costKrw: number;
   latencyMs: number;
   errorCode: string | null;
+  /** 실패했을 때 생성기가 남긴 오류 문구 (키 · 요청 본문 · 응답 본문은 들어가지 않는다 — 형식 검사에 걸린 이유 몇 개). 성공이면 null */
+  errorMessage: string | null;
+  /**
+   * 검사에 걸린 응답마다 걸린 이유 전체와 그 글 (읽기 구조만, 가상 인물의 글). 실패 원인을 보려는 진단용이다 —
+   * 글 내용이 들어 있으므로 cost-and-checks.json에는 이유(errors)만 싣고 글(text)은 따로 저장한다.
+   */
+  attempts: { round: number; errors: string[]; text: string }[];
   report: ReportContent | PhilosophicalReportV0 | null;
   /** 내용 차이 검사 결과 (lib/report/v2/depth.ts) — 낱말 · 표지를 세는 어림이며 좋은 글이라는 보증이 아니다. 가려 읽는 평가가 따로 있다 */
   depth: { pass: boolean; fails: string[]; warns: string[]; conditionRatio: number; selfOverlapMax: number } | null;
@@ -203,7 +210,7 @@ export async function runStage(opts: {
     for (const candidate of opts.candidates) {
       const blind = (Object.entries(blindKey[persona.id]).find(([, key]) => key === candidate.key)?.[0] ?? "X") as "X" | "Y";
       if (stoppedByBudget) {
-        runs.push({ persona: persona.id, candidate: candidate.key, blind, status: "skipped-budget", firstPassValid: null, calls: 0, inputTokens: 0, outputTokens: 0, costKrw: 0, latencyMs: 0, errorCode: "BUDGET_EXCEEDED", report: null, depth: null });
+        runs.push({ persona: persona.id, candidate: candidate.key, blind, status: "skipped-budget", firstPassValid: null, calls: 0, inputTokens: 0, outputTokens: 0, costKrw: 0, latencyMs: 0, errorCode: "BUDGET_EXCEEDED", errorMessage: null, attempts: [], report: null, depth: null });
         continue;
       }
       const spentBefore = opts.guard.spentKrw;
@@ -219,13 +226,16 @@ export async function runStage(opts: {
       const started = Date.now();
       let report: ReportContent | PhilosophicalReportV0 | null = null;
       let errorCode: string | null = null;
+      let errorMessage: string | null = null;
+      const attempts: CompareRun["attempts"] = [];
       try {
-        report = await generator.generate(persona.input, { onUsage: (u) => usage.push(u) });
+        report = await generator.generate(persona.input, { onUsage: (u) => usage.push(u), onAttempt: (a) => attempts.push(a) });
       } catch (e) {
         if (e instanceof BudgetExceededError) {
           stoppedByBudget = true;
           errorCode = "BUDGET_EXCEEDED";
         } else errorCode = e instanceof Error && "code" in e ? String((e as { code: unknown }).code) : "FAILED";
+        if (e instanceof Error) errorMessage = e.message.slice(0, 600);
       }
       const first = usage.find((u) => u.outcome !== "error" && u.outcome !== "timeout");
       const inputTokens = usage.reduce((n, u) => n + (u.inputTokens ?? 0), 0);
@@ -258,6 +268,8 @@ export async function runStage(opts: {
         costKrw: opts.guard.spentKrw - spentBefore,
         latencyMs: Date.now() - started,
         errorCode,
+        errorMessage,
+        attempts,
         report,
         depth,
       });

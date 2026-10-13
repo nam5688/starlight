@@ -9,6 +9,9 @@
 // 실행 (miyu 폴더, PowerShell — 키는 .env.local 에만 두고 채팅 · 화면에 붙여넣지 않는다):
 //   node --env-file=.env.local scripts/run-ai-compare.ts              # 드라이런 (호출 없음) — 키가 들어갔는지(있음 · 없음)도 보여 준다
 //   --rehearsal                                                       # 리허설: 네트워크 · 키 · 비용 없이 같은 흐름(생성 → 파일 저장 → 화면용 원본)을 모의 글로 끝까지 돈다. 결과 폴더 이름이 rehearsal-로 시작한다
+//   --rehearsal-fail                                                  # 리허설 + 일부러 검사에 걸리는 글: 실패했을 때 이유 · 글이 저장되고 화면에 나오는지 시험 (호출 없음)
+//   --persona P01                                                     # 가상 인물 한 명만 (원인을 볼 때 비용을 줄인다)
+//   --already-spent-krw 621                                           # 같은 단계에서 이미 쓴 금액(원). 승인 총액(3,000원)에서 빼고 남은 만큼만 하드스톱 한도로 쓴다
 //   --only A                                                          # 한 모델만(A=Claude, B=GPT). 그 모델의 키만 있으면 되고 비용은 절반 정도이며, 이름을 가린 비교는 아니다
 //   node --env-file=.env.local scripts/run-ai-compare.ts --stage stage-1 --execute --approved-cap-krw 3000 --approved-on 2026-10-13
 //
@@ -34,7 +37,8 @@ const arg = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1
 const stageName = arg("--stage") ?? "stage-1";
 const variant = (arg("--variant") ?? "reading-v1") as CompareVariant;
 if (!["reading-v1", "personal-v2"].includes(variant)) throw new Error("--variant 은 reading-v1(기본) 또는 personal-v2만 쓸 수 있습니다.");
-const rehearsal = args.includes("--rehearsal");
+const rehearsalFail = args.includes("--rehearsal-fail"); // 리허설에서 일부러 검사에 걸리는 글을 돌려줘 실패 경로(이유 · 글 저장 · 화면 안내)를 시험한다
+const rehearsal = args.includes("--rehearsal") || rehearsalFail;
 const only = arg("--only");
 if (only !== undefined && only !== "A" && only !== "B") throw new Error("--only 는 A(Claude) 또는 B(GPT)만 쓸 수 있습니다.");
 const stage = COMPARE_STAGES.find((s) => s.name === stageName);
@@ -42,17 +46,23 @@ if (!stage) throw new Error(`알 수 없는 단계: ${stageName} (${COMPARE_STAG
 const won = (x: number) => `${Math.round(x).toLocaleString("ko-KR")}원`;
 const now = new Date();
 const settings = { fxKrwPerUsd: DEFAULT_FX_KRW_PER_USD, surcharge: DEFAULT_SURCHARGE };
-const personas = buildPersonas(stage.personaCount);
+const personaArg = arg("--persona");
+const personas = buildPersonas(stage.personaCount).filter((p) => !personaArg || p.id === personaArg);
+if (personas.length === 0) throw new Error(`--persona ${personaArg} 인물이 없습니다 (${buildPersonas(stage.personaCount).map((p) => p.id).join(" · ")}).`);
+// 같은 단계에서 이미 쓴 금액 — 승인 총액에서 빼고 남은 만큼만 쓴다 (한 번에 3,000원씩 다시 승인되는 것처럼 쓰지 않게)
+const alreadySpent = Number(arg("--already-spent-krw") ?? 0);
+if (!Number.isFinite(alreadySpent) || alreadySpent < 0 || alreadySpent >= stage.capKrw) throw new Error(`--already-spent-krw 는 0 이상, ${stage.capKrw}원 미만의 숫자여야 합니다.`);
+const remainingCap = stage.capKrw - alreadySpent;
 const chosen = AI_CANDIDATES.filter((c) => !only || c.key === only);
 const solo = chosen.length === 1;
 
-const plan = planStage({ stage: stage.name, capKrw: stage.capKrw, personas, candidates: chosen.map((c) => ({ key: c.key, price: c.price })), settings, now, variant });
+const plan = planStage({ stage: stage.name, capKrw: remainingCap, personas, candidates: chosen.map((c) => ({ key: c.key, price: c.price })), settings, now, variant });
 console.log(`# ${solo ? `${stage.label.split(":")[0]}: 가상 인물 ${personas.length}명 × ${chosen[0].company} 1개 = 생성 ${personas.length}건 (한 모델만 — 이름을 가린 비교가 아님)` : stage.label}`);
 console.log(`- 비교 대상: **개인 통합 리포트**(9,900원 상품) — ${variant === "reading-v1" ? "읽기 구조(reading-v1, 지금 제품 형식)" : "이전 형식(personal-v2)"}. 고민 반영 리포트(4,900원)는 이 비교에 넣지 않았다(지시문이 아직 옛 규칙이라 검증하지 않음).`);
 console.log("- 인물 1명은 '알려 준 고민'이 있어 개인 통합 리포트 안의 '알려 주신 고민까지 반영한 해석' 구역이 함께 나오지만, 그것이 고민 반영 리포트 상품은 아니다.");
 for (const c of chosen) console.log(`- 후보 ${c.key}: ${c.company} ${c.modelId} (입력 $${c.price.inputUsdPerMTok} · 출력 $${c.price.outputUsdPerMTok} / 100만 토큰) — 생각 · 추론 강도 중간`);
 console.log(`- 예상 비용(평소 수준): ${won(plan.expectedKrw)} · 모든 생성이 한 번에 끝나는 최악: ${won(plan.firstCallWorstKrw)} · 모두 고쳐 쓰기까지 가는 최악: ${won(plan.twoRoundWorstKrw)}`);
-console.log(`- 하드스톱 한도: ${won(stage.capKrw)} (환율 ${settings.fxKrwPerUsd.toLocaleString("ko-KR")}원/달러 · 여유율 ${Math.round((settings.surcharge - 1) * 100)}% 가정 — 실제 청구는 제공사 콘솔에서 확인)`);
+console.log(`- 하드스톱 한도: ${won(remainingCap)}${alreadySpent > 0 ? ` (승인 총액 ${won(stage.capKrw)} − 이미 쓴 ${won(alreadySpent)})` : ""} (환율 ${settings.fxKrwPerUsd.toLocaleString("ko-KR")}원/달러 · 여유율 ${Math.round((settings.surcharge - 1) * 100)}% 가정 — 실제 청구는 제공사 콘솔에서 확인)`);
 
 // 키가 들어갔는지(있음 · 없음)만 보여 준다 — 값은 출력하지 않고, 이 확인으로는 어떤 호출도 하지 않는다. .env.local 을 읽으려면 node --env-file=.env.local 로 실행한다
 console.log(`- 키 입력 확인: 후보 A(ANTHROPIC_API_KEY) ${process.env.ANTHROPIC_API_KEY ? "있음" : "없음"} · 후보 B(OPENAI_API_KEY) ${process.env.OPENAI_API_KEY ? "있음" : "없음"}${process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY ? "" : " (아직 키를 넣지 않았거나 --env-file=.env.local 없이 실행했습니다)"}`);
@@ -89,7 +99,7 @@ if (missing.length > 0) {
 function rehearsalFetch(kind: "anthropic" | "openai") {
   return async (_url: string, init: { body: string }) => {
     const body = JSON.parse(init.body) as { messages?: { content: string }[]; input?: { content: string }[] };
-    const text = JSON.stringify(composeMockReading((body.messages ?? body.input)![0].content));
+    const text = rehearsalFail ? '{"headline":"일부러 검사에 걸리게 만든 모의 글","blocks":[]}' : JSON.stringify(composeMockReading((body.messages ?? body.input)![0].content));
     const usage = { input_tokens: 15000, output_tokens: 8000 };
     const json = kind === "anthropic" ? { content: [{ type: "text", text }], usage } : { output: [{ type: "message", content: [{ type: "output_text", text }] }], usage };
     return { ok: true, status: 200, json: async () => json };
@@ -102,7 +112,7 @@ const candidates: CompareCandidate[] = chosen.map((c) => ({
   price: c.price,
   model: c.key === "A" ? createAnthropicModel({ apiKey: keys.A ?? "rehearsal", model: c.modelId, effort: "medium", ...(rehearsal ? { fetch: rehearsalFetch("anthropic") as never } : {}) }) : createOpenAiModel({ apiKey: keys.B ?? "rehearsal", model: c.modelId, effort: "medium", ...(rehearsal ? { fetch: rehearsalFetch("openai") as never } : {}) }),
 }));
-const guard = new BudgetGuard({ capKrw: stage.capKrw, ...settings });
+const guard = new BudgetGuard({ capKrw: remainingCap, ...settings });
 const blindSeed = Number(approvedOn.replaceAll("-", ""));
 
 let result;
@@ -133,10 +143,13 @@ writeFileSync(
       stage: result.stage,
       variant,
       spentKrw: Math.round(result.spentKrw * 100) / 100,
+      alreadySpentKrw: alreadySpent,
+      remainingCapAtStartKrw: remainingCap,
       stoppedByBudget: result.stoppedByBudget,
       estimateRatio: result.estimateRatio,
       crossPersonOverlap: result.crossPersonOverlap,
-      runs: result.runs.map(({ report: _report, ...rest }) => ({ ...rest, hasReport: _report !== null })),
+      // 글 내용(attempts[].text)은 여기에 싣지 않는다 — 걸린 이유(errors)만. 글은 failed/ 폴더에 따로 둔다
+      runs: result.runs.map(({ report: _report, attempts, ...rest }) => ({ ...rest, attempts: attempts.map(({ text: _text, ...a }) => a), hasReport: _report !== null })),
     },
     null,
     2,
@@ -151,6 +164,15 @@ const safely = (what: string, fn: () => void) => {
     console.error(`경고: ${what} 파일을 만들지 못했습니다 (${e instanceof Error ? e.message : "알 수 없는 오류"}). 원본(reports 폴더 · cost-and-checks.json)은 저장돼 있습니다.`);
   }
 };
+safely("검사에 걸린 글", () => {
+  // 실패 원인을 보려는 진단용 — 가상 인물의 글이다. 이 폴더는 저장소에 올라가지 않는다
+  for (const run of result.runs) {
+    for (const a of run.attempts) {
+      mkdirSync(join(dir, "failed"), { recursive: true });
+      writeFileSync(join(dir, "failed", `${run.persona}-${run.blind}-round${a.round + 1}.txt`), `# 검사에 걸린 이유\n${a.errors.map((e) => `- ${e}`).join("\n")}\n\n# 그때의 글\n${a.text}\n`);
+    }
+  }
+});
 safely("이름을 가린 글", () => {
   for (const run of result.runs) {
     if (!run.report || !isReadingReport(run.report)) continue;
@@ -191,7 +213,12 @@ ${rows}
 });
 
 const ok = result.runs.filter((r) => r.status === "ok").length;
-console.log(`\n완료: 생성 ${ok}/${result.runs.length}건 · 쓴 비용 ${won(result.spentKrw)} (한도 ${won(stage.capKrw)})${result.stoppedByBudget ? " · 예산 하드스톱으로 일부 중단" : ""}`);
+console.log(`\n완료: 생성 ${ok}/${result.runs.length}건 · 쓴 비용 ${won(result.spentKrw)} (이번 실행 한도 ${won(remainingCap)})${result.stoppedByBudget ? " · 예산 하드스톱으로 일부 중단" : ""}`);
 for (const r of result.runs) console.log(`- ${r.persona} ${r.blind}: ${r.status}${r.errorCode ? ` (${r.errorCode})` : ""} · 호출 ${r.calls}회 · 첫 시도 형식 통과 ${r.firstPassValid === null ? "-" : r.firstPassValid ? "예" : "아니오"} · ${won(r.costKrw)}`);
+for (const r of result.runs.filter((x) => x.status === "failed")) {
+  console.log(`\n[${r.persona} ${r.blind}] 실패 이유 (검사 문구, 글 내용 아님):`);
+  r.attempts.forEach((a, i) => console.log(`  ${i + 1}번째 응답 — 걸린 항목 ${a.errors.length}개: ${a.errors.slice(0, 6).join(" / ")}${a.errors.length > 6 ? " …" : ""}`));
+  if (r.attempts.length === 0 && r.errorMessage) console.log(`  ${r.errorMessage}`);
+}
 const runId = dir.split(/[\\/]/).pop();
 console.log(`\n결과 폴더: ${dir}\n실제 미유 리포트 화면으로 읽기: 이 PC에서 npm.cmd run dev 를 켠 뒤 http://localhost:3000/dev/compare/${runId} 을 연다 (${solo ? "한 모델만 실행해 글은 모두 X" : "이름이 가려진 X · Y"}).${solo ? "" : "\n채점이 끝나기 전에는 key-open-after-scoring.json 을 열지 마세요."}`);

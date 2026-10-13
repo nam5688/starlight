@@ -62,6 +62,11 @@ export type GenerateContext = {
   /** 시간 제한 등으로 생성을 그만둬야 할 때 신호가 켜진다 (남은 AI 호출을 멈춘다) */
   signal?: AbortSignal;
   onUsage?: (usage: AiUsageSample) => void;
+  /**
+   * 형식 · 내용 검사에 걸린 응답의 글과 걸린 이유 (읽기 구조 생성만). 가상 인물로 하는 AI 비교에서 "왜 실패했나"를 보려는 진단용이다 —
+   * 실제 고객의 글이 들어갈 수 있는 운영 경로(report-service)는 이 값을 받지 않으며 어떤 기록에도 남기지 않는다.
+   */
+  onAttempt?: (attempt: { round: number; errors: string[]; text: string }) => void;
 };
 
 export interface ReportGenerator {
