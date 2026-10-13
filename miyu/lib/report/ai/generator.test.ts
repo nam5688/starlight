@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "../../assessment/modules/index.ts";
 import { calculateSaju } from "../../saju/manseryeok-engine.ts";
 import { buildDevFreeSummary } from "../build-free-summary.ts";
-import type { ReportInput } from "../generator.ts";
+import { isPersonalV2, type ReportInput } from "../generator.ts";
 import { buildUserMessage } from "../v2/prompt.ts";
 import type { ReportDraftV2 } from "../v2/types.ts";
 import { validateDraft } from "../v2/validate.ts";
@@ -34,10 +34,10 @@ const noSleep = async () => {};
 
 test("모의 모델로 v2 리포트를 만든다 — 모든 문장이 있는 근거 ID를 쓰고, 이름은 저장할 때만 채운다", async () => {
   const model = createMockModel();
-  const generator = createAiReportGenerator({ model, now: NOW, sleep: noSleep });
+  const generator = createAiReportGenerator({ format: "personal-v2", model, now: NOW, sleep: noSleep });
   const report = await generator.generate(input());
   assert.equal(model.calls, 1);
-  if (!("kind" in report)) throw new Error("v2가 아님");
+  if (!isPersonalV2(report)) throw new Error("v2가 아님");
   assert.equal(report.kind, "personal-v2");
   assert.equal(report.personName, "서윤");
   assert.equal(report.basis.referenceDate, "2026-10-12");
@@ -63,13 +63,13 @@ test("일시 오류는 잠시 뒤 다시 부르고(2초 → 6초), 한도를 넘
   const waits: number[] = [];
   const sleep = async (ms: number) => void waits.push(ms);
   const recovering = createMockModel({ failTimes: 2 });
-  const report = await createAiReportGenerator({ model: recovering, now: NOW, sleep }).generate(input());
+  const report = await createAiReportGenerator({ format: "personal-v2", model: recovering, now: NOW, sleep }).generate(input());
   assert.ok("kind" in report);
   assert.equal(recovering.calls, 3);
   assert.deepEqual(waits, [2000, 6000]);
 
   const down = createMockModel({ failTimes: 5 });
-  await assert.rejects(createAiReportGenerator({ model: down, now: NOW, sleep: noSleep }).generate(input()), /모의 일시 오류/);
+  await assert.rejects(createAiReportGenerator({ format: "personal-v2", model: down, now: NOW, sleep: noSleep }).generate(input()), /모의 일시 오류/);
   assert.equal(down.calls, 3, "처음 1번 + 다시 2번");
 });
 
@@ -83,7 +83,7 @@ test("다시 해도 안 되는 오류(인증 등)는 바로 던진다", async ()
       throw new ModelCallError("인증 실패", { retryable: false, code: "HTTP_401" });
     },
   };
-  await assert.rejects(createAiReportGenerator({ model, now: NOW, sleep: noSleep }).generate(input()), /인증 실패/);
+  await assert.rejects(createAiReportGenerator({ format: "personal-v2", model, now: NOW, sleep: noSleep }).generate(input()), /인증 실패/);
   assert.equal(calls, 1);
 });
 
@@ -95,19 +95,19 @@ test("형식 검사에 실패하면 문제 목록을 주고 한 번 다시 쓰�
     model: "mock-0",
     complete: (req) => (seen.push(req.messages.map((m) => m.role)), inner.complete(req)),
   };
-  const report = await createAiReportGenerator({ model, now: NOW, sleep: noSleep }).generate(input());
+  const report = await createAiReportGenerator({ format: "personal-v2", model, now: NOW, sleep: noSleep }).generate(input());
   assert.ok("kind" in report);
   assert.deepEqual(seen, [["user"], ["user", "assistant", "user"]]);
 
   const stubborn = createMockModel({ invalidTimes: 9 });
-  await assert.rejects(createAiReportGenerator({ model: stubborn, now: NOW, sleep: noSleep }).generate(input()), /리포트 형식 검사 실패: headline/);
+  await assert.rejects(createAiReportGenerator({ format: "personal-v2", model: stubborn, now: NOW, sleep: noSleep }).generate(input()), /리포트 형식 검사 실패: headline/);
   assert.equal(stubborn.calls, 2, "처음 1번 + 고쳐 쓰기 1번");
 });
 
 test("사주 계산 결과가 없으면 AI를 부르지 않고 실패한다", async () => {
   const model = createMockModel();
   await assert.rejects(
-    createAiReportGenerator({ model, now: NOW, sleep: noSleep }).generate(input({ saju: { status: "not-connected" } })),
+    createAiReportGenerator({ format: "personal-v2", model, now: NOW, sleep: noSleep }).generate(input({ saju: { status: "not-connected" } })),
     /사주 계산 결과가 없어/,
   );
   assert.equal(model.calls, 0);
@@ -118,8 +118,8 @@ test("성별이 없으면 대운 근거 없이 세운만 시기로 쓴다", asyn
     gender: null,
     saju: calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40" }),
   });
-  const report = await createAiReportGenerator({ model: createMockModel(), now: NOW, sleep: noSleep }).generate(noGender);
-  if (!("kind" in report)) throw new Error();
+  const report = await createAiReportGenerator({ format: "personal-v2", model: createMockModel(), now: NOW, sleep: noSleep }).generate(noGender);
+  if (!isPersonalV2(report)) throw new Error();
   assert.ok(!report.evidence.some((e) => e.id.startsWith("saju.daeun")));
   assert.ok(report.timeline.every((t) => /세운/.test(t.period) || /20\d\d/.test(t.period)));
 });
@@ -216,8 +216,8 @@ test("내 고민 자세히 알려주기: 고민을 AI 자료에 넣되 연락처
   const model = createMockModel();
   const seen: string[] = [];
   const wrapped: TextModel = { provider: "mock", model: "mock-0", complete: (req) => (seen.push(req.messages[0].content), model.complete(req)) };
-  const report = await createAiReportGenerator({ model: wrapped, now: NOW, sleep: noSleep }).generate(input({ context: WORK_CONTEXT }));
-  if (!("kind" in report)) throw new Error();
+  const report = await createAiReportGenerator({ format: "personal-v2", model: wrapped, now: NOW, sleep: noSleep }).generate(input({ context: WORK_CONTEXT }));
+  if (!isPersonalV2(report)) throw new Error();
   assert.match(seen[0], /"topic":"일 · 진로 · 이직"/);
   assert.match(seen[0], /선택과 불확실성에 대한 반응/, "주제별로 더 자세히 풀 부분");
   assert.match(seen[0], /\[연락처 가림\]/);
@@ -234,8 +234,8 @@ test("내 고민 자세히 알려주기: 고민을 AI 자료에 넣되 연락처
 });
 
 test("내 고민 자세히 알려주기: 적지 않았으면 focus가 없고, AI 자료에도 context가 없다", async () => {
-  const report = await createAiReportGenerator({ model: createMockModel(), now: NOW, sleep: noSleep }).generate(input());
-  if (!("kind" in report)) throw new Error();
+  const report = await createAiReportGenerator({ format: "personal-v2", model: createMockModel(), now: NOW, sleep: noSleep }).generate(input());
+  if (!isPersonalV2(report)) throw new Error();
   assert.equal(report.focus, undefined);
   assert.equal(report.basis.context, undefined);
   assert.doesNotMatch(buildUserMessage(evidence, "2026-10-12"), /"context"/);

@@ -5,10 +5,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildEvidence } from "../report/ai/generator.ts";
+import { checkReadingDepth } from "../report/reading/depth.ts";
+import { JARGON } from "../report/reading/plan.ts";
+import { validateReadingDraft } from "../report/reading/validate.ts";
 import { FORBIDDEN } from "../report/v2/validate.ts";
 import { luckTimeline } from "../saju/interpret/rules.ts";
 import { calculateSaju } from "../saju/manseryeok-engine.ts";
-import { sampleReadingReport as R } from "./sample-reading-report.ts";
+import { sampleReadingAsDraft, sampleReadingReport as R } from "./sample-reading-report.ts";
 import { SAMPLE_CHART, sampleReport } from "./sample-report.ts";
 
 const saju = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" });
@@ -47,7 +50,6 @@ const bodyTexts = () => [
 ].filter(Boolean);
 const allTexts = () => [...bodyTexts(), ...R.inputs.map((i) => i.note), ...[...R.blocks.map((b) => b.basis), R.flow.basis].flatMap((b) => [...b.computed, ...b.tradition, ...b.answers, ...(b.differences ?? []), ...b.unknown])];
 const sentences = (t: string) => t.split(/(?<=[.!?])\s+/).filter(Boolean);
-const JARGON = /비겁|식상|관성|인성|재성|정관|편관|비견|겁재|식신|상관|편재|정재|정인|일지|일간|천간|지지|원국|오행|세운/;
 
 test("리포트 예시: 모든 해석의 근거 ID는 서윤의 계산 결과에 있고, 내부 근거 ID는 소비자 화면 문구에 나오지 않는다", () => {
   for (const s of topics) {
@@ -65,9 +67,8 @@ test("리포트 예시: 본문은 쉬운 말이다 — 사주 용어와 점수 �
   }
   const paragraphs = [...R.blocks.flatMap((b) => [b.summary, b.example ?? "", ...b.details, b.watch ?? "", b.reactionFlow?.helpful ?? "", ...(b.traits ?? []).flatMap((t) => [t.shines, t.burden, t.example])]), R.flow.summary, R.flow.cardText];
   for (const p of paragraphs) assert.ok(sentences(p).length <= 3, `한 문단이 ${sentences(p).length}문장 — ${p.slice(0, 20)}`);
-  // 대운은 처음 한 번만 뜻을 붙이고(10년 단위의 큰 흐름), 이후 본문에서는 풀어 쓰거나 괄호 없이 쓴다
-  const withGloss = bodyTexts().filter((t) => /대운/.test(t) && /10년 단위/.test(t)).length;
-  assert.equal(withGloss, 1, "대운 뜻풀이는 본문에서 한 번");
+  // 대운 · 세운도 본문에는 쓰지 않는다 — "10년 단위의 큰 흐름" · "그해의 흐름"처럼 풀어 쓰고 용어는 근거에만 둔다
+  assert.ok(bodyTexts().some((t) => /10년 단위의 큰 흐름/.test(t)), "대운은 쉬운 말로 풀어 쓴다");
 });
 
 test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강점 · 주의할 점 · 현재 흐름), 주제마다 요약 2문장 이하 · 예시 1개, 제목과 같은 말을 되풀이하지 않는다", () => {
@@ -156,7 +157,12 @@ test("리포트 예시: 없는 자료(알려 준 고민 · 상대 자료 · 연�
   const love = R.blocks.find((s) => s.id === "love")!;
   assert.match(love.caveat ?? "", /상대 자료: 없음/);
   // 개발용 문항을 새 자체 문항처럼 쓰지 않는다
-  for (const i of R.inputs.filter((x) => x.name !== "사주" && x.status !== "none")) assert.equal(i.status, "dev", i.name);
+  for (const i of R.inputs.filter((x) => x.name !== "사주" && x.name !== "MBTI" && x.status !== "none")) assert.equal(i.status, "dev", i.name);
+  // MBTI는 본인이 입력한 참고값이다 — 응답 문항으로 MBTI 축을 읽은 것처럼 쓰지 않는다 (생성기가 받는 근거에 그런 근거가 없다)
+  const mbti = R.inputs.find((i) => i.name === "MBTI")!;
+  assert.equal(mbti.status, "used");
+  assert.match(mbti.note, /본인이 입력한/);
+  assert.doesNotMatch(allTexts().join("\n"), /T 쪽|T\(논리|판단 기준이 T/);
 });
 
 test("리포트 예시: '쓰인 곳'은 각 주제가 실제로 단 근거와 맞는다 (자료가 어느 해석에 쓰였는지 화면의 말과 어긋나지 않는다)", () => {
@@ -173,4 +179,22 @@ test("리포트 예시: '쓰인 곳'은 각 주제가 실제로 단 근거와 �
     assert.deepEqual(claimed, actual, `${name}: 쓰인 곳이 근거와 다름`);
   }
   for (const i of R.inputs) for (const u of i.usedIn) assert.ok(topics.some((s) => s.topic === u), `${i.name}: 없는 주제 ${u}`);
+});
+
+// ── 예시와 실제 생성의 기준이 같다: 예시를 AI가 돌려주는 초안 형식으로 바꿔 실제 생성기와 같은 검사에 넣는다 ──
+const sampleAsDraft = sampleReadingAsDraft;
+
+test("리포트 예시: 실제 생성기가 쓰는 형식 검사(validateReadingDraft)를 그대로 통과한다 — 예시만 새롭고 생성기는 옛 규칙인 상태가 없다", () => {
+  const checked = validateReadingDraft(sampleAsDraft(), evidence, { hasContext: false });
+  assert.ok(checked.ok, checked.ok ? "" : checked.errors.join("\n"));
+});
+
+test("리포트 예시: 내용 차이 검사(조건 · 범용 문장 · 겹침 · 행동)도 같은 기준으로 확인한다 (기준값은 예시에 맞춰 바꾸지 않았다)", () => {
+  const depth = checkReadingDepth({ draft: sampleAsDraft() });
+  assert.deepEqual(depth.flags.filter((f) => f.severity === "fail"), [], depth.flags.map((f) => f.message).join("\n"));
+});
+
+test("리포트 예시: 고정 문구(이름표 · 안내)는 실제 생성과 같은 코드(plan.ts)의 것이다", () => {
+  assert.deepEqual(R.summary.map((s) => s.label), ["내가 강한 포인트", "내가 힘들 수 있는 포인트", "현재 흐름"]);
+  assert.match(R.blocks.find((b) => b.id === "love")!.caveat!, /상대 자료: 없음/);
 });

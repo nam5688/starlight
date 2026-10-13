@@ -28,7 +28,9 @@
 | 무료 해석 문단 규칙 | `lib/report/free-insight.ts` | `INSIGHT_RULE_VERSION` | `assessments.summary.insight.version` |
 | 사주 해석 근거 규칙 | `lib/saju/interpret/rules.ts` | `SAJU_RULE_VERSION` | 리포트 `basis.ruleVersions` · `reports.generator_version` |
 | 응답 근거 규칙 | `lib/report/survey-evidence.ts` | `SURVEY_RULE_VERSION` | 리포트 `basis.ruleVersions` |
-| AI 지시문 | `lib/report/v2/prompt.ts` | `PROMPT_VERSION` | 리포트 `basis.ruleVersions` · `reports.generator_version` (모델 이름과 함께) |
+| **개인 통합 리포트(읽기 구조)의 구성 · 글자 수 한도 · 고정 안내 문구 · 쉬운 말 규칙** | `lib/report/reading/plan.ts` (예시 화면 · 지시문 · 검사가 모두 이 값을 읽는다) | 지시문 버전 `READING_PROMPT_VERSION` (`lib/report/reading/prompt.ts`) | 리포트 `generated.ruleVersions` · `reports.generator_version` (모델 이름과 함께) |
+| AI 지시문 — 읽기 구조(기본) | `lib/report/reading/prompt.ts` | `READING_PROMPT_VERSION` | 위와 같다. 고치면 `reading.test.ts`와 `sample-reading-report.test.ts`가 예시 · 생성기 · 검사가 같은 기준인지 확인한다 |
+| AI 지시문 — 이전 형식(이미 저장된 리포트 · 비교용) | `lib/report/v2/prompt.ts` | `PROMPT_VERSION` | 리포트 `basis.ruleVersions` · `reports.generator_version` (모델 이름과 함께) |
 | 원국 쉬운 풀이 · 상황 · 관계 조건 · 질문 · 보완 아이템 | `lib/saju/plain.ts` · `lib/report/{situations,partner,questions,starter-actions}.ts` · `lib/saju/items.ts` | `EXTRAS_VERSION` (`lib/report/extras.ts`) | 리포트 `extras.version` |
 | 무료 미리보기 구조 | `lib/report/preview.ts` | `PREVIEW_VERSION` | (저장하지 않음 — 보여 줄 때 서버가 만든다) |
 | 만세력 엔진 · 계산 기준 | `lib/saju/manseryeok-engine.ts` · `lib/saju/policy.ts` | 엔진 이름 · 버전 · 기준을 결과에 기록 | `assessments.saju` · 리포트 `basis.lines` |
@@ -45,7 +47,8 @@
 | --- | --- | --- |
 | 사주 계산 | `lib/saju/` (엔진) | 계산만 한다. 해석 · 화면을 모른다 |
 | 해석 근거 규칙 | `lib/saju/interpret/` · `lib/report/survey-evidence.ts` | 계산 결과에서 근거 목록만 만든다 |
-| AI 문장 작성 | `lib/report/ai/` · `lib/report/v2/` | 근거 목록 안에서만 쓰고, 형식 검사를 통과한 것만 저장. 제공사는 `TextModel` 약속 뒤에 숨긴다 |
+| AI 문장 작성 | `lib/report/ai/` · `lib/report/reading/`(기본) · `lib/report/v2/`(이전 형식) | 근거 목록 안에서만 쓰고, 형식 검사를 통과한 것만 저장. 접어 둔 근거 · 안내 문구 · 타임라인은 AI가 아니라 코드가 채운다. 제공사는 `TextModel` 약속 뒤에 숨긴다 |
+| AI 제공사 연결 | `lib/integrations/ai/` (`providers.ts` Anthropic · OpenAI, `mock-local.ts`) | 승인 금액 · 날짜를 운영자가 적지 않으면 호출하지 않는다 (`scripts/run-ai-compare.ts`). 키는 환경변수에만 |
 | 결제 · 주문 | `lib/commerce/` · `lib/services/order-service.ts` · `reconcile-service.ts` | 서버 승인 확인 후에만 구매 권한. 리포트 생성과 상태를 따로 관리 |
 | 용량 · 비용 | `lib/services/capacity-service.ts` | 새 판매만 막고 이미 결제한 고객은 계속 처리 |
 | 운영 | `lib/ops/` · `server/ops.ts` | 비밀값 가리기 · 알림 중복 방지 · 오류번호 |

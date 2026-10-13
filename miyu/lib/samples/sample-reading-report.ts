@@ -1,14 +1,15 @@
 // 리포트 예시(개인 통합 리포트 · 읽기 구조) — 가상 인물 서윤.
 // 실제 검사 · 실제 AI 출력이 아니라, 미유가 목표로 하는 리포트 형식을 사람이 쓴 예시다. 운영 데이터와 섞지 않는다.
 // 서윤의 원국은 만세력 엔진 계산, 응답은 개발용 예시 문항에 가상으로 답한 값(sample-report.ts)이며, 결론은 그 근거 문구가 말하는 범위 안에서만 썼다.
-// 본문에는 사주 용어 · 응답 점수를 쓰지 않고(대운은 처음 한 번만 뜻을 붙였다) 근거는 접어 둔 "분석 근거"(basis)에 둔다.
+// 본문에는 사주 용어 · 응답 점수를 쓰지 않고 근거는 접어 둔 "분석 근거"(basis)에 둔다.
+// 실제 AI 생성과 같은 기준이다 — 이 예시는 실제 생성기가 쓰는 검사(reading/validate.ts)를 그대로 통과해야 하고(sample-reading-report.test.ts),
+// 고정 문구(안내 · 이름표)는 reading/plan.ts의 것을 그대로 쓰며, 생성기가 받는 근거 목록(사주 · 응답 행동 경향 · 입력한 MBTI)에 없는 내용은 쓰지 않았다.
 // 기본 화면은 결론 한 줄 + 요약 2문장 + 예시 1개이고, 나머지는 눌러서 보는 "자세한 풀이"에 둔다. 같은 말을 제목 · 요약 · 본문에서 되풀이하지 않는다.
 // "지금 지나는 큰 흐름" 타임라인은 글로 쓰지 않고 서윤의 사주 계산 결과(luckTimeline)에서 만든다.
-import type { IntegratedReadingReport } from "../report/reading/types.ts";
+import { BLOCK_CAVEAT, CARD_LABEL, comfortNote, FLOW_CAVEAT, RULE_DRAFT_NOTE, SCENARIO_NOTE, SCORE_NOTE, STATISTICS_NOTE } from "../report/reading/plan.ts";
+import type { IntegratedReadingReport, ReadingBlockId, ReadingDraftV1 } from "../report/reading/types.ts";
 import { luckTimeline } from "../saju/interpret/rules.ts";
 import { SAMPLE_CHART } from "./sample-report.ts";
-
-const SCORE_NOTE = "괄호 안 숫자는 응답 환산값(0~100)이며 백분위가 아닙니다. 개발용 예시 문항입니다.";
 
 /** 큰 흐름 카드에 쓰는 기준 월 — 이 달에 지나는 구간을 현재로 본다 */
 export const TIMELINE_REFERENCE = { year: 2026, month: 10 };
@@ -19,13 +20,13 @@ export const sampleReadingReport: IntegratedReadingReport = {
   personName: "서윤",
   headline: "다듬어서 말하고, 가까운 사이에서는 반응을 살피는 편입니다.",
   summary: [
-    { kind: "strength", label: "내가 강한 포인트", keyword: "다듬어서 내놓는 힘", note: "배운 것을 정리해 말 · 글 · 결과물로 내놓는 일에서 힘이 납니다." },
-    { kind: "caution", label: "내가 힘들 수 있는 포인트", keyword: "반응을 확인하고 싶은 마음", note: "관계가 불확실해 보이면 상대의 반응이 크게 신경 쓰이는 편입니다." },
-    { kind: "flow", label: "현재 흐름", keyword: "성과와 표현이 주제인 10년", note: "2024.08부터 2034.07까지, 지금은 그 앞부분을 지나고 있습니다." },
+    { kind: "strength", label: CARD_LABEL.strength, keyword: "다듬어서 내놓는 힘", note: "배운 것을 정리해 말 · 글 · 결과물로 내놓는 일에서 힘이 납니다." },
+    { kind: "caution", label: CARD_LABEL.caution, keyword: "반응을 확인하고 싶은 마음", note: "관계가 불확실해 보이면 상대의 반응이 크게 신경 쓰이는 편입니다." },
+    { kind: "flow", label: CARD_LABEL.flow, keyword: "성과와 표현이 주제인 10년", note: "2024.08부터 2034.07까지, 지금은 그 앞부분을 지나고 있습니다." },
   ],
   inputs: [
     { name: "사주", status: "used", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운입니다. 해석 규칙은 전문가 검토 전 초안입니다.", usedIn: ["생각과 행동 방식", "강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 흐름"] },
-    { name: "MBTI", status: "dev", note: "본인이 입력한 INFJ와, 개발용 성향 문항에서 보인 경향을 함께 봤습니다. 공식 MBTI 검사가 아닙니다.", usedIn: ["생각과 행동 방식"] },
+    { name: "MBTI", status: "used", note: "본인이 입력한 INFJ입니다. 참고값으로만 봤으며 공식 MBTI 검사 결과가 아닙니다.", usedIn: ["생각과 행동 방식"] },
     { name: "기질 · 성격", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["생각과 행동 방식", "강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 흐름"] },
     { name: "가까운 관계에서의 반응(애착 경향)", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "앞으로의 흐름"] },
     { name: "알려 준 고민 · 상황", status: "none", note: "입력하지 않았습니다. 특정 고민 없이 쓴 종합 해석입니다.", usedIn: [] },
@@ -38,13 +39,13 @@ export const sampleReadingReport: IntegratedReadingReport = {
       group: "me",
       topic: "생각과 행동 방식",
       headline: "알아보고, 다듬고, 그다음에 움직입니다",
-      summary: "새로운 일 앞에서 위험과 변수를 먼저 살펴보고, 익숙한 방식을 선호하는 편입니다. 사람의 마음을 헤아리는 면과 기준을 따지는 면도 상황에 따라 함께 쓰고 있을 수 있습니다.",
-      example: "친구가 고민을 털어놓을 때, 먼저 마음을 받아 주고 싶을 수 있습니다. 그러면서도 ‘그래서 어떻게 하면 될까’를 같이 따져 보게 되는 식입니다.",
+      summary: "새로운 일 앞에서 위험과 변수를 먼저 살펴보고, 익숙한 방식을 선호하는 편입니다. 충분히 알아본 뒤에 움직이는 모습으로 나타날 수 있습니다.",
+      example: "새로운 앱이나 도구를 써 볼 때, 후기와 사용법을 충분히 읽은 뒤에 설치할 수 있습니다. 쓰기 시작한 뒤에는 익숙해진 방식을 오래 쓰는 식입니다.",
       details: [
         "사주에서는 한곳에 오래 집중하는 힘도 함께 읽습니다. 하나를 깊이 다듬는 일에서 이 힘이 드러날 수 있습니다.",
-        "스스로 알고 있는 MBTI는 INFJ입니다. 그런데 이번 성향 문항에서는 판단할 때 논리와 기준을 조금 더 먼저 따지는 쪽으로 응답했습니다. 어느 한쪽이 틀렸다기보다, 마음을 헤아리는 면과 기준을 따지는 면을 상황에 따라 함께 쓰고 있을 수 있습니다.",
+        "스스로 알고 있는 MBTI는 INFJ입니다. 이 값은 본인이 입력한 참고값이라, 위의 해석은 사주와 이번 응답을 중심으로 읽었습니다. MBTI와 맞는 부분과 다른 부분은 직접 떠올려 보며 확인해 볼 수 있습니다.",
       ],
-      watch: "‘나는 원래 이런 사람’이라고 한 가지로 정하기보다, 이렇게 적어 보세요. 어떤 상황에서 기준을 먼저 따지는지, 어떤 상황에서 마음을 먼저 보는지입니다.",
+      watch: "‘나는 원래 신중한 사람’이라고 한 가지로 정하기보다, 이렇게 적어 보세요. 어떤 일에서는 오래 알아보고, 어떤 일에서는 바로 시작하는지입니다.",
       basis: {
         computed: [
           "일간(日干, 태어난 날의 위 글자이며 ‘나 자신’을 나타냅니다) 정화(丁火), 음의 화",
@@ -59,13 +60,13 @@ export const sampleReadingReport: IntegratedReadingReport = {
         answers: [
           "새로움 추구: 익숙하고 예측 가능한 방식을 선호하는 쪽 (34)",
           "신중함: 시작 전에 위험과 변수를 먼저 살피는 쪽 (71)",
-          "MBTI: 본인이 입력한 INFJ / 개발용 성향 문항에서는 판단 기준이 T(논리 · 기준) 쪽으로 조금 기울었습니다 (38)",
+          "MBTI: 본인이 입력한 INFJ (자기 인식 참고값)",
           SCORE_NOTE,
         ],
-        differences: ["본인이 알고 있는 INFJ와 이번 응답의 판단 기준(T 쪽)이 다르게 나왔습니다. 하나로 맞추지 않고 둘 다 남겨 둡니다."],
         unknown: [
           "미유의 새 성향 질문은 적용하지 않았습니다.",
-          "사주 해석 규칙은 전문가 검토 전 초안이며, 일상에서 실제로 어떻게 나타나는지는 확인하지 못했습니다.",
+          "MBTI는 본인이 입력한 값이며 참고로만 봤습니다. 공식 MBTI 검사 결과가 아닙니다.",
+          RULE_DRAFT_NOTE,
         ],
       },
       evidence: ["saju.daymaster", "saju.tengod.인성.many", "saju.element.토.many", "survey.novelty.low", "survey.caution.high", "self.mbti"],
@@ -104,7 +105,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
       ],
       details: [],
       watch: "특징을 줄이려 하기보다 ‘어떤 조건에서 힘들어지는지’를 알아 두는 쪽이 도움이 됩니다.",
-      caveat: "상대가 실제로 어떻게 느끼는지는 상대에게 직접 확인해야 알 수 있습니다.",
+      caveat: BLOCK_CAVEAT["strength-burden"]!("서윤"),
       basis: {
         computed: ["식상(食傷, 내가 만들어 내는 기운) 3자리 — 상관(傷官) 3개", "인성 3자리"],
         tradition: [
@@ -136,7 +137,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
         "그래서 큰 선택 앞에서는 ‘어느 쪽이 더 좋아 보이는가’보다 다른 두 가지를 기준으로 살펴볼 만합니다. 하나는 ‘충분히 알아보았는가’, 다른 하나는 ‘선택한 뒤에 서로 확인할 수 있는 구조가 있는가’입니다. 이 기준이 정말 내 것인지는 최근에 한 선택을 떠올리며 확인해 볼 수 있습니다.",
       ],
       watch: "중간 단계의 결과를 믿는 사람 한 명에게 먼저 보여 주세요. 어떤 반응이 오는지 보면, 완성도와 반응이라는 두 마음을 함께 챙길 수 있습니다.",
-      caveat: "이 부분은 사실로 확인된 것이 아니라 위의 자료를 겹쳐 읽은 추정입니다.",
+      caveat: BLOCK_CAVEAT.values!("서윤"),
       basis: {
         computed: ["인성 3자리, 식상 3자리, 배우자 자리(일지) 편재: 위에서 설명한 결과와 같습니다."],
         tradition: [
@@ -170,14 +171,14 @@ export const sampleReadingReport: IntegratedReadingReport = {
       comfort: {
         comfortable: ["연락과 약속의 흐름이 비교적 예측 가능한 사람", "마음이 어떤지 말로 알려 주는 사람", "일정이 바뀔 때 미리 알려 주는 사람"],
         clash: ["이유를 말하지 않고 답이 오래 걸리는 방식", "계획이 자주 바뀌는데 설명이 없는 방식", "마음을 가늠하기 어려운 모호한 표현이 이어지는 관계"],
-        note: "서윤 님이 편안해할 관계의 조건입니다. 상대의 나이나 직업 같은 정보는 사주로 알 수 없어 다루지 않습니다.",
+        note: comfortNote("서윤"),
       },
       details: [
         "사주에서는 가까운 관계를 보는 자리가 ‘관계를 현실적으로 꾸려 가려는 기대’가 큰 자리로 읽힙니다. 응답과 겹쳐 보면 이런 모습이 가능합니다. 말로 하는 애정 표현뿐 아니라, 연락 주기나 약속 같은 구체적인 모습으로도 관계를 확인하고 싶어 할 수 있습니다.",
         "다만 상대가 일부러 거리를 두는 것인지는 알 수 없습니다. 바쁘거나 혼자 정리할 시간이 필요한 것일 수도 있습니다.",
       ],
       watch: "확인하고 싶은 마음이 들 때는 추측을 늘리기보다, 한 가지를 짧게 묻는 쪽이 도움이 될 수 있습니다. 상대가 실제로 어떻게 느끼는지는 직접 확인해야 합니다.",
-      caveat: "상대 자료: 없음 · 이 부분은 서윤 님의 사주와 응답만으로 읽었습니다.",
+      caveat: BLOCK_CAVEAT.love!("서윤"),
       basis: {
         computed: [
           "배우자 자리(일지 日支, 태어난 날의 아래 글자) 유(酉) — 편재",
@@ -209,10 +210,10 @@ export const sampleReadingReport: IntegratedReadingReport = {
       example: "새 프로젝트를 맡았을 때, 처음 며칠은 자료를 읽고 정리하느라 조용할 수 있습니다. 구조가 잡히면 빠르게 결과물을 내놓는 모습일 수 있습니다. 그 사이 아무 반응이 없으면 ‘잘하고 있나’가 신경 쓰일 수 있고요.",
       details: [
         "말과 글, 정리된 자료처럼 ‘배운 것을 다듬어 내놓는’ 일과 이어서 읽는 구조입니다. 새 일을 맡으면 익숙한 방식을 선호하고, 시작 전에 위험과 변수를 먼저 살피는 쪽으로 응답했습니다. 반대로 반응이 거의 없는 환경에서는 의욕이 떨어질 수 있습니다.",
-        "돈에 관해서는 이번에 받은 응답이 없어 사주의 시기 해석만 참고했습니다. 지금 지나는 10년 단위의 큰 흐름(대운)은 현실적인 성과 · 수입 · 관리가 주제가 되는 시기로 읽힙니다. 실제 수입이 늘거나 줄어든다는 뜻은 아닙니다.",
+        "돈에 관해서는 이번에 받은 응답이 없어 사주의 시기 해석만 참고했습니다. 지금 지나는 10년 단위의 큰 흐름은 현실적인 성과 · 수입 · 관리가 주제가 되는 시기로 읽힙니다. 실제 수입이 늘거나 줄어든다는 뜻은 아닙니다.",
       ],
       watch: "일을 시작할 때 두 가지를 미리 정해 두면 좋습니다. ‘어디까지 파악되면 시작할지’와 ‘중간 결과를 누구에게 보여 줄지’입니다. 준비가 길어지거나 반응을 기다리는 시간이 줄 수 있습니다.",
-      caveat: "돈 부분은 응답 자료 없이 사주 시기 해석만으로 읽었습니다. 투자나 대출 같은 결정의 근거로 쓰는 내용이 아닙니다.",
+      caveat: BLOCK_CAVEAT["work-money"]!("서윤"),
       basis: {
         computed: [
           "식상 3자리, 재성(財星, 내가 다스리는 기운) 1자리, 인성 3자리",
@@ -237,7 +238,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
     topic: "앞으로의 흐름",
     headline: "2026~2028년, 내 방식에서 결과물로",
     summary: "2026~2028년은 두 가지 주제가 차례로 두드러지는 시기로 읽힙니다. ‘내 방식대로 해 보는 일’과 ‘표현하고 결과물을 내는 일’입니다.",
-    caveat: "전통 해석의 시기 읽기와, 응답에서 읽은 가능성입니다. 어떤 일이 일어난다는 예측이 아니며 실제 사건과 결과를 보장하지 않습니다.",
+    caveat: FLOW_CAVEAT,
     cardText: "지금은 현실적인 성과 · 수입 · 관리와, 표현하고 새로 시도하는 일이 주제가 되는 큰 흐름 안에 있습니다. 결과물을 만드는 일과 그것을 정리하고 관리하는 일을 함께 챙길 시기로 볼 수 있습니다.",
     years: [
       { year: "2026", theme: "내 방식을 지키는 일과 함께하는 일의 균형" },
@@ -248,7 +249,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
       {
         period: "지금 지나는 큰 흐름",
         theme: "현실적인 성과 · 수입 · 관리가 주제로 떠오르고, 표현하고 새로 시도하는 일이 늘어나는 시기로 읽습니다.",
-        watch: "결과물을 만드는 일과 그것을 정리하고 관리하는 일을 함께 챙길 시기로 볼 수 있습니다.",
+        watch: "지금 하고 있는 일 가운데 결과물로 이어지는 것과 정리가 필요한 것을 나눠 살펴볼 수 있습니다.",
       },
       {
         period: "2026년",
@@ -271,8 +272,8 @@ export const sampleReadingReport: IntegratedReadingReport = {
       { when: "확인하고 싶은 것 한 가지를 짧게 묻는 방식으로 바꾸면", then: "추측하는 시간이 줄고, 상대도 어떤 답을 해야 하는지 알기 쉬워질 수 있습니다." },
       { when: "충분히 다듬은 뒤에만 결과를 보여 주는 방식이 이어지면", then: "반응을 받는 시점이 늦어져 방향을 고치기 어려워질 수 있습니다. 중간 결과를 먼저 나누면 더 일찍 고칠 수 있습니다." },
     ],
-    scenarioNote: "응답에서 읽은 가능성이며, 그렇게 된다는 예측이 아닙니다.",
-    statistics: "이번 리포트에는 연구 통계를 사용하지 않았습니다. 출처와 조사 대상 · 조건이 확인된 통계가 없습니다. 또 집단의 통계를 한 사람의 앞날 확률로 바꿀 수 없습니다.",
+    scenarioNote: SCENARIO_NOTE,
+    statistics: STATISTICS_NOTE,
     basis: {
       computed: [
         "이전 대운 임신(壬申) 2014년 8월~2024년 7월, 현재 대운 신미(辛未) 2024년 8월~2034년 7월, 다음 대운 경오(庚午) 2034년 8월~2044년 7월 (시작 · 끝은 절기를 기준으로 한 대략적인 시점)",
@@ -299,3 +300,44 @@ export const sampleReadingReport: IntegratedReadingReport = {
     { title: "맞지 않는다고 느낀 부분이 있다면", detail: "그 문장을 표시해 두고, 어떤 상황에서 달랐는지 적어 두세요. 해석을 다시 살펴볼 때 기준이 됩니다." },
   ],
 };
+
+/**
+ * 이 예시를 AI가 돌려주는 초안 형식(ReadingDraftV1)으로 되돌린 것 — 실제 생성기와 같은 형식 검사 · 내용 검사에 넣어 보고(sample-reading-report.test.ts),
+ * 가짜 모델이 이 초안을 돌려줬을 때 생성기가 예시와 같은 구조의 리포트를 만드는지 확인하는 데(reading.test.ts) 쓴다. 화면에는 쓰지 않는다.
+ * 실천 제안의 근거 ID는 예시 데이터에 따로 없어 공통 근거 둘을 단다.
+ */
+export function sampleReadingAsDraft(): ReadingDraftV1 {
+  const R = sampleReadingReport;
+  const refOf = (period: string) => (period === "지금 지나는 큰 흐름" ? "current" : period === "다음 큰 흐름" ? "next" : `y${period.replace("년", "")}`);
+  const common = ["saju.spouse-palace", "survey.anxiety.high"];
+  return {
+    headline: R.headline,
+    cards: {
+      strength: { keyword: R.summary[0].keyword, note: R.summary[0].note },
+      caution: { keyword: R.summary[1].keyword, note: R.summary[1].note },
+      flow: { keyword: R.summary[2].keyword },
+    },
+    blocks: R.blocks.map((b) => ({
+      id: b.id as ReadingBlockId,
+      headline: b.headline,
+      summary: b.summary,
+      ...(b.example ? { example: b.example } : {}),
+      details: b.details,
+      watch: b.watch ?? "",
+      ...(b.traits ? { traits: b.traits } : {}),
+      ...(b.comfort ? { comfort: { comfortable: b.comfort.comfortable, clash: b.comfort.clash } } : {}),
+      ...(b.reactionFlow ? { reactionFlow: b.reactionFlow } : {}),
+      evidence: b.evidence,
+    })),
+    flow: {
+      headline: R.flow.headline,
+      summary: R.flow.summary,
+      cardText: R.flow.cardText,
+      years: R.flow.years,
+      periods: R.flow.periods.map((p) => ({ ref: refOf(p.period), theme: p.theme, watch: p.watch })),
+      scenarios: R.flow.scenarios,
+      evidence: R.flow.evidence,
+    },
+    actions: R.actions.map((a) => ({ title: a.title, detail: a.detail, evidence: common })),
+  };
+}

@@ -9,7 +9,7 @@ import { EMPTY_BASIC_INFO, type BasicInfo } from "../profile/basic-info.ts";
 import { createAiReportGenerator } from "../report/ai/generator.ts";
 import { createMockModel } from "../report/ai/mock-model.ts";
 import { devReportGenerator } from "../report/generate-dev-report.ts";
-import { isPersonalV2, type ReportGenerator } from "../report/generator.ts";
+import { isReadingReport, type ReportGenerator } from "../report/generator.ts";
 import { manseryeokEngine as sajuEngine } from "../saju/manseryeok-engine.ts";
 import { submitAssessment } from "./assessment-service.ts";
 import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "./order-service.ts";
@@ -285,7 +285,7 @@ test("리포트: 생성에 실패하면 failed로 남기고 다시 시도할 수
   assert.equal(retried?.attempts, 2);
 });
 
-test("리포트 v2(AI 모의 모델): 일시 오류가 계속되면 failed, 다시 만들기로 완성하고 이후에는 다시 부르지 않는다", async () => {
+test("리포트 읽기 구조(AI 모의 모델): 일시 오류가 계속되면 failed, 다시 만들기로 완성하고 이후에는 다시 부르지 않는다", async () => {
   const { mem, assessment } = await setup();
   const started = await startCheckout(deps(mem), { userId: USER, assessmentId: assessment.id });
   if (started.kind !== "order") throw new Error();
@@ -303,7 +303,7 @@ test("리포트 v2(AI 모의 모델): 일시 오류가 계속되면 failed, 다�
   const ready = await runReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order, { retryFailed: true, ignoreCooldown: true });
   assert.equal(ready?.status, "ready");
   assert.equal(ready?.generator, "ai:mock");
-  assert.ok(ready?.content && isPersonalV2(ready.content));
+  assert.ok(ready?.content && isReadingReport(ready.content));
   assert.equal(ready.content.personName, "지민");
 
   const callsBefore = model.calls;
@@ -356,8 +356,8 @@ test("내 고민 자세히 알려주기: AI 생성기는 생성 시점의 내용
 
   const generator = createAiReportGenerator({ model: createMockModel(), now: () => TODAY, sleep: async () => {} });
   const ready = await ensureReport({ repo: mem.repo, generator, now: () => TODAY }, paid.order);
-  assert.ok(ready?.content && isPersonalV2(ready.content));
-  assert.equal(ready.content.basis.context?.topicLabel, "일 · 진로 · 이직");
+  assert.ok(ready?.content && isReadingReport(ready.content));
+  assert.equal(ready.content.generated?.context?.topicLabel, "일 · 진로 · 이직");
   assert.match(ready.content.focus?.[0].text ?? "", /알려 주신 고민/);
   assert.equal((await getContextView(mem.repo, { userId: USER, assessmentId: assessment.id }))?.reportStatus, "ready");
 

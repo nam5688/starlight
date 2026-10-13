@@ -3,7 +3,9 @@
 // - runStage: 운영자의 단계별 승인 기록이 있고 예산 한도가 승인 금액 이하일 때만 실행한다. 모든 호출은 BudgetGuard를 거친다.
 // 제공사 구현체(실제 호출)는 이 파일에 없다. 승인 전에는 모의 모델 · 가짜 서버로만 검사한다.
 import { buildUserMessage, SYSTEM_PROMPT } from "../v2/prompt.ts";
-import { isPersonalV2, type AiUsageSample, type ReportContent } from "../generator.ts";
+import { isPersonalV2, isReadingReport, type AiUsageSample, type ReportContent } from "../generator.ts";
+import { checkReadingDepth, crossPersonOverlapReading } from "../reading/depth.ts";
+import { buildReadingUserMessage, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
 import { checkDepth, crossPersonOverlap } from "../v2/depth.ts";
 import { checkPhilosophicalDepth, crossOverlapBlocks } from "../philosophy/depth.ts";
 import { readingBlocks } from "../philosophy/compare.ts";
@@ -15,12 +17,17 @@ import { BudgetExceededError, BudgetGuard, costKrw, estimateInputTokens, withBud
 import type { Persona } from "./compare-personas.ts";
 import type { TextModel } from "./model.ts";
 
-/** 무엇을 쓰게 하는가 — personal-v2: 지금의 개인 종합 리포트 지시문, philosophical-v0: 자기 이해 풀이 비교용 지시문(제품 미연결) */
-export type CompareVariant = "personal-v2" | "philosophical-v0";
+/**
+ * 무엇을 쓰게 하는가 — reading-v1: 지금 제품의 개인 통합 리포트(읽기 구조, 기본), personal-v2: 이전 AI 형식(비교 · 호환용),
+ * philosophical-v0: 자기 이해 풀이 비교용 지시문(제품 미연결)
+ */
+export type CompareVariant = "reading-v1" | "personal-v2" | "philosophical-v0";
 
 /** 변형마다 AI에게 보내는 지시문 · 사용자 메시지 (비용 추정과 입력 토큰 보정에 같은 값을 쓴다) */
 export function promptsFor(variant: CompareVariant, evidence: ReturnType<typeof buildEvidence>, iso: string, context: Persona["input"]["context"]): [string, string] {
-  return variant === "philosophical-v0" ? [PHILOSOPHY_SYSTEM_PROMPT, buildPhilosophyUserMessage(evidence, iso, context)] : [SYSTEM_PROMPT, buildUserMessage(evidence, iso, context)];
+  if (variant === "philosophical-v0") return [PHILOSOPHY_SYSTEM_PROMPT, buildPhilosophyUserMessage(evidence, iso, context)];
+  if (variant === "personal-v2") return [SYSTEM_PROMPT, buildUserMessage(evidence, iso, context)];
+  return [READING_SYSTEM_PROMPT, buildReadingUserMessage(evidence, iso, context)];
 }
 
 export type CompareCandidate = { key: string; model: TextModel; price: ModelPrice };
@@ -77,7 +84,7 @@ export function planStage(opts: { stage: string; capKrw: number; personas: Perso
   const rows: PlanRow[] = [];
   for (const p of opts.personas) {
     const evidence = buildEvidence(p.input, ref);
-    const [system, user] = promptsFor(opts.variant ?? "personal-v2", evidence, ref.iso, p.input.context);
+    const [system, user] = promptsFor(opts.variant ?? "reading-v1", evidence, ref.iso, p.input.context);
     const inputTokens = estimateInputTokens([system, user]);
     for (const c of opts.candidates) {
       const first = worstCaseKrw(c.price, { inputTokens, maxOutputTokens: MAX_OUTPUT_TOKENS }, opts.settings);
@@ -171,7 +178,7 @@ export async function runStage(opts: {
   guard: BudgetGuard;
   approval: CompareApproval | null | undefined;
   now: Date;
-  /** 쓰게 할 리포트의 종류 (기본: 개인 종합 리포트) */
+  /** 쓰게 할 리포트의 종류 (기본: 개인 통합 리포트 읽기 구조) */
   variant?: CompareVariant;
   blindSeed: number;
   /** 제공사 오류 재시도 사이의 대기 (테스트에서는 즉시) */
@@ -179,7 +186,7 @@ export async function runStage(opts: {
   callTimeoutMs?: number;
 }): Promise<StageResult> {
   checkApproval(opts.stage, opts.guard, opts.approval);
-  const variant = opts.variant ?? "personal-v2";
+  const variant = opts.variant ?? "reading-v1";
   const blindKey = assignBlind(opts.personas.map((p) => p.id), opts.candidates.map((c) => c.key), opts.blindSeed);
   const runs: CompareRun[] = [];
   let stoppedByBudget = false;
@@ -201,7 +208,7 @@ export async function runStage(opts: {
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         callTimeoutMs: opts.callTimeoutMs,
       };
-      const generator = variant === "philosophical-v0" ? createPhilosophicalGenerator(generatorOptions) : createAiReportGenerator(generatorOptions);
+      const generator = variant === "philosophical-v0" ? createPhilosophicalGenerator(generatorOptions) : createAiReportGenerator({ ...generatorOptions, format: variant });
       const started = Date.now();
       let report: ReportContent | PhilosophicalReportV0 | null = null;
       let errorCode: string | null = null;
@@ -225,6 +232,9 @@ export async function runStage(opts: {
       if (report && isPhilosophicalReport(report)) {
         const d = checkPhilosophicalDepth({ draft: report, evidence: report.evidence, concern: persona.input.context });
         depth = { pass: d.pass, fails: d.fails, warns: d.warns, conditionRatio: d.metrics.conditionShare, selfOverlapMax: d.metrics.selfOverlapMax };
+      } else if (report && isReadingReport(report)) {
+        const d = checkReadingDepth({ draft: report });
+        depth = { pass: d.pass, fails: d.flags.filter((f) => f.severity === "fail").map((f) => f.id), warns: d.flags.filter((f) => f.severity === "warn").map((f) => f.id), conditionRatio: d.metrics.conditionRatio, selfOverlapMax: d.metrics.selfOverlapMax };
       } else if (report && isPersonalV2(report)) {
         const d = checkDepth({ draft: report, evidence: report.evidence, hasContext: Boolean(persona.input.context) });
         depth = { pass: d.pass, fails: d.flags.filter((f) => f.severity === "fail").map((f) => f.id), warns: d.flags.filter((f) => f.severity === "warn").map((f) => f.id), conditionRatio: d.metrics.conditionRatio, selfOverlapMax: d.metrics.selfOverlapMax };
@@ -252,6 +262,9 @@ export async function runStage(opts: {
     if (variant === "philosophical-v0") {
       const blocks = runs.filter((r) => r.candidate === c.key && r.report && isPhilosophicalReport(r.report)).map((r) => readingBlocks(r.report as PhilosophicalReportV0));
       for (let i = 0; i < blocks.length; i++) for (let j = 0; j < blocks.length; j++) if (i !== j) values.push(crossOverlapBlocks(blocks[i], blocks[j]));
+    } else if (variant === "reading-v1") {
+      const reports = runs.filter((r) => r.candidate === c.key && r.report && !isPhilosophicalReport(r.report) && isReadingReport(r.report)).map((r) => r.report as Extract<ReportContent, { kind: "integrated-reading" }>);
+      for (let i = 0; i < reports.length; i++) for (let j = 0; j < reports.length; j++) if (i !== j) values.push(crossPersonOverlapReading(reports[i], reports[j]));
     } else {
       const reports = runs.filter((r) => r.candidate === c.key && r.report && !isPhilosophicalReport(r.report) && isPersonalV2(r.report)).map((r) => r.report as Extract<ReportContent, { kind: "personal-v2" }>);
       for (let i = 0; i < reports.length; i++) for (let j = 0; j < reports.length; j++) if (i !== j) values.push(crossPersonOverlap(reports[i], reports[j]));

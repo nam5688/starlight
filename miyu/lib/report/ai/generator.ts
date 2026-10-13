@@ -14,6 +14,10 @@ import { alreadyProvidedOf, buildConcernRepairMessage, buildConcernUserMessage, 
 import type { ConcernDraftV1, ConcernReportV1 } from "../concern/types.ts";
 import { validateConcernDraft } from "../concern/validate.ts";
 import type { ConcernInput, GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
+import { assembleReading } from "../reading/assemble.ts";
+import { checkReadingDepth } from "../reading/depth.ts";
+import { buildReadingRepairMessage, buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
+import { validateReadingDraft } from "../reading/validate.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
 import { buildRepairMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from "../v2/prompt.ts";
 import type { PersonalReportV2, ReportDraftV2 } from "../v2/types.ts";
@@ -31,6 +35,16 @@ export type AiGeneratorOptions = {
   maxOutputTokens?: number;
   /** 모델 호출 한 번의 제한 시간 (넘으면 일시 오류로 보고 다시 시도) */
   callTimeoutMs?: number;
+  /**
+   * 개인 통합 리포트의 형식 — 기본은 읽기 구조(reading-v1: 결론 → 짧은 요약 → 쉬운 예시 → 접힌 풀이 · 근거, 예시 화면과 같은 구성).
+   * personal-v2는 이전 형식이며 비교 · 호환용이다.
+   */
+  format?: "reading-v1" | "personal-v2";
+  /**
+   * 형식 검사를 통과해도 내용 차이 검사(reading/depth.ts)에서 걸리면 한 번 고쳐 쓰게 하고 그래도 안 되면 실패로 남긴다 (읽기 구조만).
+   * 낱말 · 표지를 센 어림이어서 기본은 끄고(보고만), 실제 AI를 연결할 때 운영자가 켠다. 모의 글은 이 검사를 통과할 수 없다.
+   */
+  enforceDepth?: boolean;
 };
 
 /** 모델 응답에서 JSON 객체를 꺼낸다 (앞뒤 설명 · 코드 블록이 붙어도) */
@@ -85,15 +99,16 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
   const maxRepairs = opts.maxRepairs ?? 1;
   const maxRetries = opts.maxRetries ?? 2;
 
+  const format = opts.format ?? "reading-v1";
   const caller = createModelCaller({ model, maxRetries, sleep, maxOutputTokens: opts.maxOutputTokens, callTimeoutMs: opts.callTimeoutMs });
-  const spec = { system: SYSTEM_PROMPT, promptVersion: PROMPT_VERSION };
+  const spec = format === "reading-v1" ? { system: READING_SYSTEM_PROMPT, promptVersion: READING_PROMPT_VERSION } : { system: SYSTEM_PROMPT, promptVersion: PROMPT_VERSION };
   /** 호출 한 번 (일시 오류 재시도 · 사용 기록은 model-caller) */
   const call = (messages: ModelMessage[], ctx: GenerateContext) => caller.call(messages, ctx, spec);
   const concernSpec = { system: CONCERN_SYSTEM_PROMPT, promptVersion: CONCERN_PROMPT_VERSION };
 
   return {
     name: `ai:${model.provider}`,
-    version: `${model.model}|${PROMPT_VERSION}|${SAJU_RULE_VERSION}`,
+    version: `${model.model}|${spec.promptVersion}|${SAJU_RULE_VERSION}`,
     usesContext: true,
     async generateConcern(input: ConcernInput, ctx: GenerateContext = {}): Promise<ConcernReportV1> {
       const ref = input.reference ? { ...input.reference, iso: seoulYm(now()).iso } : seoulYm(now());
@@ -171,6 +186,52 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const ref = seoulYm(now());
       const evidence = buildEvidence(input, ref);
       const context = input.context;
+      if (format === "reading-v1") {
+        const messages: ModelMessage[] = [{ role: "user", content: buildReadingUserMessage(evidence, ref.iso, context) }];
+        let lastReadingErrors: string[] = [];
+        for (let round = 0; round <= maxRepairs; round++) {
+          const called = await call(messages, ctx);
+          const { result } = called;
+          const done = (outcome: "ok" | "invalid") => caller.recordResult(ctx, spec, called, outcome, "VALIDATION");
+          const retry = (errors: string[]) => {
+            lastReadingErrors = errors;
+            messages.push({ role: "assistant", content: result.text.slice(0, 20000) }, { role: "user", content: buildReadingRepairMessage(errors) });
+          };
+          let parsed: unknown;
+          try {
+            parsed = extractJson(result.text);
+          } catch {
+            done("invalid");
+            retry(["JSON 형식이 아닙니다. JSON 객체 하나만 출력해 주세요."]);
+            continue;
+          }
+          const checked = validateReadingDraft(parsed, evidence, { hasContext: Boolean(context) });
+          if (!checked.ok) {
+            done("invalid");
+            retry(checked.errors);
+            continue;
+          }
+          // 형식은 맞아도 조건 없는 단정 · 범용 문장 · 겹치는 말이 많으면 한 번 고쳐 쓰게 한다 (켜 둔 경우만)
+          if (opts.enforceDepth) {
+            const depth = checkReadingDepth({ draft: checked.draft });
+            if (!depth.pass) {
+              done("invalid");
+              retry(depth.flags.filter((f) => f.severity === "fail").map((f) => f.message));
+              continue;
+            }
+          }
+          done("ok");
+          return assembleReading({
+            draft: checked.draft,
+            evidence,
+            input,
+            reference: ref,
+            promptVersion: READING_PROMPT_VERSION,
+            ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, READING_PROMPT_VERSION],
+          });
+        }
+        throw new Error(`리포트 형식 검사 실패: ${lastReadingErrors.slice(0, 3).join(" / ")}`);
+      }
       const messages: ModelMessage[] = [{ role: "user", content: buildUserMessage(evidence, ref.iso, context) }];
 
       let lastErrors: string[] = [];

@@ -5,6 +5,7 @@ import { AI_CANDIDATES, COMPARE_STAGES } from "../../config/ai-candidates.ts";
 import { BudgetGuard, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE, type ModelPrice } from "./budget.ts";
 import { buildPersonas } from "./compare-personas.ts";
 import { assignBlind, checkApproval, planStage, runStage, type CompareApproval, type CompareCandidate } from "./compare-plan.ts";
+import { composeMockReading } from "../reading/mock-model.ts";
 import { composeMockDraft } from "./mock-model.ts";
 import { ModelCallError, type ModelResult, type TextModel } from "./model.ts";
 
@@ -26,7 +27,8 @@ function candidate(key: string, opts: { invalidFirst?: boolean; usage?: { inputT
         invalid = false;
         return { text: '{"headline":"짧음"}', model: model.model, usage: opts.usage ?? { inputTokens: 20_000, outputTokens: 500 } };
       }
-      return { text: JSON.stringify(composeMockDraft(req.messages[0].content)), model: model.model, usage: opts.usage ?? { inputTokens: 20_000, outputTokens: 9_000 } };
+      const user = req.messages[0].content;
+      return { text: JSON.stringify(user.startsWith("다음 자료로 개인 통합 리포트 JSON") ? composeMockReading(user) : composeMockDraft(user)), model: model.model, usage: opts.usage ?? { inputTokens: 20_000, outputTokens: 9_000 } };
     },
   };
   return { key, model, price: PRICE };
@@ -174,7 +176,8 @@ test("제공사 오류(속도 제한)는 청구 없이 재시도되고, 시간 �
       async complete(req: { messages: { content: string }[] }) {
         flaky.model.calls++;
         if (rateLimited-- > 0) throw new ModelCallError("속도 제한", { retryable: true, code: "RATE_LIMITED" });
-        return { text: JSON.stringify(composeMockDraft(req.messages[0].content)), model: "model-A", usage: { inputTokens: 20_000, outputTokens: 9_000 } };
+        const user = req.messages[0].content;
+        return { text: JSON.stringify(user.startsWith("다음 자료로 개인 통합 리포트 JSON") ? composeMockReading(user) : composeMockDraft(user)), model: "model-A", usage: { inputTokens: 20_000, outputTokens: 9_000 } };
       },
     },
   };

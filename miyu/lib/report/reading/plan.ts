@@ -1,0 +1,109 @@
+// 읽기 구조 리포트의 고정 구성 — 예시 화면(sample-reading-report.ts)과 실제 AI 생성이 같은 구성 · 같은 한도를 쓴다.
+// 제목 · 묶음 · 이름표 · 안전 안내는 AI가 쓰지 않고 여기서 정한다(코드가 채운다). AI는 근거 목록 안에서 본문만 쓴다.
+import type { ReadingBlockId, ReadingGroupId } from "./types.ts";
+
+export type BlockPlan = {
+  id: ReadingBlockId;
+  group: ReadingGroupId;
+  /** 제목 위의 작은 이름표 (화면의 주제 이름) */
+  topic: string;
+  /** AI에게 주는 질문 — 이 주제가 답해야 하는 것 */
+  ask: string;
+  /** 이 주제는 특징 카드 3개를 쓴다 */
+  traits?: true;
+  /** 이 주제는 상대 없이 보는 관계 스타일(편안한 조건 · 부딪히는 상황)과 반응 단계 그림을 쓴다 */
+  relation?: true;
+  /** 이 주제는 기본 화면에 "예를 들면" 예시 1개를 둔다 */
+  example: boolean;
+};
+
+export const BLOCK_PLAN: BlockPlan[] = [
+  {
+    id: "tendency",
+    group: "me",
+    topic: "생각과 행동 방식",
+    ask: "새로운 일 · 불확실함 앞에서 어떻게 움직이는가. 사주에서 읽은 집중 · 신중함의 결과 응답에서 읽은 경향이 어떻게 겹치거나 달라지는가",
+    example: true,
+  },
+  {
+    id: "strength-burden",
+    group: "me",
+    topic: "강한 포인트와 힘들 수 있는 포인트",
+    ask: "이 사람의 특징 세 가지가 어떤 때 강하게 쓰이고(강한 포인트) 어떤 때 힘들어지는가(힘들 수 있는 포인트). 특징마다 가상의 장면 하나",
+    traits: true,
+    example: false,
+  },
+  {
+    id: "values",
+    group: "me",
+    topic: "중요하게 여기는 것",
+    ask: "근거에서 읽히는 중요하게 여기는 것 두 가지와, 그 둘이 부딪힐 수 있는 곳, 큰 선택 앞에서 쓸 수 있는 기준 (사실이 아니라 가설로)",
+    example: true,
+  },
+  {
+    id: "love",
+    group: "relation",
+    topic: "가까운 관계",
+    ask: "가까운 사람 앞에서의 반응과, 관계가 불확실해 보일 때 반응이 이어지는 모습. 상대 자료는 없으므로 상대 없이 본다 (상대의 마음 · 나이 · 직업 · 만날 날짜는 쓰지 않는다)",
+    relation: true,
+    example: false,
+  },
+  {
+    id: "work-money",
+    group: "work",
+    topic: "일과 돈",
+    ask: "일하는 방식과 힘이 나는 조건, 돈을 대하는 모습 (돈에 관한 응답이 없으면 사주의 시기 해석만 참고했다고 밝힌다)",
+    example: true,
+  },
+];
+
+export const FLOW_TOPIC = "앞으로의 흐름";
+
+/**
+ * 코드가 채우는 고정 문구 — AI가 쓰지 않는다. 예시 화면(sample-reading-report.ts)도 같은 문구를 가져다 쓴다(예시와 실제 생성이 어긋나지 않게).
+ * 이름이 들어가는 문구는 함수다 (이름 뒤의 " 님"은 띄어 쓴다).
+ */
+export const BLOCK_CAVEAT: Partial<Record<ReadingBlockId, (name: string) => string>> = {
+  "strength-burden": () => "상대가 실제로 어떻게 느끼는지는 상대에게 직접 확인해야 알 수 있습니다.",
+  values: () => "이 부분은 사실로 확인된 것이 아니라 위의 자료를 겹쳐 읽은 추정입니다.",
+  love: (name) => `상대 자료: 없음 · 이 부분은 ${name} 님의 사주와 응답만으로 읽었습니다.`,
+  "work-money": () => "돈 부분은 응답 자료 없이 사주 시기 해석만으로 읽었습니다. 투자나 대출 같은 결정의 근거로 쓰는 내용이 아닙니다.",
+};
+export const comfortNote = (name: string) => `${name} 님이 편안해할 관계의 조건입니다. 상대의 나이나 직업 같은 정보는 사주로 알 수 없어 다루지 않습니다.`;
+export const FLOW_CAVEAT = "전통 해석의 시기 읽기와, 응답에서 읽은 가능성입니다. 어떤 일이 일어난다는 예측이 아니며 실제 사건과 결과를 보장하지 않습니다.";
+export const SCENARIO_NOTE = "응답에서 읽은 가능성이며, 그렇게 된다는 예측이 아닙니다.";
+export const STATISTICS_NOTE = "이번 리포트에는 연구 통계를 사용하지 않았습니다. 출처와 조사 대상 · 조건이 확인된 통계가 없습니다. 또 집단의 통계를 한 사람의 앞날 확률로 바꿀 수 없습니다.";
+export const RULE_DRAFT_NOTE = "사주 해석 규칙은 전문가 검토 전 초안이며, 일상에서 실제로 어떻게 나타나는지는 확인하지 못했습니다.";
+export const SCORE_NOTE = "괄호 안 숫자는 응답 환산값(0~100)이며 백분위가 아닙니다. 개발용 예시 문항입니다.";
+
+/** 첫 화면 카드 이름 */
+export const CARD_LABEL = { strength: "내가 강한 포인트", caution: "내가 힘들 수 있는 포인트", flow: "현재 흐름" } as const;
+
+/** 글자 · 문장 수 한도 — 검사(validate.ts) · 지시문(prompt.ts) · 모의 작성기 · 예시 테스트가 모두 이 값을 쓴다 */
+export const READING_LIMITS = {
+  headline: { min: 10, max: 40 },
+  blockHeadline: { min: 8, max: 30 },
+  card: { keywordMax: 18, noteMin: 12, noteMax: 60 },
+  summary: { min: 40, max: 220, sentencesMax: 2 },
+  example: { min: 30, max: 260, sentencesMax: 3 },
+  details: { min: 1, max: 3, textMin: 40, textMax: 520, sentencesMax: 3 },
+  watch: { min: 20, max: 300 },
+  trait: { count: 3, nameMax: 12, shortMax: 16, longMin: 20, longMax: 130, exampleMin: 20, exampleMax: 150, exampleSentencesMax: 2 },
+  comfort: { count: 3, itemMin: 8, itemMax: 40 },
+  reactionFlow: { whenMax: 30, steps: 4, stepTextMax: 30, helpfulMin: 30, helpfulMax: 220 },
+  flow: { headlineMax: 30, summaryMin: 40, summaryMax: 220, cardTextMin: 40, cardTextMax: 260, years: { min: 1, max: 3, themeMax: 40 }, periods: { min: 1, max: 4, themeMin: 20, themeMax: 220, watchMin: 15, watchMax: 160 }, scenarios: { min: 2, max: 3, whenMax: 90, thenMax: 220 } },
+  actions: { min: 3, max: 4, titleMax: 30, detailMin: 20, detailMax: 220 },
+  focus: { min: 1, max: 3, textMin: 80, textMax: 520 },
+} as const;
+
+/**
+ * 읽는 사람 화면의 본문에 쓰지 않는 사주 전문 용어 — 한자 · 뜻풀이는 접어 둔 "분석 근거"에만 둔다.
+ * (예시 화면도 같은 규칙이며 sample-reading-report.test.ts가 확인한다.)
+ */
+export const JARGON = /비겁|식상|관성|인성|재성|정관|편관|비견|겁재|식신|상관|편재|정재|정인|편인|일지|일간|천간|지지|원국|오행|세운|대운|십신|용신/;
+
+/** 본문에 쓰지 않는 점수 · 확률 표현 (응답 환산값은 접어 둔 분석 근거에만 있다) */
+export const SCORE_TEXT = /\d{2,3}\s*점|백분위|\(\d{2,3}\)|\d+\s*%|퍼센트|확률/;
+
+/** 원인을 하나로 좁혀 말하는 표현 */
+export const CAUSE_NARROWING = /성격이 아니라|불안이 아니라|시기 때문입니다|때문입니다/;

@@ -1,6 +1,7 @@
 // 저장된 리포트에서 "글"만 뽑는다 — 이미 준 리포트와 새 리포트가 겹치는지 보고, AI에게 되풀이하지 말라고 요약해 보낼 때 쓴다.
 
 import type { AnyReportContent } from "../generator.ts";
+import { isReadingReport, type IntegratedReadingReport } from "../reading/types.ts";
 import type { Paragraph, PersonalReportV2 } from "../v2/types.ts";
 import { isConcernReport, type ConcernReportV1 } from "./types.ts";
 
@@ -52,10 +53,33 @@ export function concernTexts(r: ConcernReportV1): TextParts {
   return { headline: r.headline, summary, sections, actions, all };
 }
 
-/** 어떤 종류의 리포트든 글을 뽑는다 (개인 종합 v2 · 고민 반영 · 개발용 v1) */
+/** 읽기 구조 리포트의 글 — 본문(요약 · 예시 · 풀이 · 행동)만. 접어 둔 분석 근거는 근거 목록에서 코드가 만든 글이므로 넣지 않는다 */
+export function readingTexts(r: IntegratedReadingReport): TextParts {
+  const summary = r.blocks.map((b) => b.summary);
+  const sections = r.blocks.flatMap((b) => [b.example ?? "", ...b.details, b.watch ?? "", ...(b.traits ?? []).flatMap((t) => [t.shines, t.burden, t.example]), b.reactionFlow?.helpful ?? ""]).filter(Boolean);
+  const actions = r.actions.map((a) => a.detail);
+  const all = [
+    r.headline,
+    ...r.summary.flatMap((c) => [c.keyword, c.note]),
+    ...r.blocks.flatMap((b) => [b.headline, b.summary]),
+    ...sections,
+    r.flow.headline,
+    r.flow.summary,
+    r.flow.cardText,
+    ...r.flow.years.map((y) => y.theme),
+    ...r.flow.periods.flatMap((p) => [p.theme, p.watch]),
+    ...r.flow.scenarios.flatMap((s) => [s.when, s.then]),
+    ...paragraphs(r.focus),
+    ...r.actions.flatMap((a) => [a.title, a.detail]),
+  ].filter(Boolean);
+  return { headline: r.headline, summary, sections, actions, all };
+}
+
+/** 어떤 종류의 리포트든 글을 뽑는다 (개인 통합 읽기 구조 · 개인 종합 v2 · 고민 반영 · 개발용 v1) */
 export function reportTexts(content: AnyReportContent | null): TextParts {
   if (!content) return { headline: "", summary: [], sections: [], actions: [], all: [] };
   if (isConcernReport(content)) return concernTexts(content);
+  if (isReadingReport(content)) return readingTexts(content);
   if ("kind" in content && content.kind === "personal-v2") return personalV2Texts(content);
   const all: string[] = [];
   collectStrings(content, all);

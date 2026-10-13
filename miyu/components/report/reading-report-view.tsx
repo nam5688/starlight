@@ -1,7 +1,10 @@
 import { ArrowIcon } from "@/components/ui/icons";
+import { basisFor } from "@/lib/report/reading/assemble";
 import type { IntegratedReadingReport, ReadingBlock, ReadingGroupId } from "@/lib/report/reading/types";
 import type { SajuSection, ScoreRow } from "@/lib/report/types";
 import { SajuChart } from "./detail-sections";
+import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
+import { ActionList } from "./integrated-view";
 import { ReadingNav } from "./reading-nav";
 import {
   BasisList,
@@ -40,24 +43,32 @@ const SCROLL_MARGIN = "scroll-mt-[44px] md:scroll-mt-[52px]";
 export function ReadingReportView({
   report,
   saju,
-  scores = [],
+  scores,
   idPrefix = "",
   footer,
 }: {
   report: IntegratedReadingReport;
-  saju: SajuSection;
-  /** 응답 환산값 막대 — 실제 채점이 있을 때만 넘긴다 */
+  /** 원국 표 — 실제 리포트는 저장된 report.saju를 쓴다 (예시 화면만 따로 넘긴다) */
+  saju?: SajuSection;
+  /** 응답 환산값 막대 — 실제 리포트는 저장된 report.base에서 만든다 (예시 화면만 따로 넘긴다) */
   scores?: { title: string; rows: ScoreRow[] }[];
   idPrefix?: string;
   footer?: React.ReactNode;
 }) {
   const id = (name: string) => `${idPrefix}${name}`;
+  const chart = saju ?? report.saju;
+  const scoreGroups = scores ?? (report.base ? [{ title: "기질 · 성격", rows: report.base.temperament }, { title: "가까운 관계 반응(애착 경향)", rows: report.base.relationship }] : []);
+  const extras = report.extras;
+  const focus = report.focus ?? [];
+  const hasExtras = Boolean(extras && (extras.plain || extras.questions.length || extras.situations.length || extras.partner || extras.items));
   const used = report.inputs.filter((i) => i.status !== "none").map((i) => i.name.replace(/\(.*\)/, ""));
   const none = report.inputs.filter((i) => i.status === "none").map((i) => i.name);
   const nav = [
     { id: id("summary"), label: "전체 요약" },
+    ...(focus.length ? [{ id: id("focus"), label: "내 고민" }] : []),
     ...GROUPS.filter((g) => report.blocks.some((b) => b.group === g.id)).map((g) => ({ id: id(g.section), label: g.label })),
     { id: id(report.flow.id), label: "미래 흐름" },
+    ...(hasExtras ? [{ id: id("extras"), label: "더 살펴보기" }] : []),
   ];
 
   return (
@@ -108,6 +119,30 @@ export function ReadingReportView({
             </ul>
           </details>
         </section>
+
+        {focus.length > 0 && (
+          <section id={id("focus")} aria-labelledby={id("focus-h")} className={`mt-12 ${SCROLL_MARGIN}`}>
+            <h2 id={id("focus-h")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
+              알려 주신 고민까지 반영한 해석
+            </h2>
+            <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">
+              {report.generated?.context
+                ? `최근 알려 주신 내용(${report.generated.context.topicLabel}${report.generated.context.fields.length ? ` · ${report.generated.context.fields.join(", ")}` : ""})을 반영해 해석의 초점과 예시를 골랐습니다. `
+                : "알려 주신 고민을 반영해 해석의 초점과 예시를 골랐습니다. "}
+              사주 계산은 그대로이며, 알려 주신 이야기를 사주로 알아낸 것이 아닙니다.
+            </p>
+            <div className="mt-4">
+              <Paragraphs items={focus.map((f) => f.text)} />
+            </div>
+            {report.generated && (
+              <FoldRow>
+                <Fold label="분석 근거 보기">
+                  <BasisList basis={basisFor(focus.flatMap((f) => f.evidence), report.generated.evidence)} />
+                </Fold>
+              </FoldRow>
+            )}
+          </section>
+        )}
 
         {GROUPS.map((g) => {
           const blocks = report.blocks.filter((b) => b.group === g.id);
@@ -194,11 +229,27 @@ export function ReadingReportView({
           </article>
         </section>
 
+        {hasExtras && extras && (
+          <div id={id("extras")} className={`mt-12 space-y-12 ${SCROLL_MARGIN}`}>
+            {extras.plain && <PlainReadingSection plain={extras.plain} id={id("x-plain")} />}
+            {extras.questions.length > 0 && <QuestionsSection questions={extras.questions} id={id("x-questions")} />}
+            {extras.situations.length > 0 && <SituationsSection situations={extras.situations} id={id("x-situations")} />}
+            {extras.partner && <PartnerSection partner={extras.partner} id={id("x-partner")} />}
+            {extras.items && <ItemsSection items={extras.items} id={id("x-items")} />}
+          </div>
+        )}
+
         <section aria-labelledby={id("actions")} className="mt-12">
           <h2 id={id("actions")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
             지금 확인해 볼 것
           </h2>
           <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">정답을 정하는 목록이 아니라, 위의 해석이 나에게 맞는지 확인해 볼 수 있는 작은 행동입니다.</p>
+          {extras && extras.starterActions.length > 0 && (
+            <div className="mt-5">
+              <h3 className="mb-3 text-[15px] font-semibold text-ink-2">바로 해볼 3가지</h3>
+              <ActionList actions={extras.starterActions} />
+            </div>
+          )}
           <ul className="mt-4 space-y-2">
             {report.actions.map((a) => (
               <li key={a.title}>
@@ -221,16 +272,18 @@ export function ReadingReportView({
           <FoldRow>
             <Fold label="내 분석 데이터 보기" wide>
               <div className="space-y-6">
-                <div>
-                  <p className="text-[15px] font-semibold">사주 원국과 오행</p>
-                  <p className="mt-0.5 mb-3 text-[13px] text-ink-3">만세력 엔진이 계산한 결과입니다. 오행 막대는 원국 글자 수 기준 개수이며, 많고 적음이 좋고 나쁨은 아닙니다.</p>
-                  <SajuChart saju={saju} />
-                </div>
-                {scores.length > 0 && (
+                {chart && (
+                  <div>
+                    <p className="text-[15px] font-semibold">사주 원국과 오행</p>
+                    <p className="mt-0.5 mb-3 text-[13px] text-ink-3">만세력 엔진이 계산한 결과입니다. 오행 막대는 원국 글자 수 기준 개수이며, 많고 적음이 좋고 나쁨은 아닙니다.</p>
+                    <SajuChart saju={chart} />
+                  </div>
+                )}
+                {scoreGroups.length > 0 && (
                   <div>
                     <p className="text-[15px] font-semibold">응답 환산값</p>
                     <p className="mt-0.5 text-[13px] text-ink-3">개발용 예시 문항에 답한 값을 0~100으로 옮긴 것입니다. 백분위나 정확도가 아니며, 높고 낮음은 좋고 나쁨이 아닙니다.</p>
-                    {scores.map((s) => (
+                    {scoreGroups.map((s) => (
                       <div key={s.title} className="mt-3">
                         <p className="text-[13px] font-semibold text-ink-2">{s.title}</p>
                         <div className="divide-y divide-line">

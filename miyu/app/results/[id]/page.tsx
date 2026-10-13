@@ -9,13 +9,14 @@ import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { FullReportView } from "@/components/report/full-report-view";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
+import { ReadingReportView } from "@/components/report/reading-report-view";
 import { ContextPanel } from "@/components/results/context-panel";
 import { PurchasePanel } from "@/components/results/purchase-panel";
 import { ReadingNav } from "@/components/report/reading-nav";
 import { ResultHeader } from "@/components/report/result-header";
 import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { isConcernReport } from "@/lib/report/concern/types";
-import { isPersonalV2 } from "@/lib/report/generator";
+import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import { getResultView } from "@/lib/services/report-service";
@@ -92,11 +93,19 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
         <Track name="report_view" />
         <ResultHeader
           title={isPersonalV2(content) ? `${assessment.nickname} 님의 개인 종합 사주 리포트` : `${assessment.nickname} 님의 개인 통합 리포트`}
-          subtitle={isPersonalV2(content) ? "사주 원국 · 대운 · 세운 중심, 성향 응답은 보조 근거" : "사주 · MBTI · 기질 · 애착을 한 사람의 해석으로 읽었습니다."}
+          subtitle={
+            isReadingReport(content)
+              ? "사주를 틀로, 성향 응답과 입력한 MBTI를 함께 읽은 하나의 해석입니다."
+              : isPersonalV2(content)
+                ? "사주 원국 · 대운 · 세운 중심, 성향 응답은 보조 근거"
+                : "사주 · MBTI · 기질 · 애착을 한 사람의 해석으로 읽었습니다."
+          }
           source={content.source}
           meta={`검사일 ${created} · 저장된 리포트`}
         />
-        {isPersonalV2(content) ? (
+        {isReadingReport(content) ? (
+          <ReadingReportView report={content} idPrefix="r-" footer={footer} />
+        ) : isPersonalV2(content) ? (
           <PersonalV2View report={content} idPrefix="r-" footer={footer} />
         ) : (
           <FullReportView report={content} idPrefix="r-" footer={footer} />

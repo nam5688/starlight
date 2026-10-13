@@ -1,11 +1,12 @@
 // 리포트 생성기 연결 지점.
 // - 개발용 규칙 생성기(generate-dev-report.ts) → FullReport (v1 화면)
-// - AI 생성기(ai/generator.ts) → PersonalReportV2 (계산 결과 → 근거 → AI 서술 → 형식 검사)
+// - AI 생성기(ai/generator.ts) → IntegratedReadingReport(읽기 구조, 기본) · PersonalReportV2(이전 형식) (계산 결과 → 근거 → AI 서술 → 형식 검사)
 // 저장된 리포트는 kind로 구분해 그대로 다시 보여준다 (v1에는 kind가 없다).
 
 import type { ContextTopic, PersonalContextInput } from "../personalization/context.ts";
 import type { SajuResult } from "../saju/engine.ts";
 import type { ConcernReportV1 } from "./concern/types.ts";
+import type { IntegratedReadingReport } from "./reading/types.ts";
 import type { FreeSummary, FullReport } from "./types.ts";
 import type { PersonalReportV2 } from "./v2/types.ts";
 
@@ -35,12 +36,13 @@ export type ConcernInput = Pick<ReportInput, "nickname" | "knownMbti" | "summary
   previous: { topic: ContextTopic; headline: string; texts: string[] }[];
 };
 
-/** 개인 종합 리포트 생성 결과 (개발용 v1 · AI v2) */
-export type ReportContent = FullReport | PersonalReportV2;
+/** 개인 통합 리포트 생성 결과 (개발용 v1 · AI 읽기 구조 reading-v1 · 이전 AI 형식 v2) */
+export type ReportContent = FullReport | PersonalReportV2 | IntegratedReadingReport;
 /** 저장 · 열람하는 모든 리포트 (개인 종합 + 고민 반영) */
 export type AnyReportContent = ReportContent | ConcernReportV1;
 
 export const isPersonalV2 = (c: AnyReportContent): c is PersonalReportV2 => "kind" in c && c.kind === "personal-v2";
+export { isReadingReport } from "./reading/types.ts";
 
 /** AI 호출 한 번의 사용 기록 — 비용 계산과 운영 점검에 쓴다. 입력 · 출력 내용은 담지 않는다 */
 export type AiUsageSample = {

@@ -35,7 +35,7 @@ export default function SampleReportPage() {
         footer={
           <>
             <p className="text-[13px] leading-[1.7] text-ink-3">
-              이 예시는 미유가 목표로 하는 리포트 형식을 사람이 쓴 것입니다. 실제 리포트는 AI 연결 뒤에 이 형식으로 바꿀 예정이라, 지금 만들어지는 개발 단계의 리포트와 구성이 다를 수 있습니다.
+              이 예시는 미유가 목표로 하는 리포트 형식을 사람이 쓴 것입니다. AI가 연결되면 실제 리포트도 이 형식으로 만들어집니다. AI 연결 전에 만들어지는 개발 단계의 리포트는 구성이 다를 수 있습니다.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link href="/analyze" className={buttonPrimary}>

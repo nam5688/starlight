@@ -3,7 +3,11 @@
 // 기본 화면에는 결론 한 줄(headline) · 요약 2~3문장(summary) · 예시 1개만 보인다. 같은 말을 제목 · 요약 · 본문에서 되풀이하지 않는다.
 // 본문(headline · summary · example · details · watch)에는 사주 용어와 응답 점수를 쓰지 않고, 근거는 basis(접어 둔 "분석 근거")에 둔다.
 // evidence는 내부 점검용 근거 ID이며 소비자 화면에는 보이지 않는다.
+import type { ContextTopic } from "../../personalization/context.ts";
 import type { LuckSlot } from "../../saju/interpret/rules.ts";
+import type { Evidence } from "../evidence.ts";
+import type { ReportExtras } from "../extras.ts";
+import type { DataSource, FreeSummary, SajuSection } from "../types.ts";
 
 export type { LuckSlot };
 
@@ -89,7 +93,7 @@ export type ReadingInput = {
 
 export type IntegratedReadingReport = {
   kind: "integrated-reading";
-  source: "sample";
+  source: DataSource;
   personName: string;
   /** 핵심 해석 한 문장 (모바일 두 줄 이내) */
   headline: string;
@@ -102,4 +106,73 @@ export type IntegratedReadingReport = {
   timelineReference: { year: number; month: number };
   /** 다음 행동 체크리스트 */
   actions: { title: string; detail: string }[];
+  // ── 실제 생성된 리포트에만 있는 값 (예시에는 없다). 글은 AI가 쓰고, 아래 값은 코드가 채운다 ──
+  /** 만세력 계산 결과의 화면용 표 */
+  saju?: SajuSection;
+  /** 응답 요약 (점수 · MBTI 축) — 접어 둔 "내 분석 데이터"에 보인다 */
+  base?: FreeSummary;
+  /** 규칙 기반 구성 요소 (질문과 답 · 상황별 · 어울리는 관계 조건 · 보완 아이템) — 구매 범위에 포함된 항목 */
+  extras?: ReportExtras;
+  /** 알려 주신 고민까지 반영한 해석 (내 고민 자세히 알려주기를 적었을 때만) */
+  focus?: { text: string; evidence: string[] }[];
+  generated?: {
+    promptVersion: string;
+    ruleVersions: string[];
+    referenceDate: string;
+    /** 계산 기준 안내 줄 (만세력 엔진 · 자시 · 지역 보정 정책) */
+    lines: string[];
+    /** 근거 목록 — 접어 둔 분석 근거는 여기서 코드가 만든다 (AI가 쓰지 않는다) */
+    evidence: Evidence[];
+    /** 반영한 맥락 — 주제와 적은 항목 이름만 (내용은 담지 않는다) */
+    context?: { topic: ContextTopic; topicLabel: string; fields: string[]; updatedAt: string | null };
+  };
 };
+
+// ── AI가 돌려주는 부분(초안). 근거 · 사주 용어 풀이 · 안전 안내 · 시기 계산은 코드가 채운다 ──
+
+export type ReadingBlockId = "tendency" | "strength-burden" | "values" | "love" | "work-money";
+
+export type ReadingTraitDraft = ReadingTrait & { example: string };
+
+export type ReadingBlockDraft = {
+  id: ReadingBlockId;
+  /** 결론 한 줄 (8~30자) */
+  headline: string;
+  /** 요약 1~2문장 — 제목을 되풀이하지 않는다 */
+  summary: string;
+  /** 쉬운 예시 (강한 포인트 블록은 특징마다 따로 있고, 가까운 관계는 반응 단계 그림이 그 자리를 맡는다) */
+  example?: string;
+  /** 자세한 풀이 — 문단마다 2~3문장 */
+  details: string[];
+  watch: string;
+  traits?: ReadingTraitDraft[];
+  comfort?: { comfortable: string[]; clash: string[] };
+  reactionFlow?: { when: string; steps: { label: string; text: string }[]; helpful: string };
+  evidence: string[];
+};
+
+export type ReadingFlowDraft = {
+  headline: string;
+  summary: string;
+  /** 지금 지나는 큰 흐름 카드의 쉬운 설명 2~3문장 */
+  cardText: string;
+  years: { year: string; theme: string }[];
+  /** ref는 사용자 메시지의 periods 목록에서 고른다 (current · next · y2026 …) */
+  periods: { ref: string; theme: string; watch: string }[];
+  scenarios: { when: string; then: string }[];
+  evidence: string[];
+};
+
+export type ReadingDraftV1 = {
+  /** 이 사람의 핵심 해석 한 문장 */
+  headline: string;
+  /** 현재 흐름 카드의 기간 문장은 계산 결과로 코드가 붙인다 — AI는 주제 한 줄(keyword)만 쓴다 */
+  cards: { strength: { keyword: string; note: string }; caution: { keyword: string; note: string }; flow: { keyword: string } };
+  blocks: ReadingBlockDraft[];
+  flow: ReadingFlowDraft;
+  actions: { title: string; detail: string; evidence: string[] }[];
+  focus?: { text: string; evidence: string[] }[];
+};
+
+/** 저장된 리포트가 이 읽기 구조인가 (kind만 본다. 실제로 생성된 리포트에는 saju · base · extras · generated가 있고, 예시 화면의 데이터에는 없다) */
+export const isReadingReport = (c: unknown): c is IntegratedReadingReport => typeof c === "object" && c !== null && (c as { kind?: unknown }).kind === "integrated-reading";
