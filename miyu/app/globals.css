@@ -1,26 +1,35 @@
 @import "tailwindcss";
 
 /*
-  ME:U 디자인 토큰
-  - 바탕: 화이트 / 밝은 회색(mist)
-  - 글자: 차콜(ink) 3단계
-  - 포인트: 딥블루(accent) 한 가지
+  ME:U 디자인 토큰 (운영자 2026-10-13 팔레트)
+  - 바탕: 밝은 회색 페이지(page) 위에 흰 면(canvas) · 구분용 연한 회색(mist)
+  - 글자: 짙은 남색 계열 차콜(ink) 3단계
+  - 포인트: 인디고(accent) 한 가지 — 링크 · 버튼 · 현재 위치
+  - 의미 색: 강점 · 잘 쓰일 때(positive, 청록) / 주의할 점 · 조절이 필요할 때(caution, 황토). 빨간 경고처럼 쓰지 않고,
+    색만으로 뜻을 구분하지 않는다(제목 · 아이콘을 함께 쓴다). 모든 글에 색을 넣지 않고 핵심 구절 · 작은 이름표 · 구분에만 쓴다.
   화면 코드에서는 색상값을 직접 쓰지 않고 아래 이름(text-ink, bg-mist, bg-accent …)만 쓴다.
+  글자와 바탕의 조합은 대비 4.5 이상이어야 하며 server/design-tokens.test.ts가 확인한다.
 */
 @theme {
+  --color-page: #f7f8fa;
   --color-canvas: #ffffff;
-  --color-mist: #f5f6f8;
-  --color-line: #e2e5e9;
-  --color-line-strong: #c9ced5;
-  --color-track: #e4e7ec;
+  --color-mist: #f3f4f7;
+  --color-line: #e2e5ea;
+  --color-line-strong: #c9ced6;
+  --color-track: #e4e7ed;
 
-  --color-ink: #1d2125;
-  --color-ink-2: #464d55;
-  --color-ink-3: #5f666e;
+  --color-ink: #252936;
+  --color-ink-2: #4a5060;
+  --color-ink-3: #5f6675;
 
-  --color-accent: #1e4b8f;
-  --color-accent-strong: #163a70;
-  --color-accent-soft: #edf2f9;
+  --color-accent: #5364b8;
+  --color-accent-strong: #3f4e9e;
+  --color-accent-soft: #eef0fa;
+
+  --color-positive: #32776d;
+  --color-positive-soft: #e8f1ef;
+  --color-caution: #96652e;
+  --color-caution-soft: #faf5ec;
 
   /* 카카오 로그인 버튼 전용 (카카오 디자인 가이드) */
   --color-kakao: #fee500;

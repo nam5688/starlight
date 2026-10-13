@@ -78,3 +78,34 @@ test("근거 문장의 조사는 받침에 맞춘다 (수가 없음 · 인과 �
   assert.match(list.find((e) => e.id === "saju.element.목.none")!.fact, /목이 없음/);
   for (const e of [...items, ...list]) assert.doesNotMatch(e.fact, /(수|화|토|오|묘|사|미|유|해|자)이 없음|(인|진|신|술|축)와 /, e.id);
 });
+
+test("대운 타임라인: 기준 월이 속한 대운을 가운데로 이전 · 다음 대운이 이어지고, 현재 대운은 기간 안의 위치만 가진다 (근거 목록의 대운과 같은 기간)", async () => {
+  const { luckTimeline, GROUP_THEME_SHORT } = await import("./rules.ts");
+  const { calculateSaju } = await import("../manseryeok-engine.ts");
+  const r = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" });
+  assert.equal(r.status, "ok");
+  const saju = r as import("../engine.ts").SajuOk;
+  const ref = { year: 2026, month: 10 };
+  const slots = luckTimeline(saju, ref);
+  assert.deepEqual(slots.map((s) => s.role), ["previous", "current", "next"]);
+  const [prev, cur, next] = slots;
+  const monthsOf = (t: string) => Number(t.slice(0, 4)) * 12 + Number(t.slice(5, 7)) - 1;
+  assert.equal(monthsOf(prev.to) + 1, monthsOf(cur.from), "이전 대운 끝 다음 달이 현재 대운 시작");
+  assert.equal(monthsOf(cur.to) + 1, monthsOf(next.from), "현재 대운 끝 다음 달이 다음 대운 시작");
+  assert.ok(cur.progress !== undefined && cur.progress > 0 && cur.progress < 1, "현재 위치는 0과 1 사이");
+  assert.equal(prev.progress, undefined);
+  assert.equal(next.progress, undefined);
+  for (const s of slots) {
+    assert.ok(s.themes.length >= 1 && s.themes.length <= 2);
+    for (const t of s.themes) assert.ok(Object.values(GROUP_THEME_SHORT).includes(t));
+  }
+  // 근거 목록(sajuEvidence)의 현재 · 다음 대운과 같은 기간이다
+  const ev = sajuEvidence(saju, { reference: ref, gender: "female" });
+  const curEv = ev.find((e) => e.id === "saju.daeun.current")!;
+  const nextEv = ev.find((e) => e.id === "saju.daeun.next")!;
+  assert.deepEqual([curEv.period?.from, curEv.period?.to], [cur.from, cur.to]);
+  assert.deepEqual([nextEv.period?.from, nextEv.period?.to], [next.from, next.to]);
+  // 성별이 없으면 대운을 만들지 않는다
+  const noGender = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: null as never });
+  if (noGender.status === "ok") assert.deepEqual(luckTimeline(noGender as import("../engine.ts").SajuOk, ref), []);
+});

@@ -11,7 +11,7 @@ import type { SajuOk } from "../saju/engine.ts";
 import { calculateSaju } from "../saju/manseryeok-engine.ts";
 
 // 가상의 인물(서윤)의 생년월일을 실제 만세력 엔진으로 계산한 원국 — 리포트가 어떻게 풀리는지 보여 주는 예시용이다.
-const SAMPLE_CHART = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" }) as SajuOk;
+export const SAMPLE_CHART = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" }) as SajuOk;
 const COMPUTED = sajuSection(SAMPLE_CHART);
 if (COMPUTED.status === "not-connected") throw new Error("예시 원국을 계산하지 못했습니다.");
 const SAMPLE_SAJU = { ...COMPUTED, status: "sample" as const };

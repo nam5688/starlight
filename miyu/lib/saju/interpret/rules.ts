@@ -98,6 +98,68 @@ function ym(d: { year: number; month: number }) {
   return `${d.year}-${String(d.month).padStart(2, "0")}`;
 }
 
+/** 대운 한 칸 — 화면의 "지금 지나는 큰 흐름" 타임라인용 (계산 결과와 위 GROUP_RULE의 주제 이름만 쓰고 새 해석을 만들지 않는다) */
+export type LuckSlot = {
+  role: "previous" | "current" | "next";
+  /** 예: 신미(辛未) */
+  label: string;
+  /** 양력 연-월 (엔진이 계산한 대략적 시점) */
+  from: string;
+  to: string;
+  /** 기준 월이 이 기간에서 지난 비율 0~1 — 현재 대운일 때만. 운세의 좋고 나쁨이 아니라 기간 안의 위치다 */
+  progress?: number;
+  stemGroup: Group;
+  branchGroup: Group;
+  /** 천간 · 지지가 읽히는 주제의 짧은 이름 (중복 없음) */
+  themes: string[];
+};
+
+/** 십신 그룹의 짧은 주제 이름 — GROUP_RULE.timing 문장의 앞부분과 같은 뜻 */
+export const GROUP_THEME_SHORT: Record<Group, string> = {
+  비겁: "자기 주도 · 독립 · 경쟁과 협업",
+  식상: "표현 · 생산 · 새로운 시도",
+  재성: "성과 · 수입 · 관리",
+  관성: "책임 · 조직 · 평판",
+  인성: "배움 · 준비 · 도움 받기",
+};
+
+const monthIndex = (ymText: string) => {
+  const [y, m] = ymText.split("-").map(Number);
+  return y * 12 + (m - 1);
+};
+
+/** 기준 월이 속한 대운과 그 앞 · 뒤 대운. 성별이 없어 대운을 계산하지 않았으면 빈 배열 */
+export function luckTimeline(saju: SajuOk, reference: { year: number; month: number }): LuckSlot[] {
+  if (!saju.luck) return [];
+  const dm = saju.dayMaster.stem as Stem;
+  const periods = saju.luck.periods;
+  const ref = ym(reference);
+  const idx = periods.findIndex((p) => p.from <= ref && ref <= p.to);
+  const slot = (i: number, role: LuckSlot["role"]): LuckSlot | null => {
+    const p = periods[i];
+    if (!p) return null;
+    const stemGroup = GROUP_OF[getTenGod(dm, p.stem as Stem)];
+    const branchGroup = GROUP_OF[getBranchTenGod(dm, p.branch as Branch)];
+    const out: LuckSlot = {
+      role,
+      label: `${p.stem}${p.branch}(${p.stemHanja}${p.branchHanja})`,
+      from: p.from,
+      to: p.to,
+      stemGroup,
+      branchGroup,
+      themes: [...new Set([GROUP_THEME_SHORT[stemGroup], GROUP_THEME_SHORT[branchGroup]])],
+    };
+    if (role === "current") {
+      const total = monthIndex(p.to) - monthIndex(p.from) + 1;
+      out.progress = Math.min(1, Math.max(0, (monthIndex(ref) - monthIndex(p.from)) / total));
+    }
+    return out;
+  };
+  if (idx >= 0) return [slot(idx - 1, "previous"), slot(idx, "current"), slot(idx + 1, "next")].filter((x): x is LuckSlot => x !== null);
+  if (periods.length && ref < periods[0].from) return [slot(0, "next")].filter((x): x is LuckSlot => x !== null);
+  return [slot(periods.length - 1, "previous")].filter((x): x is LuckSlot => x !== null);
+}
+
 /** 원국 · 대운 · 세운 → 근거 목록. reference는 시기 해석의 기준 날짜(한국 날짜) */
 /** 배우자 자리(일지)의 십신과 그룹 — 어울리는 관계 조건 규칙이 쓴다 */
 export function spousePalace(saju: SajuOk): { branch: string; tenGod: string; group: Group } {

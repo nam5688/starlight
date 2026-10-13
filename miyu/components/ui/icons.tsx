@@ -32,3 +32,46 @@ export function LockIcon({ className = "size-4" }: { className?: string }) {
     </svg>
   );
 }
+
+/** 강점 · 잘 쓰일 때 — 위로 향하는 화살표 (색과 함께 쓰되 색만으로 뜻을 구분하지 않는다) */
+export function StrengthIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <path d="M4 11.5l7-7M5.5 4.5h5.5V10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 조절이 필요한 때 · 주의할 점 — 슬라이더 (경고 표시가 아니라 "맞춰 본다"는 뜻) */
+export function AdjustIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <path d="M2.5 5h11M2.5 11h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="10" cy="5" r="1.9" fill="var(--color-canvas)" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="6" cy="11" r="1.9" fill="var(--color-canvas)" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/** 흐름 — 이어진 세 지점 */
+export function FlowIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <path d="M2.5 8h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="3" cy="8" r="1.6" fill="var(--color-canvas)" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="8" cy="8" r="2.2" fill="currentColor" />
+      <circle cx="13" cy="8" r="1.6" fill="var(--color-canvas)" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/** 읽을 때 알아 둘 조건 */
+export function InfoIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M8 7.2v3.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="8" cy="5.1" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
