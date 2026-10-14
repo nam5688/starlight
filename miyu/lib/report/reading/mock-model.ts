@@ -26,10 +26,19 @@ export function composeMockReading(userMessage: string): ReadingDraftV1 {
       id: plan.id,
       headline: `${t}의 모의 결론입니다`,
       summary: `${M} ${t}의 요약 자리입니다. ${t} 요약은 실제 AI가 근거를 읽고 두 문장으로 씁니다.`,
-      details: plan.traits ? [] : [`${M} ${t}의 자세한 풀이 자리입니다. ${t} 풀이는 실제 AI가 연결되면 근거에 맞춰 들어옵니다.`],
-      watch: `${M} ${t}에서 살펴볼 점을 쓰는 자리입니다. ${t}의 이 자리는 실제 AI가 연결되면 채워집니다.`,
+      details: plan.traits || plan.sections ? [] : [`${M} ${t}의 자세한 풀이 자리입니다. ${t} 풀이는 실제 AI가 연결되면 근거에 맞춰 들어옵니다.`],
+      ...(plan.sections ? {} : { watch: `${M} ${t}에서 살펴볼 점을 쓰는 자리입니다. ${t}의 이 자리는 실제 AI가 연결되면 채워집니다.` }),
       evidence: ids(i),
     };
+    if (plan.sections) {
+      // 문장은 소단락마다 달라야 형식 검사의 "같은 문장 반복"에 걸리지 않는다 (자리 표시일 뿐이며 "[모의 생성]"이 붙는다)
+      const ORD = ["첫 번째", "두 번째", "세 번째", "네 번째"];
+      b.sections = plan.sections.map((_, n) => ({
+        title: `${t}의 모의 소단락 제목 ${ORD[n] ?? `${n + 1}번째`}`,
+        body: `${M} ${t}의 ${ORD[n] ?? `${n + 1}번째`} 소단락 풀이를 쓰는 자리입니다. ${t}의 ${ORD[n] ?? `${n + 1}번째`} 자리는 실제 AI가 근거를 읽고 조건과 함께 씁니다.`,
+        tryIt: `${M} ${t}의 ${ORD[n] ?? `${n + 1}번째`} 해 볼 것을 쓰는 자리입니다. ${t}의 ${ORD[n] ?? `${n + 1}번째`} 행동은 실제 AI가 적거나 묻는 일로 씁니다.`,
+      }));
+    }
     if (plan.example) b.example = `${M} ${t}의 예시 자리입니다. ${t} 예시는 실제 AI가 가상의 장면 하나로 씁니다.`;
     if (plan.traits) {
       b.traits = ["하나", "둘", "셋"].map((n) => ({

@@ -4,6 +4,7 @@ import type { IntegratedReadingReport, ReadingBlock, ReadingGroupId } from "@/li
 import type { SajuSection, ScoreRow } from "@/lib/report/types";
 import { SajuChart } from "./detail-sections";
 import { MonthCalendarView } from "./month-calendar";
+import { SECTION_CALENDAR_NOTE } from "@/lib/report/reading/plan";
 import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
 import { ActionList } from "./integrated-view";
 import { ReadingNav } from "./reading-nav";
@@ -18,6 +19,7 @@ import {
   Paragraphs,
   Prose,
   ReactionStepper,
+  SectionList,
   SummaryCards,
   TraitCards,
   TraitSentences,
@@ -173,7 +175,7 @@ export function ReadingReportView({
               </h2>
               <div className="mt-6 space-y-10 [&>article+article]:border-t [&>article+article]:border-line [&>article+article]:pt-10">
                 {blocks.map((b) => (
-                  <BlockView key={b.id} block={b} id={id(b.id)} number={numberOf.get(b.id)!} />
+                  <BlockView key={b.id} block={b} id={id(b.id)} number={numberOf.get(b.id)!} hasCalendar={Boolean(report.calendars?.items.length)} />
                 ))}
               </div>
             </section>
@@ -369,7 +371,7 @@ export function ReadingReportView({
 }
 
 /** 주제 하나 — 이름표 → 결론(제목) → 요약 2문장 → (그림) → 예시 1개 → 조건 한 줄 → 접힘 두 개 */
-function BlockView({ block: b, id, number }: { block: ReadingBlock; id: string; number: number }) {
+function BlockView({ block: b, id, number, hasCalendar }: { block: ReadingBlock; id: string; number: number; hasCalendar: boolean }) {
   const hasFoldA = b.details.length > 0 || b.traits || b.reactionFlow || b.detailExample || b.watch;
   return (
     <article id={id} aria-labelledby={`${id}-h`} className={SCROLL_MARGIN}>
@@ -387,6 +389,7 @@ function BlockView({ block: b, id, number }: { block: ReadingBlock; id: string; 
       {b.comfort && <ComfortPair comfort={b.comfort} />}
       {b.example && !b.traits && <ExampleBox text={b.example} />}
       {b.caveat && <CaveatNote text={b.caveat} />}
+      {b.sections && b.sections.length > 0 && <SectionList sections={b.sections} note={hasCalendar ? SECTION_CALENDAR_NOTE[b.id as keyof typeof SECTION_CALENDAR_NOTE] : undefined} />}
 
       <FoldRow>
         {hasFoldA && (

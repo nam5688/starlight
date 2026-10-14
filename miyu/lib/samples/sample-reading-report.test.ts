@@ -31,6 +31,7 @@ const bodyTexts = () => [
     ...b.details,
     b.detailExample ?? "",
     b.watch ?? "",
+    ...(b.sections ?? []).flatMap((x) => [x.title, x.body, x.tryIt]),
     b.caveat ?? "",
     ...(b.traits ?? []).flatMap((t) => [t.name, t.shinesShort, t.burdenShort, t.shines, t.burden, t.example]),
     ...(b.comfort ? [...b.comfort.comfortable, ...b.comfort.clash, b.comfort.note] : []),

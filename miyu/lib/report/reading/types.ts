@@ -32,6 +32,9 @@ export type ReadingSummaryCard = { kind: "strength" | "caution" | "flow"; label:
 /** "장점 / 단점이 될 수 있는 부분" 카드 — short는 카드에 보이는 짧은 말, shines · burden · example은 접어 둔 일상 예시 */
 export type ReadingTrait = { name: string; shinesShort: string; burdenShort: string; shines: string; burden: string; /** 이 특징의 가상의 장면 한두 문장 */ example: string };
 
+/** 깊게 읽는 소단락 — 눈길을 끄는 한 줄 제목 → 풀이 → 해 볼 것. 연애(가까운 관계) · 일과 돈 주제에만 있다 */
+export type ReadingSection = { title: string; body: string; tryIt: string };
+
 export type ReadingGroupId = "me" | "relation" | "work";
 
 export type ReadingBlock = {
@@ -55,6 +58,8 @@ export type ReadingBlock = {
   comfort?: { comfortable: string[]; clash: string[]; note: string };
   /** 상대의 반응이 이어지는 모습 — 단계 그림 */
   reactionFlow?: { when: string; steps: { label: string; text: string }[]; helpful: string };
+  /** 깊게 읽는 소단락(제목 → 풀이 → 해 볼 것) — 가까운 관계 · 일과 돈 주제만 */
+  sections?: ReadingSection[];
   /** 읽는 데 중요한 조건(자료 없음 · 해석의 범위) — 본문 가까이에 짧게 */
   caveat?: string;
   basis: ReadingBasis;
@@ -147,7 +152,10 @@ export type ReadingBlockDraft = {
   example?: string;
   /** 자세한 풀이 — 문단마다 2~3문장 */
   details: string[];
-  watch: string;
+  /** 살펴볼 점 — 소단락(sections)이 있는 주제는 소단락마다 해 볼 것이 있어 쓰지 않는다 */
+  watch?: string;
+  /** 깊게 읽는 소단락 — plan에서 sections가 있는 주제만 쓴다 */
+  sections?: ReadingSection[];
   traits?: ReadingTraitDraft[];
   comfort?: { comfortable: string[]; clash: string[] };
   reactionFlow?: { when: string; steps: { label: string; text: string }[]; helpful: string };

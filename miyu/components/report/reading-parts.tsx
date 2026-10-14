@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { AdjustIcon, ChevronIcon, FlowIcon, InfoIcon, StrengthIcon } from "@/components/ui/icons";
 import { lineGroups } from "@/lib/report/reading/line-breaks";
-import type { LuckSlot, ReadingBasis, ReadingBlock, ReadingSummaryCard, ReadingTrait } from "@/lib/report/reading/types";
+import type { LuckSlot, ReadingBasis, ReadingBlock, ReadingSection, ReadingSummaryCard, ReadingTrait } from "@/lib/report/reading/types";
 
 // 읽기 구조 리포트의 부품. 크기: 카드 제목 17px · 본문 16px(줄 간격 1.7) · 보조 설명 13~14px.
 // 색: 장점 = positive, 단점이 될 수 있는 부분 = caution, 현재 위치 · 링크 = accent. 색은 작은 이름표 · 핵심 구절 · 구분선에만 쓰고,
@@ -341,6 +341,38 @@ export function WatchNote({ text }: { text: string }) {
         <p className="text-[13px] font-semibold text-accent">살펴볼 점</p>
         <Prose text={text} className="mt-1.5 text-[15px] leading-[1.75]" />
       </div>
+    </div>
+  );
+}
+
+/**
+ * 깊게 읽는 소단락 — 눈길을 끄는 한 줄 제목만 보이고, 눌러서 풀이와 "해 볼 것"을 읽는다(가까운 관계 · 일과 돈).
+ * 접힘이라 길어도 훑어보기 쉽고, "해 볼 것"은 박스가 아니라 왼쪽 선으로 구분한다(카드 안에 카드를 넣지 않는다).
+ * note는 월별 달력이 있는 리포트에서만 보이는 안내 한 줄(코드가 붙이는 고정 문구)이다.
+ */
+export function SectionList({ sections, note, className = "mt-5" }: { sections: ReadingSection[]; note?: string; className?: string }) {
+  return (
+    <div className={className}>
+      <ul className="divide-y divide-line rounded-xl border border-line bg-canvas">
+        {sections.map((s) => (
+          <li key={s.title}>
+            <details data-fold className="group">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                <span className="text-[16px] leading-snug font-semibold text-pretty">{s.title}</span>
+                <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-line px-4 py-4">
+                <Prose text={s.body} className="text-[16px] leading-[1.75]" />
+                <div className="mt-4 border-l-[3px] border-accent pl-3.5">
+                  <p className="text-[13px] font-semibold text-accent-strong">해 볼 것</p>
+                  <Prose text={s.tryIt} className="mt-1 text-[15px] leading-[1.7] text-ink-2" />
+                </div>
+              </div>
+            </details>
+          </li>
+        ))}
+      </ul>
+      {note && <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">{note}</p>}
     </div>
   );
 }

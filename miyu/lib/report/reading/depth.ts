@@ -14,18 +14,19 @@ type Unit = { where: string; text: string };
 /** 내용 검사가 읽는 값 — AI 초안(ReadingDraftV1)과 저장된 리포트(IntegratedReadingReport)가 모두 이 모양을 만족한다 */
 export type ReadingDepthSource = {
   headline: string;
-  blocks: { id: string; summary: string; example?: string; details: string[]; watch?: string; traits?: { shines: string; burden: string; example: string }[]; reactionFlow?: { helpful: string } }[];
+  blocks: { id: string; summary: string; example?: string; details: string[]; watch?: string; sections?: { title: string; body: string; tryIt: string }[]; traits?: { shines: string; burden: string; example: string }[]; reactionFlow?: { helpful: string } }[];
   flow: { summary: string; cardText: string; scenarios: { when: string; then: string }[] };
   actions: { title: string; detail: string }[];
   focus?: { text: string }[];
 };
 
-/** 조건 · 상황 · 범용 · 겹침을 셀 "의미 단위" — 주제마다 요약 + 예시 + 풀이 + 살펴볼 점을 한 단위로, 특징 · 시나리오 · 행동은 각각 한 단위로 본다 */
+/** 조건 · 상황 · 범용 · 겹침을 셀 "의미 단위" — 주제마다 요약 + 예시 + 풀이 + 살펴볼 점을 한 단위로, 특징 · 소단락 · 시나리오 · 행동은 각각 한 단위로 본다 */
 export function readingUnits(d: ReadingDepthSource): Unit[] {
   const out: Unit[] = [];
   for (const b of d.blocks ?? []) {
     out.push({ where: `blocks.${b.id}`, text: [b.summary, b.example, ...(b.details ?? []), b.watch, b.reactionFlow?.helpful].filter(Boolean).join(" ") });
     (b.traits ?? []).forEach((t, i) => out.push({ where: `blocks.${b.id}.traits[${i}]`, text: `${t.shines} ${t.burden} ${t.example}` }));
+    (b.sections ?? []).forEach((s, i) => out.push({ where: `blocks.${b.id}.sections[${i}]`, text: `${s.title} ${s.body} ${s.tryIt}` }));
   }
   out.push({ where: "flow", text: `${d.flow?.summary ?? ""} ${d.flow?.cardText ?? ""}` });
   (d.flow?.scenarios ?? []).forEach((s, i) => out.push({ where: `flow.scenarios[${i}]`, text: `${s.when} ${s.then}` }));

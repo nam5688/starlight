@@ -15,6 +15,8 @@ export type BlockPlan = {
   relation?: true;
   /** 이 주제는 기본 화면에 "예를 들면" 예시 1개를 둔다 */
   example: boolean;
+  /** 깊게 읽는 소단락 — 소단락마다 답해야 하는 질문. 개수가 곧 필수 개수다(서로 다른 질문 · 다른 근거 · 다른 장면) */
+  sections?: { ask: string }[];
 };
 
 export const BLOCK_PLAN: BlockPlan[] = [
@@ -47,6 +49,11 @@ export const BLOCK_PLAN: BlockPlan[] = [
     ask: "가까운 사람 앞에서의 반응과, 관계가 불확실해 보일 때 반응이 이어지는 모습. 상대 자료는 없으므로 상대 없이 본다 (상대의 마음 · 나이 · 직업 · 만날 날짜는 쓰지 않는다)",
     relation: true,
     example: false,
+    sections: [
+      { ask: "끌리는 사람과 오래 편한 사람이 어떻게 다를 수 있는가 — 배우자 자리 · 응답에서 읽히는 편한 관계의 모습을, 조건과 장면 하나로. 상대의 나이 · 직업 · 마음은 쓰지 않는다" },
+      { ask: "알아가는 동안의 나의 속도 — 어떤 상황에서 마음이 앞서고 어떤 상황에서 멈추는가. 반응 단계 그림(상대의 답이 늦을 때)과 다른 장면으로, 해 볼 것은 속도를 맞추는 방법" },
+      { ask: "서운하거나 부딪혔을 때 풀어 가는 방식 — 바로 말할 때와 혼자 정리할 때 전개가 어떻게 달라질 수 있는가(조건 → 가능성). 상대가 왜 그랬는지는 알 수 없다는 선을 지킨다" },
+    ],
   },
   {
     id: "work-money",
@@ -54,6 +61,11 @@ export const BLOCK_PLAN: BlockPlan[] = [
     topic: "일과 돈",
     ask: "일하는 방식과 힘이 나는 조건, 돈을 대하는 모습 (돈에 관한 응답은 없다 — 이 사실을 알리는 안내는 코드가 붙이니 본문에서 되풀이하지 않는다)",
     example: true,
+    sections: [
+      { ask: "만들어 낸 결과물이 성과 · 수입으로 이어지는 방식 — 근거가 있을 때만, 어떤 조건에서 이어지고 어떤 조건에서 멈추는가. 수입이 늘거나 준다는 예언은 쓰지 않는다" },
+      { ask: "지금 지나는 시기가 일과 돈에서 무엇을 주제로 읽히는가와, 그 시기에 챙길 관리 습관 하나. 시기는 사건 예언이 아니며 계산된 시기 근거 안에서만, 투자 · 대출 판단은 쓰지 않는다" },
+      { ask: "일을 고를 때 확인해 볼 기준 질문 — 업종 이름을 추천하지 않고 힘이 나는 환경 · 반응을 받을 자리 · 속도를 기준으로 삼는 방법" },
+    ],
   },
 ];
 
@@ -70,6 +82,11 @@ export const BLOCK_CAVEAT: Partial<Record<ReadingBlockId, (name: string) => stri
   "work-money": () => "돈 부분은 응답 자료 없이 사주 시기 해석만으로 읽었어요. 투자나 대출 같은 결정의 근거로 쓰는 내용이 아니에요.",
 };
 export const comfortNote = (name: string) => `${name} 님이 편안해할 관계의 조건이에요. 상대의 나이나 직업 같은 건 사주로 알 수 없어서 다루지 않아요.`;
+/** 월별 달력이 있는 리포트에서 소단락 아래에 붙이는 안내 — 달 이름은 계산된 달력이 말하고 본문은 쓰지 않는다 */
+export const SECTION_CALENDAR_NOTE: Partial<Record<ReadingBlockId, string>> = {
+  love: "인연이 눈에 띄기 쉬운 달은 ‘앞으로의 시기’의 월별 달력에서 볼 수 있어요.",
+  "work-money": "재물 주제가 눈에 띄기 쉬운 달은 ‘앞으로의 시기’의 월별 달력에서 볼 수 있어요.",
+};
 export const FLOW_CAVEAT = "전통 해석으로 본 시기와, 응답에서 읽은 가능성이에요. 어떤 일이 일어난다는 예측이 아니고, 실제 일이나 결과를 보장하지 않아요.";
 export const SCENARIO_NOTE = "응답에서 읽은 가능성이고, 그렇게 된다는 예측이 아니에요.";
 export const STATISTICS_NOTE = "이번 리포트에는 연구 통계를 쓰지 않았어요. 출처와 조사 대상 · 조건이 확인된 통계가 없고, 집단의 통계를 한 사람의 앞날 확률로 바꿀 수도 없어요.";
@@ -88,6 +105,8 @@ export const READING_LIMITS = {
   example: { min: 30, max: 260, sentencesMax: 3 },
   details: { min: 1, max: 3, textMin: 40, textMax: 520, sentencesMax: 3 },
   watch: { min: 20, max: 300 },
+  /** 깊게 읽는 소단락: 한 줄 제목 · 풀이(조건이 있는 2~3문장) · 해 볼 것(실제로 하는 행동 1~2문장) */
+  sections: { title: { min: 8, max: 30 }, body: { min: 60, max: 300, sentencesMax: 3 }, tryIt: { min: 20, max: 160, sentencesMax: 2 } },
   trait: { count: 3, nameMax: 12, shortMax: 16, longMin: 20, longMax: 130, exampleMin: 20, exampleMax: 150, exampleSentencesMax: 2 },
   comfort: { count: 3, itemMin: 8, itemMax: 40 },
   reactionFlow: { whenMax: 30, steps: 4, stepTextMax: 30, helpfulMin: 30, helpfulMax: 220 },

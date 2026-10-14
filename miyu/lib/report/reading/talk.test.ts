@@ -267,3 +267,28 @@ test("달력 답장: 버튼 이름이 있고 같은 입력이면 같은 말풍�
   const flow = buildTalkModel(R).topics.find((t) => t.id === "flow")!;
   assert.deepEqual(extraBubbles(flow, "calendar-love"), extraBubbles(flow, "calendar-love"));
 });
+
+test("소단락 답장: [더 자세히 알려줘]는 소단락(제목 이름표 → 풀이 → 해 볼 것)부터 말풍선으로 보내고, 모두 저장된 리포트의 글이다", () => {
+  const m = buildTalkModel(R);
+  for (const id of ["love", "work-money"]) {
+    const t = m.topics.find((x) => x.id === id)!;
+    const block = R.blocks.find((b) => b.id === id)!;
+    assert.equal(block.sections?.length, 3);
+    const bubbles = extraBubbles(t, "detail");
+    const labeled = bubbles.filter((b): b is Extract<TalkBubble, { kind: "text" }> => b.kind === "text" && Boolean(b.label));
+    // 소단락마다 제목 이름표 한 번(풀이의 첫 말풍선) · "해 볼 것" 이름표 한 번
+    for (const s of block.sections!) {
+      assert.ok(labeled.some((b) => b.label === s.title), `${id}: 제목 이름표 ${s.title}`);
+      assert.ok(bubbles.some((b) => b.kind === "text" && b.text.includes(s.tryIt.split(". ")[0].replace(/\.$/, "")) ), `${id}: 해 볼 것 ${s.tryIt}`);
+    }
+    assert.equal(labeled.filter((b) => b.label === "해 볼 것").length, 3);
+    // 순서: 첫 소단락 제목이 가장 먼저 나온다
+    assert.equal(labeled[0].label, block.sections![0].title);
+    // 말풍선의 글은 모두 저장된 리포트에 있다 (새 글을 쓰지 않는다)
+    const stored = [...allStrings(R)].join("\n");
+    for (const b of bubbles) if (b.kind === "text") assert.ok(R.blocks.some((x) => [...allStrings(x)].some((str) => str.includes(b.text))) || stored.includes(b.text), `저장된 글에 없는 말풍선: ${b.text}`);
+  }
+  // 소단락이 없는 주제의 [더 자세히]에는 소단락이 없다
+  const tendency = m.topics.find((x) => x.id === "tendency")!;
+  assert.ok(!extraBubbles(tendency, "detail").some((b) => b.kind === "text" && b.label === "해 볼 것"));
+});

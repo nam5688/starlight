@@ -56,6 +56,11 @@ export function visibleTexts(d: ReadingDraftV1): { where: string; text: string }
     push(`${w}.example`, b?.example);
     (b?.details ?? []).forEach((t, i) => push(`${w}.details[${i}]`, t));
     push(`${w}.watch`, b?.watch);
+    (b?.sections ?? []).forEach((s, i) => {
+      push(`${w}.sections[${i}].title`, s?.title);
+      push(`${w}.sections[${i}].body`, s?.body);
+      push(`${w}.sections[${i}].tryIt`, s?.tryIt);
+    });
     (b?.traits ?? []).forEach((t, i) => {
       for (const f of ["name", "shinesShort", "burdenShort", "shines", "burden", "example"] as const) push(`${w}.traits[${i}].${f}`, t?.[f]);
     });
@@ -158,9 +163,25 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
       paragraphLike(b.example, `${w}.example`, L.example.min, L.example.max, L.example.sentencesMax);
       if (isString(b.example) && isString(b.summary) && b.summary.includes(b.example.trim())) errors.push(`${w}: 예시가 요약과 같습니다.`);
     } else if (b.example) errors.push(`${w}.example: 이 주제는 예시를 따로 두지 않습니다 (${plan.traits ? "특징마다 예시가 있습니다" : "반응 단계 그림이 그 자리를 맡습니다"}).`);
-    const details = list<string>(b.details, `${w}.details`, plan.traits ? 0 : L.details.min, plan.traits ? 2 : L.details.max);
+    // 소단락이 있는 주제는 풀이를 소단락이 맡는다 — 자세한 풀이는 0~1문단, 살펴볼 점은 소단락마다 있는 해 볼 것으로 대신한다
+    const deep = plan.sections;
+    const details = list<string>(b.details, `${w}.details`, plan.traits || deep ? 0 : L.details.min, plan.traits ? 2 : deep ? 1 : L.details.max);
     details.forEach((t, i) => paragraphLike(t, `${w}.details[${i}]`, L.details.textMin, L.details.textMax, L.details.sentencesMax));
-    text(b.watch, `${w}.watch`, L.watch.min, L.watch.max);
+    if (deep) {
+      if (b.watch !== undefined) text(b.watch, `${w}.watch`, L.watch.min, L.watch.max);
+      const secs = list<NonNullable<typeof b.sections>[number]>(b.sections, `${w}.sections`, deep.length, deep.length);
+      secs.forEach((s, i) => {
+        const sw = `${w}.sections[${i}]`;
+        text(s?.title, `${sw}.title`, L.sections.title.min, L.sections.title.max);
+        paragraphLike(s?.body, `${sw}.body`, L.sections.body.min, L.sections.body.max, L.sections.body.sentencesMax);
+        paragraphLike(s?.tryIt, `${sw}.tryIt`, L.sections.tryIt.min, L.sections.tryIt.max, L.sections.tryIt.sentencesMax);
+      });
+      if (new Set(secs.map((s) => s?.title)).size !== secs.length) errors.push(`${w}.sections: 소단락 제목이 겹칩니다.`);
+      if (isString(b.headline) && secs.some((s) => isString(s?.title) && s.title.trim() === b.headline.trim())) errors.push(`${w}.sections: 소단락 제목이 주제 제목과 같습니다.`);
+    } else {
+      text(b.watch, `${w}.watch`, L.watch.min, L.watch.max);
+      if (b.sections) errors.push(`${w}.sections: 이 주제는 소단락을 쓰지 않습니다.`);
+    }
 
     if (plan.traits) {
       const traits = list<NonNullable<typeof b.traits>[number]>(b.traits, `${w}.traits`, L.trait.count, L.trait.count);

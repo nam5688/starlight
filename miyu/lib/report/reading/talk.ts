@@ -114,6 +114,8 @@ function blockTopic(b: ReadingBlock, number: number): TalkTopic {
     for (const t of b.traits) detail.push(para(t.shines, `${t.name} · 장점`), para(t.burden, `${t.name} · 단점이 될 수 있는 부분`));
   } else if (b.example) example.push(para(b.example));
   if (b.reactionFlow) example.push({ kind: "flow", when: b.reactionFlow.when, steps: b.reactionFlow.steps, helpful: b.reactionFlow.helpful });
+  // 깊게 읽는 소단락(가까운 관계 · 일과 돈)은 [더 자세히 알려줘]의 앞에 — 제목이 이름표, 풀이와 해 볼 것이 말풍선으로 도착한다
+  for (const s of b.sections ?? []) detail.push(para(s.body, s.title), para(s.tryIt, "해 볼 것"));
   for (const d of b.details) detail.push(para(d));
   if (b.comfort) detail.push({ kind: "comfort", comfortable: b.comfort.comfortable, clash: b.comfort.clash, note: b.comfort.note });
   if (b.reactionFlow) detail.push(para(b.reactionFlow.helpful, "이럴 때 도움이 되는 것"));

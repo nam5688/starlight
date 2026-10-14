@@ -14,9 +14,9 @@ import { isReadingReport, type ReportInput } from "../generator.ts";
 import { assembleReading, basisFor } from "./assemble.ts";
 import { checkReadingDepth } from "./depth.ts";
 import { findRepeatedPhrases, repeatMessages } from "./repeat.ts";
-import { BLOCK_PLAN } from "./plan.ts";
-import { buildReadingUserMessage, READING_SYSTEM_PROMPT } from "./prompt.ts";
-import type { ReadingDraftV1 } from "./types.ts";
+import { BLOCK_PLAN, SECTION_CALENDAR_NOTE } from "./plan.ts";
+import { buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "./prompt.ts";
+import type { IntegratedReadingReport, ReadingDraftV1 } from "./types.ts";
 import { validateReadingDraft } from "./validate.ts";
 
 const NOW = () => new Date("2026-10-12T03:00:00Z");
@@ -352,4 +352,92 @@ test("반복 표현 고쳐 쓰기(repairRepeats): 켜면 한 번 고쳐 쓰게 �
   const stuck = fakeModel(() => JSON.stringify(repeated));
   assert.ok(isReadingReport(await createAiReportGenerator({ model: stuck, now: NOW, sleep: noSleep, repairRepeats: true }).generate(input())));
   assert.equal(stuck.calls, 2);
+});
+
+// ───────── 깊게 읽는 소단락 (가까운 관계 · 일과 돈) ─────────
+
+test("소단락: 가까운 관계 · 일과 돈은 plan의 개수만큼 소단락이 있고, 서윤 예시도 같은 구성이다", () => {
+  const deepIds = BLOCK_PLAN.filter((p) => p.sections).map((p) => p.id);
+  assert.deepEqual(deepIds, ["love", "work-money"]);
+  for (const p of BLOCK_PLAN) {
+    const b = sampleReadingReport.blocks.find((x) => x.id === p.id)!;
+    assert.equal(b.sections?.length ?? 0, p.sections?.length ?? 0, p.id);
+    if (p.sections) assert.ok(b.details.length <= 1 && !b.watch, `${p.id}: 풀이는 소단락이 맡고 살펴볼 점은 소단락마다의 해 볼 것으로 대신한다`);
+  }
+  assert.equal(validateReadingDraft(draft(), evidence).ok, true);
+});
+
+test("소단락 검사: 개수 · 글자 수 · 문장 수 · 겹치는 제목 · 용어 · 소단락 없는 주제의 소단락을 막는다", () => {
+  const errorsOf = (mut: (d: ReadingDraftV1) => void) => {
+    const d = draft();
+    mut(d);
+    const r = validateReadingDraft(d, evidence);
+    return r.ok ? [] : r.errors;
+  };
+  const love = (d: ReadingDraftV1) => d.blocks.find((b) => b.id === "love")!;
+  assert.match(errorsOf((d) => (love(d).sections = love(d).sections!.slice(0, 2))).join("\n"), /love.*sections.*2개 \(3~3개\)/);
+  assert.match(errorsOf((d) => delete love(d).sections).join("\n"), /love.*sections/);
+  assert.match(errorsOf((d) => (love(d).sections![0].title = "짧아요")).join("\n"), /sections\[0\]\.title: 길이/);
+  assert.match(errorsOf((d) => (love(d).sections![1].body = "너무 짧은 풀이예요.")).join("\n"), /sections\[1\]\.body: 길이/);
+  assert.match(errorsOf((d) => (love(d).sections![1].body = "첫 문장이에요. 둘째 문장이에요. 셋째 문장이에요. 넷째 문장이에요. 다섯째 문장이에요. 여섯째 문장이에요.")).join("\n"), /sections\[1\]\.body.*문장/);
+  assert.match(errorsOf((d) => (love(d).sections![2].tryIt = "적어 보세요")).join("\n"), /sections\[2\]\.tryIt: 길이/);
+  assert.match(errorsOf((d) => (love(d).sections![1].title = love(d).sections![0].title)).join("\n"), /소단락 제목이 겹칩니다/);
+  assert.match(errorsOf((d) => (love(d).sections![0].title = love(d).headline)).join("\n"), /소단락 제목이 주제 제목과 같습니다/);
+  assert.match(errorsOf((d) => (love(d).sections![0].body = `${love(d).sections![0].body} 일간이 정화라서 그렇게 보여요.`)).join("\n"), /sections\[0\]\.body: 사주 전문 용어/);
+  assert.match(errorsOf((d) => (love(d).sections![0].tryIt = "마음이 움직인 순간을 80점 만점으로 적어 보세요.")).join("\n"), /sections\[0\]\.tryIt: 점수/);
+  // 소단락이 없는 주제에 소단락을 쓰면 막는다
+  assert.match(errorsOf((d) => (d.blocks.find((b) => b.id === "tendency")!.sections = love(d).sections)).join("\n"), /tendency.*소단락을 쓰지 않습니다/);
+  // 소단락 주제에서 살펴볼 점은 쓰지 않아도 되지만, 쓴다면 길이를 지킨다
+  assert.match(errorsOf((d) => (love(d).watch = "짧음")).join("\n"), /love.*watch: 길이/);
+});
+
+test("소단락 반복 · 내용 검사: 소단락 글도 같은 문장 반복 · 12글자 반복 · 조건 없는 단정을 센다", () => {
+  const d = draft();
+  const love = d.blocks.find((b) => b.id === "love")!;
+  const work = d.blocks.find((b) => b.id === "work-money")!;
+  assert.deepEqual(findRepeatedPhrases(d), []);
+  // 다른 소단락의 문장을 그대로 가져오면 형식 검사의 "같은 문장 반복"에 걸린다
+  work.sections![0].body = `${work.sections![0].body.split(". ")[0]}. ${love.sections![0].body.split(". ")[0]}.`;
+  const r = validateReadingDraft(d, evidence);
+  assert.equal(r.ok, false);
+  assert.match(r.ok ? "" : r.errors.join("\n"), /같은 문장이 반복됩니다/);
+  // 말만 조금 바꾼 같은 구절(12글자 이상)은 반복 검사가 찾는다
+  const d2 = draft();
+  const w2 = d2.blocks.find((b) => b.id === "work-money")!;
+  w2.sections![2].body = `${w2.sections![2].body} 마음이 앞서면 속도부터 늦춰요 같은 때에는 쉬어 가요.`;
+  assert.ok(findRepeatedPhrases(d2).some((x) => /마음이 앞서면 속도부터 늦춰요/.test(x.phrase)));
+  // 소단락 글도 내용 검사의 단위다 — 서윤 예시는 통과한다
+  const result = checkReadingDepth({ draft: draft() });
+  assert.equal(result.pass, true);
+  assert.ok(result.metrics.units >= 5 + 3 + 6, `의미 단위 ${result.metrics.units}`);
+});
+
+test("소단락: AI 지시문 0.6은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
+  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.6");
+  assert.match(READING_SYSTEM_PROMPT, /깊게 읽는 소단락/);
+  assert.match(READING_SYSTEM_PROMPT, /근거가 약한 소단락은 늘려 쓰지 않는다/);
+  assert.match(READING_SYSTEM_PROMPT, /업종 이름 추천을 쓰지 않는다/);
+  assert.match(READING_SYSTEM_PROMPT, /인연이 오는 달 · 시점은 쓰지 않는다/);
+  const msg = JSON.parse(buildReadingUserMessage(evidence, "2026-10-12").slice(buildReadingUserMessage(evidence, "2026-10-12").indexOf("{")));
+  const love = msg.blocks.find((b: { id: string }) => b.id === "love");
+  const work = msg.blocks.find((b: { id: string }) => b.id === "work-money");
+  assert.equal(love.sections.length, 3);
+  assert.equal(work.sections.length, 3);
+  assert.ok(love.sections.every((s: { ask: string }) => s.ask.length > 20));
+  assert.equal(msg.blocks.find((b: { id: string }) => b.id === "tendency").sections, undefined);
+});
+
+test("소단락: 모의 모델의 소단락은 형식 검사를 통과하고 저장 리포트에 담기며, 달력이 있으면 안내가 따른다", async () => {
+  const gen = createAiReportGenerator({ model: createMockModel(), format: "reading-v1" } as never);
+  const r = await gen.generate(input() as never);
+  const content = ((r as { content?: unknown }).content ?? r) as IntegratedReadingReport;
+  assert.equal(content.kind, "integrated-reading");
+  for (const id of ["love", "work-money"]) {
+    const b = content.blocks.find((x) => x.id === id)!;
+    assert.equal(b.sections?.length, 3, id);
+    assert.ok(b.sections!.every((s) => /\[모의 생성\]/.test(s.body)), "모의 글은 표시가 남는다(판매할 수 없다)");
+    assert.equal(b.watch, undefined);
+  }
+  assert.equal(content.blocks.find((x) => x.id === "tendency")!.sections, undefined);
+  assert.ok(SECTION_CALENDAR_NOTE.love && SECTION_CALENDAR_NOTE["work-money"]);
 });

@@ -24,6 +24,7 @@ export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { tenden
     if (b.comfort) p("편안한 조건", ...b.comfort.comfortable.map((x) => `- ${x}`), "부딪히는 방식", ...b.comfort.clash.map((x) => `- ${x}`));
     if (b.reactionFlow) p(`반응이 이어지는 모습 (${b.reactionFlow.when})`, ...b.reactionFlow.steps.map((s, i) => `${i + 1}. ${s.label}: ${s.text}`), `도움이 되는 것: ${b.reactionFlow.helpful}`);
     for (const d of b.details) p(d);
+    for (const s of b.sections ?? []) p(`#### ${s.title}`, s.body, `해 볼 것: ${s.tryIt}`);
     if (b.watch) p(`살펴볼 점: ${b.watch}`);
     if (b.caveat) p(`> ${b.caveat}`);
   }
