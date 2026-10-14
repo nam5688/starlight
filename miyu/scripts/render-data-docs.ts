@@ -7,7 +7,8 @@ import {
   CLOSENESS_LABEL, IPIP_FACETS, IPIP_REFERENCE, IPIP_REVIEW_VERSION, ITEM_FINDINGS, PERSPECTIVE_COMPARISON, PROPOSAL_VERSION, PROPOSED_ITEMS, READING_LIMITS,
 } from "../lib/assessment/drafts/ipip-review.ts";
 import { DRAFT_CONTENT_VERSION, DRAFT_ITEMS, PERSPECTIVES, type DraftItem, type PerspectiveId } from "../lib/assessment/drafts/situational-draft.ts";
-import { RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { MONTH_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { MONTH_RULE_VERSION } from "../lib/saju/interpret/months.ts";
 import { SAJU_RULE_VERSION } from "../lib/saju/interpret/rules.ts";
 
 const mode = <T,>(xs: T[]) => [...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<T, number>()).entries()].sort((a, b) => b[1] - a[1])[0][0];
@@ -45,6 +46,12 @@ ${saju.map(block).join("\n\n")}
 ## 응답 · 본인 입력 근거 규칙 (${RULE_META.length - saju.length}개)
 
 ${RULE_META.filter((r) => r.kind !== "saju").map(block).join("\n\n")}
+
+## 월 단위 "움직이는 달" 계산 규칙 (${MONTH_RULE_META.length}개, \`months.ts\` · 규칙 ${MONTH_RULE_VERSION})
+
+근거 목록(Evidence)을 만드는 규칙이 아니라 코드가 달력을 직접 계산하는 규칙이라 위 목록과 따로 적는다. 사건 · 날짜를 알려 주는 규칙이 아니며 같은 출처 · 같은 검토 상태(전문가 검토 전)다. 설계 · 표시 빈도 측정 · 한계는 \`docs/month-calendar.md\`.
+
+${MONTH_RULE_META.map(block).join("\n\n")}
 `;
 writeFileSync(new URL("../docs/saju-rules.md", import.meta.url), sajuDoc);
 

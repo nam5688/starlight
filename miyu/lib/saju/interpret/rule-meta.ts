@@ -82,6 +82,47 @@ export const RULE_META: RuleMeta[] = [
   },
 ];
 
+
+/**
+ * 월 단위 "움직이는 달" 계산 규칙(months.ts)의 이력. 근거 목록(Evidence)을 만드는 규칙이 아니라 코드가 달력을 직접 계산하는 규칙이라 RULE_META와 따로 둔다
+ * (RULE_META는 "모든 규칙이 실제 근거를 만든다"를 테스트가 확인한다). 같은 출처 · 같은 검토 상태 기준이며, 검증된 사실이 아니다.
+ */
+const MONTH_EXCEPTIONS = [
+  "달은 절기 기준이라 양력 달과 며칠 어긋난다",
+  "사건 · 날짜(만난다 · 헤어진다 · 돈이 들어온다)를 알려 주는 데 쓰지 않는다",
+  "어느 달이든 이렇게 읽을 수 있는 면이 있다는 한계를 화면에 밝힌다",
+  "일주가 uncertain(절기 당일 · 경계 · 자시 관법)이면 가까운 관계 달력은 참고로만 보라고 안내한다",
+  "형 · 반합은 학파 차이가 있어 단계에 세지 않고 약한 표시만 한다. 파 · 해 · 원진 · 천간충은 쓰지 않는다",
+];
+
+export const MONTH_RULE_META: RuleMeta[] = [
+  saju({
+    id: "month-love-palace", title: "그 달의 지지와 일지(배우자 자리)의 육합 · 충", match: /^saju\.month\.love\.palace$/,
+    interpretation: "그 달 지지가 태어난 날의 지지(일지, 배우자 자리)와 육합이면 가까운 관계가 묶이거나 가까워지는 쪽의 주제, 충이면 변화나 조정이 필요한 주제가 두드러진다고 읽는다. 각각 1점.",
+    conditions: ["월운 지지와 원국 일지의 관계가 육합 또는 충일 때"], exceptions: MONTH_EXCEPTIONS,
+  }),
+  saju({
+    id: "month-love-stem", title: "그 달의 천간과 일간의 천간합", match: /^saju\.month\.love\.stem$/,
+    interpretation: "그 달 천간이 일간과 천간합이면 새로운 인연이나 결속에 마음이 열리기 쉬운 주제가 두드러진다고 읽는다. 1점.",
+    conditions: ["월운 천간과 일간이 천간합(갑기 · 을경 · 병신 · 정임 · 무계)일 때"], exceptions: MONTH_EXCEPTIONS,
+  }),
+  saju({
+    id: "month-love-star", title: "그 달에 배우자 별이 들어옴", match: /^saju\.month\.love\.star$/,
+    interpretation: "그 달의 천간 또는 지지가 전통 해석의 배우자 별(여성 원국은 관성, 남성 원국은 재성)에 해당하면 배우자 · 연애와 관련해 보는 기운이 들어오는 달로 읽는다. 1점(천간 · 지지 중 어느 하나라도).",
+    conditions: ["성별을 입력한 경우에만 — 성별이 없으면 이 규칙은 쓰지 않는다"], exceptions: [...MONTH_EXCEPTIONS, "성별 구분이 해석의 한 학파 기준이라는 점을 단정하지 않는다"],
+  }),
+  saju({
+    id: "month-wealth", title: "그 달의 천간 · 지지가 재성", match: /^saju\.month\.money$/,
+    interpretation: "그 달의 천간 또는 지지가 일간 기준 재성이면 성과 · 수입 · 관리 주제가 두드러진다고 읽는다. 천간 · 지지 각각 1점. 돈이 들어오는 달이라는 뜻이 아니다.",
+    conditions: ["월운 천간 또는 지지의 십신이 편재 · 정재일 때"], exceptions: [...MONTH_EXCEPTIONS, "수익 · 투자 · 대출 판단에 쓰지 않는다"],
+  }),
+  saju({
+    id: "month-level", title: "달의 단계 표시 규칙", match: /^saju\.month\.level$/,
+    interpretation: "한 주제(가까운 관계 · 재물)에서 위 규칙의 점수가 2점 이상이면 \"움직임이 큰 달\", 1점이면 \"조금 움직이는 달\", 0점이면 \"차분한 달\"로 표시한다. 좋고 나쁨이 아니라 주제가 눈에 띄기 쉬운 정도다.",
+    conditions: ["월 단위 점수는 위 네 규칙의 합이다 (두 주제는 따로 센다)"], exceptions: [...MONTH_EXCEPTIONS, "단계 기준(2점 이상)은 개발 중 정한 것이며 해석의 정확도를 뜻하지 않는다 — 표시 빈도는 docs/month-calendar.md에 직접 센 값으로 적는다"],
+  }),
+];
+
 /** 근거 ID가 나온 규칙 (없으면 null — 새 근거를 만들면서 이 기록을 빠뜨리지 않았는지 테스트가 확인한다) */
 export function ruleFor(evidenceId: string): RuleMeta | null {
   return RULE_META.find((r) => r.match.test(evidenceId)) ?? null;

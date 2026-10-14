@@ -14,9 +14,9 @@ export const SAJU_RULE_VERSION = "saju-rules-0.1-draft";
 
 type Stem = Parameters<typeof getTenGod>[0];
 type Branch = Parameters<typeof getBranchTenGod>[1];
-type Group = "비겁" | "식상" | "재성" | "관성" | "인성";
+export type Group = "비겁" | "식상" | "재성" | "관성" | "인성";
 
-const GROUP_OF: Record<string, Group> = {
+export const GROUP_OF: Record<string, Group> = {
   비견: "비겁", 겁재: "비겁", 식신: "식상", 상관: "식상", 편재: "재성", 정재: "재성", 편관: "관성", 정관: "관성", 편인: "인성", 정인: "인성",
 };
 
