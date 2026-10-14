@@ -37,7 +37,10 @@ async function Report({ params }: Pick<PageProps<"/dev/compare/[run]/[item]">, "
         <p className="mt-2 text-[14px] leading-[1.7] text-ink-3">
           가상 인물로 만든 비교용 리포트입니다. <b className="text-ink-2">개인 통합 리포트(9,900원 상품, 읽기 구조)</b>이며 고민 반영 리포트(4,900원)가 아닙니다 — 고민 반영 리포트의 AI 지시문은 아직 옛 규칙이라 이 비교에 넣지 않았습니다. 실제 고객 정보는 쓰지 않았고, 응답 문항은 개발용 예시입니다.
         </p>
-        <p className="mt-2 text-[14px]">
+        <p className="mt-2 flex flex-wrap gap-x-4 text-[14px]">
+          <Link href={`/dev/compare/${run}/${item}/talk`} className={textLink}>
+            대화로 보기 (채팅 화면)
+          </Link>
           <Link href="/dev/compare" className={textLink}>
             비교 결과 목록으로
           </Link>

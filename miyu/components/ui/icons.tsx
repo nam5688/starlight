@@ -8,6 +8,15 @@ export function CheckIcon({ className = "size-5" }: { className?: string }) {
   );
 }
 
+/** 메뉴 — 줄 세 개 (채팅 화면의 입력창 왼쪽 메뉴 버튼) */
+export function MenuIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ChevronIcon({ className = "size-5" }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>

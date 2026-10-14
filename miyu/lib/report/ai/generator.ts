@@ -17,6 +17,8 @@ import type { ConcernInput, GenerateContext, ReportGenerator, ReportInput } from
 import { assembleReading } from "../reading/assemble.ts";
 import { checkReadingDepth } from "../reading/depth.ts";
 import { buildReadingRepairMessage, buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
+import { findRepeatedPhrases, repeatMessages } from "../reading/repeat.ts";
+import type { ReadingDraftV1 } from "../reading/types.ts";
 import { plainPeriodLabel, validateReadingDraft } from "../reading/validate.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
 import { buildRepairMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from "../v2/prompt.ts";
@@ -45,6 +47,12 @@ export type AiGeneratorOptions = {
    * 낱말 · 표지를 센 어림이어서 기본은 끄고(보고만), 실제 AI를 연결할 때 운영자가 켠다. 모의 글은 이 검사를 통과할 수 없다.
    */
   enforceDepth?: boolean;
+  /**
+   * 형식 검사를 통과했어도 같은 표현이 여러 곳에 되풀이되면(reading/repeat.ts) 한 번 고쳐 쓰게 한다 (읽기 구조만).
+   * enforceDepth와 달리 **실패로 만들지 않는다** — 고쳐 쓴 글이 형식 검사에서 떨어지거나 마지막 시도에서도 반복이 남으면 받아 두는 쪽을 쓴다.
+   * 고쳐 쓰기가 한 번 더 들어 비용이 늘 수 있어(이미 잡아 둔 최악 비용 안) 기본은 끈다.
+   */
+  repairRepeats?: boolean;
 };
 
 /** 모델 응답에서 JSON 객체를 꺼낸다 (앞뒤 설명 · 코드 블록이 붙어도) */
@@ -189,6 +197,17 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       if (format === "reading-v1") {
         const messages: ModelMessage[] = [{ role: "user", content: buildReadingUserMessage(evidence, ref.iso, context) }];
         let lastReadingErrors: string[] = [];
+        // 형식은 맞지만 같은 표현이 되풀이돼 고쳐 쓰기를 부탁한 첫 초안 — 고쳐 쓴 글이 형식 검사에서 떨어지면 이것을 쓴다
+        let softFallback: ReadingDraftV1 | null = null;
+        const finish = (draft: ReadingDraftV1) =>
+          assembleReading({
+            draft,
+            evidence,
+            input,
+            reference: ref,
+            promptVersion: READING_PROMPT_VERSION,
+            ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, READING_PROMPT_VERSION],
+          });
         for (let round = 0; round <= maxRepairs; round++) {
           const called = await call(messages, ctx);
           const { result } = called;
@@ -221,16 +240,20 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
               continue;
             }
           }
+          // 같은 표현이 여러 곳에 되풀이되면 한 번 고쳐 쓰게 한다 (켜 둔 경우만, 마지막 시도에서는 그대로 받는다)
+          if (opts.repairRepeats && round < maxRepairs) {
+            const repeats = findRepeatedPhrases(checked.draft);
+            if (repeats.length > 0) {
+              softFallback ??= checked.draft;
+              done("ok");
+              retry(repeatMessages(repeats));
+              continue;
+            }
+          }
           done("ok");
-          return assembleReading({
-            draft: checked.draft,
-            evidence,
-            input,
-            reference: ref,
-            promptVersion: READING_PROMPT_VERSION,
-            ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, READING_PROMPT_VERSION],
-          });
+          return finish(checked.draft);
         }
+        if (softFallback) return finish(softFallback);
         throw new Error(`리포트 형식 검사 실패: ${lastReadingErrors.slice(0, 3).join(" / ")}`);
       }
       const messages: ModelMessage[] = [{ role: "user", content: buildUserMessage(evidence, ref.iso, context) }];

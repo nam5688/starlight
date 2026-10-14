@@ -118,7 +118,7 @@ const blindSeed = Number(approvedOn.replaceAll("-", ""));
 let result;
 try {
   // 호출 한 번의 제한 시간: 긴 글 + 생각 · 추론 시간을 고려해 5분 (기본 2분이면 정상 응답도 시간 초과로 끊겨 비용만 나간다)
-  result = await runStage({ stage: { name: stage.name, capKrw: stage.capKrw }, personas, candidates, guard, approval: { stage: stage.name, approvedCapKrw: approvedCap, approvedOn }, now, variant, blindSeed, callTimeoutMs: 300_000 });
+  result = await runStage({ stage: { name: stage.name, capKrw: stage.capKrw }, personas, candidates, guard, approval: { stage: stage.name, approvedCapKrw: approvedCap, approvedOn }, now, variant, blindSeed, callTimeoutMs: 300_000, repairRepeats: true });
 } catch (e) {
   console.error(`중단: ${e instanceof Error ? e.message : "알 수 없는 오류"}`);
   process.exit(1);
@@ -221,4 +221,4 @@ for (const r of result.runs.filter((x) => x.status === "failed")) {
   if (r.attempts.length === 0 && r.errorMessage) console.log(`  ${r.errorMessage}`);
 }
 const runId = dir.split(/[\\/]/).pop();
-console.log(`\n결과 폴더: ${dir}\n실제 미유 리포트 화면으로 읽기: 이 PC에서 npm.cmd run dev 를 켠 뒤 http://localhost:3000/dev/compare/${runId} 을 연다 (${solo ? "한 모델만 실행해 글은 모두 X" : "이름이 가려진 X · Y"}).${solo ? "" : "\n채점이 끝나기 전에는 key-open-after-scoring.json 을 열지 마세요."}`);
+console.log(`\n결과 폴더: ${dir}\n실제 미유 리포트 화면으로 읽기: 이 결과 폴더가 있는 miyu 폴더에서 npm.cmd run dev 를 켠 뒤(켜면 나오는 Local 주소의 번호를 쓴다) http://localhost:3000/dev/compare 목록을 열거나, 바로 ${personas.map((p) => `http://localhost:3000/dev/compare/${runId}/${p.id}-X`).join(" · ")}${solo ? "" : " (· -Y)"} 을 연다 (${solo ? "한 모델만 실행해 글은 모두 X" : "이름이 가려진 X · Y"})."${solo ? "" : "\n채점이 끝나기 전에는 key-open-after-scoring.json 을 열지 마세요."}`);

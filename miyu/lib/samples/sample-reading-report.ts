@@ -159,7 +159,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
       group: "relation",
       topic: "가까운 관계",
       headline: "기대는 건 편한데, 확인하고 싶어져요",
-      summary: "가까운 사람에게 마음을 보이고 기대는 건 편한 편이에요. 관계가 불확실해 보이면 상대의 반응이 궁금해지고, 그 반응이 내 마음에도 영향을 주는 편이에요.",
+      summary: "가까운 사람에게 마음을 보이고 기대는 건 편한 편이에요. 다만 상대의 반응이 흐릿한 날에는, 그 반응이 내 마음에도 영향을 주는 편이에요.",
       reactionFlow: {
         when: "상대의 답이 평소보다 늦어질 때",
         steps: [

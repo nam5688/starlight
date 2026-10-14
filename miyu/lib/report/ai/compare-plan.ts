@@ -194,6 +194,8 @@ export async function runStage(opts: {
   /** 제공사 오류 재시도 사이의 대기 (테스트에서는 즉시) */
   sleep?: (ms: number) => Promise<void>;
   callTimeoutMs?: number;
+  /** 같은 표현이 여러 곳에 되풀이되면 한 번 고쳐 쓰게 한다 (읽기 구조 · 기본은 끔 — 켜도 최악 비용은 "모두 고쳐 쓰기까지 가는 경우"에 이미 들어 있다) */
+  repairRepeats?: boolean;
 }): Promise<StageResult> {
   checkApproval(opts.stage, opts.guard, opts.approval);
   const variant = opts.variant ?? "reading-v1";
@@ -222,7 +224,7 @@ export async function runStage(opts: {
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         callTimeoutMs: opts.callTimeoutMs,
       };
-      const generator = variant === "philosophical-v0" ? createPhilosophicalGenerator(generatorOptions) : createAiReportGenerator({ ...generatorOptions, format: variant });
+      const generator = variant === "philosophical-v0" ? createPhilosophicalGenerator(generatorOptions) : createAiReportGenerator({ ...generatorOptions, format: variant, repairRepeats: opts.repairRepeats });
       const started = Date.now();
       let report: ReportContent | PhilosophicalReportV0 | null = null;
       let errorCode: string | null = null;

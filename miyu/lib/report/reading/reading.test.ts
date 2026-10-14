@@ -13,6 +13,7 @@ import { reportTexts } from "../concern/texts.ts";
 import { isReadingReport, type ReportInput } from "../generator.ts";
 import { assembleReading, basisFor } from "./assemble.ts";
 import { checkReadingDepth } from "./depth.ts";
+import { findRepeatedPhrases, repeatMessages } from "./repeat.ts";
 import { BLOCK_PLAN } from "./plan.ts";
 import { buildReadingUserMessage, READING_SYSTEM_PROMPT } from "./prompt.ts";
 import type { ReadingDraftV1 } from "./types.ts";
@@ -302,4 +303,53 @@ test("저장된 리포트 글 뽑기: 읽기 구조 리포트도 이미 준 리�
   assert.equal(t.summary.length, 5);
   assert.ok(t.all.some((x) => x.includes("후기부터 읽어 본 적 있죠")));
   assert.ok(t.actions.length >= 3);
+});
+
+test("반복 표현 검사: 서윤 예시에는 없고, 같은 구절이 서로 다른 주제에 되풀이되면 찾아 알려 준다 (말만 바꾼 반복은 못 찾는다)", () => {
+  assert.deepEqual(findRepeatedPhrases(draft()), []);
+  const d = draft();
+  // 실제 AI 글(가상 인물)에서 같은 구절이 두 주제에 되풀이됐던 모양
+  d.blocks[0].details[0] = "응답에서는 상황이 바뀌면 방향을 빠르게 바꾸는 경향도 보여요. 처음엔 오래 재다가도 판이 달라지면 방향을 틀 수 있어요.";
+  d.blocks[4].details[0] = "응답에서는 익숙한 방식을 편하게 느끼고 상황이 바뀌면 방향을 빠르게 바꾸는 경향이 보여요.";
+  const found = findRepeatedPhrases(d);
+  assert.equal(found.length, 1);
+  assert.match(found[0].phrase, /상황이 바뀌면 방향을 빠르게 바꾸는 경향/);
+  assert.deepEqual(found[0].where, ["blocks.tendency.details[0]", "blocks.work-money.details[0]"]);
+  assert.match(repeatMessages(found)[0], /되풀이돼요.*상황이 바뀌면 방향을 빠르게/);
+  // 시기 구역 안의 층층이 풀이는 반복으로 세지 않는다
+  const f = draft();
+  f.flow.cardText = "지금 지나는 시기는 결과를 정리하고 관리하는 일이 주제로 읽혀요.";
+  f.flow.periods[0].theme = "결과를 정리하고 관리하는 일이 주제로 읽혀요.";
+  assert.deepEqual(findRepeatedPhrases(f), []);
+});
+
+test("반복 표현 고쳐 쓰기(repairRepeats): 켜면 한 번 고쳐 쓰게 하고, 고쳐 쓴 글이 형식에서 떨어지거나 마지막에도 반복이 남으면 받아 둔다 — 실패로 만들지 않는다", async () => {
+  const repeated = draft();
+  repeated.blocks[0].details[0] = "응답에서는 상황이 바뀌면 방향을 빠르게 바꾸는 경향도 보여요. 처음엔 오래 재다가도 판이 달라지면 방향을 틀 수 있어요.";
+  repeated.blocks[4].details[0] = "응답에서는 익숙한 방식을 편하게 느끼고 상황이 바뀌면 방향을 빠르게 바꾸는 경향이 보여요.";
+  const clean = draft();
+
+  // 끄면(기본) 반복이 있어도 첫 응답을 그대로 받는다
+  const off = fakeModel(() => JSON.stringify(repeated));
+  assert.ok(isReadingReport(await createAiReportGenerator({ model: off, now: NOW, sleep: noSleep }).generate(input())));
+  assert.equal(off.calls, 1);
+
+  // 켜면: 첫 응답에 반복 → 이유를 알려 고쳐 쓰게 하고, 깨끗한 두 번째 글을 쓴다
+  let n = 0;
+  const fix = fakeModel(() => JSON.stringify(n++ === 0 ? repeated : clean));
+  const ok = await createAiReportGenerator({ model: fix, now: NOW, sleep: noSleep, repairRepeats: true }).generate(input());
+  assert.equal(fix.calls, 2);
+  assert.match(fix.seen[1], /같은 표현이 여러 곳에 되풀이돼요/);
+  assert.ok(isReadingReport(ok));
+
+  // 고쳐 쓴 글이 형식 검사에서 떨어지면 첫 글을 쓴다 (실패로 만들지 않는다)
+  let k = 0;
+  const broken = fakeModel(() => (k++ === 0 ? JSON.stringify(repeated) : "{}"));
+  assert.ok(isReadingReport(await createAiReportGenerator({ model: broken, now: NOW, sleep: noSleep, repairRepeats: true }).generate(input())));
+  assert.equal(broken.calls, 2);
+
+  // 마지막 시도에도 반복이 남아 있으면 그대로 받는다 (더 고쳐 쓰라고 하지 않는다)
+  const stuck = fakeModel(() => JSON.stringify(repeated));
+  assert.ok(isReadingReport(await createAiReportGenerator({ model: stuck, now: NOW, sleep: noSleep, repairRepeats: true }).generate(input())));
+  assert.equal(stuck.calls, 2);
 });

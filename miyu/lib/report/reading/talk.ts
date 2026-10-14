@@ -83,9 +83,10 @@ export const TALK_COPY = {
   concernPending: "지금 고민을 대화로 이어 가는 기능은 아직 준비 중이에요.",
   concernPendingLink: "고민을 적어 두는 건 ‘나의 고민 기록소’에서 할 수 있어요.",
   allDone: "준비한 풀이를 모두 둘러봤어요. 전체 내용은 리포트에서 언제든 다시 볼 수 있어요.",
+  menuTitle: "다른 이야기 보기",
   freeQuestion: "자유롭게 질문하기 · 준비 중",
   freeQuestionPending: "자유 질문은 준비 중이에요. 지금은 버튼으로 이어 볼 수 있어요.",
-  buttons: { example: "예를 들어줘", detail: "더 자세히 알려줘", basis: "이렇게 분석한 이유", differ: "내 경우는 달라", concern: "고민 말하기", pickTopic: "다른 주제 고르기", next: "다음 풀이", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
+  buttons: { example: "예를 들어줘", detail: "더 자세히 알려줘", basis: "이렇게 분석한 이유", differ: "내 경우는 달라", concern: "고민 말하기", pickTopic: "다른 주제 고르기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
 
 const CHIP: Record<string, string> = {
