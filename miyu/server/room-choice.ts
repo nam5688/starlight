@@ -1,5 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { talkRoomPath } from "@/components/talk/room-paths";
+import { roomAfterAnalysis } from "@/lib/report/reading/room-entry";
 import { ROOM_ORDER, type RoomId } from "@/lib/report/reading/talk-room";
 
 /**
@@ -22,10 +24,23 @@ export async function rememberRoomChoice(room: RoomId): Promise<void> {
   (await cookies()).set(ROOM_CHOICE_COOKIE, room, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: MAX_AGE_SECONDS });
 }
 
+/** 기억해 둔 방을 지운다 (Route Handler · Server Action에서만) — 쿠키를 지울 수 없는 자리면 조용히 넘어간다(24시간 뒤 저절로 사라진다) */
+export async function forgetRoomChoice(): Promise<void> {
+  try {
+    (await cookies()).delete(ROOM_CHOICE_COOKIE);
+  } catch {
+    // 지우지 못해도 이동에는 영향이 없다
+  }
+}
+
 /**
- * 검사 결과를 저장한 뒤 갈 곳 — 언제나 결과 화면(무료 리포트)이다(운영자 2026-10-15: 무료 리포트를 먼저 보고, 그 뒤에 상담방을 고른다).
- * 홈에서 방을 골랐다면 그 방은 기억해 두었다가 결과 화면에서 "OO 방으로 이어서 이야기하기" 바로가기로만 보인다(바로 그 방으로 보내지 않는다).
+ * 검사 결과를 저장한 뒤 갈 곳(운영자 2026-10-15) — 홈에서 방을 골랐고 그 방이 무료 리포트로 열리는 방이면 바로 그 상담방이다(고른 방은 이때 지운다).
+ * 방을 고르지 않았거나 심층 리포트로만 열리는 방(열자마자 구매 안내가 되는 방)이면 내가 만든 무료 리포트(결과 화면)를 먼저 보여 주고,
+ * 고른 방은 결과 화면에서 "OO 방으로 이어서 이야기하기" 바로가기로 보인다.
  */
 export async function pathAfterSave(assessmentId: string): Promise<string> {
-  return `/results/${assessmentId}`;
+  const room = roomAfterAnalysis(await peekRoomChoice());
+  if (!room) return `/results/${assessmentId}`;
+  await forgetRoomChoice();
+  return talkRoomPath(assessmentId, room);
 }

@@ -176,7 +176,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
       <div className="mx-auto w-full max-w-[720px] px-5 pt-6">
         <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
       </div>
-      {/* 무료 리포트를 먼저 보고, 그 뒤에 궁금한 주제의 상담방을 고른다(운영자 2026-10-15). 홈에서 고른 주제는 "이어서 이야기하기" 바로가기로 보인다 */}
+      {/* 결과 화면에서도 궁금한 주제의 상담방을 고른다(운영자 2026-10-15). 홈에서 심층 리포트로만 열리는 방을 골랐다면 그 방은 "이어서 이야기하기" 바로가기로 보인다(무료로 열리는 방은 분석 직후 바로 열려 이 화면에 기억이 남지 않는다) */}
       <section id="r-rooms" aria-labelledby="r-rooms-title" className="mx-auto w-full max-w-[720px] px-5 pt-12">
         <SectionTitle id="r-rooms-title" note="무료 리포트를 읽었다면, 궁금한 주제를 골라 미유와 이야기해 보세요. 방마다 새 대화로 시작해요.">
           이제 궁금한 이야기를 골라 보세요

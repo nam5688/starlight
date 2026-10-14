@@ -4,17 +4,25 @@ import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import { buildTalkModel, type TalkChat, type TalkModel } from "@/lib/report/reading/talk";
 import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
+import { ownedStateOf, type OwnedState } from "@/lib/report/reading/room-entry";
 import { roomHasMaterial, type RoomId } from "@/lib/report/reading/talk-room";
 import { seoulDate } from "@/lib/saju/interpret/day-plain";
 import type { getResultView } from "@/lib/services/report-service";
 import { now } from "./services";
 
+export type { OwnedState };
 export type ResultView = NonNullable<Awaited<ReturnType<typeof getResultView>>>;
 
 /** 구매해 준비된 개인 통합 리포트(읽기 구조)가 있으면 paid, 없으면 free(무료 맛보기) */
 export function viewTier(view: ResultView): "paid" | "free" {
   const report = view.report;
   return view.paidOrder && report?.status === "ready" && report.content && isReadingReport(report.content) ? "paid" : "free";
+}
+
+/** 구매한 리포트가 있는데 대화 방에서 풀이로 쓰지 못하는 이유(규칙은 lib/report/reading/room-entry.ts의 ownedStateOf) */
+export function ownedState(view: ResultView): OwnedState | null {
+  const report = view.report;
+  return ownedStateOf({ paid: Boolean(view.paidOrder), status: report?.status ?? null, hasContent: Boolean(report?.content), readingFormat: Boolean(report?.content && isReadingReport(report.content)) });
 }
 
 /**

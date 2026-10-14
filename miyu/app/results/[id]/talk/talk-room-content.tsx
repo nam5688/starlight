@@ -15,7 +15,7 @@ import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { now, readRepository } from "@/server/services";
 import { seoulDate } from "@/lib/saju/interpret/day-plain";
-import { roomModelFor, viewTier } from "@/server/talk-model";
+import { ownedState, roomModelFor, viewTier, type OwnedState } from "@/server/talk-model";
 
 /**
  * 대화로 풀어보기 — 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖의 경우(무료 분석만 마쳤거나 리포트를 준비 중)는 무료 맛보기로 이야기한다.
@@ -79,7 +79,7 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
 
   const owned = Boolean(view.paidOrder);
   // 무료 리포트로는 열리지 않는 방(올해의 흐름 · 결혼 · 진로 · 재무)은 심층 리포트로 이어 주는 안내만 보인다
-  if (!isSimpleRoom(room)) return <LockedRoom room={room} owned={owned} buyHref={owned ? `/results/${id}` : `/results/${id}#r-purchase`} backHref={`/results/${id}`} />;
+  if (!isSimpleRoom(room)) return <LockedRoom room={room} ownedState={ownedState(view)} buyHref={owned ? `/results/${id}` : `/results/${id}#r-purchase`} backHref={`/results/${id}`} />;
   if (!roomAvailable(model, room)) notFound();
   return (
     <TalkView
@@ -91,10 +91,19 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
       dataHref={`/results/${id}`}
       roomHrefs={roomHrefs}
       persist={await persistFor(model)}
-      badge={{
-        label: owned ? "리포트 준비 중" : "무료 맛보기",
-        text: owned ? `검사일 ${created} · 리포트를 준비하고 있어요. 준비되면 같은 방에서 전체 풀이를 이어 볼 수 있어요.` : `무료 분석으로 만든 맛보기예요 · 검사일 ${created}. 이어지는 깊은 풀이는 리포트에서 볼 수 있어요.`,
-      }}
+      badge={ownedState(view) ? ownedNotReadyBadge(ownedState(view)!, created) : { label: "무료 맛보기", text: `무료 분석으로 만든 맛보기예요 · 검사일 ${created}. 이어지는 깊은 풀이는 리포트에서 볼 수 있어요.` }}
     />
   );
+}
+
+/** 구매한 리포트가 있는데 이 방에서 풀이로 쓰지 못할 때의 이름표 — 이유를 사실대로 알린다 (이유는 server/talk-model.ts의 ownedState) */
+function ownedNotReadyBadge(state: OwnedState, created: string): { label: string; text: string } {
+  if (state === "failed") return { label: "리포트 만들기 실패", text: `검사일 ${created} · 리포트를 만들지 못했어요. 결과 화면에서 다시 만들 수 있어요. 지금은 무료 맛보기로 이야기해요.` };
+  if (state === "old-format") {
+    return {
+      label: "예전 형식 리포트",
+      text: `검사일 ${created} · 예전 형식으로 저장된 리포트라 같은 방에서 풀이를 이어 볼 수 없어요. 지금은 무료 맛보기로 이야기해요. 새 형식 리포트는 결과 화면에서 다시 받을 수 있어요.`,
+    };
+  }
+  return { label: "리포트 준비 중", text: `검사일 ${created} · 리포트를 준비하고 있어요. 준비되면 같은 방에서 전체 풀이를 이어 볼 수 있어요.` };
 }
