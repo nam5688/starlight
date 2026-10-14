@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, LockIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
-import { TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
+import { freeQuestionPlaceholder, TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
 import {
   applyAction,
   FREE_QUESTION_MAX,
@@ -122,7 +122,9 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   /** 직접 적어 보낸 뒤에는 초점을 입력창에 둔다 (눌러서 이어 간 뒤에는 답장 버튼 쪽) */
   const wantInput = useRef(false);
   /** 자유 질문은 리포트를 받아 AI가 연결돼 있고, 서버에 저장하는 화면(로그인한 내 결과)에서만 열린다 */
-  const canAsk = model.chat.state === "ready" && Boolean(persist);
+  /** 무료 질문(무료 맛보기의 첫 질문)을 방금 다 썼으면 새로고침 전에도 입력창을 닫는다 */
+  const freeSpent = Boolean(model.chat.free) && remaining === 0;
+  const canAsk = model.chat.state === "ready" && Boolean(persist) && !freeSpent;
   const busy = typing || waiting;
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -304,7 +306,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     if (reply?.ok) deliver(say(reply.paragraphs));
     else {
       deliver(say([reply ? reply.message : "답이 늦어지고 있어요. 잠시 뒤에 다시 물어봐 주세요."]));
-      if (reply && reply.reason === "limit") setRemaining(0);
+      if (reply && !reply.ok && (reply.reason === "limit" || reply.reason === "free-used")) setRemaining(0);
       if (!reply || reply.reason === "failed" || reply.reason === "budget") setDraft((d) => d || q);
     }
   };
@@ -386,8 +388,19 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const byTopic = new Map([...model.topics, ...model.codeTopics].map((t) => [t.id, t]));
   const topicsHere = roomTopics(model, room);
   // 자유 질문 입력창의 안내 — 열려 있으면 묻는 말, 아니면 왜 닫혀 있는지 (작동하는 것처럼 보이지 않게)
-  const placeholder = canAsk ? (engine.asking ? TALK_COPY.freeQuestionAsking : TALK_COPY.freeQuestionReady) : model.chat.state === "locked" ? TALK_COPY.freeQuestionLocked : TALK_COPY.freeQuestion;
-  const note = canAsk ? ROOM_COPY.chatAiNote : model.chat.state === "locked" ? ROOM_COPY.chatLocked : TALK_COPY.freeQuestionPending;
+  const used = freeSpent || Boolean(model.chat.used);
+  const placeholder = canAsk
+    ? engine.asking
+      ? TALK_COPY.freeQuestionAsking
+      : model.chat.free
+        ? freeQuestionPlaceholder(remaining ?? model.chat.left)
+        : TALK_COPY.freeQuestionReady
+    : used
+      ? TALK_COPY.freeQuestionUsed
+      : model.chat.state === "locked"
+        ? TALK_COPY.freeQuestionLocked
+        : TALK_COPY.freeQuestion;
+  const note = canAsk ? (model.chat.free ? `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatFreeNote}` : ROOM_COPY.chatAiNote) : used ? ROOM_COPY.chatFreeUsed : model.chat.state === "locked" ? ROOM_COPY.chatLocked : TALK_COPY.freeQuestionPending;
   const menuTopics = room === "main" ? model.groups : topicsHere.length > 1 ? topicsHere.map((t) => ({ id: t.id, chip: t.chip, topicIds: [t.id] })) : [];
 
   return (
@@ -540,8 +553,9 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
 
       {canAsk && (
         <p className="bg-page px-4 pt-1 text-center text-[12px] leading-snug text-ink-3">
-          {ROOM_COPY.chatAiNote}
-          {remaining !== null && ` · 오늘 ${remaining}번 더 물어볼 수 있어요`}
+          {note}
+          {remaining !== null && !model.chat.free && ` · 오늘 ${remaining}번 더 물어볼 수 있어요`}
+          {remaining !== null && model.chat.free && remaining > 0 && ` · 무료 질문 ${remaining}번 남았어요`}
         </p>
       )}
       <form onSubmit={send} className="relative flex items-center gap-2 bg-page px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

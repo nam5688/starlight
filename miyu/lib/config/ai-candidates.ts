@@ -59,3 +59,18 @@ export const COMPARE_STAGES: CompareStageDef[] = [
   { name: "stage-1", label: "1단계: 가상 인물 2명 × 후보 2개 = 생성 4건", personaCount: 2, capKrw: 3000 },
   { name: "stage-2", label: "2단계: 가상 인물 10명 × 후보 2개 = 생성 20건 (1단계 결과를 보고 따로 승인)", personaCount: 10, capKrw: 8000 },
 ];
+
+/**
+ * 1단계 승인(운영자 2026-10-13, 재시도 포함 3,000원)의 사용 기록. 실제 호출은 운영자 PC의 비교 실행(pilot-data, 저장소에 올라가지 않음)이었고 합계는 운영자가 확인한 값이다.
+ * 새 호출을 할 때마다 운영자가 확인한 누적액으로 고친다. 이 값은 호출 전 안전선(채팅 시험 상한)의 근거일 뿐 호출을 허락하지 않는다.
+ */
+export const STAGE1_LEDGER = { approvedKrw: 3000, spentKrw: 1259, asOf: "2026-10-14" } as const;
+
+/**
+ * 채팅 자유 질문의 실제 AI 시험이 넘을 수 없는 상한 — 남은 승인 금액(approved − spent) 안에서 여유를 둔 값이다.
+ * 이 안에서도 호출하려면 운영자가 .env.local에 승인 금액 · 호출 수 · 기간을 직접 적어야 한다(AI_CHAT_APPROVED_*). 적지 않으면 호출하지 않는다.
+ */
+export const CHAT_TEST_LIMITS = { maxCapKrw: 1500, maxCalls: 40, maxDays: 3 } as const;
+
+/** 채팅 질문에 쓰는 모델 — 후보 A. 가격 · 모델 ID가 어긋나지 않게 이 한 곳에서만 정한다 */
+export const CHAT_AI_MODEL = AI_CANDIDATES[0];

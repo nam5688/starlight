@@ -77,3 +77,10 @@ export function formatKrw(amount: number): string {
  * 초기 혜택을 끝낼 때는 enabled를 false로 바꾼다 — 무료 맛보기에서는 "리포트를 받으면 열려요"와 이어지는 질문만 보이고, 구매한 분은 그대로 본다.
  */
 export const DAILY_FREE = { enabled: true } as const;
+
+/**
+ * "사주로 읽은 인연의 경향" 중 나이 차의 큰 방향(연상 · 또래 · 연하 쪽) 표시 — 운영자 2026-10-15 결정으로 켜 두었다.
+ * 이 규칙은 일지(배우자 자리)의 십신 그룹을 육친의 세대 비유로 옮긴 임시 규칙이라 인연 풀이 중 근거가 가장 약하다(docs/partner-rules-audit.md).
+ * 전문가 검토 전에 끄고 싶으면 enabled를 false로 — 구매한 풀이에서는 나이 방향 문장이, 무료 맛보기에서는 그 질문이 빠지고 분위기 · 오래 가는 관계 풀이는 그대로 남는다.
+ */
+export const PARTNER_AGE_DIRECTION = { enabled: true } as const;

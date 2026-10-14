@@ -3,7 +3,7 @@
 // 이 파일은 AI를 부르지 않는다. 자유 질문의 답은 서버가 만들어 오고(자유 질문 행동 "free"), 이 파일은 그 글을 대화에 놓고 되살리기만 한다.
 // 눌러 준 답(연애 상태 등)은 풀이를 바꾸지 않는다. 풀이를 어떻게 읽을지 알려 주는 한 줄에만 쓴다.
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
-import { answerBubbles, extraBubbles, nextTopic, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
+import { answerBubbles, extraBubbles, freeLeftText, nextTopic, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
 
 /** 미유의 표정 — 운영자가 보낸 캐릭터 시트의 표정 시트 6가지와 액션 포즈 3가지 (그림은 components/talk/miyu-moods.ts) */
 export type TalkMood = "basic" | "happy" | "surprised" | "thinking" | "playful" | "worried" | "wave" | "glasses" | "aha";
@@ -51,8 +51,25 @@ export const ROOM_COPY = {
   chatReady: "아래 입력창에 편하게 적어 주세요. 한두 문장이면 충분해요.",
   chatPending: "자유롭게 이야기를 나누는 기능은 아직 준비 중이에요.",
   chatLocked: "이야기를 이어 가는 건 리포트를 받은 분께 열려 있어요.",
+  /** 무료 맛보기에서 로그인한 분께 열어 주는 첫 질문 1번 — 열려 있을 때 · 이미 썼을 때 */
+  chatFreeUsed: "무료 질문을 모두 썼어요. 이어서 묻고 깊은 풀이를 보려면 리포트에서 이어져요.",
+  chatFreeNote: "무료 질문은 지금 보이는 맛보기 내용만 가지고 답해요. 깊은 풀이는 리포트에서 이어져요.",
   /** 자유 질문이 열려 있을 때 입력창 위에 작게 — AI가 쓴 답이라는 것과 예측이 아니라는 것 */
   chatAiNote: "답은 AI가 내 리포트의 글과 적어 준 내용으로 쓴 해석이에요. 예측이나 진단이 아니에요.",
+  /** 진로 방과 재무 방은 같은 저장된 "일과 돈" 풀이에서 보여 주는 소단락 · 질문 · 안내를 달리한다 — 새 글을 쓰지 않고 고르기만 한다 */
+  focus: {
+    career: {
+      line: "이 방에서는 일하는 방식과 일을 고르는 기준을 중심으로 읽어요.",
+      ask: "일할 때는 어떤 방식이 잘 맞아요?",
+      hooks: [] as string[],
+    },
+    money: {
+      line: "이 방에서는 돈을 대하는 방식과 관리 습관을 중심으로 읽어요. 투자 · 대출 결정은 사주로 정하지 않아요.",
+      ask: "돈을 쓰고 모을 때는 어떤 편이에요?",
+      /** 무료 맛보기에서 재무 방이 리포트에서 이어 보여 주는 것 — 질문만 */
+      hooks: ["돈을 쓰고 모을 때 내가 반복하는 습관은?", "지금 시기는 일과 돈에서 어떤 주제로 읽힐까?", "재물 주제가 눈에 띄기 쉬운 달은 언제일까?"],
+    },
+  },
   mixedAsk: "어떤 상황에서는 달랐는지 한 줄만 알려 주세요. 그 상황에 맞춰 풀이를 다시 읽어 볼게요.",
   /** 무료 맛보기에서 고민해결소가 리포트에서 이어 보여 주는 것 — 질문만 */
   concernHooks: ["지금 고민에 내 사주와 응답은 어떻게 이어질까?", "비슷한 상황이 반복되는 이유는 무엇일까?", "지금 해 볼 수 있는 작은 행동은 무엇일까?"],
@@ -262,12 +279,43 @@ const text = (t: string, muted = false): TalkSay => ({ kind: "text", text: t, ..
 /** 풀이 전체 — 리포트 주제와 코드가 계산한 풀이 */
 const allTopics = (model: TalkModel): TalkTopic[] => [...model.topics, ...model.codeTopics];
 
+/** 진로 방이 보여 주는 소단락(일하는 방식 · 일을 고르는 기준) · 재무 방이 보여 주는 소단락(성과와 수입으로 이어지는 방식 · 시기와 관리 습관) — plan.ts의 일과 돈 소단락 순서 */
+const SECTION_PICK = { career: [0, 2], money: [0, 1] } as const;
+const MONEY_HINT = /돈|소비|저축|재물|수입/;
+
+/**
+ * 같은 저장된 "일과 돈" 풀이를 진로 · 재무 방에서 서로 다른 초점으로 본다 — 저장된 소단락을 고르고 질문 · 안내 문구(고정)를 바꿀 뿐 새 글을 쓰지 않는다.
+ * 소단락이 없는 이전 리포트와 무료 맛보기(잠금 질문만 있음)에서도 질문 · 안내는 방마다 다르다.
+ */
+export function roomView(room: RoomId, t: TalkTopic): TalkTopic {
+  if (t.id !== "work-money" || (room !== "career" && room !== "money")) return t;
+  const f = ROOM_COPY.focus[room];
+  const n = t.sectionCount ?? 0;
+  const detail = n > 0 ? [...t.detail.slice(0, n * 2).filter((_, i) => (SECTION_PICK[room] as readonly number[]).includes(Math.floor(i / 2))), ...t.detail.slice(n * 2)] : t.detail;
+  const hooks = t.locked ? (room === "money" ? [...f.hooks] : t.locked.hooks.filter((h) => !MONEY_HINT.test(h))) : null;
+  // 재무 방은 일하는 방식 특징 카드를 보이지 않는다
+  const base: TalkTopic = { ...t };
+  if (room === "money") delete base.traits;
+  return {
+    ...base,
+    detail,
+    caveat: room === "money" && t.caveat ? `${f.line} ${t.caveat}` : f.line,
+    askText: f.ask,
+    ...(hooks ? { locked: { hooks } } : {}),
+  };
+}
+
+/** 이 방에서 보이는 풀이 하나 — 방의 보기(roomView)를 거친다 */
+export function roomTopic(model: TalkModel, room: RoomId, id: string): TalkTopic | undefined {
+  const t = allTopics(model).find((x) => x.id === id);
+  return t ? roomView(room, t) : undefined;
+}
+
 /** 이 방이 여는 풀이 */
 export function roomTopics(model: TalkModel, room: RoomId): TalkTopic[] {
   const def = ROOMS[room];
   if (room === "main") return model.topics;
-  const all = allTopics(model);
-  return def.topicIds.map((id) => all.find((t) => t.id === id)).filter((t): t is TalkTopic => Boolean(t));
+  return def.topicIds.map((id) => roomTopic(model, room, id)).filter((t): t is TalkTopic => Boolean(t));
 }
 
 /** 이 방을 열 수 있는가 — 풀이가 하나도 없는 방(예: 해당 주제가 없는 리포트)은 열지 않는다. 이야기만 나누는 방은 늘 열 수 있다 */
@@ -325,10 +373,10 @@ const EXTRA_MOOD: Record<TalkExtra, TalkMood> = { example: "playful", detail: "b
 /** 이야기만 나누는 방(고민해결소)에서 먼저 묻는 질문에 답한 뒤 이어 가는 안내 — 자유 질문 상태에 따라 다르다 */
 function chatLead(model: TalkModel, ctx: RoomContext): TalkLine[] {
   const c = model.chat.state;
-  if (c === "ready") return [miyu(text(ROOM_COPY.chatReady), "basic")];
+  if (c === "ready") return [miyu(text(model.chat.free ? `무료 질문이 ${freeLeftText(model.chat.left)} 남아 있어요. 아래 입력창에 편하게 적어 주세요.` : ROOM_COPY.chatReady), "basic")];
   if (c === "locked") {
     return [
-      miyu(text(ROOM_COPY.chatLocked), "thinking"),
+      miyu(text(model.chat.used ? ROOM_COPY.chatFreeUsed : ROOM_COPY.chatLocked), "thinking"),
       miyu({ kind: "lock", title: TALK_COPY.lock.title, hooks: [...ROOM_COPY.concernHooks] }, "basic"),
     ];
   }
@@ -345,7 +393,7 @@ function chatLead(model: TalkModel, ctx: RoomContext): TalkLine[] {
 /** 눌러서 이어 가기 — 새로 더해진 말(내가 누른 말 + 미유의 답)과 바뀐 상태를 돌려준다. 알 수 없는 행동은 아무것도 바꾸지 않는다 */
 export function applyAction(model: TalkModel, roomId: RoomId, state: RoomState, action: RoomAction, ctx: RoomContext = {}): { state: RoomState; added: TalkLine[] } {
   const room = ROOMS[roomId];
-  const topics = new Map(allTopics(model).map((t) => [t.id, t]));
+  const topics = new Map(allTopics(model).map((t) => [t.id, roomView(roomId, t)]));
   const nothing = { state, added: [] as TalkLine[] };
   const add = (s: RoomState, added: TalkLine[], patch: Partial<RoomState> = {}) => ({ added, state: { ...s, ...patch, lines: [...s.lines, ...added] } });
 
@@ -435,7 +483,7 @@ export function replyOptions(model: TalkModel, roomId: RoomId, state: RoomState)
     return { kind: "intake", options: room.intake.options.map(chip), skip: chip(room.intake.skip) };
   }
   const empty = { feel: [] as ReplyChip[], helpers: [] as ReplyChip[], next: null, report: false, asking: state.asking !== null };
-  const t = state.current ? allTopics(model).find((x) => x.id === state.current) : undefined;
+  const t = state.current ? roomTopic(model, roomId, state.current) : undefined;
   if (!t) return { kind: "chat", ...empty, buy: model.tier === "free" && room.chatOnly ? model.buy : null };
   const used = new Set(state.used[t.id] ?? []);
   const answered = ["yes", "mixed", "unsure"].some((k) => used.has(k));

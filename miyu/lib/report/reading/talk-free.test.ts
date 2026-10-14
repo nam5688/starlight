@@ -10,7 +10,7 @@ import { buildFreePreview } from "../preview.ts";
 import { STARTER_ACTIONS } from "../starter-actions.ts";
 import { TALK_COPY, type TalkChat, type TalkModel } from "./talk.ts";
 import { buildFreeTalkModel } from "./talk-free.ts";
-import { applyAction, availableRooms, replyOptions, roomTopics, ROOM_ORDER, startRoom, type TalkLine } from "./talk-room.ts";
+import { applyAction, availableRooms, replyOptions, roomTopics, ROOM_COPY, ROOM_ORDER, startRoom, type TalkLine } from "./talk-room.ts";
 
 const REF = { year: 2026, month: 10 };
 const TODAY = { year: 2026, month: 10, day: 15 };
@@ -128,4 +128,15 @@ test("성별 정보가 없는 결과: 시기 풀이가 없어 올해의 흐름 �
   assert.equal(model.card.flow.keyword, "리포트에서 이어서 볼 수 있어요");
   assert.equal(TALK_COPY.lock.title, "여기서부터는 리포트에서 이어져요");
   assert.deepEqual(miyuText([]), []);
+});
+
+test("무료 맛보기에서도 진로 방과 재무 방은 이어지는 질문 · 안내가 다르다 (재무 방에는 일 이야기 질문이 없고, 진로 방에는 돈 질문이 없다)", () => {
+  const { model } = freeModel(PATTERNS[0]);
+  const career = roomTopics(model, "career")[0];
+  const money = roomTopics(model, "money")[0];
+  assert.deepEqual(money.locked?.hooks, ROOM_COPY.focus.money.hooks);
+  assert.ok(career.locked && career.locked.hooks.length > 0 && career.locked.hooks.every((h) => !/돈|소비|저축|재물|수입/.test(h)));
+  assert.equal(career.askText, ROOM_COPY.focus.career.ask);
+  assert.equal(money.askText, ROOM_COPY.focus.money.ask);
+  assert.equal(money.traits, undefined, "재무 방에는 일하는 방식 카드를 보이지 않는다");
 });

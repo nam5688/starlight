@@ -2,7 +2,7 @@
 // 리포트에 저장된 글이 아니라 사주 계산 결과에서 고정 문구를 골라 만든다(AI가 쓰지 않는다). 같은 입력은 항상 같은 결과다.
 // 무료 맛보기(tier "free")에서는 이어지는 부분을 잠그고, 무엇에 답하는지(질문)만 보인다 — 잠긴 문장은 만들지도 담지도 않는다.
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다).
-import { DAILY_FREE } from "../../config/product.ts";
+import { DAILY_FREE, PARTNER_AGE_DIRECTION } from "../../config/product.ts";
 import type { SajuResult } from "../../saju/engine.ts";
 import { DAY_AREAS, DAY_NOTES, dayReading, type DayArea } from "../../saju/interpret/day-plain.ts";
 import { monthsAtLevel, MONTH_NOTES, type MonthCalendar } from "../../saju/interpret/months.ts";
@@ -16,6 +16,8 @@ export type CodeTopicInput = {
   tier: "paid" | "free";
   /** 무료 맛보기에서 오늘의 한 장을 보여 줄지 (없으면 lib/config/product.ts의 DAILY_FREE) */
   dailyFree?: boolean;
+  /** 인연의 경향에서 나이 차의 큰 방향을 보여 줄지 (없으면 lib/config/product.ts의 PARTNER_AGE_DIRECTION) */
+  ageDirection?: boolean;
 };
 
 const para = (text: string, label?: string): TalkPiece => ({ kind: "para", text, ...(label ? { label } : {}) });
@@ -24,12 +26,17 @@ const note = (text: string): TalkPiece => ({ kind: "note", text });
 /** 무료 맛보기에서 오늘의 한 장이 닫혀 있을 때(초기 무료 혜택이 끝난 뒤) 리포트에서 이어 보여 주는 것 — 질문만 */
 const DAILY_HOOKS = ["오늘은 어떤 하루의 분위기일까?", "오늘 마음이 쓰이기 쉬운 영역은 어디일까?", "오늘 해 볼 수 있는 작은 행동은 무엇일까?"];
 /** 무료 맛보기에서 인연의 경향이 리포트에서 이어 보여 주는 것 — 질문만 */
-const PARTNER_HOOKS = ["나이 차는 어느 쪽으로 기울기 쉬울까?", "인연 주제가 눈에 띄는 달은 언제일까?", "오래 가는 관계에서 내가 중요하게 보는 것은?"];
+const PARTNER_AGE_HOOK = "나이 차는 어느 쪽으로 기울기 쉬울까?";
+const PARTNER_HOOKS = ["인연 주제가 눈에 띄는 달은 언제일까?", "오래 가는 관계에서 내가 중요하게 보는 것은?"];
 const MARRIAGE_HOOKS = ["결혼 이야기가 가까워지기 쉬운 해는 언제일까?", "나는 어떤 분위기의 사람에게 끌릴까?", "인연이 움직이는 달은 언제일까?"];
+
+/** 인연의 경향 아래의 작은 안내 — 전통 해석이라는 한계 + 일주가 기준에 따라 달라질 수 있으면 참고로만 보라는 말 */
+const partnerCaveat = (dayUncertain: boolean) => (dayUncertain ? `${PARTNER_NOTES.limit} ${PARTNER_NOTES.dayUncertain}` : PARTNER_NOTES.limit);
 
 export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
   const { saju, today, calendar, tier } = input;
   const dailyOpen = tier === "paid" || (input.dailyFree ?? DAILY_FREE.enabled);
+  const ageOn = input.ageDirection ?? PARTNER_AGE_DIRECTION.enabled;
   if (!saju || saju.status !== "ok") return [];
   const out: TalkTopic[] = [];
 
@@ -58,7 +65,7 @@ export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
   }
 
   const r = partnerReading(saju);
-  const basis = partnerBasis(saju);
+  const basis = partnerBasis(saju, ageOn);
   const attach = calendar ? { calendar } : {};
 
   if (tier === "free") {
@@ -69,11 +76,11 @@ export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
       title: "사주로 읽은 인연의 경향",
       headline: `${r.mood.title}에게 마음이 편해지기 쉬워요`,
       summary: [r.mood.line],
-      caveat: PARTNER_NOTES.limit,
+      caveat: partnerCaveat(r.dayUncertain),
       example: [],
       detail: [],
       basis: null,
-      locked: { hooks: PARTNER_HOOKS },
+      locked: { hooks: ageOn ? [PARTNER_AGE_HOOK, ...PARTNER_HOOKS] : PARTNER_HOOKS },
       askText: TALK_ASK_PARTNER,
     });
     out.push({
@@ -99,8 +106,8 @@ export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
     chip: "끌리는 사람의 경향",
     title: "사주로 읽은 인연의 경향",
     headline: `${r.mood.title}에게 마음이 편해지기 쉬워요`,
-    summary: [r.mood.line, r.ageTilt.line],
-    caveat: PARTNER_NOTES.limit,
+    summary: ageOn ? [r.mood.line, r.ageTilt.line] : [r.mood.line],
+    caveat: partnerCaveat(r.dayUncertain),
     example: [],
     detail: [
       para(r.longTerm.line, "오래 가는 관계에서는"),
@@ -108,6 +115,7 @@ export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
       note(PARTNER_NOTES.scope),
       note(PARTNER_NOTES.months),
       note(PARTNER_NOTES.noStats),
+      note(ageOn ? PARTNER_NOTES.source : PARTNER_NOTES.sourceNoAge),
     ],
     basis,
     askText: TALK_ASK_PARTNER,

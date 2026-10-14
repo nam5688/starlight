@@ -23,6 +23,8 @@ export interface ChatAnswerer {
   answer(ask: ChatAsk, ctx?: GenerateContext): Promise<ChatAnswer>;
   readonly provider: string;
   readonly model: string;
+  /** 질문 한 번에 걸리는 전체 시간 (밀리초) — 없으면 CHAT_LIMITS.totalTimeoutMs */
+  readonly totalTimeoutMs?: number;
 }
 
 export type ChatAnswererOptions = {
@@ -31,15 +33,21 @@ export type ChatAnswererOptions = {
   maxRepairs?: number;
   maxRetries?: number;
   sleep?: (ms: number) => Promise<void>;
+  /** 모델이 쓸 수 있는 최대 출력 (토큰). 생각하는 데 쓰는 토큰이 같이 들어가는 모델은 CHAT_LIMITS.maxOutputTokens보다 넉넉히 준다 */
+  maxOutputTokens?: number;
+  /** 모델 호출 한 번의 제한 시간 · 질문 한 번의 전체 시간 (밀리초) */
+  callTimeoutMs?: number;
+  totalTimeoutMs?: number;
 };
 
 export function createChatAnswerer(opts: ChatAnswererOptions): ChatAnswerer {
-  const caller = createModelCaller({ model: opts.model, maxRetries: opts.maxRetries ?? 1, sleep: opts.sleep, maxOutputTokens: L.maxOutputTokens, callTimeoutMs: L.callTimeoutMs });
+  const caller = createModelCaller({ model: opts.model, maxRetries: opts.maxRetries ?? 1, sleep: opts.sleep, maxOutputTokens: opts.maxOutputTokens ?? L.maxOutputTokens, callTimeoutMs: opts.callTimeoutMs ?? L.callTimeoutMs });
   const maxRepairs = opts.maxRepairs ?? 1;
   const spec = { system: CHAT_SYSTEM_PROMPT, promptVersion: CHAT_PROMPT_VERSION };
   return {
     provider: opts.model.provider,
     model: opts.model.model,
+    totalTimeoutMs: opts.totalTimeoutMs,
     async answer(ask, ctx = {}) {
       const messages: ModelMessage[] = [{ role: "user", content: buildChatUserMessage(ask) }];
       let lastErrors: string[] = [];
@@ -48,7 +56,8 @@ export function createChatAnswerer(opts: ChatAnswererOptions): ChatAnswerer {
         try {
           call = await caller.call(messages, ctx, spec);
         } catch (e) {
-          if (e instanceof ModelCallError) throw new ChatAnswerError("AI 호출에 실패했어요.", "MODEL");
+          // 첫 응답이 검사에 걸려 고쳐 쓰는 중에 호출이 실패했다면, 모델이 이미 한 번 응답한 질문이다(비용이 들었다) — 호출 전에 실패한 질문과 달리 INVALID로 센다
+          if (e instanceof ModelCallError) throw round > 0 ? new ChatAnswerError("답이 검사를 통과하지 못했어요.", "INVALID", lastErrors) : new ChatAnswerError("AI 호출에 실패했어요.", "MODEL");
           throw e;
         }
         const check = validateChatAnswer(call.result.text);

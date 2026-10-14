@@ -52,10 +52,18 @@ export const PARTNER_NOTES = {
   scope: "상대의 정확한 나이 · 직업 · 마음, 만나는 날짜는 말하지 않고, 큰 방향과 눈에 띄는 달까지만 읽어요.",
   noStats: "통계나 조사 결과를 쓰지 않았어요. 전통 해석 규칙을 그대로 정리한 초안이에요.",
   months: "달은 ‘이 달에 만난다’는 뜻이 아니라 인연 · 결속 이야기에 마음이 열리기 쉬운 달로 읽는 표시예요.",
+  /** 규칙의 출처를 있는 그대로 — 작은 주의 문구가 아니라 어디서 왔는지를 밝힌다 */
+  source: "이 규칙은 고전 문헌에서 확인한 것이 아니라, 일지(배우자 자리)로 상대의 분위기를 읽는 대중적인 명리 서술을 단순화한 임시 규칙이에요. 나이 방향은 그중에서도 근거가 가장 약한 부분이에요.",
+  /** 나이 방향을 보여 주지 않을 때의 출처 문구 (스위치 PARTNER_AGE_DIRECTION이 꺼져 있을 때) */
+  sourceNoAge: "이 규칙은 고전 문헌에서 확인한 것이 아니라, 일지(배우자 자리)로 상대의 분위기를 읽는 대중적인 명리 서술을 단순화한 임시 규칙이에요.",
+  /** 일주가 기준에 따라 달라질 수 있을 때 */
+  dayUncertain: "태어난 날의 기준(출생 시각 · 절기 · 자시)에 따라 달라질 수 있어, 이 풀이는 참고로만 봐 주세요.",
   compat: "두 사람을 비교하는 궁합은 준비 중이에요. 상대의 생년월일을 받는 기능을 만든 뒤에 열어요.",
 } as const;
 
 export type PartnerReading = {
+  /** 일주가 출생 시각 · 절기 경계 · 자시 관법에 따라 달라질 수 있는가 — 그러면 일지(배우자 자리) 풀이를 참고로만 봐야 한다 */
+  dayUncertain: boolean;
   palace: { branch: string; tenGod: string; group: Group };
   mood: { title: string; line: string };
   ageTilt: { tilt: AgeTilt; label: string; line: string };
@@ -77,7 +85,9 @@ export function partnerReading(saju: SajuOk): PartnerReading {
   const tilt = TILT_OF[palace.group];
   const star: Group | null = saju.gender ? (saju.gender === "female" ? "관성" : "재성") : null;
   const count = star ? starCount(saju, star) : 0;
+  const dayUncertain = saju.notes.some((n) => (n.kind === "jeolgi-day" || n.kind === "near-boundary" || n.kind === "jasi-school") && n.pillars.includes("day"));
   return {
+    dayUncertain,
     palace,
     mood: MOOD[palace.group],
     ageTilt: {
@@ -91,7 +101,7 @@ export function partnerReading(saju: SajuOk): PartnerReading {
 }
 
 /** 접어 두는 "분석 근거" — 계산 결과 · 전통 해석 규칙 · 모르는 것을 나눠 적는다 */
-export function partnerBasis(saju: SajuOk): { computed: string[]; tradition: string[]; answers: string[]; unknown: string[] } {
+export function partnerBasis(saju: SajuOk, ageDirection = true): { computed: string[]; tradition: string[]; answers: string[]; unknown: string[] } {
   const r = partnerReading(saju);
   const day = saju.pillars.find((p) => p.key === "day");
   const computed = [
@@ -99,14 +109,18 @@ export function partnerBasis(saju: SajuOk): { computed: string[]; tradition: str
     ...(r.star ? [`배우자 별(${saju.gender === "female" ? "여성 원국: 관성" : "남성 원국: 재성"}) ${r.star.count}자리`] : []),
   ];
   const tradition = [
+    ageDirection ? PARTNER_NOTES.source : PARTNER_NOTES.sourceNoAge,
     `배우자 자리의 십신 그룹(${r.palace.group})으로 편하게 느끼기 쉬운 분위기를 읽는 규칙(${PARTNER_RULE_VERSION}, 전문가 검토 전 초안)`,
-    "육친의 세대 비유 — 인성 · 관성은 위, 식상 · 재성은 아래, 비겁은 같은 세대 — 로 나이 차의 큰 방향(연상 · 또래 · 연하 쪽)을 읽는 초안 규칙. 검증된 사실이 아니다",
+    ...(ageDirection
+      ? ["육친의 세대 비유 — 인성 · 관성은 위, 식상 · 재성은 아래, 비겁은 같은 세대 — 로 나이 차의 큰 방향(연상 · 또래 · 연하 쪽)을 읽는 초안 규칙. 검증된 사실이 아니다"]
+      : []),
     ...(r.star ? ["배우자 별의 개수는 관계의 좋고 나쁨이나 시기를 말하는 데 쓰지 않고 참고로만 읽는다"] : []),
   ];
   const unknown = [
     "상대의 실제 나이 · 직업 · 마음은 알 수 없어요",
     "이 규칙은 통계나 조사로 확인된 것이 아니에요",
     ...(saju.gender ? [] : ["성별 정보가 없어 배우자 별은 보지 않았어요"]),
+    ...(r.dayUncertain ? [PARTNER_NOTES.dayUncertain] : []),
   ];
   return { computed, tradition, answers: [], unknown };
 }

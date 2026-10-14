@@ -56,7 +56,7 @@ export function basisLines(cal: MonthCalendar, topic: CalendarTopic): string[] {
 
 /** 모든 달력에 붙이는 작은 안내 */
 export function calendarNotes(cal: MonthCalendar, topic: CalendarTopic): string[] {
-  return [MONTH_NOTES.limit, MONTH_NOTES.levelMeaning, MONTH_NOTES.solarTerm, ...(topic === "love" && cal.dayUncertain && cal.usedSpouseStar ? [MONTH_NOTES.dayUncertain] : [])];
+  return [MONTH_NOTES.limit, ...(topic === "love" && cal.usedSpouseStar ? [MONTH_NOTES.commonLove] : []), MONTH_NOTES.levelMeaning, MONTH_NOTES.solarTerm, ...(topic === "love" && cal.dayUncertain && cal.usedSpouseStar ? [MONTH_NOTES.dayUncertain] : [])];
 }
 
 // ───────── 앞으로 12개월 (대화에서 쓴다) ─────────

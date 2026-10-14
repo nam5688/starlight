@@ -3,12 +3,6 @@ import { LoginOptions } from "@/components/auth/login-options";
 import { talkRoomPath } from "@/components/talk/room-paths";
 import { TalkView } from "@/components/talk/talk-view";
 import { pageNarrow } from "@/components/ui/styles";
-import { isReadingReport } from "@/lib/report/generator";
-import { buildFreePreview } from "@/lib/report/preview";
-import { seoulReference } from "@/lib/report/reference";
-import { buildTalkModel } from "@/lib/report/reading/talk";
-import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
-import { seoulDate } from "@/lib/saju/interpret/day-plain";
 import { ROOM_ORDER, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
 import type { TalkModel } from "@/lib/report/reading/talk";
 import { getResultView } from "@/lib/services/report-service";
@@ -16,7 +10,8 @@ import { listSavedRoomKeys, loadTalkRoom } from "@/lib/services/talk-service";
 import { chatStateFor } from "@/server/chat";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
-import { now, readRepository } from "@/server/services";
+import { readRepository } from "@/server/services";
+import { roomModelFor, viewTier } from "@/server/talk-model";
 
 /**
  * 대화로 풀어보기 — 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖의 경우(무료 분석만 마쳤거나 리포트를 준비 중)는 무료 맛보기로 이야기한다.
@@ -42,8 +37,7 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
   // 로그인한 사용자 권한으로 조회 — 다른 회원의 결과는 DB 접근 정책에서도 걸러진다
   const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId: id });
   if (!view) notFound();
-  const { assessment, report } = view;
-  const today = seoulDate(now());
+  const { assessment } = view;
   const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
   const roomHrefs = Object.fromEntries(ROOM_ORDER.map((r) => [r, talkRoomPath(id, r)]));
   const repo = await readRepository();
@@ -55,11 +49,12 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
   });
 
   // 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖에는 무료 맛보기(잠긴 내용 없음)로 이야기한다
-  if (view.paidOrder && report?.status === "ready" && report.content && isReadingReport(report.content)) {
-    const content = report.content;
-    const model = buildTalkModel(content, { saju: assessment.saju, today, chat: chatStateFor("paid") });
+  const tier = viewTier(view);
+  const chat = await chatStateFor(tier, member.userId);
+  const { model } = roomModelFor(view, { paid: chat, free: chat });
+  if (tier === "paid") {
     if (!roomAvailable(model, room)) notFound();
-    const sample = content.source === "sample";
+    const sample = view.report?.content?.source === "sample";
     return (
       <TalkView
         model={model}
@@ -77,15 +72,6 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
   }
 
   const owned = Boolean(view.paidOrder);
-  const model = buildFreeTalkModel({
-    name: assessment.nickname,
-    preview: buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(now()) }),
-    saju: assessment.saju,
-    today,
-    href: owned ? `/results/${id}` : `/results/${id}#r-purchase`,
-    owned,
-    chat: chatStateFor("free"),
-  });
   if (!roomAvailable(model, room)) notFound();
   return (
     <TalkView

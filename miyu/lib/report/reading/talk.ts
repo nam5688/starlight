@@ -44,6 +44,8 @@ export type TalkTopic = {
   basis: ReadingBasis | null;
   /** 앞으로의 시기 — 저장된 월별 달력(코드 계산). 있으면 [인연이 움직이는 달은?] · [재물이 눈에 띄는 달은?] 버튼을 보인다 */
   calendar?: { items: MonthCalendar[]; reference: { year: number; month: number } };
+  /** 이 풀이가 소단락(제목 → 풀이 → 해 볼 것) 몇 개로 시작하는가 — detail의 앞쪽 2×개 조각이 소단락이다. 방마다 보여 줄 소단락을 고를 때 쓴다 */
+  sectionCount?: number;
   /** 먼저 묻는 질문에서 고른 답(선택지 번호)에 따라 풀이 뒤에 덧붙는 말풍선 — 예: 오늘의 한 장에서 고른 영역의 한 줄 팁 · 올해의 흐름에서 고른 달력 */
   picks?: Record<string, TalkBubble[]>;
   /** 무료 맛보기 — 이 풀이의 나머지는 리포트에서 이어진다. 여기에는 질문(무엇에 답하는지)만 담고 잠긴 문장은 담지 않는다 */
@@ -74,8 +76,11 @@ export type TalkCard = {
 /** 첫 화면에서 고르는 큰 묶음 — 묶음 안의 풀이는 이어서 고른다 (예: 내 성향 → 강한 포인트 · 힘들 수 있는 포인트 → 중요하게 여기는 것) */
 export type TalkGroup = { id: string; chip: string; topicIds: string[] };
 
-/** 자유 질문 · 이야기 이어 가기의 상태 — ready: 입력창을 연다 · pending: AI 연결 전이라 준비 중 · locked: 리포트를 받은 분에게 열린다 */
-export type TalkChat = { state: "ready" | "pending" | "locked" };
+/**
+ * 자유 질문 · 이야기 이어 가기의 상태 — ready: 입력창을 연다 · pending: AI 연결 전이라 준비 중 · locked: 리포트를 받은 분에게 열린다.
+ * free: 무료 맛보기(구매 전)에서 로그인한 분께 열어 주는 "첫 질문"이다(ready일 때) · used: 그 무료 질문을 이미 썼다(locked일 때).
+ */
+export type TalkChat = { state: "ready" | "pending" | "locked"; free?: boolean; used?: boolean; /** free일 때 남은 무료 질문 수 (기본 정책은 1번) */ left?: number };
 /** 무료 맛보기에서 잠긴 내용으로 이어지는 버튼 — owned: 이미 구매한 분(리포트 보기)인지 */
 export type TalkBuy = { href: string; label: string; owned: boolean };
 
@@ -156,8 +161,14 @@ export const TALK_COPY = {
   freeQuestionReady: "궁금한 것을 직접 물어보세요",
   freeQuestionAsking: "어떤 상황에서 달랐는지 적어 주세요",
   freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
+  freeQuestionUsed: "무료 질문을 모두 썼어요 · 리포트를 받으면 계속 물어볼 수 있어요",
   buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "인연이 움직이는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
+
+/** 남은 무료 질문 수 말 — 기본 정책(1번)은 "한 번", 시험 중에 늘렸다면 숫자로 */
+export const freeLeftText = (left?: number) => (left && left > 1 ? `${left}번` : "한 번");
+/** 무료 질문이 열려 있을 때 입력창 안내 */
+export const freeQuestionPlaceholder = (left?: number) => `무료 질문 ${freeLeftText(left)} · 궁금한 것을 물어보세요`;
 
 const CHIP: Record<string, string> = {
   tendency: "나는 어떤 사람?",
@@ -193,6 +204,7 @@ function blockTopic(b: ReadingBlock, number: number): TalkTopic {
     summary: [b.summary],
     ...(b.traits ? { traits: b.traits.map((t) => ({ name: t.name, shinesShort: t.shinesShort, burdenShort: t.burdenShort })) } : {}),
     ...(b.caveat ? { caveat: b.caveat } : {}),
+    ...(b.sections?.length ? { sectionCount: b.sections.length } : {}),
     example,
     detail,
     basis: b.basis,
@@ -350,7 +362,9 @@ export function calendarBubbles(cal: NonNullable<TalkTopic["calendar"]>, topic: 
   const months = upcomingMonthTexts(cal.items, cal.reference, topic);
   for (const m of months) out.push({ kind: "text", text: m.text, label: m.label });
   if (months.length > 0) {
-    out.push({ kind: "text", text: MONTH_NOTES.limit, muted: true }, { kind: "text", text: CALENDAR_CHAT_NOTES.more, muted: true });
+    out.push({ kind: "text", text: MONTH_NOTES.limit, muted: true });
+    if (topic === "love" && cal.items.some((c) => c.usedSpouseStar)) out.push({ kind: "text", text: MONTH_NOTES.commonLove, muted: true });
+    out.push({ kind: "text", text: CALENDAR_CHAT_NOTES.more, muted: true });
   }
   return out;
 }

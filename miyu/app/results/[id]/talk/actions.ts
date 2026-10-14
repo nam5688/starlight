@@ -1,15 +1,13 @@
 "use server";
 
 import { buildChatContext } from "@/lib/report/chat/context";
-import { isReadingReport } from "@/lib/report/generator";
-import { buildTalkModel } from "@/lib/report/reading/talk";
 import { ROOMS, roomAvailable, type RoomId } from "@/lib/report/reading/talk-room";
-import { seoulDate } from "@/lib/saju/interpret/day-plain";
 import { ASK_MESSAGES, askFreeQuestion, type AskResult } from "@/lib/services/chat-service";
 import { getResultView } from "@/lib/services/report-service";
 import { resetTalkRoom, saveTalkRoom } from "@/lib/services/talk-service";
-import { chatAnswerer } from "@/server/chat";
-import { capacityConfig, chatConfig } from "@/server/env";
+import { chatAnswerer, chatCapacity } from "@/server/chat";
+import { roomModelFor } from "@/server/talk-model";
+import { chatConfig } from "@/server/env";
 import { getMember } from "@/server/member";
 import { logError } from "@/server/ops";
 import { now, readRepository, writeRepository } from "@/server/services";
@@ -39,7 +37,7 @@ type AskInput = { assessmentId: unknown; room: unknown; roomKey: unknown; questi
 const failed = (reason: "not-found" | "failed"): AskResult => ({ ok: false, reason, message: ASK_MESSAGES[reason] });
 
 /**
- * 자유 질문 — 로그인한 회원이 구매해 준비된 자기 리포트의 방에서만. 근거는 브라우저가 아니라 서버가 저장된 리포트에서 다시 만든다
+ * 자유 질문 — 로그인한 회원이 자기 검사 결과의 방에서만(리포트를 받은 분은 하루 한도, 무료 맛보기는 첫 질문 1번). 근거는 브라우저가 아니라 서버가 저장된 리포트(또는 무료 맛보기)에서 다시 만든다
  * (브라우저가 보내는 것은 질문 · 방 · 지금 이야기 중인 풀이 번호 · 고른 답 번호뿐이다). 한도 · 예산 · 소유자 확인은 서비스(chat-service)가 한다.
  */
 export async function askMiyuAction(input: AskInput): Promise<AskResult> {
@@ -55,16 +53,15 @@ export async function askMiyuAction(input: AskInput): Promise<AskResult> {
         answerer: chatAnswerer(),
         now,
         config: chatConfig(),
-        capacity: capacityConfig(),
+        capacity: chatCapacity(),
         loadAsk: async () => {
           const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId });
-          const report = view?.report;
-          if (!view?.paidOrder || report?.status !== "ready" || !report.content || !isReadingReport(report.content)) return null;
-          const today = seoulDate(now());
-          const model = buildTalkModel(report.content, { saju: view.assessment.saju, today, chat: { state: "ready" } });
+          if (!view) return null;
+          // 구매해 준비된 리포트가 있으면 paid(저장된 풀이 글, 하루 한도), 없으면 free(무료 맛보기의 보이는 글만, 평생 첫 질문 한도)
+          const { tier, model } = roomModelFor(view, { paid: { state: "ready" }, free: { state: "ready", free: true } });
           if (!roomAvailable(model, room as RoomId)) return null;
           const context = buildChatContext(model, room as RoomId, { topicId: text(input.topicId), intakeId: text(input.intake), followUp: input.followUp === true });
-          return { context, referenceDate: model.dayKey };
+          return { context, referenceDate: model.dayKey, tier };
         },
       },
       { userId: member.userId, assessmentId, roomKey, question: input.question },

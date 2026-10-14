@@ -1,6 +1,7 @@
 import "server-only";
+import { resolveChatAi, type ChatAiConfig } from "@/lib/report/chat/ai-config";
 import type { CapacityConfig } from "@/lib/services/capacity-service";
-import { DEFAULT_DAILY_LIMIT, type ChatServiceConfig } from "@/lib/services/chat-service";
+import { DEFAULT_DAILY_LIMIT, DEFAULT_FREE_LIMIT, type ChatServiceConfig } from "@/lib/services/chat-service";
 import type { PaymentEnv } from "@/lib/services/ports";
 import { isTossDocsKey } from "./setup-checks";
 
@@ -158,11 +159,22 @@ export function capacityConfig(): CapacityConfig {
 }
 
 /**
- * 자유 질문(채팅에서 직접 적는 질문) 한도 — AI_CHAT_DAILY_LIMIT: 한 회원이 하루(한국 날짜)에 보낼 수 있는 질문 수 (기본 10, 0이면 닫힘).
+ * 자유 질문(채팅에서 직접 적는 질문) 한도
+ * - AI_CHAT_DAILY_LIMIT: 리포트를 받은 회원이 하루(한국 날짜)에 보낼 수 있는 질문 수 (기본 10, 0이면 닫힘)
+ * - AI_CHAT_FREE_LIMIT: 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 질문 수 (기본 1, 0이면 무료 질문은 닫힘)
  * 질문마다 AI 호출 비용이 든다. 실제 질문 한 번의 비용을 잰 뒤 운영자가 정한다(docs/maintenance.md). 하루 AI 예산(AI_DAILY_BUDGET_KRW)에 닿아도 새 질문만 멈춘다.
  */
 export function chatConfig(): ChatServiceConfig {
-  return { dailyLimit: readInt("AI_CHAT_DAILY_LIMIT", DEFAULT_DAILY_LIMIT) };
+  return { dailyLimit: readInt("AI_CHAT_DAILY_LIMIT", DEFAULT_DAILY_LIMIT), freeLimit: readInt("AI_CHAT_FREE_LIMIT", DEFAULT_FREE_LIMIT) };
+}
+
+/**
+ * 자유 질문의 AI 설정 (리포트 AI 설정 AI_PROVIDER와 따로). 규칙과 환경변수 이름은 lib/report/chat/ai-config.ts에 있다.
+ * 요약: 비움 → (AI_PROVIDER=mock-local이면 가짜 AI 서버, 아니면) 연결 없음 / anthropic → 승인 금액 · 호출 수 · 기간을 운영자가 직접 적어야 한다(없으면 호출하지 않는다). 키 값은 어디에도 출력하지 않는다.
+ */
+export function chatAiConfig(): ChatAiConfig {
+  const ai = aiConfig();
+  return resolveChatAi(read, ai.kind === "mock-local" ? { baseUrl: ai.baseUrl } : null);
 }
 
 /** 공개 주소 — 검색 · 공유용 주소(sitemap · robots · 공유 이미지)의 기준. 배포 전에는 로컬 주소 */

@@ -7,6 +7,7 @@ import { DAY_AREAS, DAY_NOTES, DAY_RULE_VERSION, dayKey, dayReading, seoulDate }
 import { PARTNER_NOTES, PARTNER_RULE_VERSION, partnerBasis, partnerReading, type AgeTilt } from "./partner.ts";
 import { DAY_RULE_META, PARTNER_RULE_META } from "./rule-meta.ts";
 import { spousePalace, type Group } from "./rules.ts";
+import { codeTopicsFor } from "../../report/reading/talk-code.ts";
 
 function chart(y: number, m: number, d: number, gender: "male" | "female" | null = "female", birthTime: string | null = "12:00"): SajuOk {
   const r = calculateSaju({ year: y, month: m, day: d, calendar: "solar", isLeapMonth: false, birthTime, gender });
@@ -139,4 +140,62 @@ test("오늘의 한 장: 한국 날짜 계산과 날짜 키, 규칙 이력", () 
     assert.ok(r.exceptions.some((e) => /오늘 무슨 일이 생긴다고 말하는 데 쓰지 않는다/.test(e)), r.id);
     assert.ok(r.exceptions.some((e) => /좋은 날 · 나쁜 날을 가르거나/.test(e)), r.id);
   }
+});
+
+test("근거 점검: 나이 방향은 일지의 십신 그룹에서만 정해지고, 60일주 한 바퀴에서 연상 24 · 또래 12 · 연하 24로 나뉜다 (규칙 구조에서 나오는 분포이지 사람들의 실제 분포가 아니다)", () => {
+  const count: Record<AgeTilt, number> = { elder: 0, peer: 0, younger: 0 };
+  const pillars = new Set<string>();
+  for (let k = 0; k < 60; k++) {
+    const day = new Date(Date.UTC(2000, 0, 1 + k));
+    const c = chart(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), "female");
+    const dayPillar = c.pillars.find((p) => p.key === "day")!;
+    pillars.add(`${dayPillar.stem}${dayPillar.branch}`);
+    count[partnerReading(c).ageTilt.tilt]++;
+  }
+  assert.equal(pillars.size, 60);
+  assert.deepEqual(count, { elder: 24, peer: 12, younger: 24 });
+});
+
+test("근거 점검: 일주가 출생 시각 · 절기 · 자시 기준에 따라 달라질 수 있으면 풀이 아래와 접어 둔 근거에 참고로만 보라고 알린다", () => {
+  // 절기 당일 · 자시 · 시각 모름 등 일주가 흔들리는 날을 찾는다 (실제 엔진의 notes로 판단)
+  let uncertain: SajuOk | null = null;
+  let steady: SajuOk | null = null;
+  for (let k = 0; k < 400 && (!uncertain || !steady); k++) {
+    const day = new Date(Date.UTC(1995, 0, 1 + k));
+    for (const time of ["23:40", "00:20", "12:00"]) {
+      const c = chart(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate(), "female", time);
+      const r = partnerReading(c);
+      if (r.dayUncertain && !uncertain) uncertain = c;
+      if (!r.dayUncertain && !steady) steady = c;
+    }
+  }
+  assert.ok(uncertain && steady, "자시 근처 출생과 그렇지 않은 출생을 모두 찾았다");
+  assert.ok(partnerBasis(uncertain!).unknown.includes(PARTNER_NOTES.dayUncertain));
+  assert.ok(!partnerBasis(steady!).unknown.includes(PARTNER_NOTES.dayUncertain));
+  const today = { year: 2026, month: 10, day: 15 };
+  for (const tier of ["paid", "free"] as const) {
+    const u = codeTopicsFor({ saju: uncertain!, today, calendar: undefined, tier }).find((t) => t.id === "partner")!;
+    const st = codeTopicsFor({ saju: steady!, today, calendar: undefined, tier }).find((t) => t.id === "partner")!;
+    assert.ok(u.caveat?.includes(PARTNER_NOTES.dayUncertain), `${tier}: 흔들리는 일주는 참고로만`);
+    assert.ok(!st.caveat?.includes(PARTNER_NOTES.dayUncertain), `${tier}: 흔들리지 않으면 붙이지 않는다`);
+  }
+});
+
+test("근거 점검: 규칙의 출처를 있는 그대로 밝히고(고전 근거 미확인 · 나이 방향이 가장 약함), 나이 방향은 스위치로 뺄 수 있다", () => {
+  assert.match(PARTNER_NOTES.source, /고전 문헌에서 확인한 것이 아니라/);
+  assert.match(PARTNER_NOTES.source, /나이 방향은 그중에서도 근거가 가장 약한/);
+  const c = chart(1994, 11, 7, "female");
+  const today = { year: 2026, month: 10, day: 15 };
+  const on = codeTopicsFor({ saju: c, today, calendar: undefined, tier: "paid", ageDirection: true }).find((t) => t.id === "partner")!;
+  const off = codeTopicsFor({ saju: c, today, calendar: undefined, tier: "paid", ageDirection: false }).find((t) => t.id === "partner")!;
+  assert.equal(on.summary.length, 2);
+  assert.equal(off.summary.length, 1);
+  assert.ok(!JSON.stringify(off).includes("나이 차"), "스위치를 끄면 나이 방향 문장이 어디에도 없다");
+  assert.ok(JSON.stringify(on.detail).includes(PARTNER_NOTES.source), "근거 없음을 숨기지 않는다");
+  const freeOff = codeTopicsFor({ saju: c, today, calendar: undefined, tier: "free", ageDirection: false }).find((t) => t.id === "partner")!;
+  const freeOn = codeTopicsFor({ saju: c, today, calendar: undefined, tier: "free", ageDirection: true }).find((t) => t.id === "partner")!;
+  assert.ok(!freeOff.locked!.hooks.some((h) => h.includes("나이 차")) && freeOn.locked!.hooks.some((h) => h.includes("나이 차")));
+  // 규칙 이력에도 가장 약하다는 것이 기록돼 있다
+  const age = PARTNER_RULE_META.find((m) => m.id === "partner-age")!;
+  assert.ok(age.exceptions.some((e) => e.includes("가장 약하다")));
 });

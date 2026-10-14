@@ -144,7 +144,7 @@ export const PARTNER_RULE_META: RuleMeta[] = [
   saju({
     id: "partner-age", title: "육친의 세대 비유로 읽는 나이 차의 큰 방향", match: /^saju\.partner\.age$/,
     interpretation: "인성 · 관성(나를 돕거나 이끄는 기운, 위 세대 비유)이면 연상으로 느껴지는 쪽, 비겁(같은 기운)이면 또래 쪽, 식상 · 재성(내가 낳거나 다스리는 기운, 아래 세대 비유)이면 어리게 느껴지는 쪽으로 기울기 쉽다고 읽는다. 몇 살 차이라는 뜻이 아니다.",
-    conditions: ["일지의 십신 그룹이 정해질 때 — 다섯 그룹이 세 방향으로 나뉜다"], exceptions: [...PARTNER_EXCEPTIONS, "세대 비유는 한 가지 전통 서술이며 학파마다 다를 수 있다 — 검증되지 않았다"],
+    conditions: ["일지의 십신 그룹이 정해질 때 — 다섯 그룹이 세 방향으로 나뉜다"], exceptions: [...PARTNER_EXCEPTIONS, "세대 비유는 한 가지 전통 서술이며 학파마다 다를 수 있다 — 검증되지 않았다", "인연 풀이 중 근거가 가장 약하다: 고전 문헌에서 이 대응을 확인하지 못했고(대중 명리 서술을 단순화), 결과와의 관계를 확인한 자료도 없다 — 끄는 스위치는 lib/config/product.ts의 PARTNER_AGE_DIRECTION"],
   }),
   saju({
     id: "partner-long-term", title: "오래 가는 관계에서 중요하게 여기기 쉬운 것(결혼박사 방)", match: /^saju\.partner\.long$/,

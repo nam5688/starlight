@@ -391,3 +391,33 @@ test("고정 문구: 해요체이고, 사건 예언 · 단정 · 점수 · 투�
   const rooms: RoomId[] = [...ROOM_ORDER];
   assert.equal(new Set(rooms).size, 8);
 });
+
+test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이는 소단락 · 질문 · 안내가 다르고, 저장된 글만 쓴다", () => {
+  const m = model();
+  const block = R.blocks.find((b) => b.id === "work-money")!;
+  assert.equal(block.sections?.length, 3);
+  const [s0, s1, s2] = block.sections!;
+  const career = roomTopics(m, "career")[0];
+  const money = roomTopics(m, "money")[0];
+  const texts = (t: typeof career) => t.detail.flatMap((d) => (d.kind === "para" ? [d.text] : []));
+  assert.ok(texts(career).includes(s0.body) && texts(career).includes(s2.body) && !texts(career).includes(s1.body), "진로: 일하는 방식 · 일을 고르는 기준");
+  assert.ok(texts(money).includes(s0.body) && texts(money).includes(s1.body) && !texts(money).includes(s2.body), "재무: 성과와 수입으로 이어지는 방식 · 시기와 관리 습관");
+  assert.equal(career.askText, ROOM_COPY.focus.career.ask);
+  assert.equal(money.askText, ROOM_COPY.focus.money.ask);
+  assert.notEqual(career.askText, money.askText);
+  assert.match(money.caveat ?? "", /투자 · 대출 결정은 사주로 정하지 않아요/);
+  // 다른 방(나를 알아보기)의 일과 돈 풀이는 소단락 세 개를 그대로 쓴다
+  const main = roomTopics(m, "main").find((t) => t.id === "work-money")!;
+  assert.equal(texts(main).filter((t) => [s0.body, s1.body, s2.body].includes(t)).length, 3);
+  // 방에 들어가 풀이를 열면 방마다 다른 질문이 이어진다
+  const open = (room: "career" | "money") => {
+    let st = startRoom(m, room);
+    st = applyAction(m, room, st, { t: "intake", option: "unsure" }).state;
+    return st;
+  };
+  assert.ok(miyuText(open("career").lines).includes(ROOM_COPY.focus.career.ask));
+  assert.ok(miyuText(open("money").lines).includes(ROOM_COPY.focus.money.ask));
+  // 소단락이 없는 이전 리포트에서도 방마다 질문 · 안내는 다르다
+  const old = buildTalkModel({ ...R, blocks: R.blocks.map((b) => (b.id === "work-money" ? { ...b, sections: undefined } : b)) }, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: TODAY, chat: { state: "pending" } });
+  assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
+});

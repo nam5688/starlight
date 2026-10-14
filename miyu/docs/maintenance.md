@@ -13,7 +13,11 @@
 | **상담방 이름 · 모드 이름 · 먼저 묻는 질문 · 열 수 있는 풀이** (8개) | `lib/report/reading/talk-room.ts`의 `ROOMS`(순서는 `ROOM_ORDER`) | 홈 카드 · 채팅방 목록 · 메뉴가 모두 이 표를 읽는다. 진로 / 재무 방은 지금 같은 "일과 돈" 풀이를 쓴다. `talk-room.test.ts` |
 | **일일 운세 무료 혜택**(초기에만) | `lib/config/product.ts`의 `DAILY_FREE.enabled` | false로 바꾸면 무료 맛보기에서는 그날의 풀이 대신 질문만 보이고, 구매한 분은 그대로 본다. `talk-code.test.ts` |
 | **자유 질문 하루 횟수** | 환경변수 `AI_CHAT_DAILY_LIMIT` (기본 10, 0이면 닫힘) | 질문 한 번의 실제 비용을 잰 뒤 정한다. 하루 AI 예산(`AI_DAILY_BUDGET_KRW`)에 닿아도 새 질문만 멈춘다 |
-| 자유 질문 지시문 · 답 검사 · 한도 · 힘든 글 안내 | `lib/report/chat/`(`prompt.ts` · `validate.ts` · `plan.ts` · `question.ts`) | 지시문을 고치면 `CHAT_PROMPT_VERSION`을 올린다. `chat.test.ts`. 실제 AI로는 아직 시험하지 않았다 |
+| **무료 맛보기의 무료 질문 횟수** | 환경변수 `AI_CHAT_FREE_LIMIT` (기본 1 — 로그인한 회원이 평생 1번, 0이면 닫힘) | 실제 AI 시험 중에만 일시적으로 올리고(예: 8) 끝나면 비운다. 이미 쓴 횟수는 그대로 남는다 |
+| **자유 질문의 실제 AI 연결(Claude)** | 환경변수 `AI_CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` + 승인 값 `AI_CHAT_APPROVED_KRW` · `AI_CHAT_APPROVED_CALLS` · `AI_CHAT_APPROVED_FROM` · `AI_CHAT_APPROVED_THROUGH` | 운영자가 값을 직접 적어야만 연결된다. 코드 상한(`lib/config/ai-candidates.ts`의 `CHAT_TEST_LIMITS` 1,500원 · 40회 · 3일)을 넘기면 연결되지 않는다. 시험이 끝나면 `AI_CHAT_PROVIDER`를 비워 끊는다. 호출 수 · 비용은 `supabase/check-chat-usage.sql`(읽기 전용)로 본다. 승인액을 새로 정하면 `STAGE1_LEDGER`(누적 사용액)도 운영자가 확인한 값으로 고친다 |
+| **인연 풀이의 나이 방향** | `lib/config/product.ts`의 `PARTNER_AGE_DIRECTION` (`enabled: false`로 끄면 나이 방향 문장 · 질문이 빠진다) | 근거가 가장 약한 규칙이라 전문가 검토 전에는 끄기를 추천한다(`docs/partner-rules-audit.md`) |
+| 일일 운세 하루 한 번 무료 | `lib/config/product.ts`의 `DAILY_FREE` | 초기 혜택을 끝낼 때 `enabled: false` |
+| 자유 질문 지시문 · 답 검사 · 한도 · 힘든 글 안내 · 승인 가드 | `lib/report/chat/`(`prompt.ts` · `validate.ts` · `plan.ts` · `question.ts` · `approval.ts` · `ai-config.ts`) | 지시문을 고치면 `CHAT_PROMPT_VERSION`을 올린다. `chat.test.ts`. 실제 AI로는 아직 시험하지 않았다 |
 | 인연의 경향 · 오늘의 한 장 문구 규칙 | `lib/saju/interpret/partner.ts` · `day-plain.ts` (+ `rule-meta.ts`의 규칙 이력) | 고친 뒤 `node scripts/render-data-docs.ts`로 `docs/saju-rules.md`를 다시 만든다. 구체적 나이 · 직업 · 날짜 · 속마음은 쓰지 않는다 (`partner-day.test.ts`) |
 | 홈 · 안내 화면 문구 | `app/page.tsx` · `components/home/*` | 가격 · 범위는 위 파일을 읽으므로 여기서 고치지 않는다 |
 | 이용약관 · 개인정보 처리방침 | `app/terms/page.tsx` · `app/privacy/page.tsx` + **`lib/membership/terms.ts`의 `TERMS_VERSION` 올리기** | 버전을 올려야 기존 회원이 다시 동의한다 |

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ChatAnswerError, type ChatAnswerer } from "../report/chat/answer.ts";
-import { CRISIS_REPLY } from "../report/chat/question.ts";
+import { CARE_NOTE, CRISIS_REPLY } from "../report/chat/question.ts";
 import type { ChatAsk, ChatContext } from "../report/chat/types.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
 import { ASK_MESSAGES, askFreeQuestion, recentExchanges, type AskDeps } from "./chat-service.ts";
@@ -11,9 +11,9 @@ import type { AssessmentRecord } from "./ports.ts";
 import { saveTalkRoom } from "./talk-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
-const CONTEXT: ChatContext = { room: { label: "연애", mode: "연애박사 미유" }, intake: null, topic: { title: "가까운 관계", headline: "확인이 되면 마음이 편해져요", summary: ["확인이 있으면 편해져요."], detail: [] }, overview: { headline: "확인을 중요하게 여겨요", tendency: null, strength: null, caution: null, flow: null }, followUp: false };
+const CONTEXT: ChatContext = { room: { label: "연애", mode: "연애박사 미유", focus: "연애 · 관계" }, intake: null, topic: { title: "가까운 관계", headline: "확인이 되면 마음이 편해져요", summary: ["확인이 있으면 편해져요."], detail: [] }, overview: { headline: "확인을 중요하게 여겨요", tendency: null, strength: null, caution: null, flow: null }, followUp: false, taste: false };
 
-async function setup(opts: { answer?: () => Promise<string[]>; dailyLimit?: number; loaded?: boolean; budget?: number } = {}) {
+async function setup(opts: { answer?: () => Promise<string[]>; dailyLimit?: number; freeLimit?: number; tier?: "paid" | "free"; loaded?: boolean; budget?: number } = {}) {
   const mem = createMemoryRepository(() => new Date("2026-10-15T03:00:00Z"));
   const base = { channel: "web", nickname: "서윤", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 11, birthDay: 7, birthTime: "08:40", knownMbti: null, answers: {}, contentVersion: "t", source: "sample", summary: {}, saju: { status: "not-connected" } } as unknown as Omit<AssessmentRecord, "id" | "createdAt" | "userId">;
   const mine = await mem.repo.insertAssessment({ ...base, userId: "u1" });
@@ -32,9 +32,9 @@ async function setup(opts: { answer?: () => Promise<string[]>; dailyLimit?: numb
     repo: mem.repo,
     answerer,
     now: () => new Date("2026-10-15T03:00:00Z"),
-    config: { dailyLimit: opts.dailyLimit ?? 3 },
+    config: { dailyLimit: opts.dailyLimit ?? 3, freeLimit: opts.freeLimit ?? 1 },
     capacity: opts.budget ? { ...NO_LIMITS, dailyBudgetKrw: opts.budget, priceInputKrwPerMTok: 1000, priceOutputKrwPerMTok: 1000 } : undefined,
-    loadAsk: async () => (opts.loaded === false ? null : { context: CONTEXT, referenceDate: "2026-10-15" }),
+    loadAsk: async () => (opts.loaded === false ? null : { context: CONTEXT, referenceDate: "2026-10-15", tier: opts.tier ?? "paid" }),
     ...over,
   });
   return { mem, repo: mem.repo, mine: mine.id, other: other.id, asks, deps };
@@ -72,9 +72,9 @@ test("입력: 빈 글 · 300자 초과는 거절하고, 연락처는 가려서 A
   assert.ok(!asks[0].question.includes("1234-5678"));
 });
 
-test("마음이 많이 힘든 글은 AI를 부르지 않고 고정 안내만 돌려주며 횟수에도 세지 않는다", async () => {
+test("스스로를 해치겠다는 분명한 표현만 AI를 부르지 않고 고정 안내를 돌려주며 횟수에도 세지 않는다", async () => {
   const { mine, deps, asks, mem } = await setup();
-  const r = await askFreeQuestion(deps(), input(mine, "죽고 싶다는 생각이 들어요"));
+  const r = await askFreeQuestion(deps(), input(mine, "자살하고 싶다는 생각이 들어요"));
   assert.deepEqual(r, { ok: true, kind: "safety", paragraphs: CRISIS_REPLY });
   assert.equal(asks.length, 0);
   assert.equal(mem.chatQuestions.length, 0);
@@ -82,10 +82,26 @@ test("마음이 많이 힘든 글은 AI를 부르지 않고 고정 안내만 돌
   assert.equal((await askFreeQuestion(deps({ answerer: null }), input(mine, "자해를 했어요"))).ok, true);
 });
 
+test("힘든 마음의 표현(죽고 싶다 등)은 막지 않고 답하되 마음을 먼저 받아 주도록 AI에 알리고 답 뒤에 안내 한 문단을 붙이며, 일반적인 슬픔 · 연애 고민은 그대로 답한다", async () => {
+  const { mine, deps, asks, mem } = await setup({ dailyLimit: 10 });
+  const soft = await askFreeQuestion(deps(), input(mine, "헤어지고 나서 죽고 싶다는 생각까지 들어요"));
+  assert.ok(soft.ok && soft.kind === "answer", JSON.stringify(soft));
+  assert.equal(asks[0].care, true);
+  assert.equal(soft.paragraphs[soft.paragraphs.length - 1], CARE_NOTE);
+  assert.ok(soft.paragraphs.length <= 6, "저장 한도 안");
+  assert.equal(mem.chatQuestions.length, 1, "AI가 답했으니 횟수에 센다");
+  for (const q of ["너무 우울하고 외로워요", "헤어져서 힘들어요. 눈물이 자꾸 나요", "불안해서 잠이 안 와요", "남자친구가 연락이 없어서 속상해요"]) {
+    const r = await askFreeQuestion(deps(), input(mine, q));
+    assert.ok(r.ok && r.kind === "answer" && !r.paragraphs.includes(CARE_NOTE), q);
+  }
+  assert.equal(asks.length, 5);
+  assert.ok(asks.slice(1).every((a) => !a.care));
+});
+
 test("AI가 연결되지 않았거나 한도가 0이면 닫혀 있다 (준비 중)", async () => {
   const { mine, deps } = await setup();
   assert.deepEqual(await askFreeQuestion(deps({ answerer: null }), input(mine)), { ok: false, reason: "closed", message: ASK_MESSAGES.closed });
-  assert.equal((await askFreeQuestion(deps({ config: { dailyLimit: 0 } }), input(mine))).ok, false);
+  assert.equal((await askFreeQuestion(deps({ config: { dailyLimit: 0, freeLimit: 1 } }), input(mine))).ok, false);
 });
 
 test("하루 횟수 한도: 한도까지는 답하고 넘으면 멈추며, 날짜가 바뀌면 다시 열리고, 다른 회원 몫과 섞이지 않는다", async () => {
@@ -144,4 +160,44 @@ test("이어지는 질문: 이 방에 저장된 앞선 질문과 답이 최근 2
   assert.deepEqual(asks[0].recent, [{ q: "질문2", a: "답2" }, { q: "질문3", a: "답3" }]);
   assert.deepEqual(recentExchanges([{ t: "topic", id: "love" }]), []);
   assert.equal(recentExchanges([{ t: "free", q: "가".repeat(300), a: ["나".repeat(600)] }])[0].a.length, 400);
+});
+
+test("무료 맛보기(구매 전)의 로그인한 회원은 첫 질문 1번만 답을 받고, 그 횟수는 평생 센다 (날짜가 지나도 다시 열리지 않는다)", async () => {
+  const { mine, deps, asks, mem } = await setup({ tier: "free", freeLimit: 1, dailyLimit: 10 });
+  const first = await askFreeQuestion(deps(), input(mine));
+  assert.ok(first.ok && first.kind === "answer" && first.remaining === 0);
+  assert.equal(mem.chatQuestions.length, 1);
+  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "free-used", message: ASK_MESSAGES["free-used"] });
+  assert.equal(asks.length, 1, "두 번째는 AI를 부르지 않는다");
+  // 다음 날 · 한 달 뒤에도 무료 질문은 다시 열리지 않는다
+  mem.chatQuestions.forEach((q) => (q.createdAt = "2026-08-01T02:00:00.000Z"));
+  assert.equal((await askFreeQuestion(deps(), input(mine))).ok, false);
+});
+
+test("무료 질문 횟수(AI_CHAT_FREE_LIMIT)를 늘릴 수 있고 0이면 무료 질문은 닫힌다 — 리포트를 받은 회원의 하루 한도는 따로다", async () => {
+  const two = await setup({ tier: "free", freeLimit: 2 });
+  assert.ok((await askFreeQuestion(two.deps(), input(two.mine))).ok);
+  const second = await askFreeQuestion(two.deps(), input(two.mine));
+  assert.ok(second.ok && second.kind === "answer" && second.remaining === 0);
+  assert.equal((await askFreeQuestion(two.deps(), input(two.mine))).ok, false);
+
+  const off = await setup({ tier: "free", freeLimit: 0 });
+  assert.deepEqual(await askFreeQuestion(off.deps(), input(off.mine)), { ok: false, reason: "not-ready", message: ASK_MESSAGES["not-ready"] });
+  assert.equal(off.asks.length, 0);
+
+  // 무료로 한 번 물은 회원이 리포트를 받으면(paid) 하루 한도로 이어서 묻는다 — 무료 질문은 하루 몫을 줄이지만 오늘 것으로는 세지 않는다
+  const bought = await setup({ tier: "free", freeLimit: 1, dailyLimit: 3 });
+  assert.ok((await askFreeQuestion(bought.deps(), input(bought.mine))).ok);
+  bought.mem.chatQuestions.forEach((q) => (q.createdAt = "2026-10-01T02:00:00.000Z"));
+  const paid = await askFreeQuestion(bought.deps({ loadAsk: async () => ({ context: CONTEXT, referenceDate: "2026-10-15", tier: "paid" }) }), input(bought.mine));
+  assert.ok(paid.ok && paid.kind === "answer" && paid.remaining === 2);
+});
+
+test("무료 질문도 호출이 실패하면 횟수에 세지 않고(다시 물을 수 있다), 검사에 계속 걸린 답은 센다", async () => {
+  const { mine, deps, mem } = await setup({ tier: "free" });
+  const hard = { provider: "t", model: "t", answer: async () => Promise.reject(new ChatAnswerError("호출 실패", "MODEL")) } as ChatAnswerer;
+  assert.equal((await askFreeQuestion(deps({ answerer: hard }), input(mine))).ok, false);
+  assert.equal(mem.chatQuestions.length, 0);
+  assert.ok((await askFreeQuestion(deps(), input(mine))).ok, "실패한 뒤에도 무료 질문이 남아 있다");
+  assert.equal(mem.chatQuestions.length, 1);
 });
