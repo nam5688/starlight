@@ -1,5 +1,6 @@
 "use server";
 
+import { isCashProduct, parseConcernProductId } from "@/lib/config/product";
 import { newErrorId, safeErrorMessage } from "@/lib/ops/redact";
 import { confirmPayment, markCheckoutFailed } from "@/lib/services/order-service";
 import { paymentConfig } from "@/server/env";
@@ -97,8 +98,8 @@ export async function confirmPaymentAction(input: { orderId: string; paymentKey:
 }
 
 /** 결제 실패 주소에서 호출: 대기 중인 주문을 취소·실패로 정리한다 */
-export async function recordPaymentFailureAction(input: { orderId: string; code: string; message: string }): Promise<{ assessmentId: string | null; resultPath: string | null; concern: boolean }> {
-  const none = { assessmentId: null, resultPath: null, concern: false };
+export async function recordPaymentFailureAction(input: { orderId: string; code: string; message: string }): Promise<{ assessmentId: string | null; resultPath: string | null; concern: boolean; cash: boolean }> {
+  const none = { assessmentId: null, resultPath: null, concern: false, cash: false };
   if (!paymentConfig().ok) return none;
   const member = await getMember();
   if (!member || member.needsConsent || typeof input?.orderId !== "string") return none;
@@ -111,5 +112,5 @@ export async function recordPaymentFailureAction(input: { orderId: string; code:
   const order = await repo.getOrderByNumber(input.orderId);
   if (!order || order.userId !== userId) return none;
   const resultPath = resultPathOf(order);
-  return { assessmentId: order.assessmentId, resultPath, concern: resultPath !== `/results/${order.assessmentId}` };
+  return { assessmentId: order.assessmentId, resultPath, concern: parseConcernProductId(order.productId) !== null, cash: isCashProduct(order.productId) };
 }

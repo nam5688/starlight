@@ -1,7 +1,7 @@
 // 실행: npm test — 주문이 끝난 뒤 돌아갈 화면: 개인 통합 리포트는 결과 화면, 고민 반영 리포트는 나의 고민 기록소(결제 완료면 그 기록의 리포트)
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { concernProductId, PERSONAL_REPORT, personalProductId } from "../lib/config/product.ts";
+import { cashProductId, concernProductId, PERSONAL_REPORT, personalProductId } from "../lib/config/product.ts";
 import { resultPathOf } from "./order-paths.ts";
 
 const A = "11111111-1111-4111-8111-111111111111";
@@ -27,4 +27,11 @@ test("같은 결과로 다시 받은 리포트(2번째부터) 주문은 그 주�
   assert.equal(resultPathOf({ assessmentId: A, productId: personalProductId(1), orderNumber: "MIYU-20261015-ABCDEF" }), `/results/${A}`);
   // 주문번호가 없으면(예전 호출) 결과 화면 그대로
   assert.equal(resultPathOf({ assessmentId: A, productId: personalProductId(3) }), `/results/${A}`);
+});
+
+test("미유캐시 충전 주문은 충전 화면으로 돌아가고, 결제가 끝나면 충전 완료 안내(done)를 함께 보인다", () => {
+  const order = { assessmentId: A, productId: cashProductId({ cash: 100, bonus: 15, nonce: "ABCDEF2345" }), orderNumber: "MEU-20261015-ABCDEFGHJK" };
+  assert.equal(resultPathOf(order), `/cash?a=${A}`);
+  assert.equal(resultPathOf(order, { paid: true }), `/cash?a=${A}&done=MEU-20261015-ABCDEFGHJK`);
+  assert.equal(resultPathOf({ assessmentId: A, productId: order.productId }, { paid: true }), `/cash?a=${A}`, "주문번호가 없으면 done 없이");
 });

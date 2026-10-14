@@ -1,7 +1,7 @@
 // 리포트 생성과 조회. 결제가 확인된 주문에만 만들고, 완성된 리포트는 다시 만들지 않는다.
 
 import { REPORT_GENERATING_STALE_MS, REPORT_GENERATION_TIMEOUT_MS, REPORT_MAX_ATTEMPTS, REPORT_RETRY_COOLDOWN_MS } from "../commerce/report.ts";
-import { parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
+import { isCashProduct, parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
 import { concernInputOf } from "../personalization/concern.ts";
 import type { AiUsageSample, ConcernInput, ReportGenerator, ReportInput } from "../report/generator.ts";
 import { reportTexts } from "../report/concern/texts.ts";
@@ -28,7 +28,8 @@ type ReportDeps = {
  * 이미 리포트 행이 있으면 그대로 돌려준다.
  */
 export async function queueReport(deps: { repo: MiyuRepository }, order: OrderRecord): Promise<ReportRecord | null> {
-  if (order.status !== "paid") return null;
+  // 미유캐시 충전 주문은 리포트를 만들지 않는다 (결제가 확인되면 DB가 지갑에 캐시를 넣는다)
+  if (order.status !== "paid" || isCashProduct(order.productId)) return null;
   const existing = await deps.repo.getReportByOrder(order.id);
   if (existing) return existing;
   const inserted = await deps.repo.insertReport({

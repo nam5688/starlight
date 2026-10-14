@@ -75,10 +75,12 @@ export function ConfirmRunner() {
       </p>
     );
   }
+  // 미유캐시 충전은 리포트가 아니라 충전 화면으로 돌아간다
+  const cashFlow = Boolean(outcome && "resultPath" in outcome && outcome.resultPath?.startsWith("/cash"));
   if (outcome?.kind === "paid") {
     return (
       <p role="status" className="mt-4 text-[16px] leading-relaxed text-ink-2">
-        결제가 확인되었습니다. 곧 리포트 화면으로 이동합니다.
+        {cashFlow ? "결제가 확인되었습니다. 곧 충전 화면으로 이동합니다." : "결제가 확인되었습니다. 곧 리포트 화면으로 이동합니다."}
       </p>
     );
   }
@@ -92,7 +94,7 @@ export function ConfirmRunner() {
         </p>
         <p className="text-[16px] leading-relaxed text-ink-2">
           {offline ? "인터넷 연결이 불안정해 결과를 받지 못했습니다. " : "결제사 응답을 아직 받지 못했습니다. "}
-          결제가 승인되었다면 확인되는 대로 자동으로 반영되고, 리포트도 준비됩니다.{" "}
+          결제가 승인되었다면 확인되는 대로 자동으로 반영되고, {cashFlow ? "충전한 캐시도 지갑에 들어옵니다" : "리포트도 준비됩니다"}.{" "}
           <span className="font-semibold text-ink">다시 결제하지 않아도 됩니다.</span>
         </p>
         <p className="text-[14px] leading-relaxed text-ink-3">

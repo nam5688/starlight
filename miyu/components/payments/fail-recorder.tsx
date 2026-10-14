@@ -13,13 +13,13 @@ export function FailRecorder() {
   const code = params.get("code") ?? "";
   const message = params.get("message") ?? "";
   const orderId = params.get("orderId");
-  const [back, setBack] = useState<{ path: string | null; concern: boolean }>({ path: null, concern: false });
+  const [back, setBack] = useState<{ path: string | null; concern: boolean; cash: boolean }>({ path: null, concern: false, cash: false });
   const started = useRef(false);
 
   useEffect(() => {
     if (started.current || !orderId) return;
     started.current = true;
-    recordPaymentFailureAction({ orderId, code, message }).then((r) => setBack({ path: r.resultPath, concern: r.concern }));
+    recordPaymentFailureAction({ orderId, code, message }).then((r) => setBack({ path: r.resultPath, concern: r.concern, cash: r.cash }));
   }, [orderId, code, message]);
 
   const canceled = USER_CANCEL_CODES.includes(code);
@@ -34,7 +34,7 @@ export function FailRecorder() {
       <div className="flex flex-col gap-3 sm:flex-row">
         {back.path ? (
           <Link href={back.path} className={buttonPrimary}>
-            {back.concern ? "고민 기록소로 돌아가기" : "다시 결제하기"}
+            {back.concern ? "고민 기록소로 돌아가기" : back.cash ? "충전 화면으로 돌아가기" : "다시 결제하기"}
           </Link>
         ) : (
           <Link href="/my" className={buttonPrimary}>

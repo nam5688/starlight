@@ -120,7 +120,7 @@ function Revenue({ m }: { m: Metrics }) {
         매출 · 비용 · 한 건당 이익
       </h2>
       <dl className="mt-3 border-y border-line text-[14px]">
-        <Row label="승인된 실결제">{r.paidCount + r.refundedCount}건 · {formatKrw(r.grossKrw)}</Row>
+        <Row label="승인된 실결제 (리포트)">{r.paidCount + r.refundedCount}건 · {formatKrw(r.grossKrw)}</Row>
         <Row label="환불 반영">
           {r.refundedCount}건 · -{formatKrw(r.refundedKrw)}
         </Row>
@@ -129,6 +129,9 @@ function Revenue({ m }: { m: Metrics }) {
         </Row>
         <Row label="이 중 고민 반영 리포트">
           {r.concern.paidCount}건 · {formatKrw(r.concern.netKrw)} (기존 구매자의 추가 구매 — 위 첫 구매 단계 · 채널별 전환에는 넣지 않음)
+        </Row>
+        <Row label="미유캐시 충전 (별도)">
+          {r.cash.paidCount}건 · {formatKrw(r.cash.netKrw)} · 환불 {r.cash.refundedCount}건 (리포트 매출 · 한 건당 계산에는 넣지 않음 — 아직 쓰지 않은 선불 금액이라 매출로 잡는 시점은 운영자 · 세무 확인 전)
         </Row>
         <Row label="제외한 것">테스트 결제 {r.testPaidCount}건 (매출 아님) · 중복 결제 의심 {r.duplicateSuspects}건 (운영자 확인)</Row>
         <Row label="AI 비용 (실결제 리포트)">{e.pricingConfigured ? krw(e.aiCostKrw) : "토큰 단가 설정 전 — 비용 계산 안 함"}</Row>

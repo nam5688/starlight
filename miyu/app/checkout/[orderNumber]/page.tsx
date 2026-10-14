@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { TossCheckout } from "@/components/checkout/toss-checkout";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
-import { formatKrw, parseConcernProductId, parsePersonalSeq, productNameOf } from "@/lib/config/product";
+import { formatKrw, isCashProduct, parseConcernProductId, parsePersonalSeq, productNameOf } from "@/lib/config/product";
 import { paymentConfig } from "@/server/env";
 import { readRepository, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
@@ -54,6 +54,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
   const productName = productNameOf(order.productId);
   const isConcern = parseConcernProductId(order.productId) !== null;
   const isRepeat = (parsePersonalSeq(order.productId) ?? 1) > 1;
+  const isCash = isCashProduct(order.productId);
   const backPath = resultPathOf(order);
 
   // 본인 프로필(결제 구매자 키)이 빠져 있으면 서버가 채운다 — 테이블보다 먼저 가입한 회원
@@ -103,6 +104,11 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
           기존 개인 통합 리포트는 그대로 보관되고, 이 결제로는 지금 적어 둔 고민을 반영한 새 리포트가 따로 만들어집니다. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없습니다.
         </p>
       )}
+      {isCash && (
+        <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
+          질문에 쓰는 미유캐시 충전이에요. 결제가 확인되면 지갑에 캐시가 들어오고, 리포트는 새로 만들어지지 않아요. 가격과 보너스는 가안이에요.
+        </p>
+      )}
       {isRepeat && (
         <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
           같은 결과로 새 리포트를 받는 결제예요. 이미 받은 리포트는 그대로 남고, 이 결제가 끝나면 새 리포트가 따로 만들어져요.
@@ -110,7 +116,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
       )}
       <p className="mt-6 text-[14px] text-ink-3">
         <Link href={backPath} className={textLink}>
-          {isConcern ? "고민 기록소로 돌아가기" : "결과 화면으로 돌아가기"}
+          {isConcern ? "고민 기록소로 돌아가기" : isCash ? "충전 화면으로 돌아가기" : "결과 화면으로 돌아가기"}
         </Link>
       </p>
     </>

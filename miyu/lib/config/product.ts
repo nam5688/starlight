@@ -80,6 +80,8 @@ export const MIYU_CASH = {
   ],
   /** 충전 화면의 빠른 선택 (개) */
   packages: [10, 30, 50, 100, 300],
+  /** 환불 · 유효기간 · 보너스 환불 여부 같은 이용 기준을 운영자가 확정했는가 — false인 동안 충전 화면은 "아직 정해지지 않았다"고 밝힌다(docs/cash-policy.md). 확정하면 true로 바꾸고 화면 문구를 정책에 맞게 고친다 */
+  policyDecided: false,
 } as const;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

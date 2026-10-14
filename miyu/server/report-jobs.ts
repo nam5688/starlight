@@ -1,5 +1,6 @@
 import "server-only";
 import { after } from "next/server";
+import { isCashProduct } from "@/lib/config/product";
 import type { OrderRecord } from "@/lib/services/ports";
 import { claimReport, completeReport, queueReport, runReport } from "@/lib/services/report-service";
 import { capacityConfig } from "./env";
@@ -20,6 +21,7 @@ function log(where: string, e: unknown) {
 
 /** 결제 확인 직후: 대기열에 올리고 백그라운드 생성을 예약한다 */
 export async function queueAndScheduleReport(order: OrderRecord) {
+  if (isCashProduct(order.productId)) return; // 미유캐시 충전은 리포트가 없다
   try {
     await queueReport({ repo: writeRepository() }, order);
   } catch (e) {

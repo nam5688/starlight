@@ -2,7 +2,7 @@
 // 결제 상태(orders)와 리포트 생성 상태(reports)는 섞지 않는다: 결제했지만 생성에 실패한 고객에게 다시 구매하라고 하지 않는다.
 
 import type { OrderStatus } from "../commerce/order.ts";
-import { isPersonalProduct, parseConcernProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
+import { isPersonalProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
@@ -220,8 +220,10 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
 
 export type OrderTrace = {
   order: MyOrderRow & { method: string | null; failureMessage: string | null };
-  /** 결제 승인 후에만 리포트 열람 권한이 생긴다 */
+  /** 결제 승인 후에만 리포트 열람 권한이 생긴다 (미유캐시 충전 주문은 리포트가 아니라 cash를 본다) */
   entitled: boolean;
+  /** 미유캐시 충전 주문이면 — 주문에 적힌 충전량과 지갑에 실제로 들어간 · 회수된 양 (서버가 결제 승인을 확인한 뒤에만 들어간다) */
+  cash: { cash: number; bonus: number; credited: number; clawedBack: number; shortfall: number } | null;
   generation: Generation;
   events: { at: string; source: string; status: string | null; statusLabel: string | null; method?: string; mId?: string; approvedAt?: string }[];
 };
@@ -283,6 +285,7 @@ export async function traceOrder(
       failureMessage: order.failureMessage,
     },
     entitled: order.status === "paid",
+    cash: await cashTraceOf(readRepo, input.userId, order),
     generation: order.status === "paid" ? generationOf(report) : "none",
     events: events.map((e) => ({
       at: e.createdAt,
@@ -294,4 +297,18 @@ export async function traceOrder(
       approvedAt: str(e.detail.approvedAt),
     })),
   };
+}
+
+async function cashTraceOf(repo: MiyuRepository, userId: string, order: OrderRecord): Promise<OrderTrace["cash"]> {
+  const parsed = parseCashProductId(order.productId);
+  if (!parsed) return null;
+  let rows: Awaited<ReturnType<MiyuRepository["listCashLedger"]>> = [];
+  try {
+    rows = (await repo.listCashLedger(userId, 200)).filter((r) => r.orderId === order.id);
+  } catch {
+    // 13번 DB 변경 전에는 지갑 내역이 없다
+  }
+  const credited = rows.filter((r) => r.kind === "charge" || r.kind === "bonus").reduce((n, r) => n + r.amount, 0);
+  const clawback = rows.filter((r) => r.kind === "clawback");
+  return { cash: parsed.cash, bonus: parsed.bonus, credited, clawedBack: -clawback.reduce((n, r) => n + r.amount, 0), shortfall: clawback.reduce((n, r) => n + r.shortfall, 0) };
 }

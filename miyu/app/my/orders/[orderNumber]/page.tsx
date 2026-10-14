@@ -67,21 +67,41 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
         {order.failureMessage && <Row label="안내">{order.failureMessage}</Row>}
       </dl>
 
-      <section aria-labelledby="o-access">
-        <h2 id="o-access" className="text-[18px] font-bold">
-          리포트 제공
-        </h2>
-        <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-          {trace.entitled
-            ? `서버가 결제 승인을 확인해 전체 리포트 열람 권한이 있습니다. 생성 상태: ${GENERATION_LABEL[trace.generation] || "생성 전"}.`
-            : "결제 승인이 확인되지 않아 전체 리포트 열람 권한이 없습니다. 결제 성공 화면으로 이동했거나 리포트가 보였더라도, 서버 승인 기록이 없으면 결제 완료가 아닙니다."}
-        </p>
-        <p className="mt-2 text-[15px]">
-          <Link href={`/results/${order.assessmentId}`} className={textLink}>
-            연결된 결과 보기
-          </Link>
-        </p>
-      </section>
+      {trace.cash ? (
+        <section aria-labelledby="o-access">
+          <h2 id="o-access" className="text-[18px] font-bold">
+            미유캐시 충전
+          </h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
+            {trace.entitled
+              ? `서버가 결제 승인을 확인해 지갑에 ${trace.cash.credited}캐시(충전 ${trace.cash.cash}${trace.cash.bonus > 0 ? ` + 보너스 ${trace.cash.bonus}` : ""})가 들어갔습니다.`
+              : trace.cash.credited > 0 && trace.cash.clawedBack > 0
+                ? `결제가 취소되어 이 충전으로 들어간 ${trace.cash.credited}캐시 중 ${trace.cash.clawedBack}캐시를 회수했습니다.${trace.cash.shortfall > 0 ? ` 이미 사용한 ${trace.cash.shortfall}캐시는 회수하지 못해 운영자가 확인합니다.` : ""}`
+                : "결제 승인이 확인되지 않아 지갑에 캐시가 들어가지 않았습니다. 결제 성공 화면으로 이동했더라도 서버 승인 기록이 없으면 결제 완료가 아닙니다."}
+          </p>
+          <p className="mt-2 text-[15px]">
+            <Link href={`/cash?a=${order.assessmentId}`} className={textLink}>
+              미유캐시 화면 보기
+            </Link>
+          </p>
+        </section>
+      ) : (
+        <section aria-labelledby="o-access">
+          <h2 id="o-access" className="text-[18px] font-bold">
+            리포트 제공
+          </h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
+            {trace.entitled
+              ? `서버가 결제 승인을 확인해 전체 리포트 열람 권한이 있습니다. 생성 상태: ${GENERATION_LABEL[trace.generation] || "생성 전"}.`
+              : "결제 승인이 확인되지 않아 전체 리포트 열람 권한이 없습니다. 결제 성공 화면으로 이동했거나 리포트가 보였더라도, 서버 승인 기록이 없으면 결제 완료가 아닙니다."}
+          </p>
+          <p className="mt-2 text-[15px]">
+            <Link href={`/results/${order.assessmentId}`} className={textLink}>
+              연결된 결과 보기
+            </Link>
+          </p>
+        </section>
+      )}
 
       <section aria-labelledby="o-events">
         <h2 id="o-events" className="text-[18px] font-bold">

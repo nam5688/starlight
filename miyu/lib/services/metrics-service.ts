@@ -7,7 +7,7 @@
 // - 이름 · 생년월일 · 응답 · 고민 · 리포트 내용은 이 집계에 들어오지 않는다 (익명 방문 번호와 주문 · 리포트의 상태 · 금액뿐).
 // - 순이익은 결제 수수료 · 세금을 빼지 않은 단순 계산이다 (AI 비용만 뺀다).
 
-import { isPersonalProduct, parseConcernProductId } from "../config/product.ts";
+import { isCashProduct, isPersonalProduct, parseConcernProductId } from "../config/product.ts";
 import type { FunnelEventRecord, MetricsOrder, MiyuRepository } from "./ports.ts";
 import { seoulDayStart } from "./capacity-service.ts";
 
@@ -41,6 +41,8 @@ export type Metrics = {
     duplicateSuspects: number;
     /** 위 매출 중 "내 고민 반영 리포트"(기존 구매자 추가 구매)가 차지하는 건수 · 순매출 — 첫 구매 단계 · 채널별 전환에는 넣지 않는다 */
     concern: { paidCount: number; netKrw: number };
+    /** 미유캐시 충전 — 위 리포트 매출 · 한 건당 계산에는 넣지 않는다 (충전은 아직 쓰지 않은 선불 금액이라 매출 인식 시점은 운영자 · 세무 확인 전) */
+    cash: { paidCount: number; refundedCount: number; netKrw: number };
   };
   economics: {
     aiCostKrw: number;
@@ -89,7 +91,10 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
 
   const isLive = (o: MetricsOrder) => o.paymentEnv === "live";
   const approved = (o: MetricsOrder) => o.status === "paid" || o.status === "refunded";
-  const liveOrders = orders.filter(isLive);
+  // 미유캐시 충전은 리포트가 아니라서 리포트 매출 · 한 건당 계산에 섞지 않고 따로 센다
+  const liveAll = orders.filter(isLive);
+  const liveCash = liveAll.filter((o) => isCashProduct(o.productId));
+  const liveOrders = liveAll.filter((o) => !isCashProduct(o.productId));
   const livePaid = liveOrders.filter((o) => o.status === "paid");
   const liveRefunded = liveOrders.filter((o) => o.status === "refunded");
   const readyReports = reports.filter((r) => r.status === "ready");
@@ -117,6 +122,8 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   const refundedKrw = sum(liveRefunded);
   const netKrw = grossKrw - refundedKrw;
   const testPaidCount = orders.filter((o) => !isLive(o) && approved(o)).length;
+  const cashPaid = liveCash.filter((o) => o.status === "paid");
+  const cashRefunded = liveCash.filter((o) => o.status === "refunded");
   const concernPaid = liveConcern.filter((o) => o.status === "paid");
   const concernNet = sum(concernPaid);
   const duplicateSuspects = anomalies.filter((e) => /DUPLICATE/.test(e.message) || /DUPLICATE/.test(JSON.stringify(e.detail))).length;
@@ -183,7 +190,7 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
     since,
     funnel,
     sources,
-    revenue: { grossKrw, refundedKrw, netKrw, paidCount, refundedCount: liveRefunded.length, testPaidCount, duplicateSuspects, concern: { paidCount: concernPaid.length, netKrw: concernNet } },
+    revenue: { grossKrw, refundedKrw, netKrw, paidCount, refundedCount: liveRefunded.length, testPaidCount, duplicateSuspects, concern: { paidCount: concernPaid.length, netKrw: concernNet }, cash: { paidCount: cashPaid.length, refundedCount: cashRefunded.length, netKrw: sum(cashPaid) } },
     economics: {
       aiCostKrw,
       avgAiCostPerPaidKrw: avgCost,

@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDate } from "@/components/ui/format";
 import { CONCERN_RECORDS, formatKrw } from "@/lib/config/product";
+import { getCashView } from "@/lib/services/cash-service";
 import { getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
@@ -73,8 +74,10 @@ async function MyContent() {
   // 결제 승인이 났는데 돌아오지 못한 주문이 있으면 응답 뒤에 결제사 기록과 맞춘다
   reconcileUserInBackground(member.userId);
 
-  const { cards, concerns, orders } = await getMyPage(await readRepository(), member.userId);
+  const repo = await readRepository();
+  const [{ cards, concerns, orders }, cash] = await Promise.all([getMyPage(repo, member.userId), getCashView(repo, member.userId, 1)]);
   const paymentsReady = paymentConfig().ok;
+  const cashHref = cards[0] ? `/cash?a=${cards[0].assessmentId}` : "/cash";
   return (
     <>
       <section aria-labelledby="my-list" className="mt-8">
@@ -90,6 +93,24 @@ async function MyContent() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="my-cash" className="mt-12">
+        <h2 id="my-cash" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
+          미유캐시
+        </h2>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl bg-canvas px-4 py-4 shadow-soft">
+          <p>
+            <span className="text-[26px] font-bold tabular-nums">{cash.balance}</span>
+            <span className="ml-1 text-[15px] font-semibold text-ink-2">캐시</span>
+            <span className="mt-0.5 block text-[13px] text-ink-3">{cash.ready ? `질문 ${cash.questions}번 정도 · 충전 · 사용 내역은 충전 화면에서 봐요` : "충전을 준비하고 있어요"}</span>
+          </p>
+          {cash.ready && (
+            <Link href={cashHref} className={buttonSecondary}>
+              충전하기 · 내역 보기
+            </Link>
+          )}
+        </div>
       </section>
 
       {CONCERN_RECORDS.visible && concerns.length > 0 && (
