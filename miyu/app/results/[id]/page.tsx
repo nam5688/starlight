@@ -8,6 +8,7 @@ import { buildTalkModel } from "@/lib/report/reading/talk";
 import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
 import { availableRooms } from "@/lib/report/reading/talk-room";
 import { seoulDate } from "@/lib/saju/interpret/day-plain";
+import { chatConnected } from "@/server/chat";
 import { peekRoomChoice } from "@/server/room-choice";
 import { Track } from "@/components/analytics/track";
 import { ClearAnalyzeDraft } from "@/components/analyze/clear-draft";
@@ -142,7 +143,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           source={content.source}
           meta={`검사일 ${created} · 저장된 리포트${receivedRows.length > 1 ? ` · ${seq}번째로 받은 리포트` : ""}`}
         />
-        {isReadingReport(content) && <TalkEntry id={assessment.id} rooms={availableRooms(buildTalkModel(content, { saju: assessment.saju, today: seoulDate(now()) }))} remembered={await peekRoomChoice()} />}
+        {isReadingReport(content) && <TalkEntry id={assessment.id} tier="deep" chatReady={chatConnected()} rooms={availableRooms(buildTalkModel(content, { saju: assessment.saju, today: seoulDate(now()) }))} remembered={await peekRoomChoice()} />}
         {isReadingReport(content) ? (
           <ReadingReportView report={content} idPrefix="r-" footer={footer} />
         ) : isPersonalV2(content) ? (
@@ -184,6 +185,9 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
       <TalkEntry
         id={assessment.id}
         tasting
+        tier="simple"
+        chatReady={chatConnected()}
+        buyHref={view.paidOrder ? undefined : "#r-purchase"}
         rooms={availableRooms(
           buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" } }),
         )}

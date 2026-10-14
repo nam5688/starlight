@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, LockIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
-import { MIYU_CASH } from "@/lib/config/product";
+import { MIYU_CASH, REPORT_TIER_NAMES } from "@/lib/config/product";
+import { isSimpleRoom, roomSections } from "@/lib/report/chat/quota";
 import { freeQuestionPlaceholder, questionMaxFor, TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
 import {
   applyAction,
@@ -404,6 +405,31 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     };
   }, [menuOpen, scope, model, persist]);
 
+  // 채팅방 메뉴 — 심층 리포트(paid)는 열 수 있는 방을 한 목록으로, 간단 리포트(free)는 무료로 열리는 방을 위에, 심층 리포트로만 열리는 방은 "심층 리포트로는 아래 상담도 가능해요!" 아래에 잠금 표시로 둔다
+  const menuRooms = (() => {
+    const shown = ROOM_ORDER.filter((r) => roomHrefs[r] && (model.tier === "free" && !isSimpleRoom(r) ? true : roomAvailable(model, r)));
+    if (model.tier !== "free") return { simple: shown, deepOnly: [] as RoomId[] };
+    const sec = roomSections(shown);
+    return sec;
+  })();
+  const roomLink = (r: RoomId, locked: boolean) => (
+    <Link
+      key={r}
+      href={roomHrefs[r] ?? "#"}
+      aria-current={r === room ? "page" : undefined}
+      className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2 text-left hover:bg-mist aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent-strong"
+    >
+      <span className="min-w-0">
+        <span className="block text-[15px] font-semibold">{ROOMS[r].label}</span>
+        <span className="block truncate text-[12px] text-ink-3">{ROOMS[r].mode === "미유" ? "기본 미유" : ROOMS[r].mode}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1 text-[13px] font-medium text-ink-3">
+        {locked && <LockIcon className="size-3.5" />}
+        {locked ? "심층 리포트" : r === room ? "지금 여기" : saved[r] ? "이어 보기" : "새로 시작"}
+      </span>
+    </Link>
+  );
+
   const replies = replyOptions(model, room, engine);
   const visibleMiyu = log.filter((l): l is Item & { from: "miyu" } => l.from === "miyu" && l.say.kind !== "system" && l.say.kind !== "card");
   const lastMood: TalkMood = visibleMiyu.length > 0 ? visibleMiyu[visibleMiyu.length - 1].mood : "basic";
@@ -630,20 +656,13 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           <div ref={menuRef} id={menuId} role="group" aria-label="채팅방 · 메뉴" className="absolute right-3 bottom-full left-3 mb-2 max-h-[min(30rem,70dvh)] overflow-y-auto rounded-2xl bg-canvas p-2 shadow-pop">
             <p className="px-3 pt-1.5 pb-0.5 text-[13px] font-semibold text-ink-3">채팅방 · 방마다 새 대화로 시작해요</p>
             <div className="px-1">
-              {ROOM_ORDER.filter((r) => roomHrefs[r] && roomAvailable(model, r)).map((r) => (
-                <Link
-                  key={r}
-                  href={roomHrefs[r] ?? "#"}
-                  aria-current={r === room ? "page" : undefined}
-                  className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2 text-left hover:bg-mist aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent-strong"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-[15px] font-semibold">{ROOMS[r].label}</span>
-                    <span className="block truncate text-[12px] text-ink-3">{ROOMS[r].mode === "미유" ? "기본 미유" : ROOMS[r].mode}</span>
-                  </span>
-                  <span className="shrink-0 text-[13px] font-medium text-ink-3">{r === room ? "지금 여기" : saved[r] ? "이어 보기" : "새로 시작"}</span>
-                </Link>
-              ))}
+              {menuRooms.simple.map((r) => roomLink(r, false))}
+              {menuRooms.deepOnly.length > 0 && (
+                <>
+                  <p className="px-2 pt-2.5 pb-0.5 text-[12px] font-semibold text-ink-3">{REPORT_TIER_NAMES.deep}로는 아래 상담도 가능해요!</p>
+                  {menuRooms.deepOnly.map((r) => roomLink(r, true))}
+                </>
+              )}
             </div>
             {menuTopics.length > 0 && (
               <div className="mt-1 px-1">

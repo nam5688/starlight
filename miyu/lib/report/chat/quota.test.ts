@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CHAT_ROOMS } from "../../config/product.ts";
 import { ROOM_ORDER } from "../reading/talk-room.ts";
-import { isSimpleRoom, roomPolicy } from "./quota.ts";
+import { isSimpleRoom, roomPolicy, roomQuestionNote, roomSections } from "./quota.ts";
 
 test("운영자 지정값: 간단 리포트는 네 개 방(연애 2 · 고민 2 · 일일 1 · 나를 알아보기 0), 심층 리포트는 방마다 3", () => {
   assert.deepEqual({ ...CHAT_ROOMS.simple }, { main: 0, daily: 1, concern: 2, love: 2 });
@@ -36,4 +36,26 @@ test("시험용 추가 질문은 열린 방의 무료 질문만 늘린다 (질�
   assert.equal(roomPolicy("free", "main", 5).freeQuestions, 0);
   assert.equal(roomPolicy("free", "career", 5).open, false);
   assert.equal(roomPolicy("free", "love", -3).freeQuestions, 2);
+});
+
+test("방 나누기: 간단 리포트 방은 운영자 순서(나를 알아보기 · 오늘의 운세 · 고민해결소 · 연애), 나머지는 심층 리포트 방(올해의 흐름 · 결혼 · 진로 · 재무)", () => {
+  const order = ["main", "daily", "year", "love", "marriage", "career", "money", "concern"] as const;
+  const s = roomSections(order);
+  assert.deepEqual(s.simple, ["main", "daily", "concern", "love"]);
+  assert.deepEqual(s.deepOnly, ["year", "marriage", "career", "money"]);
+  assert.equal(s.simple.length + s.deepOnly.length, order.length, "모든 방이 어느 한쪽에 있다");
+  // 정책에 있는 방은 모두 간단 리포트 쪽
+  for (const r of order) assert.equal(s.simple.includes(r), isSimpleRoom(r));
+});
+
+test("방 카드 한 줄: 방마다 무료 질문 수 · 질문 없는 방은 심층 리포트로 안내 · 닫힌 방은 심층 리포트로 열림 · AI가 연결되지 않았으면 준비 중", () => {
+  assert.equal(roomQuestionNote("free", "love", true), "무료 질문 2번");
+  assert.equal(roomQuestionNote("free", "concern", true), "무료 질문 2번");
+  assert.equal(roomQuestionNote("free", "daily", true), "하루 무료 질문 1번");
+  assert.equal(roomQuestionNote("free", "main", true), "질문은 없어요 · 자세한 이야기는 심층 리포트에서");
+  assert.equal(roomQuestionNote("free", "career", true), "심층 리포트로 열려요");
+  assert.equal(roomQuestionNote("free", "career", false), "심층 리포트로 열려요", "닫힌 방은 AI 연결과 상관없이 같은 안내");
+  assert.equal(roomQuestionNote("free", "love", false), "질문 기능은 준비 중이에요");
+  assert.equal(roomQuestionNote("paid", "career", true), "무료 질문 3번 · 더 묻고 싶으면 미유캐시");
+  assert.equal(roomQuestionNote("paid", "daily", true), "하루 무료 질문 3번 · 더 묻고 싶으면 미유캐시");
 });

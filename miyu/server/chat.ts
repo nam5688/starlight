@@ -50,6 +50,9 @@ export function chatAnswerer(): ChatAnswerer | null {
   return answerer;
 }
 
+/** 자유 질문 AI가 연결돼 있는가 — 아니면 화면은 방마다 무료 질문 수를 약속하지 않고 "준비 중"으로 밝힌다 */
+export const chatConnected = () => chatAnswerer() !== null;
+
 /**
  * 사용 기록의 비용 계산에 쓰는 설정 — 실제 Anthropic이면 모델 단가(달러) × 환율을 원 / 100만 토큰으로 바꿔 채운다(그래야 호출마다 비용이 사용 기록에 남고 승인 가드가 합계를 센다).
  * 운영자가 AI_PRICE_*를 직접 적었다면 그 값을 먼저 쓴다.

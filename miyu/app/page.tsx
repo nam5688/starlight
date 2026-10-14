@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ChatExample } from "@/components/home/chat-example";
 import { CompareSection } from "@/components/home/compare-section";
 import { Faq } from "@/components/home/faq";
 import { ReportPreview } from "@/components/home/report-preview";
 import { RoomCards } from "@/components/home/room-cards";
+import { RoomCardsLive } from "@/components/home/room-cards-live";
 import { SignalRow } from "@/components/home/signal-row";
 import { MiyuAvatar } from "@/components/talk/miyu-character";
 import { CheckIcon } from "@/components/ui/icons";
@@ -88,16 +90,15 @@ export default function Home() {
             <span className="inline-flex items-center gap-1.5">
               궁합 비교 <StatusBadge>준비 중</StatusBadge>
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              자유 질문 상담 <StatusBadge>준비 중</StatusBadge>
-            </span>
             으로 이어집니다.
           </p>
         </div>
         <MiyuHello />
       </section>
 
-      <RoomCards />
+      <Suspense fallback={<RoomCards chatReady={false} />}>
+        <RoomCardsLive />
+      </Suspense>
 
       {/* 분석 한 장 → 풀이 → 내 경우 확인, 그리고 대화 예시 (후기 자리에는 가상 인물 예시만 둔다) */}
       <section aria-labelledby="home-flow" className={`${pageWide} py-10 md:py-14`}>

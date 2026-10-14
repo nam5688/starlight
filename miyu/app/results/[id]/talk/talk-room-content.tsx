@@ -1,9 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { LoginOptions } from "@/components/auth/login-options";
 import { talkRoomPath } from "@/components/talk/room-paths";
+import { LockedRoom } from "@/components/talk/locked-room";
 import { TalkView } from "@/components/talk/talk-view";
 import { pageNarrow } from "@/components/ui/styles";
 import { CONCERN_RECORDS } from "@/lib/config/product";
+import { isSimpleRoom } from "@/lib/report/chat/quota";
 import { ROOM_ORDER, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
 import type { TalkModel } from "@/lib/report/reading/talk";
 import { getResultView } from "@/lib/services/report-service";
@@ -76,6 +78,8 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
   }
 
   const owned = Boolean(view.paidOrder);
+  // 간단 리포트로는 열리지 않는 방(올해의 흐름 · 결혼 · 진로 · 재무)은 심층 리포트로 이어 주는 안내만 보인다
+  if (!isSimpleRoom(room)) return <LockedRoom room={room} owned={owned} buyHref={owned ? `/results/${id}` : `/results/${id}#r-purchase`} backHref={`/results/${id}`} />;
   if (!roomAvailable(model, room)) notFound();
   return (
     <TalkView
