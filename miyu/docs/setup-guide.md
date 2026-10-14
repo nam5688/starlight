@@ -235,7 +235,7 @@ Supabase **Authentication → URL Configuration**에서:
 | `CRON_SECRET` | 정기 점검 주소(`/api/cron/reconcile`)의 인증값. 길고 추측하기 어려운 무작위 문자열 | PowerShell: `[Convert]::ToBase64String((1..32 \| ForEach-Object { Get-Random -Maximum 256 }))` 로 만들어 환경변수에 넣기 |
 | `TELEGRAM_BOT_TOKEN` · `TELEGRAM_CHAT_ID` | 운영 알림(결제 확인 필요 · 리포트 실패 · 새 구매 중단). 둘 다 있을 때만 텔레그램으로 보내고, 없으면 서버 로그에만 남깁니다 | 텔레그램 BotFather로 봇 만들기 → 내 채팅 번호 확인 |
 | `AI_CHAT_DAILY_LIMIT` | 자유 질문(채팅에서 직접 적는 질문)을 한 회원이 하루에 보낼 수 있는 횟수. 비우면 10, 0이면 닫힘. AI를 연결한 뒤에만 의미가 있습니다 | 질문 한 번의 실제 비용을 잰 뒤 정합니다 |
-| `AI_CHAT_FREE_LIMIT` | 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 자유 질문 수. 비우면 1, 0이면 닫힘 | 실제 AI 시험 중에만 올립니다 |
+| `AI_CHAT_FREE_LIMIT` | 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 자유 질문 수. 비우면 2(3번째 질문부터는 리포트), 0이면 닫힘 | 실제 AI 시험 중에만 올립니다 |
 | `AI_CHAT_PROVIDER` · `ANTHROPIC_API_KEY` · `AI_CHAT_APPROVED_KRW` · `AI_CHAT_APPROVED_CALLS` · `AI_CHAT_APPROVED_FROM` · `AI_CHAT_APPROVED_THROUGH` | **자유 질문의 실제 AI(Claude) 시험.** 제공사 `anthropic` · 키 · 승인 금액(원) · 승인 호출 수 · 승인 기간(한국 날짜)을 **운영자가 직접** 적어야만 연결됩니다. 하나라도 비어 있거나 상한(1,500원 · 40회 · 3일)을 넘으면 연결되지 않고 입력창은 "준비 중"으로 보입니다. 키는 대화에 붙여넣지 않습니다 | Anthropic 콘솔에서 키 발급(이미 비교 실험에 쓴 `ANTHROPIC_API_KEY`와 같은 값). 승인 값은 `docs/ai-quality-comparison-plan.md` 8-5의 제안을 확인한 뒤 적습니다 |
 | `AI_MAX_CONCURRENT` · `AI_SALE_QUEUE_LIMIT` · `AI_DAILY_BUDGET_KRW` 등 | AI를 연결한 뒤의 동시 생성 · 새 구매 중단 · 하루 예산 한도 (`.env.example` 참고) | AI 제공사를 정하고 승인한 뒤 가격표를 보고 정합니다 |
 

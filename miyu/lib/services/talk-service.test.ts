@@ -1,6 +1,7 @@
 // 실행: npm test — 대화 저장: 내 검사 결과에만 저장 · 불러오기, 모양 · 크기 검사, 지난 날짜 정리, 테이블이 없을 때의 동작
 import assert from "node:assert/strict";
 import test from "node:test";
+import { QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
 import { listSavedRoomKeys, loadTalkRoom, resetTalkRoom, saveTalkRoom, TALK_ROOM_KEY, TALK_SAVE_MAX_CHARS } from "./talk-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
@@ -40,7 +41,7 @@ test("모양 · 크기 검사: 모르는 행동은 버리고, 글자 수 · 개�
   const { repo, mine } = await setup();
   assert.ok(TALK_ROOM_KEY.test("daily:2026-10-15") && TALK_ROOM_KEY.test("concern") && !TALK_ROOM_KEY.test("../x") && !TALK_ROOM_KEY.test("Love"));
   assert.deepEqual(await saveTalkRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "../x", actions }), { ok: false, reason: "invalid" });
-  await saveTalkRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "love", actions: [...actions, { t: "x" }, null, { t: "topic", id: "<script>" }, { t: "free", q: "가".repeat(301), a: ["x"] }] });
+  await saveTalkRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "love", actions: [...actions, { t: "x" }, null, { t: "topic", id: "<script>" }, { t: "free", q: "가".repeat(QUESTION_MAX.paid + 1), a: ["x"] }] });
   assert.deepEqual(await loadTalkRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "love" }), actions);
   const many = Array.from({ length: 250 }, () => ({ t: "topic", id: "love" }));
   const r = await saveTalkRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "career", actions: many });

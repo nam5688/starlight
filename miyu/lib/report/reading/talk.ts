@@ -48,6 +48,8 @@ export type TalkTopic = {
   sectionCount?: number;
   /** 먼저 묻는 질문에서 고른 답(선택지 번호)에 따라 풀이 뒤에 덧붙는 말풍선 — 예: 오늘의 한 장에서 고른 영역의 한 줄 팁 · 올해의 흐름에서 고른 달력 */
   picks?: Record<string, TalkBubble[]>;
+  /** 무료 맛보기에서 이 풀이에 내 자료(응답에서 읽은 반응 · 사주 계산)로 읽은 내용이 있는가 — 없으면(예: "가볍게 살펴봤어요" 한 줄뿐) 그 방의 무료 질문을 열지 않는다. 코드가 계산한 풀이는 요약이 있으면 있는 것으로 본다 */
+  grounded?: boolean;
   /** 무료 맛보기 — 이 풀이의 나머지는 리포트에서 이어진다. 여기에는 질문(무엇에 답하는지)만 담고 잠긴 문장은 담지 않는다 */
   locked?: { hooks: string[] };
   /** 풀이를 읽은 뒤 [맞아요] 같은 내 경험 답장을 보이지 않는다 (오늘의 한 장처럼 한 번으로 끝나는 풀이) */
@@ -80,7 +82,7 @@ export type TalkGroup = { id: string; chip: string; topicIds: string[] };
  * 자유 질문 · 이야기 이어 가기의 상태 — ready: 입력창을 연다 · pending: AI 연결 전이라 준비 중 · locked: 리포트를 받은 분에게 열린다.
  * free: 무료 맛보기(구매 전)에서 로그인한 분께 열어 주는 "첫 질문"이다(ready일 때) · used: 그 무료 질문을 이미 썼다(locked일 때).
  */
-export type TalkChat = { state: "ready" | "pending" | "locked"; free?: boolean; used?: boolean; /** free일 때 남은 무료 질문 수 (기본 정책은 1번) */ left?: number };
+export type TalkChat = { state: "ready" | "pending" | "locked"; free?: boolean; used?: boolean; /** free일 때 남은 무료 질문 수 (기본 정책은 2번) */ left?: number; /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 아직 없어 무료 질문을 열지 않았다 (locked일 때) */ noMaterial?: boolean };
 /** 무료 맛보기에서 잠긴 내용으로 이어지는 버튼 — owned: 이미 구매한 분(리포트 보기)인지 */
 export type TalkBuy = { href: string; label: string; owned: boolean };
 
@@ -116,6 +118,14 @@ export type TalkBubble =
   | { kind: "lock"; title: string; hooks: string[] };
 
 export const CARD_DISCLAIMER = "참고용 해석이며 예측이나 진단이 아닙니다.";
+
+/**
+ * 질문 한 번의 글자 수 한도(운영자 2026-10-15) — 무료 질문은 500자, 리포트를 받은 분의 질문은 1,000자(두 배).
+ * 입력창 · 서버 확인 · 저장이 같은 값을 쓴다. 저장하는 글은 둘 중 큰 쪽(paid)까지 받는다.
+ */
+export const QUESTION_MAX = { free: 500, paid: 1000 } as const;
+export const questionMaxFor = (free: boolean) => (free ? QUESTION_MAX.free : QUESTION_MAX.paid);
+const won = (n: number) => n.toLocaleString("ko-KR");
 
 /** 대화 속 고정 안내 문구 — 친구에게 말하듯 짧게. 풀이 내용은 여기에 쓰지 않는다 */
 export const TALK_COPY = {
@@ -161,11 +171,20 @@ export const TALK_COPY = {
   freeQuestionReady: "궁금한 것을 직접 물어보세요",
   freeQuestionAsking: "어떤 상황에서 달랐는지 적어 주세요",
   freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
+  freeQuestionNoMaterial: "이 주제는 리포트를 받으면 질문할 수 있어요",
   freeQuestionUsed: "무료 질문을 모두 썼어요 · 리포트를 받으면 계속 물어볼 수 있어요",
+  /** 무료 질문을 모두 썼을 때 뜨는 안내창 — 운영자 문구(2026-10-15). 버튼은 실제로 있는 리포트 구매(또는 내 리포트)로 이어진다 */
+  recharge: {
+    title: "질문 충전이 필요해요!",
+    body: `유료 질문은 글자 수 제한이 ${won(QUESTION_MAX.paid)}자로 두 배 늘어요! (무료 질문은 ${won(QUESTION_MAX.free)}자까지예요)`,
+    used: "무료 질문을 모두 썼어요.",
+    later: "다음에 할게요",
+    open: "무료 질문을 모두 썼어요. 질문 충전 안내 열기",
+  },
   buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "연애운이 강해지는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
 
-/** 남은 무료 질문 수 말 — 기본 정책(1번)은 "한 번", 시험 중에 늘렸다면 숫자로 */
+/** 남은 무료 질문 수 말 — 한 번 남았으면 "한 번", 그 이상이면 숫자로(기본 정책은 2번이라 처음에는 "2번") */
 export const freeLeftText = (left?: number) => (left && left > 1 ? `${left}번` : "한 번");
 /** 무료 질문이 열려 있을 때 입력창 안내 */
 export const freeQuestionPlaceholder = (left?: number) => `무료 질문 ${freeLeftText(left)} · 궁금한 것을 물어보세요`;

@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, LockIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
-import { freeQuestionPlaceholder, TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
+import { freeQuestionPlaceholder, questionMaxFor, TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
 import {
   applyAction,
-  FREE_QUESTION_MAX,
   parseRoomSave,
   replayRoom,
   replyOptions,
@@ -31,6 +30,7 @@ import { askMiyuAction, resetTalkRoomAction, saveTalkRoomAction } from "@/app/re
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
 import { MiyuAvatar, TypingDots } from "./miyu-character";
+import { RechargeDialog } from "./recharge-dialog";
 
 /** 화면에 보이는 대화 한 줄 — 번호를 붙여 스크롤 · 초점이 어느 줄인지 찾는다 */
 type Item = TalkLine & { id: number };
@@ -126,6 +126,11 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const freeSpent = Boolean(model.chat.free) && remaining === 0;
   const canAsk = model.chat.state === "ready" && Boolean(persist) && !freeSpent;
   const busy = typing || waiting;
+  /** 질문 한 번의 글자 수 한도 — 무료 질문은 500자, 리포트를 받은 분은 1,000자 */
+  const questionMax = questionMaxFor(Boolean(model.chat.free));
+  /** 무료 질문을 모두 썼을 때 뜨는 안내창 — 마지막 답을 읽을 시간을 준 뒤(답이 다 도착한 다음) 연다 */
+  const [rechargeOpen, setRechargeOpen] = useState(false);
+  const [rechargeDue, setRechargeDue] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [saved, setSaved] = useState<Partial<Record<RoomId, boolean>>>({});
@@ -290,6 +295,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     const say = (texts: string[]): TalkLine[] => texts.map((text, i) => ({ from: "miyu", say: { kind: "text", text }, mood: i === 0 ? "thinking" : "basic" }));
     if (reply?.ok && reply.kind === "answer") {
       setRemaining(reply.remaining);
+      if (model.chat.free && reply.remaining === 0) setRechargeDue(true);
       // 저장하는 질문은 서버가 개인정보를 가린 글이다
       const action: RoomAction = { t: "free", q: reply.question, a: reply.paragraphs, ...(topic ? { topic } : {}) };
       const r = applyAction(model, room, engine, action, ctx);
@@ -307,7 +313,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     else {
       deliver(say([reply ? reply.message : "답이 늦어지고 있어요. 잠시 뒤에 다시 물어봐 주세요."]));
       if (reply && !reply.ok && (reply.reason === "limit" || reply.reason === "free-used")) setRemaining(0);
-      if (!reply || reply.reason === "failed" || reply.reason === "budget") setDraft((d) => d || q);
+      if (reply && !reply.ok && reply.reason === "free-used") setRechargeDue(true);
+      if (!reply || reply.reason === "failed" || reply.reason === "budget" || reply.reason === "too-long-free") setDraft((d) => d || q);
     }
   };
 
@@ -380,6 +387,16 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     };
   }, [menuOpen, scope, model, persist]);
 
+  // 무료 질문을 다 쓴 직후: 마지막 답이 다 도착하고 잠시 뒤에 안내창을 연다 (답을 가리지 않게)
+  useEffect(() => {
+    if (!rechargeDue || busy) return;
+    const t = window.setTimeout(() => {
+      setRechargeDue(false);
+      setRechargeOpen(true);
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [rechargeDue, busy]);
+
   const replies = replyOptions(model, room, engine);
   const visibleMiyu = log.filter((l): l is Item & { from: "miyu" } => l.from === "miyu" && l.say.kind !== "system" && l.say.kind !== "card");
   const lastMood: TalkMood = visibleMiyu.length > 0 ? visibleMiyu[visibleMiyu.length - 1].mood : "basic";
@@ -397,10 +414,12 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         : TALK_COPY.freeQuestionReady
     : used
       ? TALK_COPY.freeQuestionUsed
-      : model.chat.state === "locked"
-        ? TALK_COPY.freeQuestionLocked
-        : TALK_COPY.freeQuestion;
-  const note = canAsk ? (model.chat.free ? `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatFreeNote}` : ROOM_COPY.chatAiNote) : used ? ROOM_COPY.chatFreeUsed : model.chat.state === "locked" ? ROOM_COPY.chatLocked : TALK_COPY.freeQuestionPending;
+      : model.chat.noMaterial
+        ? TALK_COPY.freeQuestionNoMaterial
+        : model.chat.state === "locked"
+          ? TALK_COPY.freeQuestionLocked
+          : TALK_COPY.freeQuestion;
+  const note = canAsk ? (model.chat.free ? `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatFreeNote}` : ROOM_COPY.chatAiNote) : used ? ROOM_COPY.chatFreeUsed : model.chat.noMaterial ? ROOM_COPY.chatNoMaterial : model.chat.state === "locked" ? ROOM_COPY.chatLocked : TALK_COPY.freeQuestionPending;
   const menuTopics = room === "main" ? model.groups : topicsHere.length > 1 ? topicsHere.map((t) => ({ id: t.id, chip: t.chip, topicIds: [t.id] })) : [];
 
   return (
@@ -556,6 +575,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           {note}
           {remaining !== null && !model.chat.free && ` · 오늘 ${remaining}번 더 물어볼 수 있어요`}
           {remaining !== null && model.chat.free && remaining > 0 && ` · 무료 질문 ${remaining}번 남았어요`}
+          {draft.length > 0 && <span aria-live="polite"> · {draft.length.toLocaleString("ko-KR")} / {questionMax.toLocaleString("ko-KR")}자</span>}
         </p>
       )}
       <form onSubmit={send} className="relative flex items-center gap-2 bg-page px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -639,7 +659,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={!canAsk || busy}
-            maxLength={FREE_QUESTION_MAX}
+            maxLength={questionMax}
             enterKeyHint="send"
             autoComplete="off"
             aria-label={placeholder}
@@ -647,6 +667,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
             placeholder={busy ? "" : placeholder}
             className={`h-11 w-full min-w-0 rounded-full bg-canvas px-4 text-[15px] ring-1 ring-line placeholder:text-ink-3 disabled:cursor-not-allowed ${busy ? "motion-safe:animate-miyu-glow" : ""}`}
           />
+          {/* 무료 질문을 모두 쓴 뒤에는 닫힌 입력창을 눌러도 안내창이 열린다 (닫힌 입력창은 누름을 받지 못하므로 위에 덮는다) */}
+          {used && model.buy && <button type="button" onClick={() => setRechargeOpen(true)} aria-label={TALK_COPY.recharge.open} className="absolute inset-0 rounded-full" />}
           {/* 미유가 답을 쓰는 동안 입력창에도 "입력 중"을 보인다 */}
           {busy && (
             <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center gap-2 px-4 text-[15px] font-medium text-accent-strong">
@@ -667,6 +689,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           {note}
         </span>
       </form>
+      {model.buy && <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} buy={model.buy} />}
     </div>
   );
 }

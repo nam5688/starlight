@@ -1,8 +1,9 @@
 // 자유 질문 입력 정리 — 글자 수 · 제어 문자 · 개인정보(연락처 · 이메일 · 주민번호 · 카드 · 계좌)를 가리고, 마음이 많이 힘든 글은 AI에 보내지 않는다.
 import { redactPersonalInfo } from "../../personalization/context.ts";
-import { FREE_QUESTION_MAX } from "../reading/talk-room.ts";
+import { QUESTION_MAX } from "../reading/talk.ts";
 
-export type CleanQuestion = { ok: true; text: string; redactions: number } | { ok: false; reason: "empty" | "too-long" };
+/** length는 개인정보를 가리기 전 정리한 글의 글자 수 — 무료 질문의 글자 수 한도(QUESTION_MAX.free)는 이 값으로 센다 */
+export type CleanQuestion = { ok: true; text: string; redactions: number; length: number } | { ok: false; reason: "empty" | "too-long" };
 
 export function cleanQuestion(raw: unknown): CleanQuestion {
   if (typeof raw !== "string") return { ok: false, reason: "empty" };
@@ -11,9 +12,10 @@ export function cleanQuestion(raw: unknown): CleanQuestion {
     .replace(/\s+/g, " ")
     .trim();
   if (!text) return { ok: false, reason: "empty" };
-  if (text.length > FREE_QUESTION_MAX) return { ok: false, reason: "too-long" };
+  // 가장 넉넉한 한도(리포트를 받은 분의 1,000자)를 넘으면 누구에게도 받지 않는다. 무료 질문의 500자 한도는 어떤 쪽인지 안 뒤에 확인한다(chat-service)
+  if (text.length > QUESTION_MAX.paid) return { ok: false, reason: "too-long" };
   const r = redactPersonalInfo(text);
-  return { ok: true, text: r.text, redactions: r.count };
+  return { ok: true, text: r.text, redactions: r.count, length: text.length };
 }
 
 /**

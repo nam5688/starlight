@@ -3,7 +3,7 @@
 // 이 파일은 AI를 부르지 않는다. 자유 질문의 답은 서버가 만들어 오고(자유 질문 행동 "free"), 이 파일은 그 글을 대화에 놓고 되살리기만 한다.
 // 눌러 준 답(연애 상태 등)은 풀이를 바꾸지 않는다. 풀이를 어떻게 읽을지 알려 주는 한 줄에만 쓴다.
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
-import { answerBubbles, extraBubbles, freeLeftText, nextTopic, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
+import { answerBubbles, extraBubbles, freeLeftText, nextTopic, QUESTION_MAX, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
 
 /** 미유의 표정 — 운영자가 보낸 캐릭터 시트의 표정 시트 6가지와 액션 포즈 3가지 (그림은 components/talk/miyu-moods.ts) */
 export type TalkMood = "basic" | "happy" | "surprised" | "thinking" | "playful" | "worried" | "wave" | "glasses" | "aha";
@@ -51,9 +51,11 @@ export const ROOM_COPY = {
   chatReady: "아래 입력창에 편하게 적어 주세요. 한두 문장이면 충분해요.",
   chatPending: "자유롭게 이야기를 나누는 기능은 아직 준비 중이에요.",
   chatLocked: "이야기를 이어 가는 건 리포트를 받은 분께 열려 있어요.",
-  /** 무료 맛보기에서 로그인한 분께 열어 주는 첫 질문 1번 — 열려 있을 때 · 이미 썼을 때 */
+  /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 아직 없을 때 — 무료 질문을 열지 않는다(재료가 있는 방에서만 연다) */
+  chatNoMaterial: "이 방의 무료 풀이에는 아직 이야기 나눌 내용이 없어서 무료 질문은 열리지 않았어요. 리포트를 받으면 이어서 물어볼 수 있어요.",
+  /** 무료 맛보기에서 로그인한 분께 열어 주는 무료 질문(기본 2번) — 열려 있을 때 · 이미 썼을 때 */
   chatFreeUsed: "무료 질문을 모두 썼어요. 이어서 묻고 깊은 풀이를 보려면 리포트에서 이어져요.",
-  chatFreeNote: "무료 질문은 지금 보이는 맛보기 내용만 가지고 답해요. 깊은 풀이는 리포트에서 이어져요.",
+  chatFreeNote: `무료 질문은 ${QUESTION_MAX.free}자까지 쓸 수 있고, 지금 보이는 맛보기 내용만 가지고 답해요. 깊은 풀이는 리포트에서 이어져요.`,
   /** 자유 질문이 열려 있을 때 입력창 위에 작게 — AI가 쓴 답이라는 것과 예측이 아니라는 것 */
   chatAiNote: "답은 AI가 내 리포트의 글과 적어 준 내용으로 쓴 해석이에요. 예측이나 진단이 아니에요.",
   /** 진로 방과 재무 방은 같은 저장된 "일과 돈" 풀이에서 보여 주는 소단락 · 질문 · 안내를 달리한다 — 새 글을 쓰지 않고 고르기만 한다 */
@@ -267,8 +269,6 @@ export type RoomState = {
 
 export type RoomContext = { contextHref?: string };
 
-/** 자유 질문 글자 수 한도 (서버 · 화면 · 저장이 같은 값을 쓴다) */
-export const FREE_QUESTION_MAX = 300;
 export const FREE_ANSWER_PARAGRAPHS_MAX = 6;
 export const FREE_ANSWER_PARAGRAPH_MAX = 600;
 
@@ -316,6 +316,21 @@ export function roomTopics(model: TalkModel, room: RoomId): TalkTopic[] {
   const def = ROOMS[room];
   if (room === "main") return model.topics;
   return def.topicIds.map((id) => roomTopic(model, room, id)).filter((t): t is TalkTopic => Boolean(t));
+}
+
+/** 무료 맛보기에서 이 풀이에 내 자료로 읽은 내용이 있는가 — 맛보기 모델이 표시한 값(grounded), 코드가 계산한 풀이는 요약이 있으면 있는 것 */
+const hasMaterial = (t: TalkTopic) => t.grounded ?? t.summary.length > 0;
+
+/**
+ * 이 방에서 무료 질문을 열 만큼 내 자료로 읽은 내용이 있는가(운영자 2026-10-15) — 무료 맛보기는 풀이에 재료가 있는 방에서만 질문을 열고,
+ * 응답에서 읽힌 반응도 사주 계산도 없어 "가볍게 살펴봤어요"만 있는 방은 열지 않는다. 구매한 리포트는 늘 열린다.
+ * 나를 알아보기와 이야기만 나누는 방은 맛보기 전체 풀이 중 하나라도 재료가 있으면 연다.
+ */
+export function roomHasMaterial(model: TalkModel, room: RoomId): boolean {
+  if (model.tier !== "free") return true;
+  const def = ROOMS[room];
+  const topics = room === "main" || def.chatOnly ? allTopics(model) : def.topicIds.map((id) => allTopics(model).find((t) => t.id === id)).filter((t): t is TalkTopic => Boolean(t));
+  return topics.some(hasMaterial);
 }
 
 /** 이 방을 열 수 있는가 — 풀이가 하나도 없는 방(예: 해당 주제가 없는 리포트)은 열지 않는다. 이야기만 나누는 방은 늘 열 수 있다 */
@@ -376,7 +391,7 @@ function chatLead(model: TalkModel, ctx: RoomContext): TalkLine[] {
   if (c === "ready") return [miyu(text(model.chat.free ? `무료 질문이 ${freeLeftText(model.chat.left)} 남아 있어요. 아래 입력창에 편하게 적어 주세요.` : ROOM_COPY.chatReady), "basic")];
   if (c === "locked") {
     return [
-      miyu(text(model.chat.used ? ROOM_COPY.chatFreeUsed : ROOM_COPY.chatLocked), "thinking"),
+      miyu(text(model.chat.used ? ROOM_COPY.chatFreeUsed : model.chat.noMaterial ? ROOM_COPY.chatNoMaterial : ROOM_COPY.chatLocked), "thinking"),
       miyu({ kind: "lock", title: TALK_COPY.lock.title, hooks: [...ROOM_COPY.concernHooks] }, "basic"),
     ];
   }
@@ -536,7 +551,7 @@ export function sanitizeRoomActions(raw: unknown): RoomAction[] {
     else if (a.t === "extra" && idText(a.topic) && typeof a.which === "string" && EXTRA_KEYS.has(a.which)) out.push({ t: "extra", topic: a.topic as string, which: a.which as TalkExtra });
     else if (a.t === "feel" && idText(a.topic) && (a.kind === "yes" || a.kind === "mixed" || a.kind === "unsure")) out.push({ t: "feel", topic: a.topic as string, kind: a.kind });
     else if (a.t === "free") {
-      const q = cleanText(a.q, FREE_QUESTION_MAX);
+      const q = cleanText(a.q, QUESTION_MAX.paid);
       const paragraphs = Array.isArray(a.a) ? a.a.map((p) => cleanText(p, FREE_ANSWER_PARAGRAPH_MAX)).filter((p): p is string => p !== null).slice(0, FREE_ANSWER_PARAGRAPHS_MAX) : [];
       if (q && paragraphs.length > 0) out.push({ t: "free", q, a: paragraphs, ...(idText(a.topic) ? { topic: a.topic as string } : {}) });
     }

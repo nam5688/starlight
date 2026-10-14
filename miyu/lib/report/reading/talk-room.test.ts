@@ -3,7 +3,7 @@ import test from "node:test";
 import { SAMPLE_CHART } from "../../samples/sample-report.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
 import { dayReading } from "../../saju/interpret/day-plain.ts";
-import { askFor, buildTalkModel, TALK_COPY, type TalkChat, type TalkModel } from "./talk.ts";
+import { askFor, buildTalkModel, QUESTION_MAX, TALK_COPY, type TalkChat, type TalkModel } from "./talk.ts";
 import {
   applyAction,
   availableRooms,
@@ -316,7 +316,7 @@ test("자유 질문과 답: 내 질문과 미유의 답이 대화에 놓이고, 
   // 빈 질문 · 빈 답은 무시하고, 너무 긴 글은 저장에서 버린다
   assert.equal(applyAction(m, "love", st, { t: "free", q: " ", a: ["x"] }).added.length, 0);
   assert.equal(applyAction(m, "love", st, { t: "free", q: "질문", a: [] }).added.length, 0);
-  assert.deepEqual(parseRoomSave({ v: ROOM_SAVE_VERSION, actions: [{ t: "free", q: "가".repeat(301), a: ["x"] }, { t: "free", q: "질문", a: ["가".repeat(601)] }] }, m, "love"), []);
+  assert.deepEqual(parseRoomSave({ v: ROOM_SAVE_VERSION, actions: [{ t: "free", q: "가".repeat(QUESTION_MAX.paid + 1), a: ["x"] }, { t: "free", q: "질문", a: ["가".repeat(601)] }] }, m, "love"), []);
 });
 
 test("이어 보기: 행동 목록을 처음부터 다시 적용하면 같은 대화가 되살아나고, 저장에는 리포트 글 · 이름이 들어 있지 않다", () => {
@@ -420,4 +420,17 @@ test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이�
   // 소단락이 없는 이전 리포트에서도 방마다 질문 · 안내는 다르다
   const old = buildTalkModel({ ...R, blocks: R.blocks.map((b) => (b.id === "work-money" ? { ...b, sections: undefined } : b)) }, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: TODAY, chat: { state: "pending" } });
   assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
+});
+
+test("무료 질문을 모두 썼을 때의 안내창 문구: 운영자 문구 그대로(질문 충전 · 1,000자 · 두 배), 해요체, 마감 타이머 · 불안 자극 없음, 글자 수는 상수와 같다", () => {
+  const c = TALK_COPY.recharge;
+  assert.equal(c.title, "질문 충전이 필요해요!");
+  assert.ok(c.body.includes("유료 질문은 글자 수 제한이 1,000자로 두 배 늘어요!"), c.body);
+  assert.ok(c.body.includes(`${QUESTION_MAX.free}자`), "무료 질문의 한도도 함께 밝힌다");
+  assert.equal(QUESTION_MAX.paid, QUESTION_MAX.free * 2, "\"두 배\"가 사실이어야 한다");
+  for (const text of [c.title, c.body, c.used, c.later, c.open]) {
+    assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정/.test(text), `불안 · 압박 표현 없음: ${text}`);
+    assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
+  }
+  assert.ok(ROOM_COPY.chatFreeNote.includes(`${QUESTION_MAX.free}자`), "무료 질문 안내에도 글자 수 한도가 있다");
 });

@@ -4,8 +4,9 @@ import test from "node:test";
 import { ChatAnswerError, type ChatAnswerer } from "../report/chat/answer.ts";
 import { CARE_NOTE, CRISIS_REPLY } from "../report/chat/question.ts";
 import type { ChatAsk, ChatContext } from "../report/chat/types.ts";
+import { QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
-import { ASK_MESSAGES, askFreeQuestion, recentExchanges, type AskDeps } from "./chat-service.ts";
+import { ASK_MESSAGES, askFreeQuestion, DEFAULT_FREE_LIMIT, recentExchanges, type AskDeps } from "./chat-service.ts";
 import { NO_LIMITS } from "./capacity-service.ts";
 import type { AssessmentRecord } from "./ports.ts";
 import { saveTalkRoom } from "./talk-service.ts";
@@ -13,7 +14,7 @@ import { createMemoryRepository } from "./testing/memory-repository.ts";
 
 const CONTEXT: ChatContext = { room: { label: "연애", mode: "연애박사 미유", focus: "연애 · 관계" }, intake: null, topic: { title: "가까운 관계", headline: "확인이 되면 마음이 편해져요", summary: ["확인이 있으면 편해져요."], detail: [] }, overview: { headline: "확인을 중요하게 여겨요", tendency: null, strength: null, caution: null, flow: null }, followUp: false, taste: false };
 
-async function setup(opts: { answer?: () => Promise<string[]>; dailyLimit?: number; freeLimit?: number; tier?: "paid" | "free"; loaded?: boolean; budget?: number } = {}) {
+async function setup(opts: { answer?: () => Promise<string[]>; dailyLimit?: number; freeLimit?: number; tier?: "paid" | "free"; loaded?: boolean; budget?: number; noMaterial?: boolean } = {}) {
   const mem = createMemoryRepository(() => new Date("2026-10-15T03:00:00Z"));
   const base = { channel: "web", nickname: "서윤", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 11, birthDay: 7, birthTime: "08:40", knownMbti: null, answers: {}, contentVersion: "t", source: "sample", summary: {}, saju: { status: "not-connected" } } as unknown as Omit<AssessmentRecord, "id" | "createdAt" | "userId">;
   const mine = await mem.repo.insertAssessment({ ...base, userId: "u1" });
@@ -34,7 +35,7 @@ async function setup(opts: { answer?: () => Promise<string[]>; dailyLimit?: numb
     now: () => new Date("2026-10-15T03:00:00Z"),
     config: { dailyLimit: opts.dailyLimit ?? 3, freeLimit: opts.freeLimit ?? 1 },
     capacity: opts.budget ? { ...NO_LIMITS, dailyBudgetKrw: opts.budget, priceInputKrwPerMTok: 1000, priceOutputKrwPerMTok: 1000 } : undefined,
-    loadAsk: async () => (opts.loaded === false ? null : { context: CONTEXT, referenceDate: "2026-10-15", tier: opts.tier ?? "paid" }),
+    loadAsk: async () => (opts.loaded === false ? null : { context: CONTEXT, referenceDate: "2026-10-15", tier: opts.tier ?? "paid", ...(opts.noMaterial ? { noMaterial: true } : {}) }),
     ...over,
   });
   return { mem, repo: mem.repo, mine: mine.id, other: other.id, asks, deps };
@@ -62,11 +63,11 @@ test("남의 검사 결과 · 잘못된 방 이름은 거절하고 AI를 부르�
   assert.equal(mem.chatQuestions.length, 0);
 });
 
-test("입력: 빈 글 · 300자 초과는 거절하고, 연락처는 가려서 AI에 보낸다", async () => {
+test("입력: 빈 글 · 1,000자 초과는 거절하고(1,000자까지는 받는다), 연락처는 가려서 AI에 보낸다", async () => {
   const { mine, deps, asks } = await setup();
   assert.equal((await askFreeQuestion(deps(), input(mine, "  "))).ok, false);
-  const long = await askFreeQuestion(deps(), input(mine, "가".repeat(301)));
-  assert.ok(!long.ok && long.reason === "too-long");
+  const long = await askFreeQuestion(deps(), input(mine, "가".repeat(QUESTION_MAX.paid + 1)));
+  assert.ok(!long.ok && long.reason === "too-long" && long.message.includes("1,000자"));
   assert.equal(asks.length, 0);
   await askFreeQuestion(deps(), input(mine, "이 번호 010-1234-5678 로 연락이 왔어요"));
   assert.ok(!asks[0].question.includes("1234-5678"));
@@ -207,4 +208,48 @@ test("무료 질문은 답을 받지 못했다면 — 호출이 실패했든 검
   assert.equal(mem.chatQuestions.length, 1);
   // 답을 받은 뒤에는 무료 질문을 다 쓴 것이다
   assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "free-used", message: ASK_MESSAGES["free-used"] });
+});
+
+test("무료 질문은 기본 2번까지 — 2번을 쓰면 3번째부터는 리포트(유료)로 이어진다", async () => {
+  assert.equal(DEFAULT_FREE_LIMIT, 2);
+  const { mine, deps, asks } = await setup({ tier: "free", freeLimit: DEFAULT_FREE_LIMIT });
+  const first = await askFreeQuestion(deps(), input(mine));
+  assert.ok(first.ok && first.kind === "answer" && first.remaining === 1);
+  const second = await askFreeQuestion(deps(), input(mine));
+  assert.ok(second.ok && second.kind === "answer" && second.remaining === 0);
+  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "free-used", message: ASK_MESSAGES["free-used"] });
+  assert.equal(asks.length, 2, "세 번째는 AI를 부르지 않는다");
+});
+
+test("재료가 없는 방(무료 맛보기에 내 자료로 읽은 내용이 없음)은 무료 질문을 열지 않고 AI를 부르지 않으며 횟수도 쓰지 않는다 — 리포트를 받은 분은 늘 열린다", async () => {
+  const { mine, deps, asks, mem } = await setup({ tier: "free", noMaterial: true, freeLimit: 2 });
+  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "no-material", message: ASK_MESSAGES["no-material"] });
+  assert.equal(asks.length, 0);
+  assert.equal(mem.chatQuestions.length, 0, "열리지 않은 질문은 횟수에 세지 않는다");
+  const paid = await setup({ tier: "paid", noMaterial: true });
+  assert.ok((await askFreeQuestion(paid.deps(), input(paid.mine))).ok, "리포트를 받은 분은 재료 여부와 상관없이 열린다");
+});
+
+test("질문 글자 수: 무료 질문은 500자까지, 리포트를 받은 분은 1,000자까지 — 넘으면 AI를 부르지 않고 횟수도 쓰지 않으며, 힘든 글은 길어도 안내가 먼저다", async () => {
+  assert.equal(QUESTION_MAX.free, 500);
+  assert.equal(QUESTION_MAX.paid, 1000);
+  assert.equal(QUESTION_MAX.paid, QUESTION_MAX.free * 2, "안내 문구의 \"두 배\"가 사실이어야 한다");
+
+  const free = await setup({ tier: "free", freeLimit: 2 });
+  const over = await askFreeQuestion(free.deps(), input(free.mine, "가".repeat(QUESTION_MAX.free + 1)));
+  assert.ok(!over.ok && over.reason === "too-long-free" && over.message.includes("500자") && over.message.includes("1,000자"), JSON.stringify(over));
+  assert.equal(free.asks.length, 0);
+  assert.equal(free.mem.chatQuestions.length, 0, "글자 수에 걸린 질문은 횟수에 세지 않는다 — 줄여서 다시 물을 수 있다");
+  const exact = await askFreeQuestion(free.deps(), input(free.mine, "가".repeat(QUESTION_MAX.free)));
+  assert.ok(exact.ok && exact.kind === "answer");
+  // 위기 표현은 글이 길어도 글자 수 안내가 아니라 고정 안내가 먼저다
+  const longCrisis = await askFreeQuestion(free.deps(), input(free.mine, `자살하고 싶어요 ${"가".repeat(QUESTION_MAX.free)}`));
+  assert.deepEqual(longCrisis, { ok: true, kind: "safety", paragraphs: CRISIS_REPLY });
+
+  const paid = await setup({ tier: "paid", dailyLimit: 5 });
+  const long = await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.free + 1)));
+  assert.ok(long.ok && long.kind === "answer", "리포트를 받은 분은 500자를 넘어도 된다");
+  assert.ok((await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.paid)))).ok);
+  const tooLong = await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.paid + 1)));
+  assert.ok(!tooLong.ok && tooLong.reason === "too-long" && tooLong.message.includes("1,000자"));
 });

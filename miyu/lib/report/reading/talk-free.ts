@@ -64,6 +64,7 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     detail: [],
     basis: null,
     ...(tendencyInsight ? { caveat: tendencyInsight.basisNote } : {}),
+    grounded: Boolean(tendencyInsight || dmSentence),
     locked: { hooks: [...preview.core.locked.map((c) => c.question), "새로운 일 앞에서 나는 먼저 해 보는 편일까, 따져 보는 편일까?"] },
   });
 
@@ -78,6 +79,7 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     example: [],
     detail: [],
     basis: null,
+    grounded: Boolean(relationInsight || partner),
     locked: { hooks: hooksOf(preview, ["close", "partner", "repeat", "years"]) },
   });
 
@@ -93,6 +95,7 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     example: preview.saju.status === "ok" && preview.saju.everyday.shown ? [para(preview.saju.everyday.shown, "내 원국에서 읽히는 한 줄")] : [],
     detail: [],
     basis: null,
+    grounded: Boolean((work?.strengthLabel && work?.cautionLabel) || (preview.saju.status === "ok" && preview.saju.everyday.shown)),
     locked: { hooks: hooksOf(preview, ["work", "stress"], ["돈을 쓰고 모을 때 내가 반복하는 습관은?"]) },
   });
 
@@ -109,6 +112,7 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
       example: [],
       detail: [],
       basis: null,
+      grounded: true,
       locked: { hooks: ["다음 시기는 어떤 분위기일까?", ...hooksOf(preview, ["years"]), "움직임이 큰 달은 언제일까?"] },
     });
   }

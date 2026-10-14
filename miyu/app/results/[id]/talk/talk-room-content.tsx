@@ -51,7 +51,7 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
   // 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖에는 무료 맛보기(잠긴 내용 없음)로 이야기한다
   const tier = viewTier(view);
   const chat = await chatStateFor(tier, member.userId);
-  const { model } = roomModelFor(view, { paid: chat, free: chat });
+  const { model } = roomModelFor(view, { paid: chat, free: chat }, room);
   if (tier === "paid") {
     if (!roomAvailable(model, room)) notFound();
     const sample = view.report?.content?.source === "sample";

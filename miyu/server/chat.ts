@@ -66,7 +66,8 @@ export function chatCapacity(): CapacityConfig {
 /**
  * 자유 질문 · 이야기 이어 가기의 상태.
  * - 리포트를 받은 분(paid): AI가 연결돼 있으면 열린다(하루 횟수 한도)
- * - 무료 맛보기(free): 로그인한 분께 첫 질문 1번(AI_CHAT_FREE_LIMIT)을 열어 주고, 쓰고 나면 "리포트를 받으면 열려요"로 잠긴다
+ * - 무료 맛보기(free): 로그인한 분께 무료 질문 2번(AI_CHAT_FREE_LIMIT, 기본 2)을 열어 주고, 쓰고 나면 "리포트를 받으면 열려요"로 잠긴다(3번째부터는 리포트).
+ *   방의 무료 풀이에 내 자료로 읽은 내용이 없으면 그 방의 무료 질문은 열지 않는다(roomModelFor의 noMaterial)
  * 연결 전에는 "준비 중"으로 밝힌다(작동하는 것처럼 보이지 않게 한다). 12번 DB 변경 전이라 횟수를 셀 수 없을 때도 준비 중이다.
  */
 export async function chatStateFor(tier: "paid" | "free", userId: string): Promise<TalkChat> {

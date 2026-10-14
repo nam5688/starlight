@@ -161,7 +161,7 @@ export function capacityConfig(): CapacityConfig {
 /**
  * 자유 질문(채팅에서 직접 적는 질문) 한도
  * - AI_CHAT_DAILY_LIMIT: 리포트를 받은 회원이 하루(한국 날짜)에 보낼 수 있는 질문 수 (기본 10, 0이면 닫힘)
- * - AI_CHAT_FREE_LIMIT: 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 질문 수 (기본 1, 0이면 무료 질문은 닫힘)
+ * - AI_CHAT_FREE_LIMIT: 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 질문 수 (기본 2 — 3번째부터는 리포트, 0이면 무료 질문은 닫힘)
  * 질문마다 AI 호출 비용이 든다. 실제 질문 한 번의 비용을 잰 뒤 운영자가 정한다(docs/maintenance.md). 하루 AI 예산(AI_DAILY_BUDGET_KRW)에 닿아도 새 질문만 멈춘다.
  */
 export function chatConfig(): ChatServiceConfig {

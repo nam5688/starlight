@@ -7,6 +7,7 @@ import { ChatAnswerError, type ChatAnswerer } from "../report/chat/answer.ts";
 import { CHAT_LIMITS } from "../report/chat/plan.ts";
 import { CARE_NOTE, CRISIS_REPLY, cleanQuestion, crisisLevel } from "../report/chat/question.ts";
 import type { ChatAsk, ChatContext, ChatExchange } from "../report/chat/types.ts";
+import { QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
 import { estimateCostKrw, seoulDayStart, type CapacityConfig } from "./capacity-service.ts";
 import type { MiyuRepository } from "./ports.ts";
@@ -15,16 +16,17 @@ import { loadTalkRoom, owns, TALK_ROOM_KEY } from "./talk-service.ts";
 export type ChatServiceConfig = {
   /** 리포트를 받은 회원이 하루(한국 날짜)에 보낼 수 있는 자유 질문 수. 0이면 닫힘 */
   dailyLimit: number;
-  /** 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 자유 질문 수 — 기본 1번. 0이면 무료 질문은 닫힘 */
+  /** 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 자유 질문 수 — 기본 2번. 0이면 무료 질문은 닫힘 */
   freeLimit: number;
 };
 
 export const DEFAULT_DAILY_LIMIT = 10;
-export const DEFAULT_FREE_LIMIT = 1;
+/** 무료 맛보기의 로그인한 회원이 평생 보낼 수 있는 질문 수 — 운영자 결정(2026-10-15): 2번까지 무료, 3번째부터는 리포트(유료) */
+export const DEFAULT_FREE_LIMIT = 2;
 /** "처음부터 세기" 위한 아주 오래된 시각 — 무료 질문은 평생 횟수라 날짜로 나누지 않는다 */
 export const COUNT_ALL_SINCE = "1970-01-01T00:00:00.000Z";
 
-export type AskReason = "closed" | "limit" | "free-used" | "budget" | "empty" | "too-long" | "not-found" | "not-ready" | "failed";
+export type AskReason = "closed" | "limit" | "free-used" | "no-material" | "budget" | "empty" | "too-long" | "too-long-free" | "not-found" | "not-ready" | "failed";
 
 export const ASK_MESSAGES: Record<AskReason, string> = {
   closed: "자유 질문은 아직 준비 중이에요.",
@@ -32,7 +34,9 @@ export const ASK_MESSAGES: Record<AskReason, string> = {
   "free-used": "무료 질문을 모두 썼어요. 이어서 묻고 깊은 풀이를 보려면 리포트에서 이어져요.",
   budget: "지금은 질문이 많아 잠시 쉬고 있어요. 조금 뒤에 다시 물어봐 주세요.",
   empty: "궁금한 것을 한두 문장으로 적어 주세요.",
-  "too-long": "질문은 300자 이하로 적어 주세요.",
+  "too-long": `질문은 ${QUESTION_MAX.paid.toLocaleString("ko-KR")}자 이하로 적어 주세요.`,
+  "too-long-free": `무료 질문은 ${QUESTION_MAX.free.toLocaleString("ko-KR")}자까지예요. 줄여서 적어 주세요. 리포트를 받으면 ${QUESTION_MAX.paid.toLocaleString("ko-KR")}자까지 쓸 수 있어요.`,
+  "no-material": "이 방의 무료 풀이에는 아직 이야기 나눌 내용이 없어요. 리포트를 받으면 이어서 물어볼 수 있어요.",
   "not-found": "이 대화를 찾지 못했어요. 화면을 새로 열어 주세요.",
   "not-ready": "이야기를 이어 가는 건 리포트가 준비된 분께 열려 있어요.",
   failed: "이번에는 답을 만들지 못했어요. 잠시 뒤에 다시 물어봐 주세요.",
@@ -59,7 +63,7 @@ export type AskDeps = {
    * 이 질문에 쓸 자료와 기준 날짜. tier는 구매해 준비된 리포트가 있으면 paid(하루 한도), 없으면 free(무료 맛보기의 첫 질문 — 평생 한도).
    * 분석 결과를 찾지 못하면 null.
    */
-  loadAsk: () => Promise<{ context: ChatContext; referenceDate: string; tier: "paid" | "free" } | null>;
+  loadAsk: () => Promise<{ context: ChatContext; referenceDate: string; tier: "paid" | "free"; /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 없다(무료 질문을 열지 않는다) */ noMaterial?: boolean } | null>;
 };
 
 export type AskInput = { userId: string; assessmentId: string; roomKey: string; question: unknown };
@@ -88,6 +92,9 @@ export async function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<A
   const loaded = await deps.loadAsk();
   if (!loaded) return fail("not-ready");
   const free = loaded.tier === "free";
+  if (free && loaded.noMaterial) return fail("no-material");
+  // 글자 수 한도는 무료 500자 · 리포트를 받은 분 1,000자 (위기 표현 확인 · 소유자 확인 뒤에 센다 — 힘든 글은 길어도 안내가 먼저다)
+  if (free && q.length > QUESTION_MAX.free) return fail("too-long-free");
   const limit = free ? deps.config.freeLimit : deps.config.dailyLimit;
   if (limit <= 0) return fail(free ? "not-ready" : "closed");
 

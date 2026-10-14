@@ -10,7 +10,7 @@ import { buildFreePreview } from "../preview.ts";
 import { STARTER_ACTIONS } from "../starter-actions.ts";
 import { TALK_COPY, type TalkChat, type TalkModel } from "./talk.ts";
 import { buildFreeTalkModel } from "./talk-free.ts";
-import { applyAction, availableRooms, replyOptions, roomTopics, ROOM_COPY, ROOM_ORDER, startRoom, type TalkLine } from "./talk-room.ts";
+import { applyAction, availableRooms, replyOptions, roomHasMaterial, roomTopics, ROOM_COPY, ROOM_ORDER, ROOMS, startRoom, type TalkLine } from "./talk-room.ts";
 
 const REF = { year: 2026, month: 10 };
 const TODAY = { year: 2026, month: 10, day: 15 };
@@ -139,4 +139,34 @@ test("무료 맛보기에서도 진로 방과 재무 방은 이어지는 질문 
   assert.equal(career.askText, ROOM_COPY.focus.career.ask);
   assert.equal(money.askText, ROOM_COPY.focus.money.ask);
   assert.equal(money.traits, undefined, "재무 방에는 일하는 방식 카드를 보이지 않는다");
+});
+
+test("무료 질문은 재료가 있는 방에서만 열린다: 내 자료(응답에서 읽은 반응 · 사주 계산)가 있으면 열리고, 없는 방은 열리지 않는다 — 구매한 리포트는 늘 열린다", () => {
+  // 사주 계산이 되는 결과: 나를 알아보기 · 연애 · 진로 · 재무 · 흐름 방이 열린다 (일지 · 일간 문장과 계산한 시기가 재료다)
+  const { model } = freeModel(PATTERNS[0]);
+  for (const room of ROOM_ORDER) assert.equal(typeof roomHasMaterial(model, room), "boolean", room);
+  assert.ok(roomHasMaterial(model, "main"), "나를 알아보기는 맛보기 전체에서 하나라도 재료가 있으면 열린다");
+  assert.ok(roomHasMaterial(model, "love"));
+  assert.ok(roomHasMaterial(model, "year"));
+  // 방마다 자기 풀이의 재료만 본다 — 한 방의 재료가 다른 방의 무료 질문을 열지 않는다
+  for (const id of ["tendency", "love", "work-money", "flow"]) {
+    const t = model.topics.find((x) => x.id === id);
+    assert.equal(typeof t?.grounded, "boolean", `${id}: 맛보기 풀이는 재료 여부를 표시한다`);
+  }
+
+  // 재료가 하나도 없는 맛보기(사주 계산 불가 + 응답에서 읽은 반응 없음)는 어느 방도 무료 질문을 열지 않는다
+  const empty = { ...model, topics: model.topics.map((t) => ({ ...t, grounded: false })), codeTopics: [] };
+  for (const room of ROOM_ORDER) {
+    if (ROOMS[room].chatOnly) continue;
+    assert.equal(roomHasMaterial(empty, room), false, `${room}: 재료 없음`);
+  }
+  // 한 풀이에만 재료가 있으면 그 풀이를 쓰는 방만 열린다
+  const onlyLove = { ...empty, topics: empty.topics.map((t) => (t.id === "love" ? { ...t, grounded: true } : t)) };
+  assert.equal(roomHasMaterial(onlyLove, "love"), true);
+  assert.equal(roomHasMaterial(onlyLove, "main"), true);
+  assert.equal(roomHasMaterial(onlyLove, "career"), false);
+  assert.equal(roomHasMaterial(onlyLove, "year"), false);
+
+  // 구매한 리포트(tier paid)는 재료 여부와 상관없이 늘 열린다
+  assert.equal(roomHasMaterial({ ...empty, tier: "paid" }, "love"), true);
 });

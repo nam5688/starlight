@@ -4,7 +4,8 @@ import test from "node:test";
 import { SAMPLE_CHART } from "../../samples/sample-report.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
 import { ModelCallError, type ModelRequest, type TextModel } from "../ai/model.ts";
-import { FREE_ANSWER_PARAGRAPH_MAX, FREE_ANSWER_PARAGRAPHS_MAX, FREE_QUESTION_MAX, ROOMS, ROOM_ORDER, type RoomId } from "../reading/talk-room.ts";
+import { QUESTION_MAX } from "../reading/talk.ts";
+import { FREE_ANSWER_PARAGRAPH_MAX, FREE_ANSWER_PARAGRAPHS_MAX, ROOMS, ROOM_ORDER, type RoomId } from "../reading/talk-room.ts";
 import { buildTalkModel } from "../reading/talk.ts";
 import { buildFreeTalkModel } from "../reading/talk-free.ts";
 import { buildFreePreview } from "../preview.ts";
@@ -32,14 +33,14 @@ test("한도: 답 한도는 저장 한도(서버 저장 · 화면)보다 작다"
   assert.ok(CHAT_LIMITS.total <= CHAT_LIMITS.paragraphs.max * CHAT_LIMITS.paragraph.max);
 });
 
-test("질문 정리: 공백 · 제어 문자 정리, 연락처 · 이메일 가리기, 빈 글 · 300자 초과 거절", () => {
-  assert.deepEqual(cleanQuestion("  요즘   고민이\n있어요 "), { ok: true, text: "요즘 고민이 있어요", redactions: 0 });
+test("질문 정리: 공백 · 제어 문자 정리, 연락처 · 이메일 가리기, 빈 글 · 1,000자 초과 거절", () => {
+  assert.deepEqual(cleanQuestion("  요즘   고민이\n있어요 "), { ok: true, text: "요즘 고민이 있어요", redactions: 0, length: 10 });
   const r = cleanQuestion("제 번호는 010-1234-5678이고 메일은 a@b.com 이에요");
   assert.ok(r.ok && !/010-1234|a@b\.com/.test(r.text) && r.redactions === 2, JSON.stringify(r));
   assert.deepEqual(cleanQuestion("   "), { ok: false, reason: "empty" });
   assert.deepEqual(cleanQuestion(undefined), { ok: false, reason: "empty" });
-  assert.deepEqual(cleanQuestion("가".repeat(FREE_QUESTION_MAX + 1)), { ok: false, reason: "too-long" });
-  assert.ok(cleanQuestion("가".repeat(FREE_QUESTION_MAX)).ok);
+  assert.deepEqual(cleanQuestion("가".repeat(QUESTION_MAX.paid + 1)), { ok: false, reason: "too-long" });
+  assert.ok(cleanQuestion("가".repeat(QUESTION_MAX.paid)).ok, "가장 넉넉한 한도(리포트를 받은 분)까지는 받는다 — 무료 500자는 서비스가 센다");
 });
 
 test("힘든 글의 구분: 스스로를 해치겠다는 분명한 표현만 AI를 막고, 힘든 마음의 표현은 답하되 안내를 붙이고, 일반적인 슬픔 · 연애 고민은 그대로 답한다", () => {
