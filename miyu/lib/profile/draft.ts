@@ -44,6 +44,8 @@ export function parseDraft(raw: string | null, now: number, maxStep: number): Dr
     if (typeof v === typeof EMPTY_BASIC_INFO[key]) info[key] = typeof v === "string" ? v.slice(0, 100) : v;
   }
 
+  if (info.gender !== "male" && info.gender !== "female") info.gender = "";
+
   const answers: Answers = {};
   const rawAnswers = (typeof d.answers === "object" && d.answers !== null ? d.answers : {}) as Record<string, unknown>;
   for (const [id, v] of Object.entries(rawAnswers)) {

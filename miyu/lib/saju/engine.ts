@@ -99,10 +99,15 @@ export type SajuOk = {
   elementCounts: Record<FiveElement, number>;
   /** 공망 (일주 기준) */
   voidBranches: string[];
+  /** 입력한 성별 — 대운 순서와 전통 해석의 배우자 별(여성 관성 · 남성 재성) 기준으로 쓴다. 입력하지 않았거나 답하지 않았으면 없다(이전에 저장된 결과도 없다) */
+  gender?: "male" | "female";
   /** 성별을 받은 경우에만 */
   luck: LuckInfo | null;
   notes: SajuNote[];
 };
+
+/** 저장된 계산 결과에서 입력한 성별을 꺼낸다 (이전에 저장된 결과 · 답하지 않은 경우는 null) */
+export const genderOfSaju = (saju: SajuResult): "male" | "female" | null => (saju.status === "ok" ? saju.gender ?? null : null);
 
 export type SajuResult =
   | { status: "not-connected" }

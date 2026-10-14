@@ -8,6 +8,7 @@
 // "지금 지나는 시기" 타임라인은 글로 쓰지 않고 서윤의 사주 계산 결과(luckTimeline)에서 만든다.
 import { BLOCK_CAVEAT, CARD_LABEL, comfortNote, FLOW_CAVEAT, RULE_DRAFT_NOTE, SCENARIO_NOTE, SCORE_NOTE, STATISTICS_NOTE } from "../report/reading/plan.ts";
 import type { IntegratedReadingReport, ReadingBlockId, ReadingDraftV1 } from "../report/reading/types.ts";
+import { MONTH_RULE_VERSION, monthCalendars } from "../saju/interpret/months.ts";
 import { luckTimeline } from "../saju/interpret/rules.ts";
 import { SAMPLE_CHART } from "./sample-report.ts";
 
@@ -295,6 +296,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
   },
   timeline: luckTimeline(SAMPLE_CHART, TIMELINE_REFERENCE),
   timelineReference: TIMELINE_REFERENCE,
+  calendars: { ruleVersion: MONTH_RULE_VERSION, items: monthCalendars(SAMPLE_CHART, TIMELINE_REFERENCE) },
   actions: [
     { title: "상대의 답이 늦다고 느낀 다음번에", detail: "떠오른 이유를 세 가지까지 적어 보고, 그중 직접 확인할 수 있는 것 하나를 짧은 문장으로 물어봐요." },
     { title: "일을 시작할 때", detail: "‘어디까지 알아보면 시작할지’를 한 줄로 적고, 중간 결과를 보여 줄 사람을 정해 둬요." },

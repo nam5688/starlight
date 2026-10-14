@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
-import { answerBubbles, extraBubbles, nextTopic, TALK_COPY, type TalkBubble, type TalkGroup, type TalkModel, type TalkTopic } from "@/lib/report/reading/talk";
+import { answerBubbles, extraBubbles, nextTopic, TALK_COPY, type TalkBubble, type TalkExtra, type TalkGroup, type TalkModel, type TalkTopic } from "@/lib/report/reading/talk";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
 
-type Extra = "example" | "detail" | "basis";
+type Extra = TalkExtra;
 /** 미유가 보내는 말 하나 — 저장된 리포트의 글을 나눈 말풍선(TalkBubble), 분석 카드, 링크가 달린 안내 */
 type Say = TalkBubble | { kind: "card" } | { kind: "link"; text: string; href: string; label: string };
 type Item = { id: number; from: "me"; text: string } | { id: number; from: "miyu"; say: Say };
@@ -272,8 +272,17 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
         </Link>
         <Avatar className="size-10 text-[17px]" />
         <div className="min-w-0 flex-1">
-          <h1 className="text-[17px] leading-tight font-bold">
-            미유<span className="sr-only"> · {name} 님의 분석 이야기</span>
+          <h1 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[17px] leading-tight font-bold">
+            <span>
+              미유<span className="sr-only"> · {name} 님의 분석 이야기</span>
+            </span>
+            {/* 대표 경향(~형)은 분석 카드가 위로 올라가도 계속 보인다 — 후보 이름이며 진단이 아니다 */}
+            {model.card.tendency && (
+              <span className="inline-flex items-center rounded-md bg-accent-soft px-2 py-0.5 text-[13px] font-bold text-accent-strong">
+                <span className="sr-only">나의 대표 경향 </span>
+                {model.card.tendency}
+              </span>
+            )}
           </h1>
           <p className="line-clamp-2 text-[13px] leading-snug text-ink-3">{subtitle}</p>
         </div>
@@ -351,6 +360,16 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
                 {cur.detail.length > 0 && !usedHere.has("detail") && (
                   <button type="button" onClick={() => openExtra(cur, "detail")} className={chip}>
                     {TALK_COPY.buttons.detail}
+                  </button>
+                )}
+                {cur.calendar && !usedHere.has("calendar-love") && (
+                  <button type="button" onClick={() => openExtra(cur, "calendar-love")} className={chip}>
+                    {TALK_COPY.buttons["calendar-love"]}
+                  </button>
+                )}
+                {cur.calendar && !usedHere.has("calendar-money") && (
+                  <button type="button" onClick={() => openExtra(cur, "calendar-money")} className={chip}>
+                    {TALK_COPY.buttons["calendar-money"]}
                   </button>
                 )}
                 {cur.basis && !usedHere.has("basis") && (

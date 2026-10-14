@@ -4,6 +4,7 @@
 // 본문(headline · summary · example · details · watch)에는 사주 용어와 응답 점수를 쓰지 않고, 근거는 basis(접어 둔 "분석 근거")에 둔다.
 // evidence는 내부 점검용 근거 ID이며 소비자 화면에는 보이지 않는다.
 import type { ContextTopic } from "../../personalization/context.ts";
+import type { MonthCalendar } from "../../saju/interpret/months.ts";
 import type { LuckSlot } from "../../saju/interpret/rules.ts";
 import type { Evidence } from "../evidence.ts";
 import type { ReportExtras } from "../extras.ts";
@@ -104,6 +105,8 @@ export type IntegratedReadingReport = {
   /** 지금 지나는 시기 타임라인 — 사용자의 사주 계산 결과(luckTimeline)로 만든다. 기준 월은 timelineReference */
   timeline: LuckSlot[];
   timelineReference: { year: number; month: number };
+  /** 월 단위 "움직이는 달" 달력 — 사용자의 사주 계산 결과로 코드가 만든다(AI가 쓰지 않는다). 규칙 버전과 함께 저장하고 열 때마다 새로 계산하지 않는다. 이전에 저장된 리포트에는 없다 */
+  calendars?: { ruleVersion: string; items: MonthCalendar[] };
   /** 다음 행동 체크리스트 */
   actions: { title: string; detail: string }[];
   // ── 실제 생성된 리포트에만 있는 값 (예시에는 없다). 글은 AI가 쓰고, 아래 값은 코드가 채운다 ──

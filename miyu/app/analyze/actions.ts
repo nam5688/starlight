@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
 import { parseAnswers, validateAnswers } from "@/lib/assessment/scoring";
 import type { Answers } from "@/lib/assessment/types";
-import { parseBasicInfo, validateBasicInfo, type BasicInfo } from "@/lib/profile/basic-info";
+import { genderOf, parseBasicInfo, validateBasicInfo, type BasicInfo } from "@/lib/profile/basic-info";
 import { buildDevFreeSummary } from "@/lib/report/build-free-summary";
 import { buildFreePreview, type FreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
@@ -27,6 +27,7 @@ function birthInput(info: BasicInfo) {
     calendar: info.calendar,
     isLeapMonth: info.calendar === "lunar" && info.isLeapMonth,
     birthTime: info.birthTimeUnknown ? null : info.birthTime,
+    gender: genderOf(info),
   };
 }
 

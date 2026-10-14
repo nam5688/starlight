@@ -254,6 +254,7 @@ export function calculateSaju(input: SajuInput, options: SajuOptions = SAJU_POLI
     dayMaster: { stem: day.stem, stemHanja: day.stemHanja, element: day.stemElement, yinYang: day.stemYinYang },
     elementCounts,
     voidBranches: [...main.voidBranches],
+    ...(gender ? { gender } : {}),
     luck: luckOf(main, solar),
     notes,
   };

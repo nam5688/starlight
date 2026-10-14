@@ -4,7 +4,7 @@
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
 import { validateAnswers } from "../assessment/scoring.ts";
 import type { Answers } from "../assessment/types.ts";
-import { MBTI_TYPES, PROVINCES, validateBasicInfo, type BasicInfo } from "../profile/basic-info.ts";
+import { genderOf, MBTI_TYPES, PROVINCES, validateBasicInfo, type BasicInfo } from "../profile/basic-info.ts";
 import { ASSESSMENT_DAILY_LIMIT } from "../commerce/report.ts";
 import { buildDevFreeSummary } from "../report/build-free-summary.ts";
 import type { SajuEngine } from "../saju/engine.ts";
@@ -41,7 +41,7 @@ export async function submitAssessment(
   }
 
   const summary = buildDevFreeSummary(answers);
-  const saju = await deps.saju.calculate({ year, month, day, calendar: info.calendar, isLeapMonth, birthTime });
+  const saju = await deps.saju.calculate({ year, month, day, calendar: info.calendar, isLeapMonth, birthTime, gender: genderOf(info) });
   if (saju.status === "invalid") return { ok: false, message: saju.message };
   if (saju.status === "ok" && toDate(saju.solarDate) > input.today) {
     return { ok: false, message: "오늘 이후 날짜는 입력할 수 없습니다." };

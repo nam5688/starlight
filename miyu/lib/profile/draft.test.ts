@@ -19,6 +19,18 @@ test("저장한 값을 그대로 복원한다 (단계는 허용 범위로 맞춘
   assert.equal(parseDraft(raw, NOW + 1000, 1)?.step, 1, "요약 단계는 복원하지 않고 마지막 검사 단계로");
 });
 
+test("성별: 임시 보관에서 알려진 값만 복원하고, 성별 칸이 없던 이전 보관값은 답하지 않음으로 복원한다", () => {
+  const withGender = parseDraft(serializeDraft({ step: 1, info: { ...info, gender: "male" }, answers: {} }, NOW), NOW, 3);
+  assert.equal(withGender?.info.gender, "male");
+  const odd = parseDraft(JSON.stringify({ v: 1, savedAt: NOW, step: 1, answers: {}, info: { ...info, gender: "아무거나" } }), NOW, 3);
+  assert.equal(odd?.info.gender, "");
+  const { gender: _g, ...legacyInfo } = info;
+  void _g;
+  const legacy = parseDraft(JSON.stringify({ v: 1, savedAt: NOW, step: 1, answers: {}, info: legacyInfo }), NOW, 3);
+  assert.equal(legacy?.info.gender, "");
+  assert.equal(hasContent({ ...EMPTY_BASIC_INFO, gender: "female" }, {}), true, "성별만 골라도 입력한 것으로 본다");
+});
+
 test("빈 입력 · 오래된 것 · 깨진 것 · 다른 버전은 버린다", () => {
   assert.equal(hasContent(EMPTY_BASIC_INFO, {}), false);
   assert.equal(parseDraft(serializeDraft({ step: 0, info: EMPTY_BASIC_INFO, answers: {} }, NOW), NOW, 3), null);

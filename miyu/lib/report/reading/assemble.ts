@@ -4,6 +4,7 @@
 import { filledFields, topicLabel, type PersonalContextInput } from "../../personalization/context.ts";
 import { sajuSection } from "../../saju/display.ts";
 import { GLOSSARY, termsOfEvidence } from "../../saju/glossary.ts";
+import { MONTH_RULE_VERSION, monthCalendars } from "../../saju/interpret/months.ts";
 import { luckTimeline } from "../../saju/interpret/rules.ts";
 import { describePolicy } from "../../saju/policy.ts";
 import type { Evidence } from "../evidence.ts";
@@ -170,6 +171,7 @@ export function assembleReading(o: AssembleOptions): IntegratedReadingReport {
     flow,
     timeline,
     timelineReference: { year: reference.year, month: reference.month },
+    ...(saju.status === "ok" ? { calendars: { ruleVersion: MONTH_RULE_VERSION, items: monthCalendars(saju, reference) } } : {}),
     actions: draft.actions.map((a) => ({ title: a.title, detail: a.detail })),
     saju: sajuSection(saju),
     base: input.summary,

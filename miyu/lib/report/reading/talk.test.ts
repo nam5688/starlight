@@ -201,3 +201,69 @@ test("대화 속 고정 문구: 친구에게 말하듯 해요체이고, 풀이 �
   assert.match(TALK_COPY.freeQuestion, /준비 중/);
   assert.match(TALK_COPY.notice, /AI가 새로 쓰는 글이 아니고/);
 });
+
+// ───────── 월별 달력 답장 (저장된 달력으로 만든 고정 문구 · AI 없음) ─────────
+
+const bubbleTexts = (bs: TalkBubble[]) => bs.flatMap((b) => (b.kind === "text" ? [b.text, ...(b.label ? [b.label] : [])] : []));
+const MONTH_REF = /(\d{4})년 (\d{1,2})월/g;
+
+test("달력 답장: 앞으로의 시기 주제에만 달력 버튼이 있고, 말하는 달은 모두 저장된 달력의 앞으로 12개월 안에 있다", () => {
+  const m = buildTalkModel(R);
+  assert.deepEqual(m.topics.filter((t) => t.calendar).map((t) => t.id), ["flow"]);
+  const flow = m.topics.find((t) => t.id === "flow")!;
+  assert.ok(flow.calendar && flow.calendar.items.length === 3);
+  const stored = new Set(flow.calendar.items.flatMap((c) => c.months.map((x) => `${x.startsOn.slice(0, 4)}년 ${x.startMonth}월`)));
+  const ref = flow.calendar.reference;
+  const from = `${ref.year}-${String(ref.month).padStart(2, "0")}`;
+  for (const which of ["calendar-love", "calendar-money"] as const) {
+    const texts = bubbleTexts(extraBubbles(flow, which));
+    assert.ok(texts.length >= 2, which);
+    for (const t of texts) for (const [full, y, mo] of t.matchAll(MONTH_REF)) {
+      assert.ok(stored.has(full), `${t} — 저장된 달력에 없는 달 ${full}`);
+      assert.ok(`${y}-${String(mo).padStart(2, "0")}` >= from, `${full}은 기준 달 ${from}보다 앞이다`);
+    }
+  }
+});
+
+test("달력 답장: 첫 말풍선은 앞으로 12개월 요약이고, 큰 달이 있으면 큰 달만 · 없으면 조금 움직이는 달 네 개까지 보이며 한계 안내가 따라온다", () => {
+  const flow = buildTalkModel(R).topics.find((t) => t.id === "flow")!;
+  for (const which of ["calendar-love", "calendar-money"] as const) {
+    const bs = extraBubbles(flow, which);
+    const first = bs[0];
+    assert.ok(first.kind === "text" && /^앞으로 12개월 동안/.test(first.text), which);
+    const labeled = bs.filter((b): b is Extract<TalkBubble, { kind: "text" }> => b.kind === "text" && Boolean(b.label));
+    const levels = new Set(labeled.map((b) => b.label!.split(" · ")[1]));
+    assert.ok(levels.size <= 1, "한 번에 한 단계만 보인다");
+    if (levels.has("조금 움직이는 달")) assert.ok(labeled.length <= 4);
+    const muted = bs.filter((b) => b.kind === "text" && b.muted).map((b) => (b.kind === "text" ? b.text : ""));
+    if (labeled.length > 0) {
+      assert.ok(muted.some((t) => /검증된 사실이 아니에요/.test(t)), "한계 안내");
+      assert.ok(muted.some((t) => /월별 달력/.test(t)), "더 보는 곳 안내");
+    }
+    for (const t of bubbleTexts(bs)) {
+      assert.doesNotMatch(t, /점수|확률|만나게 돼요|헤어지게|돈이 들어와요|반드시/, t);
+    }
+  }
+});
+
+test("달력 답장: 성별을 답하지 않으면 가까운 관계 달력은 이유만 알리고, 달력이 없는 이전 리포트에는 버튼 자체가 없다", () => {
+  const noGender = { ...R, calendars: { ...R.calendars!, items: R.calendars!.items.map((c) => ({ ...c, usedSpouseStar: false })) } } satisfies IntegratedReadingReport;
+  const flow = buildTalkModel(noGender).topics.find((t) => t.id === "flow")!;
+  const love = bubbleTexts(extraBubbles(flow, "calendar-love")).join(" ");
+  assert.match(love, /성별을 답하지 않아/);
+  assert.doesNotMatch(love, MONTH_REF);
+  assert.ok(bubbleTexts(extraBubbles(flow, "calendar-money")).join(" ").match(MONTH_REF) || /눈에 띄는 달이 없어요/.test(bubbleTexts(extraBubbles(flow, "calendar-money")).join(" ")));
+
+  const { calendars: _omit, ...legacy } = R;
+  void _omit;
+  const old = buildTalkModel(legacy as IntegratedReadingReport);
+  assert.ok(old.topics.every((t) => !t.calendar));
+  assert.deepEqual(extraBubbles(old.topics.find((t) => t.id === "flow")!, "calendar-love"), []);
+});
+
+test("달력 답장: 버튼 이름이 있고 같은 입력이면 같은 말풍선이다(저장된 달력만 쓴다)", () => {
+  assert.equal(TALK_COPY.buttons["calendar-love"], "가까운 관계가 움직이는 달은?");
+  assert.equal(TALK_COPY.buttons["calendar-money"], "재물이 눈에 띄는 달은?");
+  const flow = buildTalkModel(R).topics.find((t) => t.id === "flow")!;
+  assert.deepEqual(extraBubbles(flow, "calendar-love"), extraBubbles(flow, "calendar-love"));
+});

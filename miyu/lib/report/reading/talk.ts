@@ -2,7 +2,9 @@
 // 새 글을 쓰지 않는다(AI 호출 없음): 풀이 · 예시 · 근거는 모두 저장된 리포트의 문장 그대로이고, 대화 속 안내 문구만 이 파일의 고정 문구다.
 // 자유 질문 · "내 경우는 달라"에 AI가 답하는 기능은 아직 없다(2단계, 운영자 결정 뒤) — 화면에서 "준비 중"으로 밝힌다.
 // 이 파일은 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
+import type { MonthCalendar } from "../../saju/interpret/months.ts";
 import { basisFor } from "./assemble.ts";
+import { CALENDAR_CHAT_NOTES, MONTH_NOTES, upcomingMonthTexts, upcomingSummary, type CalendarTopic } from "./calendar-text.ts";
 import { splitSentences } from "./line-breaks.ts";
 import type { IntegratedReadingReport, LuckSlot, ReadingBasis, ReadingBlock } from "./types.ts";
 
@@ -34,7 +36,12 @@ export type TalkTopic = {
   detail: TalkPiece[];
   /** [이렇게 분석한 이유] — 저장된 분석 근거 */
   basis: ReadingBasis | null;
+  /** 앞으로의 시기 — 저장된 월별 달력(코드 계산). 있으면 [가까운 관계가 움직이는 달은?] · [재물이 눈에 띄는 달은?] 버튼을 보인다 */
+  calendar?: { items: MonthCalendar[]; reference: { year: number; month: number } };
 };
+
+/** 답장 버튼이 여는 조각 */
+export type TalkExtra = "example" | "detail" | "basis" | "calendar-love" | "calendar-money";
 
 export type TalkCard = {
   headline: string;
@@ -86,7 +93,7 @@ export const TALK_COPY = {
   menuTitle: "다른 이야기 보기",
   freeQuestion: "자유롭게 질문하기 · 준비 중",
   freeQuestionPending: "자유 질문은 준비 중이에요. 지금은 버튼으로 이어 볼 수 있어요.",
-  buttons: { example: "예를 들어줘", detail: "더 자세히 알려줘", basis: "이렇게 분석한 이유", differ: "내 경우는 달라", concern: "고민 말하기", pickTopic: "다른 주제 고르기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
+  buttons: { example: "예를 들어줘", detail: "더 자세히 알려줘", basis: "이렇게 분석한 이유", "calendar-love": "가까운 관계가 움직이는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", differ: "내 경우는 달라", concern: "고민 말하기", pickTopic: "다른 주제 고르기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
 
 const CHIP: Record<string, string> = {
@@ -143,6 +150,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: { tendency
     example: [note(f.scenarioNote), ...f.scenarios.map((s) => para(s.then, s.when))],
     detail: [...f.years.map((y) => para(y.theme, y.year)), ...f.periods.flatMap((p) => [para(p.theme, p.period), para(p.watch, `${p.period} · 살펴볼 점`)]), note(f.statistics)],
     basis: f.basis,
+    ...(report.calendars && report.calendars.items.length > 0 ? { calendar: { items: report.calendars.items, reference: report.timelineReference } } : {}),
   });
 
   if (report.focus?.length) {
@@ -249,7 +257,23 @@ export function answerBubbles(t: TalkTopic): TalkBubble[] {
 }
 
 /** [예를 들어줘] · [더 자세히 알려줘] · [이렇게 분석한 이유]를 눌렀을 때 도착하는 말풍선 */
-export function extraBubbles(t: TalkTopic, which: "example" | "detail" | "basis"): TalkBubble[] {
+export function extraBubbles(t: TalkTopic, which: TalkExtra): TalkBubble[] {
   if (which === "basis") return t.basis ? [{ kind: "basis", basis: t.basis }] : [];
+  if (which === "calendar-love" || which === "calendar-money") return t.calendar ? calendarBubbles(t.calendar, which === "calendar-love" ? "love" : "money") : [];
   return piecesToBubbles(which === "example" ? t.example : t.detail);
+}
+
+/**
+ * 월별 달력 답장 — 저장된 달력의 앞으로 12개월에서 고른 달만 말한다. 문장은 고정 문구와 계산된 달 · 단계 · 이유로만 만든다(AI가 쓰지 않는다).
+ * 성별을 답하지 않아 가까운 관계 달력이 없으면 이유만 알린다.
+ */
+export function calendarBubbles(cal: NonNullable<TalkTopic["calendar"]>, topic: CalendarTopic): TalkBubble[] {
+  const out: TalkBubble[] = toBubbles(upcomingSummary(cal.items, cal.reference, topic)).map((text) => ({ kind: "text", text }));
+  const months = upcomingMonthTexts(cal.items, cal.reference, topic);
+  for (const m of months) out.push({ kind: "text", text: m.text, label: m.label });
+  if (months.length > 0) {
+    for (const text of toBubbles(MONTH_NOTES.limit)) out.push({ kind: "text", text, muted: true });
+    for (const text of toBubbles(CALENDAR_CHAT_NOTES.more)) out.push({ kind: "text", text, muted: true });
+  }
+  return out;
 }

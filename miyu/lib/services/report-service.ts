@@ -6,6 +6,7 @@ import { concernInputOf } from "../personalization/concern.ts";
 import type { AiUsageSample, ConcernInput, ReportGenerator, ReportInput } from "../report/generator.ts";
 import { reportTexts } from "../report/concern/texts.ts";
 import { isConcernReport } from "../report/concern/types.ts";
+import { genderOfSaju } from "../saju/engine.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { PersonalContext } from "../personalization/context.ts";
 import { estimateCostKrw, type CapacityConfig } from "./capacity-service.ts";
@@ -176,7 +177,7 @@ async function concernInputFor(repo: MiyuRepository, generator: ReportGenerator,
     knownMbti: assessment.knownMbti,
     summary: assessment.summary,
     saju: assessment.saju,
-    gender: null,
+    gender: genderOfSaju(assessment.saju),
     concern: concernInputOf(record),
     snapshot: { recordId: record.id, writtenAt: record.writtenAt },
     base,
@@ -211,7 +212,7 @@ export function reportInputOf(a: AssessmentRecord, context: PersonalContext | nu
     birthText: formatAssessmentBirth(a),
     summary: a.summary,
     saju: a.saju,
-    gender: null,
+    gender: genderOfSaju(a.saju),
     context: context
       ? {
           topic: context.topic,

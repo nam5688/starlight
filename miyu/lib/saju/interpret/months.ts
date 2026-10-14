@@ -133,6 +133,16 @@ export function monthCalendar(saju: SajuOk, input: { year: number; gender?: "mal
   return { year: input.year, months, usedSpouseStar: star !== null, dayUncertain };
 }
 
+/**
+ * 리포트에 싣는 달력 — 기준 날짜가 속한 해부터 3년(세운과 같은 길이). 입춘 전(1 · 2월)에는 전년도 달력이 아직 진행 중이라 한 해 앞에서 시작한다.
+ * 성별은 계산 결과(saju.gender)에서 가져온다 — 답하지 않았거나 이전에 저장된 결과는 배우자 별을 쓰지 않는다.
+ */
+export const CALENDAR_YEARS = 3;
+export function monthCalendars(saju: SajuOk, reference: { year: number; month: number }): MonthCalendar[] {
+  const first = reference.month <= 2 ? reference.year - 1 : reference.year;
+  return Array.from({ length: CALENDAR_YEARS }, (_, k) => monthCalendar(saju, { year: first + k, gender: saju.gender ?? null }));
+}
+
 /** 단계가 같은 달들을 시작 순서대로 (화면의 "움직임이 큰 달: 3월 · 9월" 같은 요약용) */
 export function monthsAtLevel(cal: MonthCalendar, topic: "love" | "money", level: MonthLevel): MonthCell[] {
   return cal.months.filter((m) => m[topic].level === level);

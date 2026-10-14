@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  GENDER_OPTIONS,
   MBTI_TYPES,
   NICKNAME_MAX,
   PROVINCES,
@@ -210,6 +211,33 @@ export function BasicInfoStep({
           </label>
           <FieldError id="birthTime-error" message={errors.birthTime} />
         </div>
+
+        {/* 성별 (선택) — 대운 · 배우자 별 · 월 달력 계산에만 쓴다 */}
+        <fieldset>
+          <legend className="text-[16px] font-semibold">
+            성별 <span className="text-[14px] font-normal text-ink-3">선택</span>
+          </legend>
+          <p id="gender-help" className="mt-1 text-[14px] leading-relaxed text-ink-3">
+            전통 사주 계산에서 10년 단위의 시기(대운)의 순서와 배우자와 관련해 보는 기운이 성별에 따라 달라서 묻습니다. 다른 곳에는 쓰지 않아요. 답하지 않으면 이 두 가지와 이를 쓰는 월별 달력은 계산하지 않고 &lsquo;알 수 없음&rsquo;으로 둡니다.
+          </p>
+          <div role="radiogroup" aria-label="성별" aria-describedby="gender-help" className="mt-3 grid grid-cols-3 gap-2">
+            {GENDER_OPTIONS.map(([value, label]) => (
+              <label key={label} className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="gender"
+                  value={value}
+                  checked={(info.gender ?? "") === value}
+                  onChange={() => set("gender", value)}
+                  className="peer sr-only"
+                />
+                <span className="flex h-12 items-center justify-center rounded-lg border border-line-strong px-1 text-center text-[15px] peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:font-semibold peer-checked:text-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent">
+                  {label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         {/* 알고 있는 MBTI */}
         <div>

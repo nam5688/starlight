@@ -30,6 +30,7 @@ import { type CompareCandidate, type CompareVariant, planStage, runStage } from 
 import { isReadingReport } from "../lib/report/generator.ts";
 import { composeMockReading } from "../lib/report/reading/mock-model.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
+import { sampleReport } from "../lib/samples/sample-report.ts";
 import { sampleReadingReport } from "../lib/samples/sample-reading-report.ts";
 
 const args = process.argv.slice(2);
@@ -179,7 +180,7 @@ safely("이름을 가린 글", () => {
     writeFileSync(join(dir, "blind", `${run.persona}-${run.blind}.md`), renderReadingMarkdown(run.report));
   }
 });
-safely("사람이 쓴 예시", () => writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport)}`));
+safely("사람이 쓴 예시", () => writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport, { tendencyName: sampleReport.tendency.name })}`));
 safely("채점표", () => {
 const rows = personas.flatMap((p) => (solo ? ["X"] : ["X", "Y"]).map((b) => `| ${p.id} | ${b} |  |  |  |  |  |  |  |`)).join("\n");
 writeFileSync(

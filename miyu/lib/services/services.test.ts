@@ -16,7 +16,7 @@ import { confirmPayment, markCheckoutFailed, startCheckout, syncPayment } from "
 import type { GatewayResult, PaymentGateway } from "./ports.ts";
 import { getMyPage, orderStatusLabel, traceOrder } from "./my-service.ts";
 import { deleteContext, getContextView, saveContext } from "./context-service.ts";
-import { canRetryReport, claimReport, completeReport, ensureReport, getResultView, listMyItems, queueReport, runReport } from "./report-service.ts";
+import { canRetryReport, claimReport, completeReport, ensureReport, getResultView, listMyItems, queueReport, reportInputOf, runReport } from "./report-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
 const TODAY = new Date("2026-10-11T00:00:00Z");
@@ -86,6 +86,24 @@ test("검사 저장: 서버에서 채점하고 모르는 문항 키는 버린다
   assert.equal(assessment.saju.status, "ok", "만세력 엔진으로 원국을 계산해 함께 저장한다");
   assert.equal(mem.profiles.get(USER)?.nickname, "지민");
   assert.deepEqual(mem.regions.get(USER), { province: "서울특별시", district: "마포구" });
+});
+
+test("검사 저장: 성별을 고르면 대운 · 배우자 별 계산에 쓰고 결과와 함께 저장하며, 답하지 않으면 계산하지 않는다", async () => {
+  const mem = createMemoryRepository(() => TODAY);
+  const d = { repo: mem.repo, saju: sajuEngine };
+  const withGender = await submitAssessment(d, { userId: USER, channel: "web", info: { ...INFO, gender: "female" }, answers: answersAll(3), today: TODAY });
+  assert.ok(withGender.ok);
+  const a = withGender.ok ? withGender.assessment : (null as never);
+  assert.equal(a.saju.status, "ok");
+  assert.equal(a.saju.status === "ok" ? a.saju.gender : null, "female");
+  assert.ok(a.saju.status === "ok" && a.saju.luck && a.saju.luck.periods.length > 0, "성별이 있으면 대운을 계산한다");
+  assert.equal(reportInputOf(a).gender, "female", "리포트 생성에 성별 기준이 전달된다");
+
+  const without = await submitAssessment(d, { userId: OTHER, channel: "web", info: { ...INFO, gender: "" }, answers: answersAll(3), today: TODAY });
+  assert.ok(without.ok);
+  const b = without.ok ? without.assessment : (null as never);
+  assert.ok(b.saju.status === "ok" && b.saju.luck === null && b.saju.gender === undefined, "답하지 않으면 대운 · 성별 기준을 만들지 않는다");
+  assert.equal(reportInputOf(b).gender, null);
 });
 
 test("검사 저장: 기본 정보나 응답이 잘못되면 거부한다", async () => {

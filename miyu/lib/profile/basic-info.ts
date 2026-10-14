@@ -1,6 +1,14 @@
 // 기본 정보 입력값과 검증.
 // 지역은 성향 분석에 쓰지 않는다 — 향후 장소 추천용으로만 따로 보관할 예정이다.
 
+/** 성별(선택) — 대운 순서와 배우자 별 계산에만 쓴다. ""는 답하지 않음 */
+export type Gender = "" | "male" | "female";
+export const GENDER_OPTIONS: readonly (readonly [Gender, string])[] = [
+  ["female", "여성"],
+  ["male", "남성"],
+  ["", "답하지 않음"],
+];
+
 export type BasicInfo = {
   nickname: string;
   calendar: "solar" | "lunar";
@@ -13,6 +21,8 @@ export type BasicInfo = {
   knownMbti: string;
   regionProvince: string;
   regionDistrict: string;
+  /** 선택. 없으면(이전 버전의 임시 저장 · 테스트 입력) 답하지 않음으로 본다 */
+  gender?: Gender;
 };
 
 export const EMPTY_BASIC_INFO: BasicInfo = {
@@ -27,7 +37,11 @@ export const EMPTY_BASIC_INFO: BasicInfo = {
   knownMbti: "",
   regionProvince: "",
   regionDistrict: "",
+  gender: "",
 };
+
+/** 사주 계산에 넘기는 성별 (답하지 않으면 null — 대운 · 배우자 별은 계산하지 않는다) */
+export const genderOf = (info: Pick<BasicInfo, "gender">): "male" | "female" | null => (info.gender === "male" || info.gender === "female" ? info.gender : null);
 
 export type BasicInfoErrors = Partial<Record<"nickname" | "birthDate" | "birthTime", string>>;
 
@@ -110,5 +124,7 @@ export function parseBasicInfo(raw: unknown): BasicInfo | null {
     regionProvince: str("regionProvince", 20),
     regionDistrict: str("regionDistrict", 20),
   };
-  return Object.values(info).some((v) => v === null) ? null : (info as BasicInfo);
+  // 성별은 선택이고 이전 버전이 보관한 값에는 없다 — 알려진 값이 아니면 답하지 않음으로 받는다
+  const gender: Gender = r.gender === "male" || r.gender === "female" ? r.gender : "";
+  return Object.values(info).some((v) => v === null) ? null : ({ ...info, gender } as BasicInfo);
 }

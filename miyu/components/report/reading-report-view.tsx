@@ -3,6 +3,7 @@ import { basisFor } from "@/lib/report/reading/assemble";
 import type { IntegratedReadingReport, ReadingBlock, ReadingGroupId } from "@/lib/report/reading/types";
 import type { SajuSection, ScoreRow } from "@/lib/report/types";
 import { SajuChart } from "./detail-sections";
+import { MonthCalendarView } from "./month-calendar";
 import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
 import { ActionList } from "./integrated-view";
 import { ReadingNav } from "./reading-nav";
@@ -207,6 +208,11 @@ export function ReadingReportView({
             </div>
 
             <FoldRow>
+              {report.calendars && report.calendars.items.length > 0 && (
+                <Fold label="월별 달력" hint="가까운 관계 · 재물이 눈에 띄기 쉬운 달" wide>
+                  <MonthCalendarView calendars={report.calendars.items} idPrefix={id("cal")} />
+                </Fold>
+              )}
               <Fold label="자세한 풀이" wide>
                 <div className="divide-y divide-line [&>div]:py-6 [&>div:first-child]:pt-0 [&>div:last-child]:pb-0">
                   <div>
