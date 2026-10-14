@@ -4,6 +4,7 @@ import { buildChatContext } from "@/lib/report/chat/context";
 import { ROOMS, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
 import { ASK_MESSAGES, askFreeQuestion, type AskResult } from "@/lib/services/chat-service";
 import { getResultView } from "@/lib/services/report-service";
+import { closeRoom, saveRoomSummary, SUMMARY_MESSAGES, type SummaryFailure } from "@/lib/services/summary-service";
 import { resetTalkRoom, saveTalkRoom } from "@/lib/services/talk-service";
 import { chatAnswerer, chatCapacity } from "@/server/chat";
 import { roomModelFor } from "@/server/talk-model";
@@ -30,6 +31,57 @@ export async function resetTalkRoomAction(input: Input): Promise<{ ok: boolean }
   if (!member || member.needsConsent) return { ok: false };
   const r = await resetTalkRoom(writeRepository(), { userId: member.userId, assessmentId: input.assessmentId, roomKey: input.roomKey });
   return { ok: r.ok };
+}
+
+export type SummaryActionResult = { ok: true; saved: boolean } | { ok: false; reason: SummaryFailure | "failed"; message: string };
+
+const summaryFailed = (reason: SummaryFailure | "failed"): SummaryActionResult => ({ ok: false, reason, message: reason === "failed" ? "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요." : SUMMARY_MESSAGES[reason] });
+
+type SummaryInput = Input & { room: unknown };
+
+/** 요약에 쓰는 풀이 이름표를 가져오는 대화 모델 — 저장된 리포트(또는 무료 맛보기)에서 서버가 다시 만든다 (브라우저가 보낸 글을 믿지 않는다) */
+async function summaryModel(userId: string, assessmentId: string, room: RoomId) {
+  const view = await getResultView(await readRepository(), { userId, assessmentId });
+  if (!view) return null;
+  return roomModelFor(view, { paid: { state: "ready" }, free: { state: "ready", free: true } }, room).model;
+}
+
+/**
+ * [저장하기] — 지금까지 나눈 대화를 짧은 "질문 → 답변"으로 요약해 저장한다 (이전 저장 이후의 대화만). 요약은 코드가 규칙대로 줄이며 AI를 부르지 않는다.
+ * 저장한 요약은 MY의 "저장한 채팅 요약 보기"에서 본인만 본다. 서버 로그에는 가린 오류만 남기고 대화 내용은 어떤 기록에도 넣지 않는다.
+ */
+export async function saveChatSummaryAction(input: SummaryInput): Promise<SummaryActionResult> {
+  if (typeof input?.assessmentId !== "string" || typeof input?.roomKey !== "string" || typeof input?.room !== "string" || !(input.room in ROOMS)) return summaryFailed("invalid");
+  const member = await getMember();
+  if (!member || member.needsConsent) return summaryFailed("not-found");
+  try {
+    const model = await summaryModel(member.userId, input.assessmentId, input.room as RoomId);
+    if (!model) return summaryFailed("not-found");
+    const r = await saveRoomSummary(writeRepository(), { userId: member.userId, assessmentId: input.assessmentId, roomKey: input.roomKey, room: input.room, actions: input.actions, model });
+    return r.ok ? { ok: true, saved: true } : summaryFailed(r.reason);
+  } catch (e) {
+    logError("talk.summary.save", e);
+    return summaryFailed("failed");
+  }
+}
+
+/**
+ * 대화 종료 — 이 방의 대화를 지우고 새 대화로 시작하게 한다. keep이 true이면 마지막 저장 이후의 대화를 요약해 저장하고,
+ * false이면 저장하지 않고 끝내되 보이지 않는 참고 기록으로만 남긴다(다음 질문에서 AI가 이전 이야기를 참고한다 · 회원이 MY에서 지울 수 있다).
+ */
+export async function closeTalkRoomAction(input: SummaryInput & { keep: unknown }): Promise<SummaryActionResult> {
+  if (typeof input?.assessmentId !== "string" || typeof input?.roomKey !== "string" || typeof input?.room !== "string" || !(input.room in ROOMS)) return summaryFailed("invalid");
+  const member = await getMember();
+  if (!member || member.needsConsent) return summaryFailed("not-found");
+  try {
+    const model = await summaryModel(member.userId, input.assessmentId, input.room as RoomId);
+    if (!model) return summaryFailed("not-found");
+    const r = await closeRoom(writeRepository(), { userId: member.userId, assessmentId: input.assessmentId, roomKey: input.roomKey, room: input.room, actions: input.actions, model, keep: input.keep === true });
+    return r.ok ? { ok: true, saved: r.saved } : summaryFailed(r.reason);
+  } catch (e) {
+    logError("talk.summary.close", e);
+    return summaryFailed("failed");
+  }
 }
 
 type AskInput = { assessmentId: unknown; room: unknown; roomKey: unknown; question: unknown; topicId?: unknown; intake?: unknown; followUp?: unknown };

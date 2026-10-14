@@ -26,7 +26,8 @@ t as (
     to_regclass('public.talk_rooms')          is not null as talk_rooms,
     to_regclass('public.chat_questions')      is not null as chat_questions,
     to_regclass('public.cash_wallets')        is not null as cash_wallets,
-    to_regclass('public.cash_ledger')         is not null as cash_ledger
+    to_regclass('public.cash_ledger')         is not null as cash_ledger,
+    to_regclass('public.chat_summaries')      is not null as chat_summaries
 ),
 wd as (
   select
@@ -45,6 +46,14 @@ wd12 as (
   select coalesce((select bool_or(pg_get_functiondef(p.oid) like '%talk_rooms%')
                    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                    where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as fn_updated
+),
+-- 14번: 방 요약 위치 열 · 탈퇴 함수가 채팅 요약 삭제를 포함하도록 갱신됐는가
+wd14 as (
+  select
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'talk_rooms' and column_name = 'saved_upto') as saved_col,
+    coalesce((select bool_or(pg_get_functiondef(p.oid) like '%chat_summaries%')
+              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as fn_updated
 ),
 -- 13번: 캐시 함수 · 충전 트리거 · 탈퇴 함수가 캐시 잔액 확인을 포함하도록 갱신됐는가
 wd13 as (
@@ -158,5 +167,11 @@ select * from (
               when t.cash_wallets or t.cash_ledger or wd13.spend_fn or wd13.restore_fn or wd13.trigger_ok or wd13.fn_updated then '일부만' else '아직 안 함' end,
          '표 cash_wallets, cash_ledger / 함수 spend_cash, restore_cash_spend / 주문 결제 완료 때 충전하는 트리거 / 탈퇴 함수에 캐시 잔액 확인 포함: ' || wd13.fn_updated::text
   from t, wd13
+  union all
+  select 14, '20261024000000_chat_summaries.sql',
+         case when t.chat_summaries and wd14.saved_col and wd14.fn_updated then '적용됨'
+              when t.chat_summaries or wd14.saved_col or wd14.fn_updated then '일부만' else '아직 안 함' end,
+         '표 chat_summaries / 열 talk_rooms.saved_upto: ' || wd14.saved_col::text || ' / 탈퇴 함수에 채팅 요약 삭제 포함: ' || wd14.fn_updated::text
+  from t, wd14
 ) r
 order by "번호";

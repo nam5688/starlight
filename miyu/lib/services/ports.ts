@@ -172,7 +172,14 @@ export type CashLedgerKind = "charge" | "bonus" | "spend" | "spend_restore" | "c
 export type CashLedgerRecord = { id: number; kind: CashLedgerKind; amount: number; orderId: string | null; shortfall: number; createdAt: string };
 
 /** 대화(상담방) 저장 — 회원 · 검사 결과 · 방마다 한 줄. 눌렀던 행동 목록과 자유 질문 · 답만 담고 리포트 글은 담지 않는다 */
-export type TalkRoomRecord = { assessmentId: string; roomKey: string; userId: string; actions: unknown[]; updatedAt: string };
+export type TalkRoomRecord = { assessmentId: string; roomKey: string; userId: string; actions: unknown[]; updatedAt: string; /** 행동 목록에서 어디까지 요약했는가 — 다음 저장은 여기부터 요약한다 */ savedUpto: number };
+
+/**
+ * 채팅 요약 — 방에서 [저장하기]를 누르거나 대화를 끝낼 때의 "그때까지 나눈 질문과 답" 줄임. 만든 뒤 고치지 않는다.
+ * visible: true = 회원이 직접 저장한 요약(MY에서 본인이 본다) · false = 저장하지 않고 끝낸 대화의 참고 기록(회원 화면에는 보이지 않고 다음 질문에서 AI가 참고한다).
+ * room은 방 이름이고 날짜별 방(오늘의 한 장)도 날짜 없이 daily로 묶는다. items는 lib/report/chat/summary.ts의 SummaryItems(읽을 때 모양을 다시 확인한다).
+ */
+export type ChatSummaryRecord = { id: string; userId: string; assessmentId: string; room: string; visible: boolean; items: unknown; createdAt: string };
 
 export interface MiyuRepository {
   /** 동의 기록 (지우지 않고 쌓는다) */
@@ -240,6 +247,25 @@ export interface MiyuRepository {
   deleteTalkRoom(assessmentId: string, roomKey: string): Promise<void>;
   /** roomKey가 prefix로 시작하고 keepKey보다 앞서는 방을 지운다 (지난 날짜의 오늘의 한 장 정리) */
   deleteTalkRoomsBefore(assessmentId: string, prefix: string, keepKey: string): Promise<void>;
+  /**
+   * 채팅 요약 — 테이블이 없으면(DB 변경 14번 전) 조회는 빈 값, 쓰기는 오류(코드 42P01).
+   * claimTalkRoomSegment: 이 방의 요약 위치(saved_upto)가 from일 때만 to로 옮긴다 — 저장 버튼을 두 번 눌러도 같은 대화가 두 번 요약되지 않게 하는 한 번만 성공하는 자리 잡기. 옮겼으면 true, 이미 다른 요청이 옮겼거나 방이 없으면 false.
+   * releaseTalkRoomSegment: 요약을 만들지 못했을 때 위치를 되돌린다(to일 때만 from으로).
+   */
+  claimTalkRoomSegment(assessmentId: string, roomKey: string, from: number, to: number): Promise<boolean>;
+  releaseTalkRoomSegment(assessmentId: string, roomKey: string, from: number, to: number): Promise<void>;
+  insertChatSummary(input: { userId: string; assessmentId: string; room: string; visible: boolean; items: unknown }): Promise<ChatSummaryRecord>;
+  /** 이 회원의 채팅 요약 — 최근 것이 먼저. visibleOnly면 직접 저장한 것만(MY 화면) */
+  listChatSummaries(userId: string, opts: { visibleOnly: boolean; limit?: number }): Promise<ChatSummaryRecord[]>;
+  /** 이 검사 결과의 이 방 요약(직접 저장한 것 + 참고 기록) — 최근 것이 먼저. 다음 질문에서 AI가 참고한다 */
+  listRoomChatSummaries(userId: string, assessmentId: string, room: string, limit: number): Promise<ChatSummaryRecord[]>;
+  countVisibleChatSummaries(userId: string): Promise<number>;
+  /** 요약 하나를 지운다 (내 것만, 지웠으면 true) */
+  deleteChatSummary(userId: string, id: string): Promise<boolean>;
+  /** 이 회원의 채팅 요약을 모두 지운다 (직접 저장한 것과 참고 기록 모두) — 지운 개수 */
+  deleteChatSummaries(userId: string): Promise<number>;
+  /** 이 방의 참고 기록(visible = false)을 최근 keep개만 남기고 지운다 */
+  trimHiddenChatSummaries(userId: string, assessmentId: string, room: string, keep: number): Promise<void>;
   /** 자유 질문 횟수 기록 — 질문 내용은 담지 않는다. 테이블이 없으면 조회 · 쓰기 모두 오류(코드 42P01) */
   addChatQuestion(input: { userId: string; assessmentId: string; roomKey: string }): Promise<void>;
   countChatQuestionsSince(userId: string, since: string): Promise<number>;

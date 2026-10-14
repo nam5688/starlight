@@ -27,6 +27,10 @@ import { ensureReport, getResultView } from "../../lib/services/report-service.t
 import { kakaoOAuthOptions } from "../../server/kakao-options.ts";
 import { getConcernWorkspace, startConcernCheckout } from "../../lib/services/concern-service.ts";
 import { deleteContext, getContextView, saveContext } from "../../lib/services/context-service.ts";
+import { buildTalkModel } from "../../lib/report/reading/talk.ts";
+import { sampleReadingReport } from "../../lib/samples/sample-reading-report.ts";
+import { SAMPLE_CHART } from "../../lib/samples/sample-report.ts";
+import { closeRoom, deleteAllSummaries, listSavedSummaries, memoryFor, saveRoomSummary } from "../../lib/services/summary-service.ts";
 
 const URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
 const JWT_SECRET = process.env.JWT_SECRET ?? "local-test-jwt-secret-at-least-32-characters";
@@ -854,6 +858,120 @@ test("대화 저장(12번 마이그레이션): 서버가 저장하고 본인만 
   // 다른 회원의 대화는 그대로
   await server.upsertTalkRoom({ assessmentId: vid, userId: V.id, roomKey: "love", actions });
   assert.deepEqual(await server.listTalkRoomKeys(vid), ["love"]);
+});
+
+test("채팅 요약(14번 마이그레이션): 본인이 저장한 것만 보이고(참고 기록은 브라우저가 못 읽음), 쓰기는 서버로만, 같은 대화는 한 번만 요약되고, 만든 뒤 고치지 않고, 탈퇴하면 함께 지워진다", async () => {
+  const U = await makeUser();
+  const V = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const mine = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "요약" }, answers, today: new Date() });
+  const theirs = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: V.id, channel: "web", info: { ...info, nickname: "남" }, answers, today: new Date() });
+  assert.ok(mine.ok && theirs.ok);
+  const aid = mine.ok ? mine.assessment.id : "";
+  const vid = theirs.ok ? theirs.assessment.id : "";
+  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  const free = (n: number) => ({ t: "free", q: `질문${n}`, a: [`답${n}이에요.`], topic: "love" });
+  const input = (actions: unknown[], over: Record<string, unknown> = {}) => ({ userId: U.id, assessmentId: aid, roomKey: "love", room: "love", actions, model, ...over });
+
+  // 1) 저장: 서비스가 요약을 만들고 방 줄의 요약 위치(saved_upto)를 옮긴다 — 같은 대화를 동시에 두 번 저장해도 한 번만
+  const both = await Promise.all([saveRoomSummary(server, input([free(1), free(2)])), saveRoomSummary(server, input([free(1), free(2)]))]);
+  assert.equal(both.filter((r) => r.ok).length, 1, `동시에 두 번 눌러도 한 번만: ${JSON.stringify(both)}`);
+  assert.equal((await server.getTalkRoom(aid, "love"))?.savedUpto, 2);
+  assert.equal((await saveRoomSummary(server, input([free(1), free(2), free(3)]))).ok, true);
+  assert.equal((await server.getTalkRoom(aid, "love"))?.savedUpto, 3);
+  // 대화를 올릴 때(upsert) 요약 위치가 지워지지 않는다
+  await server.upsertTalkRoom({ assessmentId: aid, userId: U.id, roomKey: "love", actions: [free(1), free(2), free(3), free(4)] });
+  assert.equal((await server.getTalkRoom(aid, "love"))?.savedUpto, 3, "대화 저장이 요약 위치를 되돌리지 않는다");
+  const saved = (await listSavedSummaries(server, U.id))[0];
+  assert.deepEqual(saved.entries.map((e) => e.items.qa.map((p) => p.q)), [["질문3"], ["질문1", "질문2"]], "저장마다 이전 저장 이후의 대화만, 최근 저장이 먼저");
+
+  // 2) 대화 종료 · 저장하지 않음 → 보이지 않는 참고 기록 (같은 방, 다음 질문의 참고로만)
+  assert.deepEqual(await closeRoom(server, { ...input([free(1), free(2), free(3), free(4), free(5)]), keep: false }), { ok: true, saved: false });
+  assert.equal(await server.getTalkRoom(aid, "love"), null, "대화 종료로 방 줄이 지워진다");
+  assert.deepEqual((await memoryFor(server, { userId: U.id, assessmentId: aid, room: "love" })).map((p) => p.q), ["질문2", "질문3", "질문4", "질문5"], "다음 질문의 참고: 저장한 것과 저장하지 않은 것 모두, 오래된 순서로 최근 4쌍");
+  assert.equal(await server.countVisibleChatSummaries(U.id), 2, "저장한 요약은 2개 그대로");
+
+  // 3) 접근 정책: 본인이 직접 저장한 것만 브라우저로 읽힌다(참고 기록은 못 읽는다), 남 · 비로그인은 못 본다
+  const mineRows = await createSupabaseRepository(U.client).listChatSummaries(U.id, { visibleOnly: false });
+  assert.equal(mineRows.length, 2);
+  assert.ok(mineRows.every((r) => r.visible), "브라우저는 저장하지 않고 끝낸 대화의 참고 기록을 읽지 못한다");
+  assert.equal((await server.listChatSummaries(U.id, { visibleOnly: false })).length, 3, "서버는 참고 기록까지 읽는다");
+  assert.deepEqual(await createSupabaseRepository(V.client).listChatSummaries(U.id, { visibleOnly: false }), []);
+  const anonRead = await anon.from("chat_summaries").select();
+  assert.ok(anonRead.error || (anonRead.data ?? []).length === 0, "비로그인은 조회할 수 없다");
+
+  // 4) 브라우저의 직접 쓰기는 모두 거부 · 서버도 만든 뒤 고치지 못한다(수정 권한 없음)
+  const ins = await U.client.from("chat_summaries").insert({ user_id: U.id, assessment_id: aid, room: "love", visible: true, items: { read: [], qa: [] } });
+  assert.ok(ins.error, "직접 저장");
+  const upd = await U.client.from("chat_summaries").update({ items: { read: [], qa: [] } }).eq("user_id", U.id).select();
+  assert.ok(upd.error || (upd.data ?? []).length === 0, "직접 수정");
+  const del = await U.client.from("chat_summaries").delete().eq("user_id", U.id).select();
+  assert.ok(del.error || (del.data ?? []).length === 0, "직접 삭제");
+  const adminUpd = await admin.from("chat_summaries").update({ visible: true }).eq("user_id", U.id).select();
+  assert.ok(adminUpd.error, "서버도 만든 요약을 고치지 못한다");
+  assert.equal((await server.listChatSummaries(U.id, { visibleOnly: false })).length, 3, "직접 쓰기를 시도해도 그대로");
+
+  // 5) DB 규칙: 남의 결과에 붙이기 · 방 이름 형식 · 요약 모양과 크기
+  await assert.rejects(server.insertChatSummary({ userId: U.id, assessmentId: vid, room: "love", visible: true, items: { read: [], qa: [] } }), /owner mismatch/);
+  for (const bad of ["Love", "daily:2026-10-15", "a", "love;drop"]) {
+    const r = await admin.from("chat_summaries").insert({ user_id: U.id, assessment_id: aid, room: bad, visible: true, items: { read: [], qa: [] } });
+    assert.ok(r.error, `잘못된 방 이름 ${bad}`);
+  }
+  const notObject = await admin.from("chat_summaries").insert({ user_id: U.id, assessment_id: aid, room: "love", visible: true, items: [1] });
+  assert.ok(notObject.error, "요약이 아닌 모양");
+  const huge = await admin.from("chat_summaries").insert({ user_id: U.id, assessment_id: aid, room: "love", visible: true, items: { read: [], qa: [{ q: "가".repeat(20000), a: "나".repeat(20000) }] } });
+  assert.ok(huge.error, "크기 한도");
+
+  // 6) 지우기: 내 요약만, 모두 지우기는 참고 기록까지
+  const [first] = await server.listChatSummaries(U.id, { visibleOnly: true });
+  assert.equal(await server.deleteChatSummary(V.id, first.id), false, "남의 요약은 지울 수 없다");
+  assert.equal(await server.deleteChatSummary(U.id, first.id), true);
+  assert.equal(await deleteAllSummaries(server, U.id), 2, "남은 저장 요약 1개와 참고 기록 1개");
+  assert.deepEqual(await server.listChatSummaries(U.id, { visibleOnly: false }), []);
+
+  // 7) 탈퇴: 저장한 요약 · 참고 기록이 함께 지워진다
+  await server.insertChatSummary({ userId: U.id, assessmentId: aid, room: "love", visible: true, items: { read: ["연애"], qa: [] } });
+  await server.insertChatSummary({ userId: U.id, assessmentId: aid, room: "love", visible: false, items: { read: [], qa: [{ q: "q", a: "a" }] } });
+  await server.insertChatSummary({ userId: V.id, assessmentId: vid, room: "love", visible: true, items: { read: ["남의"], qa: [] } });
+  const gone = await server.withdrawMemberData(U.id);
+  assert.ok(gone.ok && gone.counts.chat_summaries === 2, JSON.stringify(gone));
+  assert.deepEqual(await server.listChatSummaries(U.id, { visibleOnly: false }), []);
+  assert.equal((await server.listChatSummaries(V.id, { visibleOnly: false })).length, 1, "다른 회원의 요약은 그대로");
+});
+
+test("채팅 요약 표 · 열이 없어도(14번 적용 전) 대화 · 질문은 그대로 되고, 저장만 '준비 중'으로 막히며 저장하지 않고 끝내기는 된다", async () => {
+  const U = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const mine = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "표없음요약" }, answers, today: new Date() });
+  assert.ok(mine.ok);
+  const aid = mine.ok ? mine.assessment.id : "";
+  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  const free = (n: number) => ({ t: "free", q: `질문${n}`, a: [`답${n}이에요.`], topic: "love" });
+  const input = (actions: unknown[]) => ({ userId: U.id, assessmentId: aid, roomKey: "love", room: "love", actions, model });
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const psql = (q: string) => execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-q", "-c", q]);
+  psql("alter table public.chat_summaries rename to chat_summaries_hidden; alter table public.talk_rooms rename column saved_upto to saved_upto_hidden; notify pgrst, 'reload schema'");
+  await sleep(800);
+  try {
+    // 읽기는 빈 값 · 대화 저장은 그대로
+    assert.deepEqual(await server.listChatSummaries(U.id, { visibleOnly: true }), []);
+    assert.equal(await server.countVisibleChatSummaries(U.id), 0);
+    assert.deepEqual(await memoryFor(server, { userId: U.id, assessmentId: aid, room: "love" }), []);
+    await server.upsertTalkRoom({ assessmentId: aid, userId: U.id, roomKey: "love", actions: [free(1)] });
+    assert.equal((await server.getTalkRoom(aid, "love"))?.actions.length, 1);
+    // 저장은 준비 중, 대화는 지워지지 않는다
+    assert.deepEqual(await saveRoomSummary(server, input([free(1)])), { ok: false, reason: "not-ready" });
+    assert.deepEqual(await closeRoom(server, { ...input([free(1)]), keep: true }), { ok: false, reason: "not-ready" });
+    assert.equal((await server.getTalkRoom(aid, "love"))?.actions.length, 1);
+    // 저장하지 않고 끝내기는 기록 없이 끝난다
+    assert.deepEqual(await closeRoom(server, { ...input([free(1)]), keep: false }), { ok: true, saved: false });
+    assert.equal(await server.getTalkRoom(aid, "love"), null);
+    assert.equal(await deleteAllSummaries(server, U.id), 0);
+  } finally {
+    psql("alter table public.chat_summaries_hidden rename to chat_summaries; alter table public.talk_rooms rename column saved_upto_hidden to saved_upto; notify pgrst, 'reload schema'");
+    await sleep(800);
+  }
+  assert.deepEqual(await server.listChatSummaries(U.id, { visibleOnly: false }), []);
 });
 
 test("미유캐시(13번 마이그레이션): 결제 승인과 같은 처리에서 한 번만 충전되고, 본인만 보며, 쓰기는 함수로만, 환불하면 남은 만큼 회수하고, 잔액이 있으면 탈퇴를 막는다", async () => {

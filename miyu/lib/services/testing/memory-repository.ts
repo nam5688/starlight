@@ -19,6 +19,7 @@ import type {
   ProfileRecord,
   ReportRecord,
   TalkRoomRecord,
+  ChatSummaryRecord,
 } from "../ports.ts";
 
 export function createMemoryRepository(now: () => Date = () => new Date()) {
@@ -35,6 +36,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const concernRecords = new Map<string, ConcernRecord>();
   const talkRooms = new Map<string, TalkRoomRecord>();
   const chatQuestions: { userId: string; assessmentId: string; roomKey: string; createdAt: string }[] = [];
+  const chatSummaries: ChatSummaryRecord[] = [];
   // 미유캐시 — DB의 지갑 · 내역 · 트리거(충전 · 회수) · 함수(차감 · 되돌림)를 흉내 낸다
   const wallets = new Map<string, number>();
   const ledger: (CashLedgerRecord & { userId: string; ref: string | null })[] = [];
@@ -92,7 +94,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       if ([...orders.values()].some((o) => mine(o) && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)) return { ok: false, reason: "pending-order" };
       if ([...reports.values()].some((r) => r.userId === userId && (r.status === "queued" || r.status === "generating"))) return { ok: false, reason: "report-in-progress" };
       if ((wallets.get(userId) ?? 0) > 0) return { ok: false, reason: "cash-balance" };
-      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0 };
+      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0, chat_summaries: 0 };
       for (const [k, f] of [...feedback]) {
         if (f.userId !== userId) continue;
         feedback.delete(k);
@@ -117,6 +119,11 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         if (chatQuestions[i].userId !== userId) continue;
         chatQuestions.splice(i, 1);
         counts.chat_questions++;
+      }
+      for (let i = chatSummaries.length - 1; i >= 0; i--) {
+        if (chatSummaries[i].userId !== userId) continue;
+        chatSummaries.splice(i, 1);
+        counts.chat_summaries++;
       }
       for (const [k, r] of [...reports]) {
         if (r.userId !== userId) continue;
@@ -353,13 +360,69 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async upsertTalkRoom(input) {
       if (assessments.get(input.assessmentId)?.userId !== input.userId) throw new Error("talk room owner mismatch");
-      talkRooms.set(`${input.assessmentId}|${input.roomKey}`, { assessmentId: input.assessmentId, roomKey: input.roomKey, userId: input.userId, actions: input.actions, updatedAt: iso() });
+      // 이미 있는 방은 요약 위치(savedUpto)를 그대로 둔다 (DB의 upsert가 넣은 열만 바꾸는 것과 같다)
+      const prev = talkRooms.get(`${input.assessmentId}|${input.roomKey}`);
+      talkRooms.set(`${input.assessmentId}|${input.roomKey}`, { assessmentId: input.assessmentId, roomKey: input.roomKey, userId: input.userId, actions: input.actions, updatedAt: iso(), savedUpto: prev?.savedUpto ?? 0 });
     },
     async deleteTalkRoom(assessmentId, roomKey) {
       talkRooms.delete(`${assessmentId}|${roomKey}`);
     },
     async deleteTalkRoomsBefore(assessmentId, prefix, keepKey) {
       for (const [k, t] of [...talkRooms]) if (t.assessmentId === assessmentId && t.roomKey.startsWith(prefix) && t.roomKey < keepKey) talkRooms.delete(k);
+    },
+    async claimTalkRoomSegment(assessmentId, roomKey, from, to) {
+      const k = `${assessmentId}|${roomKey}`;
+      const t = talkRooms.get(k);
+      if (!t || t.savedUpto !== from) return false;
+      talkRooms.set(k, { ...t, savedUpto: to });
+      return true;
+    },
+    async releaseTalkRoomSegment(assessmentId, roomKey, from, to) {
+      const k = `${assessmentId}|${roomKey}`;
+      const t = talkRooms.get(k);
+      if (t && t.savedUpto === to) talkRooms.set(k, { ...t, savedUpto: from });
+    },
+    async insertChatSummary(input) {
+      if (assessments.get(input.assessmentId)?.userId !== input.userId) throw new Error("chat summary owner mismatch");
+      const row: ChatSummaryRecord = { id: id(), userId: input.userId, assessmentId: input.assessmentId, room: input.room, visible: input.visible, items: input.items, createdAt: iso() };
+      chatSummaries.push(row);
+      return row;
+    },
+    async listChatSummaries(userId, opts) {
+      return chatSummaries
+        .filter((s) => s.userId === userId && (!opts.visibleOnly || s.visible))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || (a.id < b.id ? 1 : -1))
+        .slice(0, opts.limit ?? 500);
+    },
+    async listRoomChatSummaries(userId, assessmentId, room, limit) {
+      return chatSummaries
+        .filter((s) => s.userId === userId && s.assessmentId === assessmentId && s.room === room)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || (a.id < b.id ? 1 : -1))
+        .slice(0, limit);
+    },
+    async countVisibleChatSummaries(userId) {
+      return chatSummaries.filter((s) => s.userId === userId && s.visible).length;
+    },
+    async deleteChatSummary(userId, summaryId) {
+      const i = chatSummaries.findIndex((s) => s.id === summaryId && s.userId === userId);
+      if (i < 0) return false;
+      chatSummaries.splice(i, 1);
+      return true;
+    },
+    async deleteChatSummaries(userId) {
+      let n = 0;
+      for (let i = chatSummaries.length - 1; i >= 0; i--) {
+        if (chatSummaries[i].userId !== userId) continue;
+        chatSummaries.splice(i, 1);
+        n++;
+      }
+      return n;
+    },
+    async trimHiddenChatSummaries(userId, assessmentId, room, keep) {
+      const hidden = chatSummaries
+        .filter((s) => s.userId === userId && s.assessmentId === assessmentId && s.room === room && !s.visible)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || (a.id < b.id ? 1 : -1));
+      for (const old of hidden.slice(keep)) chatSummaries.splice(chatSummaries.indexOf(old), 1);
     },
     async addChatQuestion(input) {
       chatQuestions.push({ ...input, createdAt: iso() });
@@ -435,5 +498,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, opsEvents, aiUsage, funnel, feedback, wallets, ledger };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger };
 }

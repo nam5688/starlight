@@ -151,6 +151,8 @@
 4. **자유 질문 실제 AI 시험 범위 확인**(제안: 승인 600원 · 호출 14회 · 2일, 남은 1단계 승인 1,741원 안 — [`ai-quality-comparison-plan.md`](./ai-quality-comparison-plan.md) 8-5) (무료 질문은 **평생 2번까지 · 질문 한 번 1,000자까지 · 내 자료로 읽은 내용이 있는 방에서만**으로 정했고([`ai-quality-comparison-plan.md`](./ai-quality-comparison-plan.md) 8-7, 실제 AI로는 아직 확인하지 않았다), 검사에 걸려 답을 못 받으면 차감하지 않기로 결정했고, 인연 나이 방향 · 연애운이 강해지는 달 풀이는 유지하기로 결정했다 — [`partner-rules-audit.md`](./partner-rules-audit.md) 4장) · **자유 질문 하루 횟수**(기본 10, `AI_CHAT_DAILY_LIMIT`) · **위기 안내 전화번호 확인**(고정 안내에 자살예방 상담전화 109 · 119를 적었다 — 출시 전 최신 번호인지 확인) · **저장된 대화 보관 기간**([`withdrawal-policy.md`](./withdrawal-policy.md) 9번). 실제 AI 연결 전에는 비용이 들지 않는다.
 3. **최초 구매에 무료 발급을 몇 회 포함할지** — 내 고민 반영 리포트 가격 4,900원은 운영자가 확정했다(2026-10-13). 무료 발급은 지금 없고, 실제 AI 글을 읽어 본 뒤 정하는 것을 권한다 ([`concern-records.md`](./concern-records.md) 6장).
 
+5. **2026-10-15 이후 추가 기능의 결정 · 확인 항목** — 미유캐시 가격 · 보너스 · 환불 · 유효기간(`docs/cash-policy.md`), 저장하지 않은 대화의 참고 기록 보관([`chat-summary.md`](./chat-summary.md) · [`withdrawal-policy.md`](./withdrawal-policy.md) 11번), 개인 통합 리포트 이름을 "심층 리포트"로 바꿀지, 심화 검사 문항 구성(`assessment-deep-design-v1.md`). 실제 DB에는 12 · 13 · 14번 변경이 모두 필요하다(`supabase/check-migrations.sql`로 확인). **채팅 요약 · 미유캐시 · 방 등급 · 재결제는 가짜 결제 · 가짜 AI · 임시 DB에서만 확인했고 실제 서비스(실결제 · 실제 AI · 실제 Supabase)에서는 확인하지 못했다.**
+
 **추천 기본값으로 진행하면 되는 것** ([`operator-decisions.md`](./operator-decisions.md)): 12유형(시범 응답 후 확정) · 자시 기준 · 출생지 보정 · 대운 계산 기준(첫 출시에 "큰 흐름"을 넣을지에 따라).
 
 **공개 전에 필요한 것:** 약관 · 처리방침 확정(사업자 정보 · 보관 기간 · 위탁 · 국외 이전 · 환불 기준), 탈퇴 정책 8가지([`withdrawal-policy.md`](./withdrawal-policy.md) 2장), Supabase 요금제의 백업 주기 확인, 정기 점검(cron) 실행 위치, 카테고리 상품 가격 · 출시 순서(첫 출시 뒤), **공개 배포 · 실결제 전환 시점**(운영자 확인 전 진행하지 않음).

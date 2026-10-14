@@ -12,8 +12,13 @@
 | 무료 미리보기에서 보이는 항목 · 잠금 질문 | `lib/report/preview.ts` | 잠긴 내용은 이 파일이 만든 값에 **없어야** 한다 (테스트가 확인). 질문을 늘리면 구매 리포트에 그 답이 있어야 한다 |
 | **상담방 이름 · 모드 이름 · 먼저 묻는 질문 · 열 수 있는 풀이** (8개) | `lib/report/reading/talk-room.ts`의 `ROOMS`(순서는 `ROOM_ORDER`) | 홈 카드 · 채팅방 목록 · 메뉴가 모두 이 표를 읽는다. 진로 / 재무 방은 지금 같은 "일과 돈" 풀이를 쓴다. `talk-room.test.ts` |
 | **일일 운세 무료 혜택**(초기에만) | `lib/config/product.ts`의 `DAILY_FREE.enabled` | false로 바꾸면 무료 맛보기에서는 그날의 풀이 대신 질문만 보이고, 구매한 분은 그대로 본다. `talk-code.test.ts` |
-| **자유 질문 하루 횟수** | 환경변수 `AI_CHAT_DAILY_LIMIT` (기본 10, 0이면 닫힘) | 질문 한 번의 실제 비용을 잰 뒤 정한다. 하루 AI 예산(`AI_DAILY_BUDGET_KRW`)에 닿아도 새 질문만 멈춘다 |
-| **무료 맛보기의 무료 질문 횟수** | 환경변수 `AI_CHAT_FREE_LIMIT` (기본 2 — 로그인한 회원이 평생 2번까지 무료, 3번째부터는 리포트(유료), 0이면 닫힘. 질문 한 번의 글자 수는 무료 500자 · 리포트를 받은 분 1,000자 — `talk.ts`의 `QUESTION_MAX` 한 곳(무료를 고치면 안내창 문구의 "두 배"가 맞는지 확인. 테스트가 확인한다). 무료 질문을 모두 썼을 때의 안내창 문구는 `TALK_COPY.recharge`. 무료 맛보기에 내 자료로 읽은 내용이 없는 방은 무료 질문을 열지 않는다 — `roomHasMaterial`) | 실제 AI 시험 중에만 일시적으로 올리고(예: 8) 끝나면 비운다. 이미 쓴 횟수는 그대로 남는다 |
+| **하단 사업자 정보**(상호 · 대표자 · 소재지 · 사업자등록번호 · 통신판매신고번호 · 개인정보관리책임자) | `lib/config/business.ts` 한 곳 | 운영자가 보낸 값 그대로다. 저작권 줄의 서비스 이름이 "MI:U"로 적혀 있는데(운영자 원문 그대로) 화면 이름은 "ME:U"다 — 맞는지 운영자가 확인한다 |
+| **방마다 무료 질문 수 · 방 등급**(간단 리포트 / 심층 리포트) | `lib/config/product.ts`의 `CHAT_ROOMS`(간단 리포트로 열리는 방과 방마다 무료 질문 수 `simple`, 심층 리포트의 방마다 무료 질문 `deepFreeQuestions`, 기본 3) · 규칙은 `lib/report/chat/quota.ts` | 간단 리포트(무료)로는 나를 알아보기(질문 0) · 오늘의 운세(하루 1) · 고민 상담(2) · 연애(2) 네 방만 열리고, 심층 리포트(개인 통합 리포트)를 받으면 모든 방이 열리며 방마다 무료 질문 3번이다. 다 쓰면 미유캐시(`MIYU_CASH.perQuestion` 3캐시)로 이어 간다. 방 카드 · 채팅 메뉴 · 잠긴 방 안내가 같은 표를 읽는다 |
+| **시험 중 무료 질문 추가** | 환경변수 `AI_CHAT_EXTRA_QUESTIONS` (기본 0) | 실제 AI 시험 중에만 열린 방마다 무료 질문을 더 준다. 끝나면 비운다 |
+| **질문 한 번의 글자 수 · 안내창 문구** | `lib/report/reading/talk.ts`의 `QUESTION_MAX`(무료 500자 · 심층 리포트 / 캐시 질문 1,000자) · `TALK_COPY.recharge` | 무료를 고치면 안내창 문구의 "두 배"가 맞는지 확인한다(테스트가 확인한다). 무료 맛보기에 내 자료로 읽은 내용이 없는 방은 무료 질문을 열지 않는다 |
+| **미유캐시 가격 · 보너스 · 충전 단위** | `lib/config/product.ts`의 `MIYU_CASH` | 가격 · 보너스는 가설이다. 환불 · 유효기간 · 보너스 정책은 `docs/cash-policy.md`의 결정 항목. 주문 · 충전은 결제사 확인 뒤에만 지갑에 들어간다(DB 13번) |
+| **고민 기록소 노출** | `lib/config/product.ts`의 `CONCERN_RECORDS.visible` (지금 false) | false이면 주소 · 입구 · MY 목록 · 발급 동작이 모두 막힌다. 데이터 · 서비스 코드는 그대로 있다 |
+| **채팅 요약 저장** | `lib/report/chat/summary.ts`(`SUMMARY_LIMITS` — 직접 저장 최대 100개 · 저장하지 않은 대화의 참고 기록 방마다 12개 · 글자 수 한도 · 다음 질문에 참고로 보내는 쌍 수) · `lib/services/summary-service.ts` · 문구는 `ROOM_COPY.summary` | 설명은 `docs/chat-summary.md`. 저장하지 않아도 참고 기록이 남는다는 점은 대화 종료 안내창 · 처리방침 3-1 · `docs/withdrawal-policy.md` 11번에 적었다 |
 | **자유 질문의 실제 AI 연결(Claude)** | 환경변수 `AI_CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` + 승인 값 `AI_CHAT_APPROVED_KRW` · `AI_CHAT_APPROVED_CALLS` · `AI_CHAT_APPROVED_FROM` · `AI_CHAT_APPROVED_THROUGH` | 운영자가 값을 직접 적어야만 연결된다. 코드 상한(`lib/config/ai-candidates.ts`의 `CHAT_TEST_LIMITS` 1,500원 · 40회 · 3일)을 넘기면 연결되지 않는다. 시험이 끝나면 `AI_CHAT_PROVIDER`를 비워 끊는다. 호출 수 · 비용은 `supabase/check-chat-usage.sql`(읽기 전용)로 본다. 승인액을 새로 정하면 `STAGE1_LEDGER`(누적 사용액)도 운영자가 확인한 값으로 고친다 |
 | **인연 풀이의 나이 방향** | `lib/config/product.ts`의 `PARTNER_AGE_DIRECTION` (`enabled: false`로 끄면 나이 방향 문장 · 질문이 빠진다) | 운영자가 켜 두기로 결정(2026-10-15, 연상 · 동갑 · 연하 쪽 큰 방향 + 사용한 전통 해석 기준 설명). 바꿀 때는 `docs/partner-rules-audit.md` 4장을 먼저 본다 |
 | 일일 운세 하루 한 번 무료 | `lib/config/product.ts`의 `DAILY_FREE` | 초기 혜택을 끝낼 때 `enabled: false` |
@@ -94,3 +99,8 @@
 ## 6. 글꼴
 
 본문 글꼴은 Pretendard(OFL-1.1)를 이 사이트에 쓰는 글자만 남겨 줄인 파일 두 개다 (`app/fonts/`). `next/font/local`로 불러오며(설정은 `app/fonts/miyu-fonts.ts` — `scripts/subset-font.py`가 만든다), 핵심 파일은 첫 화면과 함께 미리 받고 `font-display: optional`이라 늦게 도착해도 글자가 바뀌며 화면이 흔들리지 않는다. 화면 문구에 새 한글이 많이 늘면 `scripts/subset-font.py`를 다시 실행한다 (실행법은 파일 맨 위, 글꼴 도구 `fonttools`는 개발 PC에만 필요). 빠진 글자는 나머지 파일(필요한 화면에서만 받음)과 기본 글꼴로 대체되므로 글자가 깨지지는 않는다. 화면 스타일이 바뀌지 않는 것 같으면 `.next` 폴더(빌드 캐시)를 지우고 다시 빌드한다.
+
+## 브라우저 점검(개발 환경) 때 알아 둘 것
+
+- `NEXT_PUBLIC_*` 환경변수는 **빌드할 때 화면 코드에 박힌다**. 로컬 검증 환경에서 운영 빌드(`next start`)로 확인할 때는 점검용 환경변수 파일을 읽은 채로 빌드해야(`set -a; . app.env; set +a; npm run build`) 값이 반영된다 — 서버만 다시 켜서는 바뀌지 않는다.
+- Next.js 16은 다른 화면으로 이동해도 이전 화면을 숨긴 채 DOM에 남겨 두므로, 브라우저 자동 점검에서 화면의 `main`을 찾을 때는 보이는 것만(`main:visible`) 고른다.

@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDate } from "@/components/ui/format";
 import { CONCERN_RECORDS, formatKrw } from "@/lib/config/product";
+import { ROOM_COPY } from "@/lib/report/reading/talk-room";
 import { getCashView } from "@/lib/services/cash-service";
 import { getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
@@ -75,7 +76,7 @@ async function MyContent() {
   reconcileUserInBackground(member.userId);
 
   const repo = await readRepository();
-  const [{ cards, concerns, orders }, cash] = await Promise.all([getMyPage(repo, member.userId), getCashView(repo, member.userId, 1)]);
+  const [{ cards, concerns, orders }, cash, savedChats] = await Promise.all([getMyPage(repo, member.userId), getCashView(repo, member.userId, 1), repo.countVisibleChatSummaries(member.userId).catch(() => 0)]);
   const paymentsReady = paymentConfig().ok;
   const cashHref = cards[0] ? `/cash?a=${cards[0].assessmentId}` : "/cash";
   return (
@@ -93,6 +94,20 @@ async function MyContent() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="my-chats" className="mt-12">
+        <h2 id="my-chats" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
+          {ROOM_COPY.summary.pageTitle}
+        </h2>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl bg-canvas px-4 py-4 shadow-soft">
+          <p className="text-[14px] leading-[1.6] text-ink-2">
+            {savedChats > 0 ? `채팅방에서 저장한 요약이 ${savedChats}개 있어요.` : "채팅방의 [저장하기]를 누르면 나눈 이야기가 요약으로 쌓여요."}
+          </p>
+          <Link href="/my/chats" className={buttonSecondary}>
+            저장한 채팅 요약 보기
+          </Link>
+        </div>
       </section>
 
       <section aria-labelledby="my-cash" className="mt-12">

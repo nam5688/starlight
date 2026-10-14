@@ -80,7 +80,7 @@ SQL 파일 두 개를 **순서대로 한 번씩** 실행합니다.
    - 이미 실행한 파일을 다시 실행하면 "already exists" 오류가 납니다. 표가 모두 "있음"이면 그대로 두면 됩니다.
    - 첫 번째 파일 실행 중 오류가 났다면, 두 번째 파일로 넘어가지 말고 오류 문구를 알려주세요 (키 값은 보내지 않습니다).
 
-### 2단계 추가 — 나중에 생긴 DB 변경 (3~12번)
+### 2단계 추가 — 나중에 생긴 DB 변경 (3~14번)
 
 기능이 추가되면서 SQL 파일이 더 생겼습니다. **어디까지 적용했는지 먼저 확인하세요 — `supabase/check-migrations.sql`을 SQL Editor에서 실행하면 번호별 "적용됨 / 아직 안 함 / 일부만"이 나옵니다 (읽기 전용, 자세한 순서는 [`update-guide.md`](./update-guide.md) 2장).** **이미 적용한 파일은 다시 실행하지 않고, 아직 안 한 것만 번호 순서대로 한 번씩** 실행합니다. 방법은 위와 같습니다 (New query → 아래 명령으로 복사 → 붙여넣기 → Run → `Success`).
 기존 회원 · 검사 · 주문 데이터는 지우거나 바꾸지 않습니다. 파일을 고쳐서 다시 실행하라는 안내는 하지 않습니다. 바뀐 내용은 항상 새 파일로 추가됩니다.
@@ -115,6 +115,8 @@ Get-Content supabase\migrations\20261022000000_talk_rooms.sql -Raw -Encoding UTF
 
 - 6~11번을 아직 안 했어도 결제 · 리포트 · MY는 그대로 동작합니다 (코드가 먼저 올라가고 DB 변경이 늦어도 주문 생성이 막히지 않도록 확인했습니다). 해당 번호를 적용하기 전에는 운영 기록 · AI 사용 기록 · 방문 단계 · 만족도가 쌓이지 않거나 집계가 비어 보일 뿐입니다. `/setup`의 DB 상태에서 `ops_events` 등으로 확인합니다.
 - 5번을 아직 안 했어도 다른 화면은 그대로 동작합니다. 다만 ‘내 고민 자세히 알려주기’ 저장이 "DB 변경 5번을 먼저 적용해야 합니다"라고 안내합니다. `/setup`의 DB 상태에서 `personal_contexts` 상태로도 확인할 수 있습니다.
+- 13번(미유캐시)을 아직 안 했어도 다른 화면은 그대로 동작합니다. 충전만 "충전을 준비하고 있어요"로 막히고 결제도 시작되지 않으며, 방의 무료 질문을 다 쓰면 캐시 대신 리포트 구매 안내가 보입니다 (`/setup`에서 `cash_wallets` 상태로 확인).
+- 14번(채팅 요약 저장)을 아직 안 했어도 대화 · 질문은 그대로 동작합니다. [저장하기]만 "채팅 요약 저장을 준비하고 있어요"로 막히고 저장하지 않고 끝내기는 됩니다 (`/setup`에서 `chat_summaries` 상태로 확인).
 - 12번을 아직 안 했어도 결제 · 리포트 · MY · 대화는 동작합니다. 대화가 이 기기 브라우저에만 남고(폰을 바꾸면 이어지지 않음) 자유 질문 입력은 "준비 중"으로 보입니다 (`/setup`에서 `talk_rooms` 상태로 확인).
 - 11번을 아직 안 했어도 결제 · 리포트 · MY와 고민을 적고 저장하는 것은 동작합니다. 새 리포트 발급만 "DB 변경 11번을 먼저 적용해야 합니다"로 막히고 결제는 시작되지 않습니다 (`/setup`에서 `concern_records` 상태로 확인).
 
@@ -234,8 +236,7 @@ Supabase **Authentication → URL Configuration**에서:
 | `ADMIN_USER_IDS` | 관리자 화면(`/admin`)에 들어갈 회원 번호. 비워 두면 아무에게도 열리지 않습니다 | Supabase → Authentication → Users에서 내 계정의 **User UID** (카카오로 한 번 로그인한 뒤) |
 | `CRON_SECRET` | 정기 점검 주소(`/api/cron/reconcile`)의 인증값. 길고 추측하기 어려운 무작위 문자열 | PowerShell: `[Convert]::ToBase64String((1..32 \| ForEach-Object { Get-Random -Maximum 256 }))` 로 만들어 환경변수에 넣기 |
 | `TELEGRAM_BOT_TOKEN` · `TELEGRAM_CHAT_ID` | 운영 알림(결제 확인 필요 · 리포트 실패 · 새 구매 중단). 둘 다 있을 때만 텔레그램으로 보내고, 없으면 서버 로그에만 남깁니다 | 텔레그램 BotFather로 봇 만들기 → 내 채팅 번호 확인 |
-| `AI_CHAT_DAILY_LIMIT` | 자유 질문(채팅에서 직접 적는 질문)을 한 회원이 하루에 보낼 수 있는 횟수. 비우면 10, 0이면 닫힘. AI를 연결한 뒤에만 의미가 있습니다 | 질문 한 번의 실제 비용을 잰 뒤 정합니다 |
-| `AI_CHAT_FREE_LIMIT` | 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 자유 질문 수. 비우면 2(3번째 질문부터는 리포트), 0이면 닫힘 | 실제 AI 시험 중에만 올립니다 |
+| `AI_CHAT_EXTRA_QUESTIONS` | **실제 AI 시험 중에만** 열린 방마다 무료 질문을 이만큼 더 줍니다. 비우면 0. 방마다 무료 질문 수는 코드(`lib/config/product.ts`의 `CHAT_ROOMS`)에서 정하고, 다 쓰면 미유캐시로 이어 갑니다 | 시험이 끝나면 비웁니다 |
 | `AI_CHAT_PROVIDER` · `ANTHROPIC_API_KEY` · `AI_CHAT_APPROVED_KRW` · `AI_CHAT_APPROVED_CALLS` · `AI_CHAT_APPROVED_FROM` · `AI_CHAT_APPROVED_THROUGH` | **자유 질문의 실제 AI(Claude) 시험.** 제공사 `anthropic` · 키 · 승인 금액(원) · 승인 호출 수 · 승인 기간(한국 날짜)을 **운영자가 직접** 적어야만 연결됩니다. 하나라도 비어 있거나 상한(1,500원 · 40회 · 3일)을 넘으면 연결되지 않고 입력창은 "준비 중"으로 보입니다. 키는 대화에 붙여넣지 않습니다 | Anthropic 콘솔에서 키 발급(이미 비교 실험에 쓴 `ANTHROPIC_API_KEY`와 같은 값). 승인 값은 `docs/ai-quality-comparison-plan.md` 8-5의 제안을 확인한 뒤 적습니다 |
 | `AI_MAX_CONCURRENT` · `AI_SALE_QUEUE_LIMIT` · `AI_DAILY_BUDGET_KRW` 등 | AI를 연결한 뒤의 동시 생성 · 새 구매 중단 · 하루 예산 한도 (`.env.example` 참고) | AI 제공사를 정하고 승인한 뒤 가격표를 보고 정합니다 |
 

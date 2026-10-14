@@ -28,9 +28,10 @@ import {
   type TalkMood,
   type TalkSay,
 } from "@/lib/report/reading/talk-room";
-import { askMiyuAction, resetTalkRoomAction, saveTalkRoomAction } from "@/app/results/[id]/talk/actions";
+import { askMiyuAction, closeTalkRoomAction, resetTalkRoomAction, saveChatSummaryAction, saveTalkRoomAction } from "@/app/results/[id]/talk/actions";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
+import { CloseDialog } from "./close-dialog";
 import { MiyuAvatar, TypingDots } from "./miyu-character";
 import { RechargeDialog, type RechargeVariant } from "./recharge-dialog";
 
@@ -143,6 +144,12 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [saved, setSaved] = useState<Partial<Record<RoomId, boolean>>>({});
+  /** 채팅 요약 저장 — [저장하기]를 누르는 중 · 결과를 알리는 줄 · 대화 종료 안내창 */
+  const [savingSummary, setSavingSummary] = useState(false);
+  const [strip, setStrip] = useState<{ tone: "ok" | "warn"; text: string; link: boolean } | null>(null);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeError, setCloseError] = useState<string | null>(null);
   const menuId = useId();
   const infoId = useId();
   const menuBtnRef = useRef<HTMLButtonElement>(null);
@@ -336,15 +343,14 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     }
   };
 
-  const restart = () => {
-    if (waiting) return;
+  /** 화면의 대화를 새 대화로 되돌린다 (서버에 저장된 대화를 지우는 일은 호출한 쪽이 한다) */
+  const resetView = () => {
     stopTimer();
     running.current = false;
     queue.current = [];
     setTyping(false);
     setMenuOpen(false);
     writeSave(scope, key, []);
-    if (persist) void resetTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key }).catch(() => undefined);
     const fresh = startRoom(model, room);
     setEngine(fresh);
     setActions([]);
@@ -352,6 +358,60 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     stick.current = true;
     acted.current = false;
   };
+
+  /** 예시 화면(서버 저장이 없다)의 "이 채팅방 새로 시작하기" */
+  const restart = () => {
+    if (waiting) return;
+    resetView();
+    if (persist) void resetTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key }).catch(() => undefined);
+  };
+
+  /** [저장하기] — 지금까지 나눈 대화를 요약해 저장한다 (이전 저장 이후의 대화만). 결과는 머리글 아래 한 줄로 알린다 */
+  const saveSummary = async () => {
+    if (!persist || savingSummary || waiting) return;
+    const copy = ROOM_COPY.summary;
+    if (actions.length === 0) {
+      setStrip({ tone: "warn", text: copy.nothing, link: false });
+      return;
+    }
+    setSavingSummary(true);
+    const r = await saveChatSummaryAction({ assessmentId: persist.assessmentId, room, roomKey: key, actions }).catch(() => null);
+    setSavingSummary(false);
+    setStrip(r?.ok ? { tone: "ok", text: copy.saved, link: true } : { tone: "warn", text: r ? r.message : copy.failed, link: false });
+  };
+
+  /** 대화 종료 — 나눈 대화가 없으면 바로 새로 시작하고, 있으면 "저장할까요?"를 묻는다 */
+  const askClose = () => {
+    if (waiting) return;
+    setMenuOpen(false);
+    if (actions.length === 0) {
+      restart();
+      return;
+    }
+    setCloseError(null);
+    setCloseOpen(true);
+  };
+  const finishClose = async (keep: boolean) => {
+    if (!persist || closing) return;
+    setClosing(true);
+    setCloseError(null);
+    const r = await closeTalkRoomAction({ assessmentId: persist.assessmentId, room, roomKey: key, actions, keep }).catch(() => null);
+    setClosing(false);
+    if (!r || !r.ok) {
+      // 저장하지 못했으면 대화를 지우지 않는다 — 저장하지 않고 끝낼 수도 있다
+      setCloseError(r ? r.message : ROOM_COPY.summary.failed);
+      return;
+    }
+    setCloseOpen(false);
+    resetView();
+    setStrip({ tone: "ok", text: r.saved ? ROOM_COPY.summary.closedSaved : ROOM_COPY.summary.closedUnsaved, link: r.saved });
+  };
+  // 결과를 알리는 줄은 잠시 뒤 사라진다 (안내창이 아니라 읽고 지나가는 줄이다)
+  useEffect(() => {
+    if (!strip) return;
+    const t = window.setTimeout(() => setStrip(null), 9000);
+    return () => window.clearTimeout(t);
+  }, [strip]);
 
   // 새 말이 도착하면 아래로 — 위로 올려 읽는 중이면 따라가지 않고, 화면보다 긴 그림 · 표와 한꺼번에 도착한 답은 첫 줄부터 보이게 한다
   /** 사용자가 위로 올려 읽기 시작했다 — 따라 내려가기를 멈춘다 */
@@ -537,7 +597,32 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
             )}
           </div>
         </div>
+        {persist && (
+          <button
+            type="button"
+            onClick={saveSummary}
+            disabled={savingSummary || waiting}
+            title={ROOM_COPY.summary.saveHint}
+            aria-label={`${ROOM_COPY.summary.save} · ${ROOM_COPY.summary.saveHint}`}
+            className="inline-flex min-h-10 shrink-0 items-center rounded-full bg-accent-soft px-3.5 text-[14px] font-semibold text-accent-strong transition-colors hover:brightness-95 disabled:cursor-wait disabled:opacity-60"
+          >
+            {savingSummary ? ROOM_COPY.summary.saving : ROOM_COPY.summary.save}
+          </button>
+        )}
       </header>
+      {strip && (
+        <p role="status" className={`px-4 py-2 text-[13px] leading-[1.6] ${strip.tone === "ok" ? "bg-positive-soft text-positive" : "bg-caution-soft text-caution"}`}>
+          {strip.text}
+          {strip.link && (
+            <>
+              {" "}
+              <Link href="/my/chats" className="font-semibold underline underline-offset-4">
+                {ROOM_COPY.summary.savedLink}
+              </Link>
+            </>
+          )}
+        </p>
+      )}
       {infoOpen && (
         <div id={infoId} role="note" className="bg-mist px-4 py-2.5 text-[13px] leading-[1.6] text-ink-2">
           <p>{badge.text}</p>
@@ -701,9 +786,28 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
                 {TALK_COPY.buttons.fullReport}
                 <ArrowIcon className="size-4" />
               </Link>
-              <button type="button" onClick={restart} className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-[15px] font-semibold text-ink-2 hover:bg-mist">
-                이 채팅방 새로 시작하기
-              </button>
+              {persist ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void saveSummary();
+                    }}
+                    className="flex min-h-11 w-full flex-col items-start justify-center rounded-lg px-2 text-left hover:bg-mist"
+                  >
+                    <span className="text-[15px] font-semibold">{ROOM_COPY.summary.save}</span>
+                    <span className="text-[12px] text-ink-3">{ROOM_COPY.summary.saveHint}</span>
+                  </button>
+                  <button type="button" onClick={askClose} className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-[15px] font-semibold text-ink-2 hover:bg-mist">
+                    {ROOM_COPY.summary.close}
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={restart} className="flex min-h-11 w-full items-center rounded-lg px-2 text-left text-[15px] font-semibold text-ink-2 hover:bg-mist">
+                  이 채팅방 새로 시작하기
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -761,6 +865,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           {note}
         </span>
       </form>
+      <CloseDialog open={closeOpen} onStay={() => !closing && setCloseOpen(false)} onClose={finishClose} busy={closing} error={closeError} />
       <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} variant={rechargeVariant} action={rechargeAction} />
     </div>
   );

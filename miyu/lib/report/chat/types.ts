@@ -24,6 +24,8 @@ export type ChatAsk = {
   context: ChatContext;
   question: string;
   recent: ChatExchange[];
+  /** 이전 대화(이 방에서 앞서 끝낸 대화)에서 나눈 질문과 답의 앞부분 — 요약에서 가져온 참고용이다. 사실로 단정하지 않고, 지금 질문과 이어질 때만 가볍게 쓴다 */
+  memory?: ChatExchange[];
   /** 시기 해석 기준 날짜 (한국, YYYY-MM-DD) */
   referenceDate: string;
   /** 마음이 힘든 표현이 있는 글 — 풀이보다 마음을 먼저 받아 주는 답으로 쓴다(위기 표현은 아예 AI에 보내지 않는다) */

@@ -6,11 +6,14 @@ import { MIYU_CASH } from "../config/product.ts";
 import { ChatAnswerError, type ChatAnswerer } from "../report/chat/answer.ts";
 import { CARE_NOTE, CRISIS_REPLY } from "../report/chat/question.ts";
 import type { ChatAsk, ChatContext } from "../report/chat/types.ts";
-import { QUESTION_MAX } from "../report/reading/talk.ts";
+import { SAMPLE_CHART } from "../samples/sample-report.ts";
+import { sampleReadingReport } from "../samples/sample-reading-report.ts";
+import { buildTalkModel, QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
 import { ASK_MESSAGES, askFreeQuestion, recentExchanges, type AskDeps } from "./chat-service.ts";
 import { NO_LIMITS } from "./capacity-service.ts";
 import type { AssessmentRecord, MiyuRepository } from "./ports.ts";
+import { closeRoom } from "./summary-service.ts";
 import { saveTalkRoom } from "./talk-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
@@ -304,4 +307,29 @@ test("이어지는 질문: 이 방에 저장된 앞선 질문과 답이 최근 2
   assert.deepEqual(asks[0].recent, [{ q: "질문2", a: "답2" }, { q: "질문3", a: "답3" }]);
   assert.deepEqual(recentExchanges([{ t: "topic", id: "love" }]), []);
   assert.equal(recentExchanges([{ t: "free", q: "가".repeat(300), a: ["나".repeat(600)] }])[0].a.length, 400);
+});
+
+test("이전 대화의 참고: 이 방에서 이미 끝낸 대화의 질문 · 답이 memory로 함께 가고, 이번 대화에 아직 있는 질문은 중복해서 보내지 않는다", async () => {
+  const { mine, repo, deps, asks } = await setup();
+  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  const free = (n: number): RoomAction => ({ t: "free", q: `예전 질문${n}`, a: [`예전 답${n}이에요.`] });
+  // 저장하지 않고 끝낸 이전 대화 (참고 기록으로만 남는다)
+  await closeRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "love", room: "love", actions: [free(1), free(2)], model, keep: false });
+  await askFreeQuestion(deps(), input(mine));
+  assert.deepEqual(asks[0].memory, [{ q: "예전 질문1", a: "예전 답1이에요." }, { q: "예전 질문2", a: "예전 답2이에요." }]);
+  assert.deepEqual(asks[0].recent, [], "새 대화에는 아직 앞선 질문이 없다");
+
+  // 이번 대화에 같은 질문이 이미 있으면 memory에서 뺀다
+  await saveTalkRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "love", actions: [free(2)] });
+  await askFreeQuestion(deps(), input(mine));
+  assert.deepEqual(asks[1].memory, [{ q: "예전 질문1", a: "예전 답1이에요." }]);
+  assert.deepEqual(asks[1].recent.map((r) => r.q), ["예전 질문2"]);
+});
+
+test("이전 대화의 참고가 없으면 memory 항목 자체를 보내지 않는다 (다른 방의 이야기는 가져오지 않는다)", async () => {
+  const { mine, repo, deps, asks } = await setup();
+  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  await closeRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "money", room: "money", actions: [{ t: "free", q: "돈 질문", a: ["돈 답이에요."] }], model, keep: false });
+  await askFreeQuestion(deps(), input(mine));
+  assert.equal("memory" in asks[0], false);
 });

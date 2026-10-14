@@ -6,6 +6,7 @@ import type { GenerateContext } from "../report/generator.ts";
 import { ChatAnswerError, type ChatAnswerer } from "../report/chat/answer.ts";
 import { CHAT_LIMITS } from "../report/chat/plan.ts";
 import { CARE_NOTE, CRISIS_REPLY, cleanQuestion, crisisLevel } from "../report/chat/question.ts";
+import { shorten, SUMMARY_LIMITS } from "../report/chat/summary.ts";
 import type { ChatAsk, ChatContext, ChatExchange } from "../report/chat/types.ts";
 import { MIYU_CASH, REPORT_TIER_NAMES } from "../config/product.ts";
 import { roomPolicy } from "../report/chat/quota.ts";
@@ -13,6 +14,7 @@ import { QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
 import { estimateCostKrw, seoulDayStart, type CapacityConfig } from "./capacity-service.ts";
 import type { MiyuRepository } from "./ports.ts";
+import { memoryFor } from "./summary-service.ts";
 import { loadTalkRoom, owns, TALK_ROOM_KEY } from "./talk-service.ts";
 
 export type ChatServiceConfig = {
@@ -172,11 +174,16 @@ export async function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<A
     await repo.restoreCashSpend({ userId: input.userId, ref: cashRef });
   };
 
+  // 이 대화에서 앞서 나눈 질문 · 답(recent)과, 이 방에서 이미 끝낸 이전 대화의 요약(memory) — 이번 대화에 아직 있는 것은 memory에서 뺀다(같은 말을 두 번 보내지 않는다)
+  const recent = recentExchanges(await loadTalkRoom(repo, { userId: input.userId, assessmentId: input.assessmentId, roomKey }));
+  const seen = new Set(recent.map((r) => shorten(r.q, SUMMARY_LIMITS.memory.questionChars)));
+  const memory = (await memoryFor(repo, { userId: input.userId, assessmentId: input.assessmentId, room: loaded.room })).filter((m) => !seen.has(m.q));
   const ask: ChatAsk = {
     context: loaded.context,
     question: q.text,
     referenceDate: loaded.referenceDate,
-    recent: recentExchanges(await loadTalkRoom(repo, { userId: input.userId, assessmentId: input.assessmentId, roomKey })),
+    recent,
+    ...(memory.length > 0 ? { memory } : {}),
     ...(level === "soft" ? { care: true } : {}),
   };
 

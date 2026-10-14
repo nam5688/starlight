@@ -18,6 +18,7 @@ import type {
   ReportRecord,
   ReportStatusRecord,
   TalkRoomRecord,
+  ChatSummaryRecord,
 } from "../../services/ports.ts";
 
 type Row = Record<string, unknown>;
@@ -54,7 +55,17 @@ function fail(context: string, error: { message: string; code?: string }): never
 }
 
 function toTalkRoom(r: Row): TalkRoomRecord {
-  return { assessmentId: r.assessment_id as string, roomKey: r.room_key as string, userId: r.user_id as string, actions: Array.isArray(r.actions) ? (r.actions as unknown[]) : [], updatedAt: r.updated_at as string };
+  return { assessmentId: r.assessment_id as string, roomKey: r.room_key as string, userId: r.user_id as string, actions: Array.isArray(r.actions) ? (r.actions as unknown[]) : [], updatedAt: r.updated_at as string, savedUpto: Number(r.saved_upto ?? 0) };
+}
+
+function toChatSummary(r: Row): ChatSummaryRecord {
+  return { id: r.id as string, userId: r.user_id as string, assessmentId: r.assessment_id as string, room: r.room as string, visible: Boolean(r.visible), items: r.items, createdAt: r.created_at as string };
+}
+
+/** 14번 DB 변경 전 — 표(chat_summaries)나 열(talk_rooms.saved_upto)이 없다. 호출한 쪽이 "준비 중"으로 다루도록 코드 42P01로 통일한다 */
+function summaryNotReady(what: string, error: { message: string; code?: string }, status?: number): { message: string; code?: string } {
+  const missing = isMissingTableError(error) || ["42703", "PGRST204", "PGRST205"].includes(error.code ?? "") || (status === 404 && !error.code);
+  return missing ? { code: "42P01", message: `${what}가 없습니다 (DB 변경 14번 필요)` } : error;
 }
 
 function toAssessment(r: Row): AssessmentRecord {
@@ -755,6 +766,77 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     async deleteTalkRoomsBefore(assessmentId, prefix, keepKey) {
       const { error } = await db.from("talk_rooms").delete().eq("assessment_id", assessmentId).like("room_key", `${prefix}%`).lt("room_key", keepKey);
       if (error && !isMissingTableError(error)) fail("지난 대화 정리", error);
+    },
+    async claimTalkRoomSegment(assessmentId, roomKey, from, to) {
+      const { data, error, status } = await db.from("talk_rooms").update({ saved_upto: to }).eq("assessment_id", assessmentId).eq("room_key", roomKey).eq("saved_upto", from).select("room_key");
+      if (error) fail("채팅 요약 위치 잡기", summaryNotReady("talk_rooms.saved_upto 열", error, status));
+      return (data ?? []).length > 0;
+    },
+    async releaseTalkRoomSegment(assessmentId, roomKey, from, to) {
+      const { error } = await db.from("talk_rooms").update({ saved_upto: from }).eq("assessment_id", assessmentId).eq("room_key", roomKey).eq("saved_upto", to);
+      if (error && !isMissingTableError(error)) fail("채팅 요약 위치 되돌리기", error);
+    },
+    async insertChatSummary(input) {
+      const { data, error, status } = await db
+        .from("chat_summaries")
+        .insert({ user_id: input.userId, assessment_id: input.assessmentId, room: input.room, visible: input.visible, items: input.items })
+        .select()
+        .single();
+      if (error || !data) fail("채팅 요약 저장", summaryNotReady("chat_summaries 테이블", error ?? { message: "저장된 줄이 돌아오지 않았습니다" }, status));
+      return toChatSummary(data as Row);
+    },
+    async listChatSummaries(userId, opts) {
+      let q = db.from("chat_summaries").select().eq("user_id", userId);
+      if (opts.visibleOnly) q = q.eq("visible", true);
+      const { data, error } = await q.order("created_at", { ascending: false }).limit(opts.limit ?? 500);
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("채팅 요약 목록 조회", error);
+      }
+      return (data ?? []).map((r) => toChatSummary(r as Row));
+    },
+    async listRoomChatSummaries(userId, assessmentId, room, limit) {
+      const { data, error } = await db.from("chat_summaries").select().eq("user_id", userId).eq("assessment_id", assessmentId).eq("room", room).order("created_at", { ascending: false }).limit(limit);
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("방별 채팅 요약 조회", error);
+      }
+      return (data ?? []).map((r) => toChatSummary(r as Row));
+    },
+    async countVisibleChatSummaries(userId) {
+      const { count, error } = await db.from("chat_summaries").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("visible", true);
+      if (error) {
+        if (isMissingTableError(error)) return 0;
+        fail("채팅 요약 개수 조회", error);
+      }
+      return count ?? 0;
+    },
+    async deleteChatSummary(userId, id) {
+      const { data, error } = await db.from("chat_summaries").delete().eq("user_id", userId).eq("id", id).select("id");
+      if (error) {
+        if (isMissingTableError(error)) return false;
+        fail("채팅 요약 삭제", error);
+      }
+      return (data ?? []).length > 0;
+    },
+    async deleteChatSummaries(userId) {
+      const { count, error } = await db.from("chat_summaries").delete({ count: "exact" }).eq("user_id", userId);
+      if (error) {
+        if (isMissingTableError(error)) return 0;
+        fail("채팅 요약 모두 삭제", error);
+      }
+      return count ?? 0;
+    },
+    async trimHiddenChatSummaries(userId, assessmentId, room, keep) {
+      const { data, error } = await db.from("chat_summaries").select("id").eq("user_id", userId).eq("assessment_id", assessmentId).eq("room", room).eq("visible", false).order("created_at", { ascending: false }).range(keep, keep + 199);
+      if (error) {
+        if (isMissingTableError(error)) return;
+        fail("참고 기록 정리 조회", error);
+      }
+      const ids = (data ?? []).map((r) => (r as Row).id as string);
+      if (ids.length === 0) return;
+      const del = await db.from("chat_summaries").delete().eq("user_id", userId).in("id", ids);
+      if (del.error && !isMissingTableError(del.error)) fail("참고 기록 정리", del.error);
     },
     async addChatQuestion(input) {
       const { error, status } = await db.from("chat_questions").insert({ user_id: input.userId, assessment_id: input.assessmentId, room_key: input.roomKey });

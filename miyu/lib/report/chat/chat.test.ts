@@ -15,7 +15,7 @@ import { ChatAnswerError, createChatAnswerer } from "./answer.ts";
 import { buildChatContext, ROOM_AI_FOCUS } from "./context.ts";
 import { composeMockChatAnswer, createMockChatModel } from "./mock-model.ts";
 import { CHAT_LIMITS } from "./plan.ts";
-import { buildChatRepairMessage, buildChatUserMessage, CHAT_PROMPT_MARK, CHAT_SYSTEM_PROMPT } from "./prompt.ts";
+import { buildChatRepairMessage, buildChatUserMessage, CHAT_PROMPT_MARK, CHAT_PROMPT_VERSION, CHAT_SYSTEM_PROMPT } from "./prompt.ts";
 import { CARE_NOTE, CRISIS_REPLY, cleanQuestion, crisisLevel, isCrisisQuestion } from "./question.ts";
 import type { ChatAsk } from "./types.ts";
 import { validateChatAnswer } from "./validate.ts";
@@ -137,6 +137,12 @@ test("지시문과 입력: 이름 · 생년월일이 없고, 근거 안에서만
   for (const must of ["알려 준 사실", "리포트에서 읽은 경향", "속마음", "투자", "결정을 대신", "100%", "followUp", "해요체", "room.focus", "taste", "care", "슬픔"]) assert.ok(CHAT_SYSTEM_PROMPT.includes(must), must);
   const withRecent = buildChatUserMessage(ask({ recent: [{ q: "앞 질문", a: "앞 답" }] }));
   assert.ok(withRecent.includes("앞 질문") && withRecent.includes('"question"'));
+  // 이전 대화(memory): 있을 때만 보내고, 지시문은 참고용이며 새 근거가 아니라고 못박는다 (사실로 단정 금지 · 이어질 때만 가볍게)
+  const withMemory = buildChatUserMessage(ask({ memory: [{ q: "지난 질문", a: "지난 답" }] }));
+  assert.ok(withMemory.includes('"memory"') && withMemory.includes("지난 질문"));
+  assert.ok(!buildChatUserMessage(ask()).includes('"memory"') && !buildChatUserMessage(ask({ memory: [] })).includes('"memory"'));
+  for (const must of ["memory", "이어질 때만", "새 근거가 아니다", "단정하지 않는다"]) assert.ok(CHAT_SYSTEM_PROMPT.includes(must), `memory 지시: ${must}`);
+  assert.equal(CHAT_PROMPT_VERSION, "chat-v1-prompt-0.4");
   assert.ok(buildChatRepairMessage(["가", "나"]).includes("- 가") && buildChatRepairMessage(["가"]).includes("처음부터 다시"));
 });
 
