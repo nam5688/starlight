@@ -7,7 +7,7 @@ import { getBranchTenGod, getTenGod } from "manseryeok";
 import type { SajuOk } from "../engine.ts";
 import { monthPeriods } from "../yearly.ts";
 import { branchRelations, stemRelation, type Relation } from "./relations.ts";
-import { GROUP_OF, GROUP_THEME_SHORT, type Group } from "./rules.ts";
+import { GROUP_OF, type Group } from "./rules.ts";
 
 export const MONTH_RULE_VERSION = "saju-month-rules-0.1-draft";
 
@@ -116,8 +116,8 @@ export function monthCalendar(saju: SajuOk, input: { year: number; gender?: "mal
 
     // 재물: 월 천간 · 지지가 재성(각 1점)
     const money: MonthTag[] = [];
-    if (stemGroup === "재성") money.push({ code: "wealth", plain: `${GROUP_THEME_SHORT.재성} 주제가 두드러져요`, detail: `그 달의 천간 ${m.stem}(재성)` });
-    if (branchGroup === "재성") money.push({ code: "wealth", plain: `${GROUP_THEME_SHORT.재성} 주제가 두드러져요`, detail: `그 달의 지지 ${m.branch}(재성)` });
+    if (stemGroup === "재성") money.push({ code: "wealth", plain: "일의 결과나 돈 · 시간을 챙기는 주제가 두드러져요", detail: `그 달의 천간 ${m.stem}(재성)` });
+    if (branchGroup === "재성") money.push({ code: "wealth", plain: "일의 결과나 돈 · 시간을 챙기는 주제가 두드러져요", detail: `그 달의 지지 ${m.branch}(재성)` });
 
     return {
       index: i + 1,

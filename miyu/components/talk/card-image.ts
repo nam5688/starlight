@@ -2,7 +2,7 @@
 // 이미지는 이 기기 안에서 만들어지며 서버로 보내지 않는다 (카드의 글은 이미 이 화면에 보이던 리포트 문장이다).
 import { layoutCard, type CardLayoutOptions } from "@/lib/report/reading/talk-card";
 import type { TalkCard } from "@/lib/report/reading/talk";
-import { CHARACTER_IMAGE, CHEEKS, FACE, NOTEBOOK, PEBBLE_BODY } from "./miyu-shape";
+import { MIYU_IMAGES } from "./miyu-moods";
 
 type Options = Omit<CardLayoutOptions, "measure" | "width">;
 
@@ -15,7 +15,7 @@ export async function renderCardPng(card: TalkCard, options: Options): Promise<B
   const font = (size: number, weight: number) => `${weight} ${size}px ${family}`;
 
   // 캐릭터 그림 파일이 정해져 있으면 먼저 불러온다 — 못 불러오면 기본 조약돌 그림으로 그린다
-  const character = CHARACTER_IMAGE ? await loadImage(CHARACTER_IMAGE) : null;
+  const character = await loadImage(MIYU_IMAGES.happy);
   const probe = document.createElement("canvas").getContext("2d");
   if (!probe) throw new Error("이 브라우저에서는 이미지를 만들 수 없어요.");
   const layout = layoutCard(card, {
@@ -41,8 +41,21 @@ export async function renderCardPng(card: TalkCard, options: Options): Promise<B
         ctx.fill();
       } else ctx.fillRect(op.x, op.y, op.w, op.h);
     } else if (op.type === "mark") {
+      // 운영자가 보낸 그림 그대로 둥근 정사각형으로 — 못 불러오면 "미" 글자 프로필로 대신한다
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(op.x, op.y, op.size, op.size, op.size * 0.26);
+      ctx.clip();
       if (character) ctx.drawImage(character, op.x, op.y, op.size, op.size);
-      else drawPebble(ctx, op.x, op.y, op.size, colorOf);
+      else {
+        ctx.fillStyle = colorOf("accent-soft");
+        ctx.fillRect(op.x, op.y, op.size, op.size);
+        ctx.fillStyle = colorOf("accent-strong");
+        ctx.font = font(op.size * 0.5, 700);
+        ctx.textAlign = "center";
+        ctx.fillText("미", op.x + op.size / 2, op.y + op.size * 0.24);
+      }
+      ctx.restore();
     } else {
       ctx.font = font(op.size, op.weight);
       ctx.fillStyle = colorOf(op.color);
@@ -60,53 +73,4 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
     img.onerror = () => resolve(null);
     img.src = src;
   });
-}
-
-/** 기본 조약돌 "미유"를 Canvas로 그린다 — 화면의 SVG(miyu-character.tsx)와 같은 좌표(48 × 48 칸)를 쓴다 */
-function drawPebble(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, c: (name: string) => string) {
-  const face = FACE.smile;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(size / 48, size / 48);
-  const body = new Path2D(PEBBLE_BODY);
-  ctx.fillStyle = c("pebble");
-  ctx.fill(body);
-  ctx.lineWidth = 1.3;
-  ctx.strokeStyle = c("pebble-edge");
-  ctx.stroke(body);
-  ctx.fillStyle = c("pebble-point");
-  ctx.globalAlpha = 0.8;
-  for (const k of CHEEKS) {
-    ctx.beginPath();
-    ctx.ellipse(k.cx, k.cy, k.rx, k.ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = c("ink");
-  for (const [ex, ey] of face.eyes) {
-    ctx.beginPath();
-    ctx.arc(ex, ey, face.eyeR, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.lineWidth = 1.7;
-  ctx.lineCap = "round";
-  ctx.strokeStyle = c("ink");
-  ctx.stroke(new Path2D(face.mouth));
-  // 작은 노트
-  ctx.save();
-  ctx.translate(NOTEBOOK.pivotX, NOTEBOOK.pivotY);
-  ctx.rotate((NOTEBOOK.rotate * Math.PI) / 180);
-  ctx.translate(-NOTEBOOK.pivotX, -NOTEBOOK.pivotY);
-  ctx.beginPath();
-  ctx.roundRect(NOTEBOOK.x, NOTEBOOK.y, NOTEBOOK.w, NOTEBOOK.h, NOTEBOOK.r);
-  ctx.fillStyle = c("pebble-point");
-  ctx.fill();
-  ctx.lineWidth = 1.2;
-  ctx.strokeStyle = c("accent");
-  ctx.stroke();
-  ctx.lineWidth = 1.1;
-  ctx.strokeStyle = c("accent-strong");
-  for (const d of NOTEBOOK.lines) ctx.stroke(new Path2D(d));
-  ctx.restore();
-  ctx.restore();
 }

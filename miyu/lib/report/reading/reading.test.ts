@@ -73,7 +73,11 @@ test("기본 생성 형식은 읽기 구조다 — 모의 모델로 만든 리�
   assert.ok(!JSON.stringify(report).includes("{name}"));
   // 코드가 채우는 값: 타임라인은 계산 결과, 큰 흐름 카드의 기간 문장도 계산 결과
   assert.deepEqual(report.timeline.map((s) => s.role), ["previous", "current", "next"]);
-  assert.match(report.summary[2].note, /^2024\.08부터 2034\.07까지, 지금은 그 앞부분을 지나고 있어요\.$/);
+  // 지금 나의 시기 카드는 해석 키워드가 아니라 계산된 대운 그룹을 쉬운 말로 옮긴 제목 · 뜻 · 기간이다 (코드가 채운다)
+  assert.equal(report.summary[2].keyword, "생각을 실제 결과로 만들어 가는 시기");
+  assert.match(report.summary[2].note, /^배운 것을 일에 써 보거나, 내 의견을 말하고, 만든 결과물을 보여 주는 일이 중요한 주제로 해석돼요\.$/);
+  assert.equal(report.summary[2].foot, "2024.08–2034.07 · 사주에서 보는 10년 시기");
+  assert.doesNotMatch(`${report.summary[2].keyword} ${report.summary[2].note}`, /성과와 표현이 주제|성과 · 수입 · 관리/);
 });
 
 test("가짜 모델이 예시와 같은 초안을 돌려주면, 생성기가 만든 리포트의 구조 · 고정 문구 · 타임라인 · 자료 목록이 예시와 같다 (예시와 실제 생성의 기준이 같다)", async () => {
@@ -413,7 +417,7 @@ test("소단락 반복 · 내용 검사: 소단락 글도 같은 문장 반복 �
 });
 
 test("소단락: AI 지시문 0.6은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
-  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.6");
+  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.7");
   assert.match(READING_SYSTEM_PROMPT, /깊게 읽는 소단락/);
   assert.match(READING_SYSTEM_PROMPT, /근거가 약한 소단락은 늘려 쓰지 않는다/);
   assert.match(READING_SYSTEM_PROMPT, /업종 이름 추천을 쓰지 않는다/);

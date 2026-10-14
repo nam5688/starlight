@@ -28,5 +28,16 @@ async function Talk({ params }: Pick<PageProps<"/dev/compare/[run]/[item]/talk">
   const report = await readRunReport(run, item);
   if (!report || !isReadingReport(report)) notFound();
   const base = `/dev/compare/${run}/${item}`;
-  return <TalkView model={buildTalkModel(report)} dateLabel="비교용" reportHref={base} dataHref={`${base}#c-data`} subtitle={`개발용 · AI 비교 결과(${item}) · 가상 인물`} />;
+  return (
+    <TalkView
+      model={buildTalkModel(report)}
+      room="main"
+      scope={`dev-${run}-${item}`}
+      dateLabel="비교용"
+      reportHref={base}
+      dataHref={`${base}#c-data`}
+      roomHrefs={{ main: `${base}/talk` }}
+      badge={{ label: "개발용 비교", text: `개발용 · AI 비교 결과(${item}) · 가상 인물` }}
+    />
+  );
 }

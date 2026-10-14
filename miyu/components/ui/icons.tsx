@@ -61,7 +61,7 @@ export function LeafIcon({ className = "size-4" }: { className?: string }) {
   );
 }
 
-/** 단점이 될 수 있는 부분 · 조절이 필요한 때 — 슬라이더 (경고 표시가 아니라 "맞춰 본다"는 뜻) */
+/** 내가 힘들 수 있는 포인트 · 조절이 필요한 때 — 슬라이더 (경고 표시가 아니라 "맞춰 본다"는 뜻) */
 export function AdjustIcon({ className = "size-4" }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>

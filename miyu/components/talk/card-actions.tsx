@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { TalkCard } from "@/lib/report/reading/talk";
 import { renderCardPng } from "./card-image";
@@ -10,10 +11,10 @@ const FILE_SHARE = "miyu-analysis-card-share.png";
 type Share = { url: string; blob: Blob; includeName: boolean };
 
 /**
- * [이미지 저장] [공유용 카드 만들기] — 이미지는 이 기기 안에서 만들어지며 서버로 보내지 않는다.
+ * [이미지 저장] [분석 자료 보기] + 작은 글자 [공유용 카드 만들기] — 이미지는 이 기기 안에서 만들어지며 서버로 보내지 않는다.
  * 공유용은 이름 · 분석일 · 사용한 정보를 빼고(이름은 고르면 넣는다), 생년월일 · 고민은 카드에 원래 없다.
  */
-export function CardActions({ card, name, dateLabel }: { card: TalkCard; name: string; dateLabel: string }) {
+export function CardActions({ card, name, dateLabel, dataHref }: { card: TalkCard; name: string; dateLabel: string; /** 리포트의 "내 분석 데이터"(원국 · 오행 · 응답 환산값) 위치 */ dataHref: string }) {
   const [busy, setBusy] = useState<"save" | "share" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [share, setShare] = useState<Share | null>(null);
@@ -88,10 +89,13 @@ export function CardActions({ card, name, dateLabel }: { card: TalkCard; name: s
         <button type="button" onClick={save} disabled={busy !== null} className={btn}>
           {busy === "save" ? "만드는 중…" : "이미지 저장"}
         </button>
-        <button type="button" onClick={() => makeShare(includeName)} disabled={busy !== null} className={btn}>
-          {busy === "share" ? "만드는 중…" : "공유용 카드 만들기"}
-        </button>
+        <Link href={dataHref} className={btn}>
+          분석 자료 보기
+        </Link>
       </div>
+      <button type="button" onClick={() => makeShare(includeName)} disabled={busy !== null} className="mt-1 inline-flex min-h-11 items-center px-1 text-[14px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent disabled:cursor-wait disabled:opacity-60">
+        {busy === "share" ? "만드는 중…" : "공유용 카드 만들기"}
+      </button>
       {message && (
         <p role="status" className="mt-2 text-[14px] leading-[1.6] text-ink-2">
           {message}

@@ -8,6 +8,7 @@ import type { FiveElement, PillarKey, SajuOk } from "../engine.ts";
 import { PILLAR_LABEL } from "../engine.ts";
 import { iga, wagwa } from "../josa.ts";
 import { yearGanji } from "../yearly.ts";
+import { periodPlain, yearTitle } from "./period-plain.ts";
 import { branchRelations, stemRelation, type Relation } from "./relations.ts";
 
 export const SAJU_RULE_VERSION = "saju-rules-0.1-draft";
@@ -68,6 +69,12 @@ const GROUP_RULE: Record<Group, { topics: Topic[]; cue: string; timing: string }
     timing: "배움 · 준비 · 도움을 받는 시기로 봅니다.",
   },
 };
+
+/** 시기 cue 끝에 붙이는 쉬운 말 설명 — 해석 키워드("성과 · 수입 · 관리")를 그대로 옮기지 않고 생활에서 뜻하는 것으로 풀어 쓰게 한다(period-plain.ts) */
+function plainCue(stemGroup: Group, branchGroup: Group, unit: "period" | "year"): string {
+  const p = periodPlain(stemGroup, branchGroup);
+  return `(쉬운 말: ${unit === "year" ? yearTitle(p) : p.title} — ${p.meaning})`;
+}
 
 const SPOUSE_PALACE_CUE: Record<Group, string> = {
   비겁: "가까운 관계에서 동등함과 각자의 영역을 중요하게 여기는 자리로 봅니다.",
@@ -377,7 +384,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         topics: ["timing", ...GROUP_RULE[GROUP_OF[tgStem]].topics],
         strength: "moderate",
         fact: `${label} ${p.stem}${p.branch}(${p.stemHanja}${p.branchHanja}) ${p.from}~${p.to} — 천간 ${tgStem}, 지지 ${tgBranch}`,
-        cue: `천간이 ${GROUP_OF[tgStem]}: ${GROUP_RULE[GROUP_OF[tgStem]].timing} 지지가 ${GROUP_OF[tgBranch]}: ${GROUP_RULE[GROUP_OF[tgBranch]].timing}`,
+        cue: `천간이 ${GROUP_OF[tgStem]}: ${GROUP_RULE[GROUP_OF[tgStem]].timing} 지지가 ${GROUP_OF[tgBranch]}: ${GROUP_RULE[GROUP_OF[tgBranch]].timing} ${plainCue(GROUP_OF[tgStem], GROUP_OF[tgBranch], "period")}`,
         period: { from: p.from, to: p.to, label: `${label} ${p.stem}${p.branch}` },
       });
       for (const { r, key } of relationsWithChart(p.branch)) {
@@ -407,7 +414,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
       topics: ["timing", ...GROUP_RULE[GROUP_OF[tgStem]].topics],
       strength: "moderate",
       fact: `${year}년 세운 ${g.stem}${g.branch} — 천간 ${tgStem}, 지지 ${tgBranch}`,
-      cue: `천간이 ${GROUP_OF[tgStem]}: ${GROUP_RULE[GROUP_OF[tgStem]].timing} 지지가 ${GROUP_OF[tgBranch]}: ${GROUP_RULE[GROUP_OF[tgBranch]].timing}`,
+      cue: `천간이 ${GROUP_OF[tgStem]}: ${GROUP_RULE[GROUP_OF[tgStem]].timing} 지지가 ${GROUP_OF[tgBranch]}: ${GROUP_RULE[GROUP_OF[tgBranch]].timing} ${plainCue(GROUP_OF[tgStem], GROUP_OF[tgBranch], "year")}`,
       period,
     });
     for (const { r, key } of relationsWithChart(g.branch)) {

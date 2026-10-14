@@ -5,6 +5,7 @@ import { AI_CANDIDATES } from "../../config/ai-candidates.ts";
 import { BudgetGuard, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE } from "../../report/ai/budget.ts";
 import { buildPersonas } from "../../report/ai/compare-personas.ts";
 import { runStage, type CompareCandidate } from "../../report/ai/compare-plan.ts";
+import { tendencyPhrase } from "../../assessment/dev-rules.ts";
 import { isReadingReport } from "../../report/generator.ts";
 import { composeMockReading } from "../../report/reading/mock-model.ts";
 import { renderReadingMarkdown } from "../../report/reading/render-text.ts";
@@ -65,9 +66,9 @@ test("승인 후: 두 후보 · 두 인물 4건이 읽기 구조로 생성되고
   for (const r of res.runs) {
     const md = renderReadingMarkdown(r.report as never);
     assert.doesNotMatch(md, /claude|gpt|anthropic|openai|Sonnet/i);
-    // 대표 경향 이름(~형)은 화면과 같게 맨 위에 보이고, 같은 인물이면 후보와 상관없이 같은 값이다
-    const tendency = (r.report as { base?: { tendency: { name: string } } }).base?.tendency.name;
-    assert.ok(tendency && md.includes(`**나의 대표 경향** ${tendency}`), "평가용 글에도 대표 경향(~형)이 있다");
+    // 대표 경향은 화면과 같게 설명 문구("~하는 편")로 맨 위에 보이고, 같은 인물이면 후보와 상관없이 같은 값이다
+    const tendency = tendencyPhrase((r.report as { base?: { tendency: { name: string } } }).base?.tendency.name);
+    assert.ok(tendency && md.includes(`**나의 대표 경향** ${tendency}`), "평가용 글에도 대표 경향 설명이 있다");
   }
   // 모의 글이므로 내용 검사는 "모의 생성 표시"로 실패해야 한다 (판매할 수 없는 글을 통과시키지 않는다)
   assert.ok(res.runs.every((r) => r.depth && !r.depth.pass && r.depth.fails.includes("placeholder")));
@@ -102,7 +103,7 @@ test("검사에 걸려 실패하면 걸린 이유와 그때의 글이 남는다 
 test("블라인드 평가용 글: 예시 리포트를 마크다운으로 옮기면 본문만 담고(분석 근거 · 내부 근거 ID 없음) 모든 주제와 행동이 들어 있다", () => {
   const md = renderReadingMarkdown(sampleReadingReport, { tendencyName: sampleReport.tendency.name });
   assert.match(md, /^# 서윤 님의 개인 통합 리포트/);
-  assert.ok(md.includes(`**나의 대표 경향** ${sampleReport.tendency.name}`), "예시도 대표 경향(~형)을 맨 위에 보인다");
+  assert.ok(md.includes(`**나의 대표 경향** ${tendencyPhrase(sampleReport.tendency.name)}`), "예시도 대표 경향 설명을 맨 위에 보인다");
   for (const b of sampleReadingReport.blocks) assert.ok(md.includes(b.headline), b.headline);
   for (const a of sampleReadingReport.actions) assert.ok(md.includes(a.detail));
   assert.doesNotMatch(md, /\b(saju|survey|self)\.[\w.가-힣-]+/);

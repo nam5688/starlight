@@ -1,4 +1,5 @@
 import { ArrowIcon, ChevronIcon } from "@/components/ui/icons";
+import { tendencyPhrase } from "@/lib/assessment/dev-rules";
 import { basisFor } from "@/lib/report/reading/assemble";
 import type { IntegratedReadingReport, ReadingBlock, ReadingGroupId } from "@/lib/report/reading/types";
 import type { SajuSection, ScoreRow } from "@/lib/report/types";
@@ -65,7 +66,7 @@ export function ReadingReportView({
   const id = (name: string) => `${idPrefix}${name}`;
   const chart = saju ?? report.saju;
   const scoreGroups = scores ?? (report.base ? [{ title: "기질 · 성격", rows: report.base.temperament }, { title: "가까운 관계 반응(애착 경향)", rows: report.base.relationship }] : []);
-  const tendency = tendencyName ?? report.base?.tendency.name;
+  const tendency = tendencyPhrase(tendencyName ?? report.base?.tendency.name);
   // 큰 주제에 붙이는 번호 — 주제 5개 다음이 "앞으로의 시기"
   const numberOf = new Map(report.blocks.map((b, i) => [b.id, i + 1]));
   const flowNumber = report.blocks.length + 1;
@@ -97,12 +98,12 @@ export function ReadingReportView({
           </h2>
           {tendency && (
             <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="inline-flex items-center rounded-md bg-accent-soft px-2.5 py-1 text-[15px] font-bold text-accent-strong">{tendency}</span>
+              <span className="inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-[15px] font-bold text-accent-strong">{tendency}</span>
               <span className="text-[13px] text-ink-3">나의 대표 경향</span>
             </p>
           )}
           <p className="mt-2 text-[22px] leading-[1.4] font-bold tracking-tight md:text-[28px]">{report.headline}</p>
-          {tendency && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 이름이며, 진단이나 평생 가는 유형이 아닙니다.</p>}
+          {tendency && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아닙니다.</p>}
           <SummaryCards cards={report.summary} />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <a href={`#${id("tendency")}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-accent px-3 text-[15px] font-semibold text-white transition-colors hover:bg-accent-strong">
@@ -195,7 +196,7 @@ export function ReadingReportView({
             <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
             <CaveatNote text={report.flow.caveat} />
 
-            <LuckTimelineCard timeline={report.timeline} text={report.flow.cardText} reference={report.timelineReference} />
+            <LuckTimelineCard timeline={report.timeline} reference={report.timelineReference} />
 
             <div className="mt-4 rounded-xl border border-line bg-canvas p-4 md:p-5">
               <p className="text-[17px] font-bold tracking-tight">가까운 세 해</p>

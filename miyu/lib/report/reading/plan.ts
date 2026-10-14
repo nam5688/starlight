@@ -1,5 +1,6 @@
 // 읽기 구조 리포트의 고정 구성 — 예시 화면(sample-reading-report.ts)과 실제 AI 생성이 같은 구성 · 같은 한도를 쓴다.
 // 제목 · 묶음 · 이름표 · 안전 안내는 AI가 쓰지 않고 여기서 정한다(코드가 채운다). AI는 근거 목록 안에서 본문만 쓴다.
+import { GROUP_THEME_SHORT } from "../../saju/interpret/rules.ts";
 import type { ReadingBlockId, ReadingGroupId } from "./types.ts";
 
 export type BlockPlan = {
@@ -30,8 +31,8 @@ export const BLOCK_PLAN: BlockPlan[] = [
   {
     id: "strength-burden",
     group: "me",
-    topic: "장점과 단점이 될 수 있는 부분",
-    ask: "이 사람의 특징 세 가지가 어떤 때 강하게 쓰이고(장점) 어떤 때 힘들어지는가(단점이 될 수 있는 부분). 특징마다 가상의 장면 하나",
+    topic: "강한 포인트와 힘들 수 있는 포인트",
+    ask: "이 사람의 특징 세 가지가 어떤 때 강하게 쓰이고(내가 강한 포인트) 어떤 때 힘들어지는가(내가 힘들 수 있는 포인트). 특징마다 가상의 장면 하나",
     traits: true,
     example: false,
   },
@@ -81,7 +82,7 @@ export const BLOCK_CAVEAT: Partial<Record<ReadingBlockId, (name: string) => stri
   love: (name) => `상대 자료: 없음 · 이 부분은 ${name} 님의 사주와 응답만으로 읽었어요.`,
   "work-money": () => "돈 부분은 응답 자료 없이 사주 시기 해석만으로 읽었어요. 투자나 대출 같은 결정의 근거로 쓰는 내용이 아니에요.",
 };
-export const comfortNote = (name: string) => `${name} 님이 편안해할 관계의 조건이에요. 상대의 나이나 직업 같은 건 사주로 알 수 없어서 다루지 않아요.`;
+export const comfortNote = (name: string) => `${name} 님이 편안해할 관계의 조건이에요. 상대의 나이나 직업은 정해서 말하지 않고, 편안해할 만한 관계의 조건만 읽어요.`;
 /** 월별 달력이 있는 리포트에서 소단락 아래에 붙이는 안내 — 달 이름은 계산된 달력이 말하고 본문은 쓰지 않는다 */
 export const SECTION_CALENDAR_NOTE: Partial<Record<ReadingBlockId, string>> = {
   love: "인연이 눈에 띄기 쉬운 달은 ‘앞으로의 시기’의 월별 달력에서 볼 수 있어요.",
@@ -94,7 +95,7 @@ export const RULE_DRAFT_NOTE = "사주 해석 규칙은 전문가 검토 전 초
 export const SCORE_NOTE = "괄호 안 숫자는 응답 환산값(0~100)이며 백분위가 아닙니다. 개발용 예시 문항입니다.";
 
 /** 첫 화면 카드 이름 */
-export const CARD_LABEL = { strength: "장점", caution: "단점이 될 수 있는 부분", flow: "지금 나의 시기" } as const;
+export const CARD_LABEL = { strength: "내가 강한 포인트", caution: "내가 힘들 수 있는 포인트", flow: "지금 나의 시기" } as const;
 
 /** 글자 · 문장 수 한도 — 검사(validate.ts) · 지시문(prompt.ts) · 모의 작성기 · 예시 테스트가 모두 이 값을 쓴다 */
 export const READING_LIMITS = {
@@ -121,6 +122,12 @@ export const READING_LIMITS = {
  */
 // 해요체 · 일상어와 겹치는 낱말은 걸리지 않게 한다: "주는 편인데" · "상관없이" · "편해지지 않아요" · "~일지도 몰라요" · "계획을 세운 뒤에"
 export const JARGON = /비겁|식상|관성|인성|재성|정관|편관|비견|겁재|식신|상관(?!없|이 없)|편재|정재|정인|편인(?![데지가])|(?<![가-힣])일지(?![도가-힣])|일간|천간|(?<![가-힣])지지(?![가-힣])|원국|오행|세운(?=[은는이가을를의에도(·,)]|$)|대운|십신|용신/;
+
+/**
+ * 시기를 읽는 해석 키워드 나열 — 본문에 그대로 옮기지 않는다(운영자 2026-10-15). "성과 · 수입 · 관리"는 성과가 돈인지 일인지, "표현 · 생산"은 말인지 창작인지 알 수 없다.
+ * 쉬운 제목 → 생활에서 뜻하는 것 → 예시로 풀어 쓴다(lib/saju/interpret/period-plain.ts). 접어 둔 분석 근거의 전통 해석 칸에는 그대로 남는다.
+ */
+export const RAW_THEME_TEXT = new RegExp(Object.values(GROUP_THEME_SHORT).join("|"));
 
 /** 본문에 쓰지 않는 점수 · 확률 표현 (응답 환산값은 접어 둔 분석 근거에만 있다) */
 export const SCORE_TEXT = /\d{2,3}\s*점|백분위|\(\d{2,3}\)|\d+\s*%|퍼센트|확률/;

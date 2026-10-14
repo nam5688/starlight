@@ -27,9 +27,16 @@ export type ReadingBasis = {
 };
 
 /** 첫 화면 요약 카드 — 강점 · 주의할 점 · 지금의 흐름 */
-export type ReadingSummaryCard = { kind: "strength" | "caution" | "flow"; label: string; keyword: string; note: string };
+export type ReadingSummaryCard = {
+  kind: "strength" | "caution" | "flow";
+  label: string;
+  keyword: string;
+  note: string;
+  /** 카드 맨 아래 작은 줄 — 지금 나의 시기 카드의 기간("2024.08–2034.07 · 사주에서 보는 10년 시기"). 코드가 계산해 채우며 이전에 저장된 리포트에는 없다 */
+  foot?: string;
+};
 
-/** "장점 / 단점이 될 수 있는 부분" 카드 — short는 카드에 보이는 짧은 말, shines · burden · example은 접어 둔 일상 예시 */
+/** "강한 포인트 / 힘들 수 있는 포인트" 카드 — short는 카드에 보이는 짧은 말, shines · burden · example은 접어 둔 일상 예시 */
 export type ReadingTrait = { name: string; shinesShort: string; burdenShort: string; shines: string; burden: string; /** 이 특징의 가상의 장면 한두 문장 */ example: string };
 
 /** 깊게 읽는 소단락 — 눈길을 끄는 한 줄 제목 → 풀이 → 해 볼 것. 연애(가까운 관계) · 일과 돈 주제에만 있다 */
@@ -148,7 +155,7 @@ export type ReadingBlockDraft = {
   headline: string;
   /** 요약 1~2문장 — 제목을 되풀이하지 않는다 */
   summary: string;
-  /** 쉬운 예시 (장점 블록은 특징마다 따로 있고, 가까운 관계는 반응 단계 그림이 그 자리를 맡는다) */
+  /** 쉬운 예시 (강한 포인트 블록은 특징마다 따로 있고, 가까운 관계는 반응 단계 그림이 그 자리를 맡는다) */
   example?: string;
   /** 자세한 풀이 — 문단마다 2~3문장 */
   details: string[];

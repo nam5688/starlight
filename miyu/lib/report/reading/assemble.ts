@@ -5,6 +5,7 @@ import { filledFields, topicLabel, type PersonalContextInput } from "../../perso
 import { sajuSection } from "../../saju/display.ts";
 import { GLOSSARY, termsOfEvidence } from "../../saju/glossary.ts";
 import { MONTH_RULE_VERSION, monthCalendars } from "../../saju/interpret/months.ts";
+import { periodLine, periodPlain } from "../../saju/interpret/period-plain.ts";
 import { luckTimeline } from "../../saju/interpret/rules.ts";
 import { describePolicy } from "../../saju/policy.ts";
 import type { Evidence } from "../evidence.ts";
@@ -84,7 +85,6 @@ function buildInputs(args: { knownMbti: string | null; hasContext: boolean; hasS
   return out;
 }
 
-const positionText = (progress: number | undefined) => (progress === undefined ? "" : progress < 1 / 3 ? "지금은 그 앞부분을 지나고 있어요" : progress < 2 / 3 ? "지금은 그 중간쯤을 지나고 있어요" : "지금은 그 뒷부분을 지나고 있어요");
 
 export type AssembleOptions = {
   draft: ReadingDraftV1;
@@ -128,7 +128,6 @@ export function assembleReading(o: AssembleOptions): IntegratedReadingReport {
   const refs = periodRefs(evidence);
   const timeline = saju.status === "ok" ? luckTimeline(saju, reference) : [];
   const current = timeline.find((s) => s.role === "current");
-  const dot = (s: string) => s.replace("-", ".");
 
   const flow: ReadingFlow = {
     id: "flow",
@@ -136,7 +135,8 @@ export function assembleReading(o: AssembleOptions): IntegratedReadingReport {
     headline: draft.flow.headline,
     summary: draft.flow.summary,
     caveat: FLOW_CAVEAT,
-    cardText: draft.flow.cardText,
+    // 계산된 현재 시기가 있으면 시기 카드의 글도 쉬운 말 설명(제목 · 뜻 · 예시, period-plain.ts)에서 코드가 채운다 — 같은 시기를 AI가 다시 쓴 글로 덮어쓰지 않는다
+    cardText: current ? `${periodPlain(current.stemGroup, current.branchGroup).meaning} ${periodPlain(current.stemGroup, current.branchGroup).example}` : draft.flow.cardText,
     years: draft.flow.years,
     periods: draft.flow.periods.map((p) => ({ period: refs.find((r) => r.ref === p.ref)?.label ?? p.ref, theme: p.theme, watch: p.watch })),
     scenarios: draft.flow.scenarios,
@@ -163,8 +163,10 @@ export function assembleReading(o: AssembleOptions): IntegratedReadingReport {
       {
         kind: "flow",
         label: CARD_LABEL.flow,
-        keyword: draft.cards.flow.keyword,
-        note: current ? `${dot(current.from)}부터 ${dot(current.to)}까지, ${positionText(current.progress)}.` : "10년 시기의 기간은 계산하지 못했어요. 가까운 해의 분위기만 읽었어요.",
+        // 계산된 대운이 있으면 제목 · 뜻은 해석 키워드가 아니라 쉬운 말 설명(period-plain.ts)을 코드가 채운다 — 계산된 천간 · 지지 그룹이 뒷받침할 때만 쓴다
+        ...(current
+          ? { keyword: periodPlain(current.stemGroup, current.branchGroup).title, note: periodPlain(current.stemGroup, current.branchGroup).meaning, foot: periodLine(current.from, current.to) }
+          : { keyword: draft.cards.flow.keyword, note: "10년 시기의 기간은 계산하지 못했어요. 가까운 해의 분위기만 읽었어요." }),
       },
     ],
     inputs: buildInputs({ knownMbti: input.knownMbti, hasContext: Boolean(context), hasSaju: saju.status === "ok", topics: topicsForInputs, allEvidence: evidence, nickname: name }),

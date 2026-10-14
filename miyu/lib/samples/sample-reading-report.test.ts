@@ -69,13 +69,16 @@ test("리포트 예시: 본문은 쉬운 말이다 — 사주 용어와 점수 �
   const paragraphs = [...R.blocks.flatMap((b) => [b.summary, b.example ?? "", ...b.details, b.watch ?? "", b.reactionFlow?.helpful ?? "", ...(b.traits ?? []).flatMap((t) => [t.shines, t.burden, t.example])]), R.flow.summary, R.flow.cardText];
   for (const p of paragraphs) assert.ok(sentences(p).length <= 3, `한 문단이 ${sentences(p).length}문장 — ${p.slice(0, 20)}`);
   // 대운 · 세운도 본문에는 쓰지 않는다 — "10년 단위의 시기" · "그해의 분위기"처럼 풀어 쓰고 용어는 근거에만 둔다
-  assert.ok(bodyTexts().some((t) => /10년 단위의 시기/.test(t)), "대운은 쉬운 말로 풀어 쓴다");
+  assert.ok(R.summary.find((s) => s.kind === "flow")!.foot?.includes("사주에서 보는 10년 시기"), "대운은 쉬운 말로 풀어 쓴다");
 });
 
 test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강점 · 주의할 점 · 지금 나의 시기), 주제마다 요약 2문장 이하 · 예시 1개, 제목과 같은 말을 되풀이하지 않는다", () => {
   assert.deepEqual(R.summary.map((s) => s.kind), ["strength", "caution", "flow"]);
   assert.ok(R.headline.length <= 36, `첫 화면 핵심 문장이 길다 (${R.headline.length}자)`);
-  for (const s of R.summary) assert.ok(s.keyword.length <= 18 && s.note.length <= 60, `${s.kind} 카드가 길다`);
+  // 강한 포인트 · 힘들 수 있는 포인트 카드는 AI가 쓰는 짧은 말, 지금 나의 시기 카드는 코드가 채우는 쉬운 말(제목 · 뜻)이라 한도가 따로다
+  for (const s of R.summary.filter((x) => x.kind !== "flow")) assert.ok(s.keyword.length <= 18 && s.note.length <= 60, `${s.kind} 카드가 길다`);
+  const flowCard = R.summary.find((x) => x.kind === "flow")!;
+  assert.ok(flowCard.keyword.length <= 24 && flowCard.note.length <= 90, "지금 나의 시기 카드가 길다");
   for (const b of R.blocks) {
     assert.ok(b.headline.length <= 30, `${b.id}: 제목이 길다 (${b.headline.length}자)`);
     assert.ok(sentences(b.summary).length <= 2, `${b.id}: 요약이 2문장을 넘는다`);
@@ -91,7 +94,7 @@ test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강�
   assert.doesNotMatch(bodyTexts().join("\n"), /힘이 되는 때|부담이 되는 때/);
 });
 
-test("리포트 예시: '장점 / 단점이 될 수 있는 부분'는 특징 3개를 짧은 문구로 줄여 보이고, 접힘 안에서 특징마다 풀이 · 예시를 나눠 쓴다", () => {
+test("리포트 예시: '강한 포인트 / 힘들 수 있는 포인트'는 특징 3개를 짧은 문구로 줄여 보이고, 접힘 안에서 특징마다 풀이 · 예시를 나눠 쓴다", () => {
   const b = R.blocks.find((x) => x.id === "strength-burden")!;
   assert.equal(b.traits?.length, 3);
   assert.deepEqual(b.traits!.map((t) => t.name), ["꼼꼼하게 다듬기", "상대 반응 살피기", "가까운 사람에게 기대기"]);
@@ -105,9 +108,9 @@ test("리포트 예시: '장점 / 단점이 될 수 있는 부분'는 특징 3�
   assert.equal(new Set(b.traits!.map((t) => t.example)).size, 3);
   assert.equal(b.example, undefined);
   // 화면 이름표는 "강점 · 부담" 대신 쉬운 말
-  assert.match(b.topic, /장점/);
+  assert.match(b.topic, /강한 포인트/);
   assert.doesNotMatch(bodyTexts().join("\n"), /강점과 부담|부담이 되는|조절이 필요할 때/);
-  assert.deepEqual(R.summary.filter((s) => s.kind !== "flow").map((s) => s.label), ["장점", "단점이 될 수 있는 부분"]);
+  assert.deepEqual(R.summary.filter((s) => s.kind !== "flow").map((s) => s.label), ["내가 강한 포인트", "내가 힘들 수 있는 포인트"]);
 });
 
 test("리포트 예시: 지금 지나는 시기 타임라인은 서윤의 사주 계산에서 나왔고(글로 지어내지 않았다), 카드 문구의 기간과 맞는다", () => {
@@ -117,7 +120,7 @@ test("리포트 예시: 지금 지나는 시기 타임라인은 서윤의 사주
   assert.ok(cur.progress! > 0 && cur.progress! < 1);
   const dot = (s: string) => s.replace("-", ".");
   const flowCard = R.summary.find((s) => s.kind === "flow")!;
-  assert.ok(flowCard.note.includes(dot(cur.from)) && flowCard.note.includes(dot(cur.to)), `지금 나의 시기 카드의 기간이 계산(${cur.from}~${cur.to})과 다르다`);
+  assert.ok(flowCard.foot!.includes(dot(cur.from)) && flowCard.foot!.includes(dot(cur.to)), `지금 나의 시기 카드의 기간이 계산(${cur.from}~${cur.to})과 다르다`);
   // 근거에 적은 대운 기간도 같은 계산이다
   const [fy, fm] = cur.from.split("-").map(Number);
   const [ty, tm] = cur.to.split("-").map(Number);
@@ -137,7 +140,7 @@ test("리포트 예시: 원인을 하나로 좁혀 말하지 않고, 막는 표�
     assert.doesNotMatch(t, /\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일/, `특정 날짜: ${t.slice(0, 30)}`);
     assert.doesNotMatch(t, /결혼|이별|헤어지|이직하게|취업|퇴사/, `사건 예언: ${t.slice(0, 30)}`);
     // 나이 · 직업은 "다루지 않는다" 또는 "알지 못한다"는 안내에서만 나온다 (만들어 채우지 않는다)
-    if (/나이|직업/.test(t)) assert.match(t, /다루지 않(습니다|아요)|알지 못(합니다|해요)|알 수 없어서/, `나이 · 직업 언급: ${t.slice(0, 30)}`);
+    if (/나이|직업/.test(t)) assert.match(t, /다루지 않(습니다|아요)|알지 못(합니다|해요)|정해서 말하지 않/, `나이 · 직업 언급: ${t.slice(0, 30)}`);
   }
   // 시기는 계산된 해(2026~2028)와 대운 기간만 (타임라인의 이전 · 다음 기간은 계산에서 나오며 글에 적지 않는다)
   const years = new Set(bodyTexts().join(" ").match(/\b20\d{2}\b/g));
@@ -198,6 +201,6 @@ test("리포트 예시: 내용 차이 검사(조건 · 범용 문장 · 겹침 �
 });
 
 test("리포트 예시: 고정 문구(이름표 · 안내)는 실제 생성과 같은 코드(plan.ts)의 것이다", () => {
-  assert.deepEqual(R.summary.map((s) => s.label), ["장점", "단점이 될 수 있는 부분", "지금 나의 시기"]);
+  assert.deepEqual(R.summary.map((s) => s.label), ["내가 강한 포인트", "내가 힘들 수 있는 포인트", "지금 나의 시기"]);
   assert.match(R.blocks.find((b) => b.id === "love")!.caveat!, /상대 자료: 없음/);
 });

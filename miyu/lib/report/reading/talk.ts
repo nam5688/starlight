@@ -2,10 +2,11 @@
 // 새 글을 쓰지 않는다(AI 호출 없음): 풀이 · 예시 · 근거는 모두 저장된 리포트의 문장 그대로이고, 대화 속 안내 문구만 이 파일의 고정 문구다.
 // 자유 질문 · "내 경우는 달라"에 AI가 답하는 기능은 아직 없다(2단계, 운영자 결정 뒤) — 화면에서 "준비 중"으로 밝힌다.
 // 이 파일은 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
+import { tendencyPhrase } from "../../assessment/dev-rules.ts";
+import { periodPlain } from "../../saju/interpret/period-plain.ts";
 import type { MonthCalendar } from "../../saju/interpret/months.ts";
 import { basisFor } from "./assemble.ts";
 import { CALENDAR_CHAT_NOTES, MONTH_NOTES, upcomingMonthTexts, upcomingSummary, type CalendarTopic } from "./calendar-text.ts";
-import { splitSentences } from "./line-breaks.ts";
 import type { IntegratedReadingReport, LuckSlot, ReadingBasis, ReadingBlock } from "./types.ts";
 
 /** 대화 속 조각 — para: 문단(label은 위의 작은 이름표) · note: 작은 안내 · flow: 반응이 이어지는 모습 · comfort: 편안한 조건 / 부딪히기 쉬운 상황 */
@@ -29,7 +30,10 @@ export type TalkTopic = {
   summary: string[];
   traits?: { name: string; shinesShort: string; burdenShort: string }[];
   caveat?: string;
-  timeline?: { slots: LuckSlot[]; text: string; reference: { year: number; month: number } };
+  /** 지금 나의 시기 그림 — 제목 · 생활 의미는 카드가 계산된 그룹에서 쉬운 말로 보이고, 예시는 이어지는 말풍선(periodExample)으로 보낸다 */
+  timeline?: { slots: LuckSlot[]; reference: { year: number; month: number } };
+  /** 지금 나의 시기의 예시 한 줄 — 계산된 현재 시기의 그룹을 쉬운 말로 옮긴 고정 문구(period-plain.ts) */
+  periodExample?: string;
   /** [예를 들어줘] — 비어 있으면 버튼을 보이지 않는다 */
   example: TalkPiece[];
   /** [더 자세히 알려줘] */
@@ -45,29 +49,30 @@ export type TalkExtra = "example" | "detail" | "basis" | "calendar-love" | "cale
 
 export type TalkCard = {
   headline: string;
-  /** 대표 경향 이름(~형, 후보 이름) — 없으면 null */
+  /** 대표 경향 설명(예: 관계에서 확인을 중요하게 여기는 편) — "~형" 이름표 대신 쓴다. 없으면 null */
   tendency: string | null;
   strength: { label: string; keyword: string; note: string };
   caution: { label: string; keyword: string; note: string };
-  flow: { label: string; keyword: string; note: string };
+  /** foot: 기간 줄(예: 2024.08–2034.07 · 사주에서 보는 10년 시기) — 이전에 저장된 리포트에는 없다 */
+  flow: { label: string; keyword: string; note: string; foot?: string };
   /** 사용한 정보의 이름 (없음은 넣지 않는다) */
   inputs: string[];
 };
 
-/** 첫 화면에서 고르는 큰 묶음 — 묶음 안의 풀이는 이어서 고른다 (예: 내 성향 → 장점 · 단점이 될 수 있는 부분 → 중요하게 여기는 것) */
+/** 첫 화면에서 고르는 큰 묶음 — 묶음 안의 풀이는 이어서 고른다 (예: 내 성향 → 강한 포인트 · 힘들 수 있는 포인트 → 중요하게 여기는 것) */
 export type TalkGroup = { id: string; chip: string; topicIds: string[] };
 
 export type TalkModel = { name: string; card: TalkCard; topics: TalkTopic[]; groups: TalkGroup[] };
 
 /**
- * 말풍선 하나에 담기는 내용 — 저장된 리포트의 글을 문장 단위로 끊어 나눈 것이다(글자는 바꾸지 않는다).
- * text: 말풍선(label은 위의 작은 이름표, muted는 작은 안내) · 나머지는 말풍선 안에 들어가는 그림 · 표.
+ * 말풍선 하나에 담기는 내용 — 저장된 리포트의 글을 문단 단위로 보여 준다(글자는 바꾸지 않는다). 답변 한 번에 말풍선은 1~2개다(운영자 2026-10-15).
+ * answer: 결론 한 줄(굵게) + 요약을 한 말풍선으로 묶은 것 · text: 말풍선(label은 위의 작은 이름표, muted는 작은 안내) · 나머지는 말풍선 안에 들어가는 그림 · 표.
  */
 export type TalkBubble =
-  | { kind: "headline"; number: number; title: string; text: string }
+  | { kind: "answer"; number: number; title: string; headline: string; paragraphs: string[] }
   | { kind: "text"; text: string; label?: string; muted?: boolean }
   | { kind: "traits"; traits: { name: string; shinesShort: string; burdenShort: string }[] }
-  | { kind: "timeline"; slots: LuckSlot[]; text: string; reference: { year: number; month: number } }
+  | { kind: "timeline"; slots: LuckSlot[]; reference: { year: number; month: number } }
   | { kind: "flow"; when: string; steps: { label: string; text: string }[]; helpful: string }
   | { kind: "comfort"; comfortable: string[]; clash: string[]; note: string }
   | { kind: "basis"; basis: ReadingBasis };
@@ -77,14 +82,32 @@ export const CARD_DISCLAIMER = "참고용 해석이며 예측이나 진단이 �
 /** 대화 속 고정 안내 문구 — 친구에게 말하듯 짧게. 풀이 내용은 여기에 쓰지 않는다 */
 export const TALK_COPY = {
   intro: (name: string) => `${name} 님의 분석을 한 장으로 정리했어요.`,
-  askTopic: "저장해 두고 다시 봐도 좋아요. 어떤 이야기부터 풀어 볼까요?",
+  askTopic: "어떤 이야기부터 풀어 볼까요?",
   notice: "저장된 리포트를 나눠서 보여 줘요. AI가 새로 쓰는 글이 아니고, 결과를 보장하지 않아요.",
-  askNext: "더 알아볼까요?",
-  askMore: "더 보고 싶은 이야기를 골라 주세요.",
-  opening: (chip: string) => `‘${chip}’ 이야기부터 해 볼게요.`,
-  openingMore: (chip: string) => `이어서 ‘${chip}’ 이야기예요.`,
+  /** 풀이를 읽은 뒤 내 경험을 말하게 하는 질문 — 주제마다 다르다 */
+  ask: {
+    tendency: (name: string) => `${name} 님은 실제로 어때요?`,
+    "strength-burden": (name: string) => `${name} 님은 실제로 어때요?`,
+    values: (name: string) => `${name} 님은 실제로 어때요?`,
+    love: () => "가까운 사람과는 실제로 어때요?",
+    "work-money": () => "일이나 돈 앞에서는 실제로 어때요?",
+    flow: () => "지금 시기는 어떻게 느껴져요?",
+    focus: () => "이 고민, 지금은 어떤 상태예요?",
+    other: (name: string) => `${name} 님은 실제로 어때요?`,
+  },
+  /** 내 경험을 고르는 답장 — 고정 문구로만 답하고 눌러 준 답을 저장하거나 해석에 반영하지 않는다 */
+  feel: {
+    yes: { label: "맞아요", lead: "그렇군요. 그럼 이런 장면일 수 있어요.", leadNoExample: "그렇군요. 맞는 부분이 있다면 그 부분을 기억해 두세요." },
+    mixed: {
+      label: "상황에 따라 달라요",
+      lead: "상황에 따라 다른 건 아주 자연스러워요. 어떤 때는 맞고 어떤 때는 다르다는 걸 알아 두는 것도 이 풀이를 쓰는 방법이에요.",
+      pending: "어떤 상황에서 달랐는지 대화로 이어 가는 기능은 아직 준비 중이에요.",
+      pendingLink: "지금은 ‘나의 고민 기록소’에 적어 둘 수 있어요.",
+    },
+    unsure: { label: "잘 모르겠어요", lead: "괜찮아요. 한 번에 정할 필요 없어요. 일상 예시나 분석한 이유를 보고 맞는 부분만 가져가세요." },
+    note: "눌러 준 답은 풀이를 바꾸지 않고, 이 기기 화면에만 남아요.",
+  },
   basisIntro: "이 풀이는 아래 자료를 보고 썼어요. 사주 계산은 만세력 엔진이 한 값이고, 해석 규칙은 아직 검증된 사실이 아니에요.",
-  differ: "맞지 않는 부분이 있을 수 있어요. 대화로 풀이를 함께 고쳐 가는 기능은 아직 준비 중이에요. 지금은 어느 부분이 어떤 상황에서 달랐는지 직접 적어 두세요. 나중에 해석을 다시 살펴볼 때 기준이 돼요.",
   concernPending: "지금 고민을 대화로 이어 가는 기능은 아직 준비 중이에요.",
   concernPendingLink: "고민을 적어 두는 건 ‘나의 고민 기록소’에서 할 수 있어요.",
   allDone: "준비한 풀이를 모두 둘러봤어요. 전체 내용은 리포트에서 언제든 다시 볼 수 있어요.",
@@ -92,12 +115,12 @@ export const TALK_COPY = {
   menuTitle: "다른 이야기 보기",
   freeQuestion: "자유롭게 질문하기 · 준비 중",
   freeQuestionPending: "자유 질문은 준비 중이에요. 지금은 버튼으로 이어 볼 수 있어요.",
-  buttons: { example: "예를 들어줘", detail: "더 자세히 알려줘", basis: "이렇게 분석한 이유", "calendar-love": "가까운 관계가 움직이는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", differ: "내 경우는 달라", concern: "고민 말하기", pickTopic: "다른 주제 고르기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
+  buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "가까운 관계가 움직이는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
 
 const CHIP: Record<string, string> = {
   tendency: "나는 어떤 사람?",
-  "strength-burden": "장점 · 단점이 될 수 있는 부분",
+  "strength-burden": "강한 포인트 · 힘들 수 있는 포인트",
   values: "중요하게 여기는 것",
   love: "가까운 관계",
   "work-money": "일과 돈",
@@ -110,7 +133,7 @@ function blockTopic(b: ReadingBlock, number: number): TalkTopic {
   const detail: TalkPiece[] = [];
   if (b.traits) {
     for (const t of b.traits) example.push(para(t.example, t.name));
-    for (const t of b.traits) detail.push(para(t.shines, `${t.name} · 장점`), para(t.burden, `${t.name} · 단점이 될 수 있는 부분`));
+    for (const t of b.traits) detail.push(para(t.shines, `${t.name} · 내가 강한 포인트`), para(t.burden, `${t.name} · 내가 힘들 수 있는 포인트`));
   } else if (b.example) example.push(para(b.example));
   if (b.reactionFlow) example.push({ kind: "flow", when: b.reactionFlow.when, steps: b.reactionFlow.steps, helpful: b.reactionFlow.helpful });
   // 깊게 읽는 소단락(가까운 관계 · 일과 돈)은 [더 자세히 알려줘]의 앞에 — 제목이 이름표, 풀이와 해 볼 것이 말풍선으로 도착한다
@@ -139,6 +162,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: { tendency
   const topics: TalkTopic[] = report.blocks.map((b, i) => blockTopic(b, i + 1));
 
   const f = report.flow;
+  const current = report.timeline.find((s) => s.role === "current");
   topics.push({
     id: "flow",
     number: report.blocks.length + 1,
@@ -147,7 +171,8 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: { tendency
     headline: f.headline,
     summary: [f.summary],
     caveat: f.caveat,
-    timeline: { slots: report.timeline, text: f.cardText, reference: report.timelineReference },
+    timeline: { slots: report.timeline, reference: report.timelineReference },
+    ...(current ? { periodExample: periodPlain(current.stemGroup, current.branchGroup).example } : {}),
     example: [note(f.scenarioNote), ...f.scenarios.map((s) => para(s.then, s.when))],
     detail: [...f.years.map((y) => para(y.theme, y.year)), ...f.periods.flatMap((p) => [para(p.theme, p.period), para(p.watch, `${p.period} · 살펴볼 점`)]), note(f.statistics)],
     basis: f.basis,
@@ -170,7 +195,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: { tendency
 
   const cardOf = (kind: "strength" | "caution" | "flow") => {
     const c = report.summary.find((s) => s.kind === kind);
-    return { label: c?.label ?? "", keyword: c?.keyword ?? "", note: c?.note ?? "" };
+    return { label: c?.label ?? "", keyword: c?.keyword ?? "", note: c?.note ?? "", ...(c?.foot ? { foot: c.foot } : {}) };
   };
   const inputs = report.inputs.filter((i) => i.status !== "none").map((i) => `${i.name.replace(/\(.*\)/, "").trim()}${i.status === "dev" ? " (개발용 문항)" : ""}`);
 
@@ -178,7 +203,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: { tendency
     name: report.personName,
     card: {
       headline: report.headline,
-      tendency: opts.tendencyName ?? report.base?.tendency.name ?? null,
+      tendency: tendencyPhrase(opts.tendencyName ?? report.base?.tendency.name),
       strength: cardOf("strength"),
       caution: cardOf("caution"),
       flow: cardOf("flow"),
@@ -216,44 +241,33 @@ export function nextTopic(topics: TalkTopic[], currentId: string | null, opened:
   return order.find((t) => !opened.has(t.id)) ?? null;
 }
 
-/** 말풍선 하나에 합쳐 넣는 두 문장의 최대 글자 수 — 이보다 길면 한 문장씩 따로 보낸다 */
-export const BUBBLE_PAIR_MAX = 72;
-
-/**
- * 저장된 글을 말풍선 단위로 나눈다 — 문장 단위로 끊고, 짧은 두 문장만 한 말풍선에 묶는다.
- * 글자는 바꾸지 않는다: 돌려준 말풍선을 공백으로 이으면 원래 글(공백만 정리)과 같다.
- */
-export function toBubbles(text: string): string[] {
-  const sentences = splitSentences(text);
-  const out: string[] = [];
-  for (let i = 0; i < sentences.length; i++) {
-    const a = sentences[i];
-    const b = sentences[i + 1];
-    if (b !== undefined && a.length + 1 + b.length <= BUBBLE_PAIR_MAX) {
-      out.push(`${a} ${b}`);
-      i++;
-    } else out.push(a);
-  }
-  return out;
-}
-
-/** 조각(문단 · 안내 · 그림)을 말풍선으로 — 이름표는 그 조각의 첫 말풍선에만 붙는다 */
+/** 조각(문단 · 안내 · 그림)을 말풍선으로 — 문단 하나가 말풍선 하나이고 이름표는 그 위에 붙는다 */
 function piecesToBubbles(pieces: TalkPiece[]): TalkBubble[] {
   return pieces.flatMap((p): TalkBubble[] => {
-    if (p.kind === "para") return toBubbles(p.text).map((text, i) => ({ kind: "text", text, ...(p.label && i === 0 ? { label: p.label } : {}) }));
-    if (p.kind === "note") return toBubbles(p.text).map((text) => ({ kind: "text", text, muted: true }));
+    if (p.kind === "para") return [{ kind: "text", text: p.text, ...(p.label ? { label: p.label } : {}) }];
+    if (p.kind === "note") return [{ kind: "text", text: p.text, muted: true }];
     if (p.kind === "flow") return [{ kind: "flow", when: p.when, steps: p.steps, helpful: p.helpful }];
     return [{ kind: "comfort", comfortable: p.comfortable, clash: p.clash, note: p.note }];
   });
 }
 
-/** 주제를 골랐을 때 이어서 도착하는 짧은 풀이 — 결론 한 줄 → 요약 → (특징 · 시기 그림) → 안내 */
-export function answerBubbles(t: TalkTopic): TalkBubble[] {
-  const out: TalkBubble[] = [{ kind: "headline", number: t.number, title: t.title, text: t.headline }];
-  for (const s of t.summary) for (const text of toBubbles(s)) out.push({ kind: "text", text });
+/** 주제의 마지막 질문 — 풀이를 읽고 내 경험을 말하게 한다 (고정 문구) */
+export function askFor(topicId: string, name: string): string {
+  const ask = TALK_COPY.ask as Record<string, (n: string) => string>;
+  return (ask[topicId] ?? ask.other)(name);
+}
+
+/**
+ * 주제를 골랐을 때 이어서 도착하는 짧은 풀이 — 결론 한 줄 + 요약을 한 말풍선으로 묶고, (특징 · 시기 그림) → 안내 → 내 경험을 묻는 질문 순서다.
+ * 답변 한 번에 말풍선은 풀이 하나 · 질문 하나다(그림 · 작은 안내는 말풍선으로 세지 않는다).
+ */
+export function answerBubbles(t: TalkTopic, name = ""): TalkBubble[] {
+  const out: TalkBubble[] = [{ kind: "answer", number: t.number, title: t.title, headline: t.headline, paragraphs: t.summary }];
   if (t.traits) out.push({ kind: "traits", traits: t.traits });
-  if (t.timeline) out.push({ kind: "timeline", slots: t.timeline.slots, text: t.timeline.text, reference: t.timeline.reference });
-  if (t.caveat) for (const text of toBubbles(t.caveat)) out.push({ kind: "text", text, muted: true });
+  if (t.timeline) out.push({ kind: "timeline", slots: t.timeline.slots, reference: t.timeline.reference });
+  if (t.periodExample) out.push({ kind: "text", text: t.periodExample });
+  if (t.caveat) out.push({ kind: "text", text: t.caveat, muted: true });
+  out.push({ kind: "text", text: askFor(t.id, name || "당신") });
   return out;
 }
 
@@ -269,12 +283,11 @@ export function extraBubbles(t: TalkTopic, which: TalkExtra): TalkBubble[] {
  * 성별을 답하지 않아 가까운 관계 달력이 없으면 이유만 알린다.
  */
 export function calendarBubbles(cal: NonNullable<TalkTopic["calendar"]>, topic: CalendarTopic): TalkBubble[] {
-  const out: TalkBubble[] = toBubbles(upcomingSummary(cal.items, cal.reference, topic)).map((text) => ({ kind: "text", text }));
+  const out: TalkBubble[] = [{ kind: "text", text: upcomingSummary(cal.items, cal.reference, topic) }];
   const months = upcomingMonthTexts(cal.items, cal.reference, topic);
   for (const m of months) out.push({ kind: "text", text: m.text, label: m.label });
   if (months.length > 0) {
-    for (const text of toBubbles(MONTH_NOTES.limit)) out.push({ kind: "text", text, muted: true });
-    for (const text of toBubbles(CALENDAR_CHAT_NOTES.more)) out.push({ kind: "text", text, muted: true });
+    out.push({ kind: "text", text: MONTH_NOTES.limit, muted: true }, { kind: "text", text: CALENDAR_CHAT_NOTES.more, muted: true });
   }
   return out;
 }

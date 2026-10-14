@@ -103,7 +103,7 @@ export function layoutCard(card: TalkCard, o: CardLayoutOptions): { ops: CardOp[
   block(card.headline, MARGIN, inner, 52, 700, "ink");
   y += 36;
 
-  // 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 — 색이 있는 둥근 칸 (테두리 · 띠 없이, 이름과 색을 함께)
+  // 강한 포인트 · 힘들 수 있는 포인트 · 지금 나의 시기 — 색이 있는 둥근 칸 (테두리 · 띠 없이, 이름과 색을 함께)
   const box = (c: { label: string; keyword: string; note: string }, face: CardColor, tone: CardColor) => {
     const pad = 34;
     const textW = inner - pad * 2;

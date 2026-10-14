@@ -9,11 +9,17 @@
 import { BLOCK_CAVEAT, CARD_LABEL, comfortNote, FLOW_CAVEAT, RULE_DRAFT_NOTE, SCENARIO_NOTE, SCORE_NOTE, STATISTICS_NOTE } from "../report/reading/plan.ts";
 import type { IntegratedReadingReport, ReadingBlockId, ReadingDraftV1 } from "../report/reading/types.ts";
 import { MONTH_RULE_VERSION, monthCalendars } from "../saju/interpret/months.ts";
+import { periodLine, periodPlain } from "../saju/interpret/period-plain.ts";
 import { luckTimeline } from "../saju/interpret/rules.ts";
 import { SAMPLE_CHART } from "./sample-report.ts";
 
 /** 큰 흐름 카드에 쓰는 기준 월 — 이 달에 지나는 구간을 현재로 본다 */
 export const TIMELINE_REFERENCE = { year: 2026, month: 10 };
+
+/** 지금 나의 시기 — 제목 · 뜻 · 예시는 해석 키워드가 아니라 계산된 대운의 천간 · 지지 그룹을 쉬운 말로 옮긴 것이다(실제 생성도 같은 코드, assemble.ts) */
+const SAMPLE_TIMELINE = luckTimeline(SAMPLE_CHART, TIMELINE_REFERENCE);
+const SAMPLE_CURRENT = SAMPLE_TIMELINE.find((s) => s.role === "current")!;
+const SAMPLE_PLAIN = periodPlain(SAMPLE_CURRENT.stemGroup, SAMPLE_CURRENT.branchGroup);
 
 export const sampleReadingReport: IntegratedReadingReport = {
   kind: "integrated-reading",
@@ -23,13 +29,13 @@ export const sampleReadingReport: IntegratedReadingReport = {
   summary: [
     { kind: "strength", label: CARD_LABEL.strength, keyword: "다듬어서 내놓는 힘", note: "배운 걸 정리해서 말이나 글로 내놓을 때 힘이 나는 편이에요." },
     { kind: "caution", label: CARD_LABEL.caution, keyword: "반응이 궁금해지는 마음", note: "관계가 불확실해 보이면 상대의 반응이 유난히 신경 쓰여요." },
-    { kind: "flow", label: CARD_LABEL.flow, keyword: "성과와 표현이 주제인 10년", note: "2024.08부터 2034.07까지, 지금은 그 앞부분을 지나고 있어요." },
+    { kind: "flow", label: CARD_LABEL.flow, keyword: SAMPLE_PLAIN.title, note: SAMPLE_PLAIN.meaning, foot: periodLine(SAMPLE_CURRENT.from, SAMPLE_CURRENT.to) },
   ],
   inputs: [
-    { name: "사주", status: "used", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운입니다. 해석 규칙은 전문가 검토 전 초안입니다.", usedIn: ["생각과 행동 방식", "장점과 단점이 될 수 있는 부분", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 시기"] },
+    { name: "사주", status: "used", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운입니다. 해석 규칙은 전문가 검토 전 초안입니다.", usedIn: ["생각과 행동 방식", "강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 시기"] },
     { name: "MBTI", status: "used", note: "본인이 입력한 INFJ입니다. 참고값으로만 봤으며 공식 MBTI 검사 결과가 아닙니다.", usedIn: ["생각과 행동 방식"] },
-    { name: "기질 · 성격", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["생각과 행동 방식", "장점과 단점이 될 수 있는 부분", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 시기"] },
-    { name: "가까운 관계에서의 반응(애착 경향)", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["장점과 단점이 될 수 있는 부분", "중요하게 여기는 것", "가까운 관계", "앞으로의 시기"] },
+    { name: "기질 · 성격", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["생각과 행동 방식", "강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "일과 돈", "앞으로의 시기"] },
+    { name: "가까운 관계에서의 반응(애착 경향)", status: "dev", note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다.", usedIn: ["강한 포인트와 힘들 수 있는 포인트", "중요하게 여기는 것", "가까운 관계", "앞으로의 시기"] },
     { name: "알려 준 고민 · 상황", status: "none", note: "입력하지 않았습니다. 특정 고민 없이 쓴 종합 해석입니다.", usedIn: [] },
     { name: "상대 자료", status: "none", note: "없습니다. 관계 부분은 서윤 님의 사주와 응답만으로 읽었습니다.", usedIn: [] },
     { name: "연구 통계", status: "none", note: "사용하지 않았습니다.", usedIn: [] },
@@ -77,9 +83,9 @@ export const sampleReadingReport: IntegratedReadingReport = {
     {
       id: "strength-burden",
       group: "me",
-      topic: "장점과 단점이 될 수 있는 부분",
+      topic: "강한 포인트와 힘들 수 있는 포인트",
       headline: "같은 모습이 힘이 될 때도, 버거울 때도 있어요",
-      summary: "서윤 님의 특징 세 가지를 장점과 단점이 될 수 있는 부분으로 나눠 봤어요. 같은 특징도 환경과 조건이 맞으면 힘이 되고, 안 맞으면 버거워질 수 있어요.",
+      summary: "서윤 님의 특징 세 가지를 강한 포인트와 힘들 수 있는 포인트으로 나눠 봤어요. 같은 특징도 환경과 조건이 맞으면 힘이 되고, 안 맞으면 버거워질 수 있어요.",
       traits: [
         {
           name: "꼼꼼하게 다듬기",
@@ -270,9 +276,9 @@ export const sampleReadingReport: IntegratedReadingReport = {
     id: "flow",
     topic: "앞으로의 시기",
     headline: "2026~2028년, 내 방식에서 결과물로",
-    summary: "2026~2028년은 주제가 ‘내 방식대로 해 보는 일’에서 ‘표현해서 결과물을 내는 일’로 옮겨 가는 시기로 읽혀요. 일을 정할 때는 ‘어디까지 내 방식으로 할까’를 자주 따져 보게 될 수 있어요.",
+    summary: "2026~2028년은 주제가 ‘내 방식대로 해 보는 일’에서 ‘생각을 꺼내 결과물로 만드는 일’로 옮겨 가는 시기로 읽혀요. 일을 정할 때는 ‘어디까지 내 방식으로 할까’를 자주 따져 보게 될 수 있어요.",
     caveat: FLOW_CAVEAT,
-    cardText: "지금 지나는 10년 단위의 시기는 현실적인 성과 · 수입 · 관리와, 표현하고 새로 시도하는 일이 주제로 읽혀요. 결과물을 만드는 일과 그걸 정리하고 관리하는 일을 같이 챙기면 좋은 때로 볼 수 있어요.",
+    cardText: `${SAMPLE_PLAIN.meaning} ${SAMPLE_PLAIN.example}`,
     years: [
       { year: "2026", theme: "내 방식을 지키는 일과 함께하는 일의 균형" },
       { year: "2027", theme: "내 방식으로 해 본 걸 결과물로 남기는 해" },
@@ -286,17 +292,17 @@ export const sampleReadingReport: IntegratedReadingReport = {
       },
       {
         period: "2026년",
-        theme: "자기 주도 · 독립 · 경쟁과 협업이 두드러지는 해로 읽어요. 사주에 이 기운이 없어서 평소보다 크게 느껴질 수 있다고 봐요.",
+        theme: "내 방식과 힘을 믿고 나아가는 해로 읽어요. 직접 정하고 이끌고 싶은 마음이 커지고, 비슷한 위치의 사람과 견주거나 힘을 합치는 일이 주제가 될 수 있어요. 사주에 이 기운이 없어서 평소보다 크게 느껴질 수 있다고 봐요.",
         watch: "누구와 함께하고 어디까지 내 방식을 지킬지 생각할 일이 생길 수 있어요.",
       },
       {
         period: "2027년",
-        theme: "자기 주도 주제가 이어지면서 표현 · 생산 · 새로운 시도가 늘어나는 해로 읽어요.",
+        theme: "내 방식으로 새로 시도해 보는 해로 읽어요. 직접 해 보려는 마음이 이어지면서, 생각을 꺼내 보이고 새로운 걸 시도하는 일이 늘어날 수 있어요.",
         watch: "새로 시도한 것 가운데 이어 갈 것과 접을 것을 나눠 볼 만한 해예요.",
       },
       {
         period: "2028년",
-        theme: "표현 · 생산 · 새로운 시도와 현실적인 성과 · 수입 · 관리가 함께 주제가 되는 해로 읽어요.",
+        theme: "생각을 실제 결과로 만들어 가는 해로 읽어요. 만든 걸 보여 주는 일과, 그 결과를 정리하고 관리하는 일이 함께 주제가 될 수 있어요.",
         watch: "만든 것을 정리하고 관리하는 방식도 같이 살펴볼 수 있어요.",
       },
     ],
@@ -313,7 +319,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
         "세운(歲運, 해마다의 흐름) 2026년 병오(丙午) — 천간 겁재(劫財, 경쟁심과 밀어붙이는 힘), 지지 비견(比肩, 동료와 자기 기준) / 2027년 정미(丁未) — 천간 비견, 지지 식신 / 2028년 무신(戊申) — 천간 상관, 지지 정재(正財, 꾸준히 모으고 관리하는 재물 감각)",
       ],
       tradition: [
-        "대운 · 세운의 천간 · 지지가 어느 기운에 해당하는지로 주제를 읽습니다. 비겁(比劫, 나와 같은 기운)은 자기 주도 · 독립 · 경쟁과 협업, 식상은 표현 · 생산 · 새로운 시도, 재성은 현실적인 성과 · 수입 · 관리, 관성은 책임 · 조직 · 평판, 인성은 배움 · 준비 · 도움 받기로 봅니다.",
+        "대운 · 세운의 천간 · 지지가 어느 기운에 해당하는지로 주제를 읽습니다. 비겁(比劫, 나와 같은 기운)은 자기 주도 · 독립 · 경쟁과 협업(내 방식으로 정하고 이끌고 싶은 마음), 식상은 표현 · 생산 · 새로운 시도(생각을 말이나 결과물로 꺼내는 일), 재성은 현실적인 성과 · 수입 · 관리(일의 결과와 돈 · 시간을 챙기는 일), 관성은 책임 · 조직 · 평판(맡은 역할과 평가), 인성은 배움 · 준비 · 도움 받기(배우고 조언을 받아들이는 일)로 봅니다.",
         "원국에 없는 기운은 그 기운이 들어오는 시기에 주제가 상대적으로 크게 느껴질 수 있다고 봅니다. 이것은 검증된 사실이 아니라 전통 해석 규칙입니다.",
       ],
       answers: ["관계 불안, 신중함, 타인 반응 민감도, 새로움 추구: 위와 같습니다 (72, 71, 66, 34)", SCORE_NOTE],
@@ -324,7 +330,7 @@ export const sampleReadingReport: IntegratedReadingReport = {
     },
     evidence: ["saju.daeun.current", "saju.daeun.next", "saju.seun.2026", "saju.seun.2027", "saju.seun.2028", "saju.tengod.비겁.none", "survey.anxiety.high", "survey.caution.high", "survey.sensitivity.high", "survey.novelty.low"],
   },
-  timeline: luckTimeline(SAMPLE_CHART, TIMELINE_REFERENCE),
+  timeline: SAMPLE_TIMELINE,
   timelineReference: TIMELINE_REFERENCE,
   calendars: { ruleVersion: MONTH_RULE_VERSION, items: monthCalendars(SAMPLE_CHART, TIMELINE_REFERENCE) },
   actions: [
@@ -349,7 +355,8 @@ export function sampleReadingAsDraft(): ReadingDraftV1 {
     cards: {
       strength: { keyword: R.summary[0].keyword, note: R.summary[0].note },
       caution: { keyword: R.summary[1].keyword, note: R.summary[1].note },
-      flow: { keyword: R.summary[2].keyword },
+      // 계산된 시기가 있으면 화면의 제목 · 뜻은 코드가 채운다 — AI의 flow 카드 글은 계산하지 못했을 때를 위한 짧은 쉬운 말 한 줄이다
+      flow: { keyword: "생각을 결과로 만드는 시기" },
     },
     blocks: R.blocks.map((b) => ({
       id: b.id as ReadingBlockId,

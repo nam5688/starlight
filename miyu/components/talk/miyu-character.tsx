@@ -1,50 +1,24 @@
-import { CHARACTER_IMAGE, CHEEKS, FACE, NOTEBOOK, PEBBLE_BODY, type MiyuMood } from "./miyu-shape";
+import { MIYU_IMAGES, type MiyuMood } from "./miyu-moods";
 
 type Props = {
-  /** 크기와 모양을 정하는 클래스 (예: "size-10") */
+  /** 크기를 정하는 클래스 (예: "size-10") */
   className?: string;
   mood?: MiyuMood;
-  /** 눈을 가끔 깜빡인다 (모션을 줄이는 설정이면 멈춘다) */
-  blink?: boolean;
-  /** 생각 중일 때 살짝 흔들린다 */
+  /** 생각 중일 때 살짝 흔들린다 (모션을 줄이는 설정이면 멈춘다) */
   bob?: boolean;
-  /** 작은 노트 소품 — 작은 크기에서는 보이지 않게 둔다 */
-  notebook?: boolean;
 };
 
 /**
- * 안내 캐릭터 "미유" — 작은 둥근 조약돌. 장식이라 보조기기에는 숨긴다(이름은 옆의 글자가 말한다).
- * 그림 파일을 바꾸려면 miyu-shape.ts의 CHARACTER_IMAGE만 고치면 된다.
+ * 안내 캐릭터 "미유" — 운영자가 보낸 그림 그대로의 표정(miyu-moods.ts). 장식이라 보조기기에는 숨긴다(이름은 옆의 글자가 말한다).
+ * 둥근 모서리의 정사각형 프로필로 보이고, 표정은 말하는 상황마다 다르다.
  */
-export function MiyuAvatar({ className = "size-10", mood = "smile", blink = false, bob = false, notebook = false }: Props) {
-  const face = FACE[mood];
+export function MiyuAvatar({ className = "size-10", mood = "basic", bob = false }: Props) {
   return (
-    <span aria-hidden="true" className={`inline-grid shrink-0 place-items-center ${bob ? "motion-safe:animate-miyu-bob" : ""} ${className}`}>
-      {CHARACTER_IMAGE ? (
-        <span className="size-full bg-contain bg-center bg-no-repeat" style={{ backgroundImage: `url(${CHARACTER_IMAGE})` }} />
-      ) : (
-        <svg viewBox="0 0 48 48" className="size-full overflow-visible">
-          <path d={PEBBLE_BODY} fill="var(--color-pebble)" stroke="var(--color-pebble-edge)" strokeWidth="1.3" />
-          {CHEEKS.map((c) => (
-            <ellipse key={c.cx} cx={c.cx} cy={c.cy} rx={c.rx} ry={c.ry} fill="var(--color-pebble-point)" opacity="0.8" />
-          ))}
-          <g className={blink ? "origin-center [transform-box:fill-box] motion-safe:animate-miyu-blink" : ""}>
-            {face.eyes.map(([x, y]) => (
-              <circle key={x} cx={x} cy={y} r={face.eyeR} fill="var(--color-ink)" />
-            ))}
-          </g>
-          <path d={face.mouth} fill="none" stroke="var(--color-ink)" strokeWidth="1.7" strokeLinecap="round" />
-          {notebook && (
-            <g transform={`rotate(${NOTEBOOK.rotate} ${NOTEBOOK.pivotX} ${NOTEBOOK.pivotY})`}>
-              <rect x={NOTEBOOK.x} y={NOTEBOOK.y} width={NOTEBOOK.w} height={NOTEBOOK.h} rx={NOTEBOOK.r} fill="var(--color-pebble-point)" stroke="var(--color-accent)" strokeWidth="1.2" />
-              {NOTEBOOK.lines.map((d) => (
-                <path key={d} d={d} stroke="var(--color-accent-strong)" strokeWidth="1.1" strokeLinecap="round" />
-              ))}
-            </g>
-          )}
-        </svg>
-      )}
-    </span>
+    <span
+      aria-hidden="true"
+      className={`inline-block shrink-0 rounded-[26%] bg-page bg-cover bg-center ${bob ? "motion-safe:animate-miyu-bob" : ""} ${className}`}
+      style={{ backgroundImage: `url(${MIYU_IMAGES[mood]})` }}
+    />
   );
 }
 

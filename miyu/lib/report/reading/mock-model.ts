@@ -88,8 +88,8 @@ export function composeMockReading(userMessage: string): ReadingDraftV1 {
   const draft: ReadingDraftV1 = {
     headline: `${M} 근거 안에서 쓴 통합 해석 초안`,
     cards: {
-      strength: { keyword: `${M} 강점`, note: `${M} 장점을 쓰는 자리입니다.` },
-      caution: { keyword: `${M} 주의`, note: `${M} 단점이 될 수 있는 부분을 쓰는 자리입니다.` },
+      strength: { keyword: `${M} 강점`, note: `${M} 내가 강한 포인트를 쓰는 자리입니다.` },
+      caution: { keyword: `${M} 주의`, note: `${M} 내가 힘들 수 있는 포인트를 쓰는 자리입니다.` },
       flow: { keyword: `${M} 시기` },
     },
     blocks,

@@ -3,7 +3,7 @@
 // 한계: 낱말 · 길이 · 표지를 세는 검사다. 좋은 글임을 보증하지 않는다 (가려 읽는 평가가 따로 있다).
 import type { Evidence } from "../evidence.ts";
 import { FORBIDDEN, CONTEXT_ATTRIBUTION, overlap, sentences } from "../v2/validate.ts";
-import { AGE_TEXT, BLOCK_PLAN, CAUSE_NARROWING, JARGON, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
+import { AGE_TEXT, BLOCK_PLAN, CAUSE_NARROWING, JARGON, RAW_THEME_TEXT, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
 import type { ReadingDraftV1 } from "./types.ts";
 
 export type ReadingValidation = { ok: true; draft: ReadingDraftV1 } | { ok: false; errors: string[] };
@@ -132,7 +132,7 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
   text(d.headline, "headline", L.headline.min, L.headline.max);
 
   // 첫 화면 카드 3개
-  for (const [k, label] of [["strength", "장점"], ["caution", "단점이 될 수 있는 부분"], ["flow", "지금 나의 시기"]] as const) {
+  for (const [k, label] of [["strength", "내가 강한 포인트"], ["caution", "내가 힘들 수 있는 포인트"], ["flow", "지금 나의 시기"]] as const) {
     const c = d.cards?.[k];
     if (!c) {
       errors.push(`cards.${k}(${label}): 카드가 없습니다.`);
@@ -278,6 +278,7 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
   const texts = visibleTexts(d as ReadingDraftV1);
   for (const { where, text: t } of texts) {
     if (JARGON.test(t)) errors.push(`${where}: 사주 전문 용어(${JARGON.exec(t)![0]})는 본문에 쓰지 않습니다 — 쉬운 말로 풀어 쓰고 용어는 근거로만 남깁니다.`);
+    if (RAW_THEME_TEXT.test(t)) errors.push(`${where}: 해석 키워드 나열("${RAW_THEME_TEXT.exec(t)![0]}")을 그대로 옮기지 않습니다 — 쉬운 제목 → 생활에서 뜻하는 것 → 예시로 풀어 쓰세요(예: 배운 것을 일에 써 보는 것, 내 의견을 말하는 것).`);
     if (SCORE_TEXT.test(t)) errors.push(`${where}: 점수 · 퍼센트 · 확률 표현은 본문에 쓰지 않습니다.`);
     if (CAUSE_NARROWING.test(t)) errors.push(`${where}: 원인을 하나로 좁혀 말하지 않습니다 ("~때문이에요" 대신 "~일 수 있어요").`);
     if (AGE_TEXT.test(t)) errors.push(`${where}: 나이를 쓰지 않습니다.`);
