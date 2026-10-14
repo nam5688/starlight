@@ -19,10 +19,11 @@ import { BasicInfoStep } from "./basic-info-step";
 import { FreeSummaryView } from "./free-summary";
 import { QuestionStep } from "./question-step";
 
+// 단계 이름은 무엇을 재는지 알려 주지 않는 중립 이름만 쓴다 — "MBTI 성향 · 기질 · 관계" 같은 이름을 미리 보면 답을 예측해서 고르게 된다(운영자 2026-10-15)
 const STEPS = [
   { key: "basic", label: "기본 정보" },
-  ...ASSESSMENT_MODULES.map((m) => ({ key: m.id, label: m.title })),
-  { key: "summary", label: "무료 미리보기" },
+  ...ASSESSMENT_MODULES.map((m, i) => ({ key: m.id, label: `질문 ${i + 1}` })),
+  { key: "summary", label: "결과" },
 ];
 const SUMMARY_STEP = STEPS.length - 1;
 const LAST_QUESTION_STEP = SUMMARY_STEP - 1;
@@ -303,6 +304,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
             {currentModule ? (
               <QuestionStep
                 module={currentModule}
+                heading={STEPS[step].label}
                 answers={answers}
                 showMissing={showMissing}
                 onAnswer={handleAnswer}

@@ -6,13 +6,19 @@ import { LIKERT_OPTIONS, type Answers, type AssessmentModule } from "@/lib/asses
  * 한 검사 모듈의 문항 목록. 응답 도중에는 해석을 보여주지 않는다.
  * 라디오 버튼이라 키보드로 Tab(문항 이동) · 방향키(선택 변경)를 쓸 수 있다.
  */
+/** 무엇을 재는지 알려 주지 않는 안내 — 모듈 이름 · 소개("에너지를 얻는 방식 …")를 보이면 예측해서 답하게 된다 */
+const NEUTRAL_INTRO = "지금의 나에게 가까운 쪽을 골라 주세요. 정답은 없고, 처음 떠오르는 느낌대로 답하면 돼요.";
+
 export function QuestionStep({
   module,
+  heading,
   answers,
   showMissing,
   onAnswer,
 }: {
   module: AssessmentModule;
+  /** 단계 제목 (중립 이름 — "질문 1" 등) */
+  heading: string;
   answers: Answers;
   showMissing: boolean;
   onAnswer: (id: string, value: number) => void;
@@ -24,13 +30,13 @@ export function QuestionStep({
     <section>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 id="step-heading" tabIndex={-1} className="text-[26px] font-bold tracking-tight outline-none md:text-[30px]">
-          {module.title}
+          {heading}
         </h1>
         <span className="text-[14px] tabular-nums text-ink-3">
           이 단계 응답 {answered}/{module.items.length}
         </span>
       </div>
-      <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{module.intro}</p>
+      <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{NEUTRAL_INTRO}</p>
       {module.status === "dev-example" && (
         <p className="mt-3 inline-flex rounded-md border border-line-strong bg-mist px-2 py-0.5 text-[13px] font-medium text-ink-2">
           개발용 예시 문항 · {module.version}

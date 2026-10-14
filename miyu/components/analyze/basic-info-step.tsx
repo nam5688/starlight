@@ -247,7 +247,7 @@ export function BasicInfoStep({
             알고 있는 MBTI <span className="text-[14px] font-normal text-ink-3">선택</span>
           </label>
           <p id="knownMbti-help" className="mt-1 text-[14px] leading-relaxed text-ink-3">
-            참고값으로 따로 표시합니다. 입력해도 미유의 MBTI 성향 문항은 그대로 진행합니다.
+            참고값으로 따로 표시합니다. 입력해도 이어지는 질문은 그대로 진행합니다.
           </p>
           <select
             id="knownMbti"
