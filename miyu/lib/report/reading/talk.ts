@@ -42,7 +42,7 @@ export type TalkTopic = {
   detail: TalkPiece[];
   /** [이렇게 분석한 이유] — 저장된 분석 근거 */
   basis: ReadingBasis | null;
-  /** 앞으로의 시기 — 저장된 월별 달력(코드 계산). 있으면 [인연이 움직이는 달은?] · [재물이 눈에 띄는 달은?] 버튼을 보인다 */
+  /** 앞으로의 시기 — 저장된 월별 달력(코드 계산). 있으면 [연애운이 강해지는 달은?] · [재물이 눈에 띄는 달은?] 버튼을 보인다 */
   calendar?: { items: MonthCalendar[]; reference: { year: number; month: number } };
   /** 이 풀이가 소단락(제목 → 풀이 → 해 볼 것) 몇 개로 시작하는가 — detail의 앞쪽 2×개 조각이 소단락이다. 방마다 보여 줄 소단락을 고를 때 쓴다 */
   sectionCount?: number;
@@ -162,7 +162,7 @@ export const TALK_COPY = {
   freeQuestionAsking: "어떤 상황에서 달랐는지 적어 주세요",
   freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
   freeQuestionUsed: "무료 질문을 모두 썼어요 · 리포트를 받으면 계속 물어볼 수 있어요",
-  buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "인연이 움직이는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
+  buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "연애운이 강해지는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
 
 /** 남은 무료 질문 수 말 — 기본 정책(1번)은 "한 번", 시험 중에 늘렸다면 숫자로 */

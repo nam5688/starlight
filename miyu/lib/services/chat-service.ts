@@ -124,7 +124,9 @@ export async function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<A
           .catch(() => {}),
       ),
   };
-  // 모델이 응답한 질문은(검사에 걸린 글도) 비용이 들었으므로 횟수에 센다. 호출 자체가 실패한 질문은 세지 않는다
+  // 답을 받은 질문만 횟수에 센다. 무료 질문은 검사에 걸려 답을 받지 못했다면(운영자 결정 2026-10-15) 차감하지 않는다 — 다시 물을 수 있다.
+  // 리포트를 받은 분의 하루 한도는 모델이 응답한 질문(검사에 걸린 글도)이 비용이 들었으므로 센다. 호출 자체가 실패한 질문은 어느 쪽도 세지 않는다.
+  // (검사에 걸린 호출 비용은 하루 AI 예산 · 승인 가드가 막는다. 질문별 한도를 우회하는 반복은 이 두 장치 안에서만 일어난다)
   const count = () => repo.addChatQuestion({ userId: input.userId, assessmentId: input.assessmentId, roomKey: input.roomKey }).catch(() => {});
   try {
     const answer = await deps.answerer.answer(ask, ctx);
@@ -133,7 +135,7 @@ export async function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<A
     return { ok: true, kind: "answer", question: q.text, paragraphs, remaining: Math.max(0, limit - used - 1) };
   } catch (e) {
     if (!(e instanceof ChatAnswerError)) throw e;
-    if (e.code === "INVALID") await count();
+    if (e.code === "INVALID" && !free) await count();
     return fail("failed");
   } finally {
     await Promise.allSettled(pending);

@@ -280,7 +280,7 @@ test("결혼박사 미유: 오래 가는 관계 풀이로 시작해 인연의 �
   const detail = applyAction(m, "marriage", partner.state, { t: "extra", topic: "partner", which: "detail" });
   assert.ok(miyuText(detail.added).some((t) => /정확한 나이 · 직업 · 마음, 만나는 날짜는 말하지 않고/.test(t)));
   const months = replyOptions(m, "marriage", partner.state);
-  assert.ok(months.kind === "chat" && months.helpers.some((c) => c.key === "calendar-love" && c.label === "인연이 움직이는 달은?"));
+  assert.ok(months.kind === "chat" && months.helpers.some((c) => c.key === "calendar-love" && c.label === "연애운이 강해지는 달은?"));
 });
 
 test("고민해결소 미유: 먼저 묻는 질문 뒤 자유 질문 상태에 따라 이어 간다 — 준비 중이면 고민 기록소로, 잠겨 있으면 리포트 안내로, 열려 있으면 입력창으로", () => {

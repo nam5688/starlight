@@ -7,7 +7,7 @@ import {
   CALENDAR_TOPIC_LABEL,
   calendarNotes,
   monthLabel,
-  MONTH_LEVEL_LABEL,
+  levelLabel,
   reasonLine,
   startsLabel,
   summaryLine,
@@ -88,7 +88,7 @@ export function MonthCalendarView({ calendars, idPrefix }: { calendars: MonthCal
                 <div className="min-w-0">
                   <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-semibold ${CHIP[level]}`}>
                     <span aria-hidden className={`size-2.5 rounded-full ${DOT[level]}`} />
-                    {MONTH_LEVEL_LABEL[level]}
+                    {levelLabel(topic, level)}
                   </span>
                   <p className="mt-1.5 text-[14px] leading-[1.65] text-ink-2">{reasonLine(m, topic)}</p>
                 </div>

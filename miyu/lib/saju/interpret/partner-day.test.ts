@@ -181,9 +181,14 @@ test("근거 점검: 일주가 출생 시각 · 절기 · 자시 기준에 따�
   }
 });
 
-test("근거 점검: 규칙의 출처를 있는 그대로 밝히고(고전 근거 미확인 · 나이 방향이 가장 약함), 나이 방향은 스위치로 뺄 수 있다", () => {
-  assert.match(PARTNER_NOTES.source, /고전 문헌에서 확인한 것이 아니라/);
-  assert.match(PARTNER_NOTES.source, /나이 방향은 그중에서도 근거가 가장 약한/);
+test("근거 점검: 사용한 전통 해석 기준을 설명하고(구체적인 나이 · 실제 만남 예측과 구분), 나이 방향은 스위치로 뺄 수 있다", () => {
+  assert.match(PARTNER_NOTES.criteria, /태어난 날의 아래 글자\(일지\)를 배우자 자리로 봐요/);
+  assert.match(PARTNER_NOTES.criteria, /연상 쪽/);
+  assert.match(PARTNER_NOTES.criteria, /또래 쪽/);
+  assert.match(PARTNER_NOTES.criteria, /연하 쪽/);
+  assert.match(PARTNER_NOTES.criteria, /몇 살 차이인지, 실제로 그런 사람을 만나는지를 말하는 건 아니에요/);
+  assert.match(PARTNER_NOTES.months, /연애운이 강해지는 달/);
+  assert.match(PARTNER_NOTES.months, /이 달에 만난다’는 뜻이 아니라/);
   const c = chart(1994, 11, 7, "female");
   const today = { year: 2026, month: 10, day: 15 };
   const on = codeTopicsFor({ saju: c, today, calendar: undefined, tier: "paid", ageDirection: true }).find((t) => t.id === "partner")!;
@@ -191,10 +196,13 @@ test("근거 점검: 규칙의 출처를 있는 그대로 밝히고(고전 근�
   assert.equal(on.summary.length, 2);
   assert.equal(off.summary.length, 1);
   assert.ok(!JSON.stringify(off).includes("나이 차"), "스위치를 끄면 나이 방향 문장이 어디에도 없다");
-  assert.ok(JSON.stringify(on.detail).includes(PARTNER_NOTES.source), "근거 없음을 숨기지 않는다");
+  assert.ok(!JSON.stringify(off).includes("연상"), "스위치를 끄면 기준 설명에도 나이 방향이 없다");
+  assert.ok(JSON.stringify(on.detail).includes(PARTNER_NOTES.criteria), "읽은 기준을 설명한다");
+  assert.ok(JSON.stringify(off.detail).includes(PARTNER_NOTES.criteriaNoAge));
   const freeOff = codeTopicsFor({ saju: c, today, calendar: undefined, tier: "free", ageDirection: false }).find((t) => t.id === "partner")!;
   const freeOn = codeTopicsFor({ saju: c, today, calendar: undefined, tier: "free", ageDirection: true }).find((t) => t.id === "partner")!;
   assert.ok(!freeOff.locked!.hooks.some((h) => h.includes("나이 차")) && freeOn.locked!.hooks.some((h) => h.includes("나이 차")));
+  assert.ok(freeOn.locked!.hooks.some((h) => h.includes("연애운이 강해지는 달")));
   // 규칙 이력에도 가장 약하다는 것이 기록돼 있다
   const age = PARTNER_RULE_META.find((m) => m.id === "partner-age")!;
   assert.ok(age.exceptions.some((e) => e.includes("가장 약하다")));

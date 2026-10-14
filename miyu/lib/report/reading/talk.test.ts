@@ -280,7 +280,7 @@ test("달력 답장: 첫 말풍선은 앞으로 12개월 요약이고, 큰 달�
     const labeled = bs.filter((b): b is Extract<TalkBubble, { kind: "text" }> => b.kind === "text" && Boolean(b.label));
     const levels = new Set(labeled.map((b) => b.label!.split(" · ")[1]));
     assert.ok(levels.size <= 1, "한 번에 한 단계만 보인다");
-    if (levels.has("조금 움직이는 달")) assert.ok(labeled.length <= 4);
+    if (levels.has("조금 움직이는 달") || levels.has("연애운이 조금 움직이는 달")) assert.ok(labeled.length <= 4);
     const muted = bs.filter((b) => b.kind === "text" && b.muted).map((b) => (b.kind === "text" ? b.text : ""));
     if (labeled.length > 0) {
       assert.ok(muted.some((t) => /검증된 사실이 아니에요/.test(t)), "한계 안내");
@@ -308,7 +308,7 @@ test("달력 답장: 성별 정보가 없으면 가까운 관계 달력은 이�
 });
 
 test("달력 답장: 버튼 이름이 있고 같은 입력이면 같은 말풍선이다(저장된 달력만 쓴다)", () => {
-  assert.equal(TALK_COPY.buttons["calendar-love"], "인연이 움직이는 달은?");
+  assert.equal(TALK_COPY.buttons["calendar-love"], "연애운이 강해지는 달은?");
   assert.equal(TALK_COPY.buttons["calendar-money"], "재물이 눈에 띄는 달은?");
   const flow = buildTalkModel(R).topics.find((t) => t.id === "flow")!;
   assert.deepEqual(extraBubbles(flow, "calendar-love"), extraBubbles(flow, "calendar-love"));

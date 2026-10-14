@@ -6,6 +6,10 @@ export type CalendarTopic = "love" | "money";
 export const CALENDAR_TOPIC_LABEL: Record<CalendarTopic, string> = { love: "가까운 관계", money: "재물" };
 export { MONTH_LEVEL_LABEL, MONTH_NOTES };
 
+/** 가까운 관계(연애) 달력의 단계 이름 — 운영자 2026-10-15: "연애운이 강해지는 달" (사건 · 만남 예측이 아닌 전통 해석의 표시). 재물은 MONTH_LEVEL_LABEL 그대로 */
+export const LOVE_LEVEL_LABEL: Record<MonthLevel, string> = { high: "연애운이 강해지는 달", mid: "연애운이 조금 움직이는 달", calm: "차분한 달" };
+export const levelLabel = (topic: CalendarTopic, level: MonthLevel): string => (topic === "love" ? LOVE_LEVEL_LABEL[level] : MONTH_LEVEL_LABEL[level]);
+
 /** 입춘 기준 해의 마지막 달(1월 초)은 다음 해 1월이라 해를 붙여 적는다 */
 export function monthLabel(cal: MonthCalendar, m: MonthCell): string {
   return m.startMonth === 1 ? `${cal.year + 1}년 1월` : `${m.startMonth}월`;
@@ -32,10 +36,12 @@ export function summaryLine(cal: MonthCalendar, topic: CalendarTopic): string {
   if (un) return un;
   const label = CALENDAR_TOPIC_LABEL[topic];
   const high = monthsOf(cal, topic, "high");
-  if (high.length > 0) return `${cal.year}년 ${label} 주제가 움직임이 큰 달은 ${names(cal, high)}이에요.`;
+  const love = topic === "love";
+  const subject = love ? "" : `${label} 주제가 `;
+  if (high.length > 0) return `${cal.year}년 ${subject}${levelLabel(topic, "high")}은 ${names(cal, high)}이에요.`;
   const mid = monthsOf(cal, topic, "mid");
-  if (mid.length > 0) return `${cal.year}년에는 ${label} 주제가 움직임이 큰 달이 없어요. 조금 움직이는 달은 ${names(cal, mid)}이에요.`;
-  return `${cal.year}년에는 ${label} 주제가 눈에 띄는 달이 없어요. 차분하게 흘러가는 해로 읽혀요.`;
+  if (mid.length > 0) return `${cal.year}년에는 ${subject}${levelLabel(topic, "high")}이 없어요. ${levelLabel(topic, "mid")}은 ${names(cal, mid)}이에요.`;
+  return `${cal.year}년에는 ${love ? "연애운이" : `${label} 주제가`} 눈에 띄는 달이 없어요. 차분하게 흘러가는 해로 읽혀요.`;
 }
 
 /** 달마다 한 줄 이유 — 단계에 센 이유를 먼저, 없으면 약한 표시, 아무것도 없으면 차분한 달 */
@@ -56,7 +62,7 @@ export function basisLines(cal: MonthCalendar, topic: CalendarTopic): string[] {
 
 /** 모든 달력에 붙이는 작은 안내 */
 export function calendarNotes(cal: MonthCalendar, topic: CalendarTopic): string[] {
-  return [MONTH_NOTES.limit, ...(topic === "love" && cal.usedSpouseStar ? [MONTH_NOTES.commonLove] : []), MONTH_NOTES.levelMeaning, MONTH_NOTES.solarTerm, ...(topic === "love" && cal.dayUncertain && cal.usedSpouseStar ? [MONTH_NOTES.dayUncertain] : [])];
+  return [MONTH_NOTES.limit, ...(topic === "love" && cal.usedSpouseStar ? [MONTH_NOTES.commonLove] : []), topic === "love" ? MONTH_NOTES.levelMeaningLove : MONTH_NOTES.levelMeaning, MONTH_NOTES.solarTerm, ...(topic === "love" && cal.dayUncertain && cal.usedSpouseStar ? [MONTH_NOTES.dayUncertain] : [])];
 }
 
 // ───────── 앞으로 12개월 (대화에서 쓴다) ─────────
@@ -85,15 +91,17 @@ export function upcomingSummary(calendars: MonthCalendar[], reference: { year: n
   const label = CALENDAR_TOPIC_LABEL[topic];
   const s = shown(upcomingMonths(calendars, reference), topic);
   const list = s.items.map((x) => x.label).join(" · ");
-  if (s.level === "high") return `앞으로 12개월 동안 ${label} 주제가 움직임이 큰 달은 ${list}이에요.`;
-  if (s.level === "mid") return `앞으로 12개월 동안에는 ${label} 주제가 움직임이 큰 달이 없어요. 조금 움직이는 달은 ${list}${s.truncated ? " 등" : ""}이에요.`;
-  return `앞으로 12개월 동안에는 ${label} 주제가 눈에 띄는 달이 없어요. 차분하게 흘러가는 시기로 읽혀요.`;
+  const love = topic === "love";
+  const subject = love ? "" : `${label} 주제가 `;
+  if (s.level === "high") return `앞으로 12개월 동안 ${subject}${levelLabel(topic, "high")}은 ${list}이에요.`;
+  if (s.level === "mid") return `앞으로 12개월 동안에는 ${subject}${levelLabel(topic, "high")}이 없어요. ${levelLabel(topic, "mid")}은 ${list}${s.truncated ? " 등" : ""}이에요.`;
+  return `앞으로 12개월 동안에는 ${love ? "연애운이" : `${label} 주제가`} 눈에 띄는 달이 없어요. 차분하게 흘러가는 시기로 읽혀요.`;
 }
 
 /** 달마다 말풍선 하나: 이름표(달 · 단계)와 한 줄 이유. 줄일 때는 몇 개를 뺐는지 밝힌다 */
 export function upcomingMonthTexts(calendars: MonthCalendar[], reference: { year: number; month: number }, topic: CalendarTopic): { label: string; text: string }[] {
   if (calendars[0] && topicUnavailable(calendars[0], topic)) return [];
-  return shown(upcomingMonths(calendars, reference), topic).items.map((x) => ({ label: `${x.label} · ${MONTH_LEVEL_LABEL[x.m[topic].level]}`, text: reasonLine(x.m, topic) }));
+  return shown(upcomingMonths(calendars, reference), topic).items.map((x) => ({ label: `${x.label} · ${levelLabel(topic, x.m[topic].level)}`, text: reasonLine(x.m, topic) }));
 }
 
 export const CALENDAR_CHAT_NOTES = {

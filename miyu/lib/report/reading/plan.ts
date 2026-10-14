@@ -85,7 +85,7 @@ export const BLOCK_CAVEAT: Partial<Record<ReadingBlockId, (name: string) => stri
 export const comfortNote = (name: string) => `${name} 님이 편안해할 관계의 조건이에요. 상대의 나이나 직업은 정해서 말하지 않고, 편안해할 만한 관계의 조건만 읽어요.`;
 /** 월별 달력이 있는 리포트에서 소단락 아래에 붙이는 안내 — 달 이름은 계산된 달력이 말하고 본문은 쓰지 않는다 */
 export const SECTION_CALENDAR_NOTE: Partial<Record<ReadingBlockId, string>> = {
-  love: "인연이 눈에 띄기 쉬운 달은 ‘앞으로의 시기’의 월별 달력에서 볼 수 있어요.",
+  love: "연애운이 강해지는 달은 ‘앞으로의 시기’의 월별 달력에서 볼 수 있어요.",
   "work-money": "재물 주제가 눈에 띄기 쉬운 달은 ‘앞으로의 시기’의 월별 달력에서 볼 수 있어요.",
 };
 export const FLOW_CAVEAT = "전통 해석으로 본 시기와, 응답에서 읽은 가능성이에요. 어떤 일이 일어난다는 예측이 아니고, 실제 일이나 결과를 보장하지 않아요.";

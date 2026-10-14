@@ -15,7 +15,7 @@
 | **자유 질문 하루 횟수** | 환경변수 `AI_CHAT_DAILY_LIMIT` (기본 10, 0이면 닫힘) | 질문 한 번의 실제 비용을 잰 뒤 정한다. 하루 AI 예산(`AI_DAILY_BUDGET_KRW`)에 닿아도 새 질문만 멈춘다 |
 | **무료 맛보기의 무료 질문 횟수** | 환경변수 `AI_CHAT_FREE_LIMIT` (기본 1 — 로그인한 회원이 평생 1번, 0이면 닫힘) | 실제 AI 시험 중에만 일시적으로 올리고(예: 8) 끝나면 비운다. 이미 쓴 횟수는 그대로 남는다 |
 | **자유 질문의 실제 AI 연결(Claude)** | 환경변수 `AI_CHAT_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` + 승인 값 `AI_CHAT_APPROVED_KRW` · `AI_CHAT_APPROVED_CALLS` · `AI_CHAT_APPROVED_FROM` · `AI_CHAT_APPROVED_THROUGH` | 운영자가 값을 직접 적어야만 연결된다. 코드 상한(`lib/config/ai-candidates.ts`의 `CHAT_TEST_LIMITS` 1,500원 · 40회 · 3일)을 넘기면 연결되지 않는다. 시험이 끝나면 `AI_CHAT_PROVIDER`를 비워 끊는다. 호출 수 · 비용은 `supabase/check-chat-usage.sql`(읽기 전용)로 본다. 승인액을 새로 정하면 `STAGE1_LEDGER`(누적 사용액)도 운영자가 확인한 값으로 고친다 |
-| **인연 풀이의 나이 방향** | `lib/config/product.ts`의 `PARTNER_AGE_DIRECTION` (`enabled: false`로 끄면 나이 방향 문장 · 질문이 빠진다) | 근거가 가장 약한 규칙이라 전문가 검토 전에는 끄기를 추천한다(`docs/partner-rules-audit.md`) |
+| **인연 풀이의 나이 방향** | `lib/config/product.ts`의 `PARTNER_AGE_DIRECTION` (`enabled: false`로 끄면 나이 방향 문장 · 질문이 빠진다) | 운영자가 켜 두기로 결정(2026-10-15, 연상 · 동갑 · 연하 쪽 큰 방향 + 사용한 전통 해석 기준 설명). 바꿀 때는 `docs/partner-rules-audit.md` 4장을 먼저 본다 |
 | 일일 운세 하루 한 번 무료 | `lib/config/product.ts`의 `DAILY_FREE` | 초기 혜택을 끝낼 때 `enabled: false` |
 | 자유 질문 지시문 · 답 검사 · 한도 · 힘든 글 안내 · 승인 가드 | `lib/report/chat/`(`prompt.ts` · `validate.ts` · `plan.ts` · `question.ts` · `approval.ts` · `ai-config.ts`) | 지시문을 고치면 `CHAT_PROMPT_VERSION`을 올린다. `chat.test.ts`. 실제 AI로는 아직 시험하지 않았다 |
 | 인연의 경향 · 오늘의 한 장 문구 규칙 | `lib/saju/interpret/partner.ts` · `day-plain.ts` (+ `rule-meta.ts`의 규칙 이력) | 고친 뒤 `node scripts/render-data-docs.ts`로 `docs/saju-rules.md`를 다시 만든다. 구체적 나이 · 직업 · 날짜 · 속마음은 쓰지 않는다 (`partner-day.test.ts`) |

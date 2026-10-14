@@ -27,8 +27,8 @@ const note = (text: string): TalkPiece => ({ kind: "note", text });
 const DAILY_HOOKS = ["오늘은 어떤 하루의 분위기일까?", "오늘 마음이 쓰이기 쉬운 영역은 어디일까?", "오늘 해 볼 수 있는 작은 행동은 무엇일까?"];
 /** 무료 맛보기에서 인연의 경향이 리포트에서 이어 보여 주는 것 — 질문만 */
 const PARTNER_AGE_HOOK = "나이 차는 어느 쪽으로 기울기 쉬울까?";
-const PARTNER_HOOKS = ["인연 주제가 눈에 띄는 달은 언제일까?", "오래 가는 관계에서 내가 중요하게 보는 것은?"];
-const MARRIAGE_HOOKS = ["결혼 이야기가 가까워지기 쉬운 해는 언제일까?", "나는 어떤 분위기의 사람에게 끌릴까?", "인연이 움직이는 달은 언제일까?"];
+const PARTNER_HOOKS = ["연애운이 강해지는 달은 언제일까?", "오래 가는 관계에서 내가 중요하게 보는 것은?"];
+const MARRIAGE_HOOKS = ["결혼 이야기가 가까워지기 쉬운 해는 언제일까?", "나는 어떤 분위기의 사람에게 끌릴까?", "연애운이 강해지는 달은 언제일까?"];
 
 /** 인연의 경향 아래의 작은 안내 — 전통 해석이라는 한계 + 일주가 기준에 따라 달라질 수 있으면 참고로만 보라는 말 */
 const partnerCaveat = (dayUncertain: boolean) => (dayUncertain ? `${PARTNER_NOTES.limit} ${PARTNER_NOTES.dayUncertain}` : PARTNER_NOTES.limit);
@@ -112,10 +112,10 @@ export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
     detail: [
       para(r.longTerm.line, "오래 가는 관계에서는"),
       ...(r.star ? [para(r.star.line, "인연과 관련해 보는 기운")] : []),
+      note(ageOn ? PARTNER_NOTES.criteria : PARTNER_NOTES.criteriaNoAge),
       note(PARTNER_NOTES.scope),
       note(PARTNER_NOTES.months),
       note(PARTNER_NOTES.noStats),
-      note(ageOn ? PARTNER_NOTES.source : PARTNER_NOTES.sourceNoAge),
     ],
     basis,
     askText: TALK_ASK_PARTNER,
@@ -126,8 +126,8 @@ export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
     const high = monthsAtLevel(cal, "love", "high").length;
     const mid = monthsAtLevel(cal, "love", "mid").length;
     return para(
-      high + mid === 0 ? `${cal.year}년(입춘 기준)에는 인연 주제가 눈에 띄는 달이 없어요. 차분하게 흘러가는 해로 읽혀요.` : `${cal.year}년(입춘 기준)에는 인연 · 결속 이야기가 크게 눈에 띄는 달이 ${high}번, 조금 눈에 띄는 달이 ${mid}번 있어요.`,
-      "움직이는 달 · 한 해 요약",
+      high + mid === 0 ? `${cal.year}년(입춘 기준)에는 연애운이 눈에 띄는 달이 없어요. 차분하게 흘러가는 해로 읽혀요.` : `${cal.year}년(입춘 기준)에는 연애운이 강해지는 달이 ${high}번, 조금 움직이는 달이 ${mid}번 있어요.`,
+      "연애운이 강해지는 달 · 한 해 요약",
     );
   });
   const dayUncertain = calendar?.items.some((c) => c.dayUncertain) ?? false;

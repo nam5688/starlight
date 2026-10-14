@@ -193,11 +193,18 @@ test("무료 질문 횟수(AI_CHAT_FREE_LIMIT)를 늘릴 수 있고 0이면 무�
   assert.ok(paid.ok && paid.kind === "answer" && paid.remaining === 2);
 });
 
-test("무료 질문도 호출이 실패하면 횟수에 세지 않고(다시 물을 수 있다), 검사에 계속 걸린 답은 센다", async () => {
+test("무료 질문은 답을 받지 못했다면 — 호출이 실패했든 검사에 걸렸든 — 차감하지 않는다(다시 물을 수 있다). 리포트를 받은 분의 하루 한도는 검사에 걸린 답을 센다", async () => {
   const { mine, deps, mem } = await setup({ tier: "free" });
   const hard = { provider: "t", model: "t", answer: async () => Promise.reject(new ChatAnswerError("호출 실패", "MODEL")) } as ChatAnswerer;
   assert.equal((await askFreeQuestion(deps({ answerer: hard }), input(mine))).ok, false);
   assert.equal(mem.chatQuestions.length, 0);
+  // 검사에 계속 걸려 답을 받지 못한 경우도 무료 질문은 그대로 남는다
+  const invalid = { provider: "t", model: "t", answer: async () => Promise.reject(new ChatAnswerError("검사 실패", "INVALID", ["단정"])) } as ChatAnswerer;
+  const r = await askFreeQuestion(deps({ answerer: invalid }), input(mine));
+  assert.ok(!r.ok && r.reason === "failed");
+  assert.equal(mem.chatQuestions.length, 0, "검사에 걸려 답을 못 받은 무료 질문은 차감하지 않는다");
   assert.ok((await askFreeQuestion(deps(), input(mine))).ok, "실패한 뒤에도 무료 질문이 남아 있다");
   assert.equal(mem.chatQuestions.length, 1);
+  // 답을 받은 뒤에는 무료 질문을 다 쓴 것이다
+  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "free-used", message: ASK_MESSAGES["free-used"] });
 });

@@ -37,7 +37,8 @@ test("달력 문장: 요약에 나오는 달은 모두 그 달력의 달이고, 
         for (const s of shown) assert.ok(allowed.has(s), `${line} — ${s}`);
         const high = c.months.filter((m) => m[topic].level === "high");
         const mid = c.months.filter((m) => m[topic].level === "mid");
-        if (high.length === 0 && mid.length > 0) assert.match(line, /움직임이 큰 달이 없어요\. 조금 움직이는 달은/);
+        if (high.length === 0 && mid.length > 0) assert.match(line, topic === "love" ? /연애운이 강해지는 달이 없어요\. 연애운이 조금 움직이는 달은/ : /움직임이 큰 달이 없어요\. 조금 움직이는 달은/);
+        if (high.length > 0 && topic === "love") assert.match(line, /연애운이 강해지는 달은/);
         if (high.length === 0 && mid.length === 0) assert.match(line, /눈에 띄는 달이 없어요/);
       }
     }

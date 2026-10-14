@@ -80,7 +80,7 @@ export const DAILY_FREE = { enabled: true } as const;
 
 /**
  * "사주로 읽은 인연의 경향" 중 나이 차의 큰 방향(연상 · 또래 · 연하 쪽) 표시 — 운영자 2026-10-15 결정으로 켜 두었다.
- * 이 규칙은 일지(배우자 자리)의 십신 그룹을 육친의 세대 비유로 옮긴 임시 규칙이라 인연 풀이 중 근거가 가장 약하다(docs/partner-rules-audit.md).
- * 전문가 검토 전에 끄고 싶으면 enabled를 false로 — 구매한 풀이에서는 나이 방향 문장이, 무료 맛보기에서는 그 질문이 빠지고 분위기 · 오래 가는 관계 풀이는 그대로 남는다.
+ * 일지(배우자 자리)의 십신 그룹을 육친의 세대 비유로 옮긴 전통 해석 규칙이다(근거 점검 docs/partner-rules-audit.md — 운영자가 유지하기로 결정, 사용한 기준은 화면에 설명한다).
+ * 끄고 싶으면 enabled를 false로 — 구매한 풀이에서는 나이 방향 문장이, 무료 맛보기에서는 그 질문이 빠지고 분위기 · 오래 가는 관계 풀이는 그대로 남는다.
  */
 export const PARTNER_AGE_DIRECTION = { enabled: true } as const;
