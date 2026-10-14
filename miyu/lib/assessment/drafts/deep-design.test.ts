@@ -1,7 +1,8 @@
 // 실행: npm test — 심화 검사 설계안(7영역 · 세부 항목 25개)이 지금 초안과 어긋나지 않고, 공식 검사 이름 · 합산 점수를 쓰지 않는다
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEEP_DOMAINS, DEEP_SUB_COUNT, deepRows, deepSummary, supplementList } from "./deep-design.ts";
+import { DEEP_DOMAINS, DEEP_SUB_COUNT, SECONDS_PER_QUESTION, TOTAL_QUESTION_BUDGET, deepRows, deepSummary, firstBundle, supplementList } from "./deep-design.ts";
+import { ASSESSMENT_MODULES } from "../modules/index.ts";
 import { MIN_INDICATORS, PERSPECTIVES, coverage } from "./situational-draft.ts";
 
 test("설계안 구성: 7개 영역 · 세부 항목 25개, 영역 이름이 겹치지 않는다", () => {
@@ -53,4 +54,26 @@ test("요약: 세부 항목 25개 × 3문항, 지금 읽을 수 있는 것과 �
 test("공식 검사의 이름 · 합산 점수 표현을 쓰지 않는다 (TCI · MBTI · 종합 점수 · 상위 %)", () => {
   const text = JSON.stringify(DEEP_DOMAINS);
   for (const banned of ["TCI", "MBTI", "ECR", "Big Five", "종합 점수", "총점", "상위", "백분위", "정확도"]) assert.ok(!text.includes(banned), banned);
+});
+
+test("첫 묶음: 지금 문항으로 읽을 수 없는 세부 항목 12개만 골라, 무료 분석과 합쳐 50~60문항 안이다 (운영자 요청 2026-10-15)", () => {
+  const rows = deepRows();
+  const bundle = firstBundle(rows);
+  assert.equal(bundle.subs.length, 12);
+  for (const r of bundle.subs) assert.ok(r.have < MIN_INDICATORS, `${r.name}: 지금 문항으로 이미 읽을 수 있으면 첫 묶음에 넣지 않는다`);
+  assert.equal(bundle.items, 12 * MIN_INDICATORS);
+  assert.equal(bundle.liveItems, ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0));
+  assert.equal(bundle.total, bundle.liveItems + bundle.items);
+  assert.deepEqual([bundle.liveItems, bundle.items, bundle.total], [22, 36, 58], "무료 22 + 심화 36 = 58문항 (무료 문항 수가 바뀌면 이 숫자를 다시 정한다)");
+  assert.deepEqual(TOTAL_QUESTION_BUDGET, { min: 50, max: 60 });
+  assert.ok(bundle.withinBudget);
+  // 나머지 13개는 문항이 없다 — 같은 방식으로 더하면 범위를 넘는다는 것을 숨기지 않는다
+  assert.equal(bundle.later.length, 13);
+  assert.equal(bundle.later.length + bundle.subs.length, DEEP_SUB_COUNT);
+  assert.ok(bundle.total + bundle.later.length * MIN_INDICATORS > TOTAL_QUESTION_BUDGET.max);
+  assert.deepEqual(bundle.domainsWithoutItems, ["새로움과 행동"], "문항이 하나도 없는 영역은 '자료 없음'으로 두고 있는 것처럼 쓰지 않는다");
+  // 시간은 문항당 10초로 센 어림이다
+  assert.equal(SECONDS_PER_QUESTION, 10);
+  assert.equal(bundle.deepMinutes, 6);
+  assert.equal(bundle.totalMinutes, 10);
 });

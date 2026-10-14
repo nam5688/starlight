@@ -2,7 +2,7 @@
 // 표의 숫자는 화면에 연결된 개발용 문항(lib/assessment/modules)과 초안 0.2(lib/assessment/drafts)에서 읽어 와서 문서와 코드가 어긋나지 않게 한다.
 // 실행: node scripts/render-assessment-deep-design.ts   (miyu 폴더에서)
 import { writeFileSync } from "node:fs";
-import { DEEP_DESIGN_VERSION, DEEP_DOMAINS, deepRows, deepSummary, perspectiveName, supplementList } from "../lib/assessment/drafts/deep-design.ts";
+import { DEEP_DESIGN_VERSION, DEEP_DOMAINS, SECONDS_PER_QUESTION, TOTAL_QUESTION_BUDGET, deepRows, deepSummary, firstBundle, perspectiveName, supplementList } from "../lib/assessment/drafts/deep-design.ts";
 import { DOMAIN_LABEL, DRAFT_ITEMS, HOLD_TEXT, MIN_INDICATORS, PERSPECTIVES, PERSPECTIVE_IDS, UNCLEAR_TEXT, CLEAR_DISTANCE, coverage, indicatorCounts } from "../lib/assessment/drafts/situational-draft.ts";
 import { ASSESSMENT_MODULES } from "../lib/assessment/modules/index.ts";
 
@@ -13,6 +13,10 @@ const rows = deepRows();
 const sum = deepSummary(rows);
 const supplement = supplementList(rows);
 const readableIds = new Set(cov.readable);
+const bundle = firstBundle(rows);
+
+const bundleTable = bundle.subs.map((r) => `| ${r.domain.name}<br>(${r.domain.group}) | ${r.name} | ${MIN_INDICATORS} | ${r.note} |`).join("\n");
+const laterTable = bundle.later.map((r) => `| ${r.domain.name} | ${r.name} | ${r.fit} | ${r.have} |`).join("\n");
 
 const liveRows = ASSESSMENT_MODULES.map((m) => {
   const dims = m.dimensions.map((d) => `${d.label}(${m.items.filter((i) => i.dimension === d.id).length}문항)`).join(" · ");
@@ -41,7 +45,7 @@ const doc = `# 미유 자체 심화 검사 설계안 — 지금 문항이 재는
 
 - 버전: \`${DEEP_DESIGN_VERSION}\` · 날짜: 2026-10-15 · **초안, 운영자 검토 전. 검사 화면 · 저장 · 리포트에는 연결하지 않았다.**
 - 코드: \`miyu/lib/assessment/drafts/deep-design.ts\`(설계 데이터) · \`miyu/scripts/render-assessment-deep-design.ts\`(이 문서를 만든다 — 표의 숫자는 코드에서 읽는다).
-- 이 문서는 문장을 더 길게 쓰자는 것이 아니라 **"한 성향 안에서도 무엇이 다른가"를 구분하는 질문**을 만들기 위한 설계다. 문항 수는 세부 항목마다 문항을 어떻게 쓸지 정한 뒤에 확정한다(아래 3절은 그 전의 하한 계산이다).
+- 이 문서는 문장을 더 길게 쓰자는 것이 아니라 **"한 성향 안에서도 무엇이 다른가"를 구분하는 질문**을 만들기 위한 설계다. 전체를 다 묻는 하한은 3절, **무료 분석과 합쳐 50~60문항을 넘지 않게 고른 첫 묶음은 3-2절**이다(문항 글은 \`assessment-deep-questions-v01.md\`).
 - **공식 검사(TCI · MBTI® · 애착검사 등)의 문항 · 채점표 · 척도 이름은 가져오지 않는다.** 세부 항목 이름과 문항은 모두 미유가 새로 쓴다. 자기초월 영역은 이번 설계에서 뺐다.
 
 ## 0. 먼저 바로잡을 것 — "30문항"은 두 가지다
@@ -102,19 +106,43 @@ ${deepTable}
 | --- | --- | --- | --- | --- |
 ${domainTable}
 
-## 4. 질문 구성 제안 — 무료 기본 + 선택형 심화
+### 3-2. 첫 심화 묶음 — 무료 분석과 합쳐 ${TOTAL_QUESTION_BUDGET.min}~${TOTAL_QUESTION_BUDGET.max}문항 (운영자 요청 2026-10-15)
 
-운영자 방향(2026-10-15): *무료 기본 검사는 짧게 큰 경향만 보고, 더 자세한 내용은 심화 검사로 이어 가며, 심화는 기본 검사의 응답을 기억해 참고하고 심화 질문만 더한다.*
+*"심화 문항이 너무 많다. 총 70개를 풀면 중간에 그만둔다. 기존 무료 분석 질문 + 심화 질문을 합쳐 50~60개여야 할 것 같다."* — 그래서 세부 항목 ${sum.subItems}개를 모두 묻지 않고, **지금 검사 화면의 문항이 아예 재지 못하는 세부 항목 ${bundle.subs.length}개**부터 서로 다른 장면 ${MIN_INDICATORS}문항씩 묻는다.
+
+| 숫자 | 값 | 설명 |
+| --- | --- | --- |
+| 심화 첫 묶음 | **${bundle.items}문항** | 세부 항목 ${bundle.subs.length}개 × ${MIN_INDICATORS}문항 |
+| 지금 무료 분석에 연결된 문항 | ${bundle.liveItems}문항 | 개발용 예시(\`dev-example\`) |
+| **합계** | **${bundle.total}문항** | ${TOTAL_QUESTION_BUDGET.min}~${TOTAL_QUESTION_BUDGET.max}문항 범위 ${bundle.withinBudget ? "안" : "**밖**"} |
+| 푸는 시간 어림 | 심화만 약 ${bundle.deepMinutes}분 · 합쳐서 약 ${bundle.totalMinutes}분 | 문항당 ${SECONDS_PER_QUESTION}초로 센 **어림이며 직접 재지 않았다**. 시범 응답으로 재면 고친다 |
+
+| 영역 | 세부 항목 | 문항 수 | 이 항목을 먼저 묻는 이유 |
+| --- | --- | --- | --- |
+${bundleTable}
+
+- 문항 글 · 선택지 · 점수 방향 · 채점은 \`docs/assessment-deep-questions-v01.md\`(코드에서 만든다)에 있다.
+- **이 묶음에 세부 항목이 하나도 없는 영역: ${bundle.domainsWithoutItems.length ? bundle.domainsWithoutItems.join(" · ") : "없음"}** — 그 영역의 결과는 "자료 없음"이다. 리포트 글 · AI는 이 영역을 있는 것처럼 쓰지 않는다.
+- **다음 단계로 미룬 세부 항목 ${bundle.later.length}개**(아래 표)에는 아직 문항이 없다. 같은 방식으로 ${MIN_INDICATORS}문항씩 더하면 ${bundle.later.length * MIN_INDICATORS}문항이 늘어 합계가 ${bundle.total + bundle.later.length * MIN_INDICATORS}문항이 되므로 **범위(${TOTAL_QUESTION_BUDGET.max}문항)를 넘는다** — 아래 7절의 결정 항목이다.
+
+| 영역 | 세부 항목 (다음 단계) | 지금 초안과의 연결 | 지금 문항 수 |
+| --- | --- | --- | --- |
+${laterTable}
+
+## 4. 질문 구성 제안 — 무료 기본 + 첫 심화 묶음
+
+운영자 방향(2026-10-15): *무료 기본 검사는 짧게 큰 경향만 보고, 더 자세한 내용은 심화 검사로 이어 가며, 심화는 기본 검사의 응답을 기억해 참고하고 심화 질문만 더한다. 두 가지를 합쳐 50~60문항을 넘기지 않는다.*
 
 | 단계 | 질문 | 결과 |
 | --- | --- | --- |
-| **무료 기본 검사** | 지금처럼 짧게(큰 경향) — 시범 인터뷰 뒤 문항을 고친다 | 간단 리포트 + 상담방 맛보기 |
-| **선택형 심화 검사** | 7영역을 **영역 단위로 골라** 푼다(영역당 ${Math.min(...sum.perDomain.map((d) => d.fullItems))}~${Math.max(...sum.perDomain.map((d) => d.fullItems))}문항 이상). 고민과 이어지는 영역부터 안내한다 | 심층 리포트의 세부 경향 · 채팅 근거 |
+| **무료 기본 검사** | 지금처럼 짧게(큰 경향, ${bundle.liveItems}문항) — 시범 인터뷰 뒤 문항을 고친다 | 무료 리포트 + 상담방 맛보기 |
+| **첫 심화 묶음** | 세부 항목 ${bundle.subs.length}개 × ${MIN_INDICATORS}문항 = ${bundle.items}문항(어림 약 ${bundle.deepMinutes}분). 기본 응답을 다시 묻지 않고 심화 질문만 더한다 | 심층 리포트의 세부 경향 · 채팅 근거 |
 
-- **전부 한 번에(${sum.fullItems}문항 이상)는 권하지 않는다.** 영역 하나씩(9~12문항 이상) 열고, 한 번에 1~2영역까지만 묻는 방식을 제안한다.
-- 연결 제안(상담방 → 먼저 권할 영역): 연애 → 가까운 관계 · 관계 민감성 · 협력과 경계 / 일 · 진로 → 지속과 목표 · 자기관리와 기준 · 새로움과 행동 / 고민해결소 → 걱정과 대비 · 새로움과 행동 — **제안이며 운영자 확인 전**.
-- 기본 검사의 문항을 심화 세부 항목의 문항으로 **인정할지**는 시범 응답을 본 뒤 정한다(같은 문항이 두 곳에서 점수를 주면 안 된다 — 0.1에서 있던 이중 반영 문제).
-- 심화 질문은 문항마다 **주 관점 하나**에만 점수를 준다. 행동은 같아도 이유가 다른 답은 점수에 넣지 않고 이유만 남긴다(0.2의 규칙 그대로).
+- **전부 한 번에(${sum.fullItems}문항 이상)는 하지 않는다.** 첫 묶음 ${bundle.items}문항으로 시작하고, 나머지 ${bundle.later.length}개 세부 항목은 7절 결정 뒤에 정한다.
+- 연결 제안(상담방 → 먼저 권할 세부 항목): 연애 → 마음을 드러내는 편안함 · 갈등에서 의견을 말함 · 갈등 뒤 회복 / 일 · 진로 → 성취하고 싶은 마음 · 완벽하게 하려는 마음 · 행동을 조절함 / 고민해결소 → 미리 걱정함 · 낯선 상황에서의 긴장 — **제안이며 운영자 확인 전**.
+- 기본 검사의 문항을 심화 세부 항목의 문항으로 **인정할지**는 시범 응답을 본 뒤 정한다(같은 문항이 두 곳에서 점수를 주면 안 된다 — 0.1에서 있던 이중 반영 문제). 첫 묶음은 지금 문항이 재지 못하는 항목만 골랐기 때문에 이 문제가 없다.
+- 심화 질문은 문항마다 **세부 항목 하나**에만 점수를 준다. 행동은 같아도 이유가 다른 답은 점수에 넣지 않고 이유만 남긴다(0.2의 규칙 그대로).
+- **한 문항만 건너뛰어도 그 세부 항목은 판단을 보류한다**(${MIN_INDICATORS}문항이 최소선이라서). 끝까지 푸는 것을 쉽게 하려고 문항을 줄이면 건너뛴 문항 하나가 결과 하나를 지우는 한계가 남는다.
 
 ## 5. 리포트에는 이렇게 쓴다
 
@@ -142,12 +170,13 @@ ${supplementTable}
 
 ## 7. 운영자가 정할 것
 
-1. **심화 구성**: 영역 선택형(권장)으로 갈지, 처음부터 전부 묻는지.
-2. **같은 축**(새로운 것에 대한 관심 ↔ 익숙한 방식 선호)을 하나의 막대로 합칠지, 따로 물을지.
-3. **세부 항목 이름**: 화면에 쓸 쉬운 말(지금 이름은 설계용).
-4. **심화 검사의 위치**: 심층 리포트 구매 전 · 후, 가격과 무료 범위(미정).
-5. **기본 문항의 재사용**: 기본 응답을 심화 세부 항목으로 인정할 조건.
-6. **시범 인터뷰 먼저**: 몇 사람이 풀고 "왜 이 답을 골랐는지" 확인(\`assessment-pilot-protocol.md\`) → 문항 수정 → 모자란 관점 보강 → 시범 응답. 시뮬레이션 숫자를 맞추려고 문항을 고치지 않는다.
+1. **첫 묶음의 ${bundle.subs.length}개 세부 항목이 맞는지**: 지금 문항이 못 재는 것을 먼저 골랐다. 다른 항목을 먼저 묻고 싶으면 \`deep-design.ts\`의 \`first\` 표시만 바꾸면 되지만 문항은 새로 써야 한다.
+2. **나머지 ${bundle.later.length}개 세부 항목(새로움과 행동 영역 포함)**: ${bundle.later.length * MIN_INDICATORS}문항을 더하면 ${TOTAL_QUESTION_BUDGET.max}문항을 넘는다 — (가) 별도 단계로 나누어 푼다 (나) 무료 문항 일부를 심화 세부 항목의 문항으로 인정해 중복을 줄인다 (다) 몇 개를 빼거나 합친다 중에서 정한다.
+3. **같은 축**(새로운 것에 대한 관심 ↔ 익숙한 방식 선호)을 하나의 막대로 합칠지, 따로 물을지.
+4. **세부 항목 이름**: 화면에 쓸 쉬운 말(지금 이름은 설계용).
+5. **심화 검사의 위치**: 심층 리포트 구매 전 · 후, 가격과 무료 범위(미정).
+6. **기본 문항의 재사용**: 기본 응답을 심화 세부 항목으로 인정할 조건.
+7. **시범 인터뷰 먼저**: 몇 사람이 풀고 "왜 이 답을 골랐는지" 확인(\`assessment-pilot-protocol.md\`) → 문항 수정 → 모자란 세부 항목 보강 → 시범 응답. 시뮬레이션 숫자를 맞추려고 문항을 고치지 않는다. 시범 전에는 소요 시간도 어림일 뿐이다.
 
 ## 8. 지금 유료 리포트에 대해 확인한 것 (2026-10-15)
 
