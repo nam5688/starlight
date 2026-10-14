@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { MiyuAvatar } from "@/components/talk/miyu-character";
-import { sampleRoomPath } from "@/components/talk/room-paths";
 import { ArrowIcon } from "@/components/ui/icons";
 import { buildTalkModel } from "@/lib/report/reading/talk";
 import { applyAction, ROOM_COPY, startRoom, type TalkLine } from "@/lib/report/reading/talk-room";
@@ -75,8 +74,8 @@ export function ChatExample() {
           </li>
         ))}
       </ul>
-      <Link href={sampleRoomPath("love")} className="mt-4 flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white hover:bg-accent-strong">
-        이 방에서 직접 눌러 보기
+      <Link href="/analyze" className="mt-4 flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white hover:bg-accent-strong">
+        무료 분석 해보기
         <ArrowIcon className="size-4" />
       </Link>
     </div>

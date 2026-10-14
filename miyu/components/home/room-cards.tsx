@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { MiyuAvatar } from "@/components/talk/miyu-character";
-import { sampleRoomPath } from "@/components/talk/room-paths";
 import { ArrowIcon } from "@/components/ui/icons";
+import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { TALK_COPY } from "@/lib/report/reading/talk";
 import { ROOM_ORDER, ROOMS, type RoomId, type TalkMood } from "@/lib/report/reading/talk-room";
 
 /** 방마다 처음 보이는 표정 */
-const CARD_MOOD: Record<RoomId, TalkMood> = { main: "happy", love: "playful", work: "glasses", money: "thinking" };
+const CARD_MOOD: Record<RoomId, TalkMood> = { main: "happy", daily: "wave", year: "aha", love: "playful", marriage: "happy", career: "glasses", money: "thinking", concern: "basic" };
 
 /** 방에 들어가면 미유가 먼저 건네는 말 — 방 정의(ROOMS)의 먼저 묻는 질문을 그대로 쓴다 */
 const firstMessage = (room: RoomId) => ROOMS[room].intake?.question ?? TALK_COPY.askTopic;
 
 /**
- * 홈의 상담 입구 — 주제를 고르면 그 주제의 미유 채팅방(예시)으로 들어간다.
- * 방마다 새 대화로 시작하고 같은 미유가 주제에 맞게 모드만 바꾼다. 가상 인물 서윤의 예시 방이며, 내 분석이 준비되면 같은 방이 내 이야기로 열린다.
+ * 홈의 상담 입구 — 직설적인 주제 이름(연애 · 결혼 · 일 · 진로 …)을 크게, 그 방의 미유 이름(연애박사 미유 …)을 작게 보인다(운영자 2026-10-15).
+ * 주제를 누르면 무료 분석으로 이어지고(/go/방이름 — 이미 분석한 회원은 바로 그 방으로), 분석을 마치면 고른 방에서 내 맛보기를 이야기해 준다.
+ * 방마다 새 대화로 시작하고 같은 미유가 주제에 맞는 모드로 이야기한다.
  */
 export function RoomCards() {
   return (
@@ -22,28 +23,29 @@ export function RoomCards() {
         어떤 이야기가 궁금하세요?
       </h2>
       <p className="mt-2 max-w-[40rem] text-[15px] leading-[1.7] text-ink-2">
-        주제를 고르면 그 주제의 미유 채팅방이 열려요. 방마다 새 대화로 시작하고, 같은 미유가 주제에 맞는 모드로 이야기해요.
+        주제를 고르면 무료 분석을 시작해요. 분석이 끝나면 그 주제의 미유 채팅방에서 내 맛보기 분석을 이야기해 드려요.
       </p>
-      <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <ul className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {ROOM_ORDER.map((room) => {
           const def = ROOMS[room];
           return (
             <li key={room}>
               <Link
-                href={sampleRoomPath(room)}
-                className="group flex h-full flex-col gap-3 rounded-2xl bg-canvas p-4 shadow-soft transition-shadow hover:shadow-pop focus-visible:outline-offset-4"
+                href={`/go/${room}`}
+                prefetch={false}
+                className="group flex h-full flex-col gap-3 rounded-2xl bg-canvas p-3.5 shadow-soft transition-shadow hover:shadow-pop focus-visible:outline-offset-4 sm:p-4"
               >
-                <span className="flex items-center gap-3">
-                  <MiyuAvatar className="size-12" mood={CARD_MOOD[room]} />
+                <span className="flex items-center gap-2.5 sm:gap-3">
+                  <MiyuAvatar className="size-11 sm:size-12" mood={CARD_MOOD[room]} />
                   <span className="min-w-0">
-                    <span className="block text-[17px] leading-tight font-bold">{def.label}</span>
-                    <span className="mt-0.5 block text-[13px] leading-snug text-ink-3">{def.mode}</span>
+                    <span className="block text-[16px] leading-tight font-bold sm:text-[17px]">{def.label}</span>
+                    <span className="mt-0.5 block text-[12px] leading-snug text-ink-3 sm:text-[13px]">{def.mode === "미유" ? "종합 분석 · 미유" : def.mode}</span>
                   </span>
                 </span>
-                <span className="block rounded-2xl rounded-tl-md bg-page px-3.5 py-2.5 text-[14px] leading-[1.6] text-ink-2">{firstMessage(room)}</span>
+                <span className="hidden rounded-2xl rounded-tl-md bg-page px-3.5 py-2.5 text-[14px] leading-[1.6] text-ink-2 sm:block">{firstMessage(room)}</span>
                 <span className="hidden text-[13px] leading-[1.55] text-ink-3 sm:block">{def.blurb}</span>
                 <span className="mt-auto flex items-center gap-1.5 text-[14px] font-semibold text-accent-strong">
-                  예시 대화 보기
+                  무료로 시작
                   <ArrowIcon className="size-4 transition-transform motion-safe:group-hover:translate-x-0.5" />
                 </span>
               </Link>
@@ -52,7 +54,7 @@ export function RoomCards() {
         })}
       </ul>
       <p className="mt-4 text-[13px] leading-[1.65] text-ink-3">
-        여기 보이는 대화는 가상 인물 서윤의 예시예요. 분석 리포트를 받으면 같은 방이 내 이야기로 열려요. 지금은 저장된 내 분석을 대화로 나눠 보여 주는 방식이고, 자유롭게 묻는 질문은 준비 중이에요.
+        무료 분석은 생년월일과 질문에 답하면 끝나요. 맛보기 뒤의 깊은 풀이는 리포트({formatKrw(PERSONAL_REPORT.priceKrw)})에서 이어지고, 오늘의 운세는 하루 한 번 무료예요(초기 혜택). 궁합 비교와 자유 질문은 준비 중이에요.
       </p>
     </section>
   );

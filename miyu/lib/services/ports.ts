@@ -166,6 +166,9 @@ export type NewPersonalContext = PersonalContextInput & Pick<PersonalContext, "a
 /** 목록용 — 적은 내용은 담지 않는다 */
 export type PersonalContextSummary = Pick<PersonalContext, "assessmentId" | "topic" | "updatedAt">;
 
+/** 대화(상담방) 저장 — 회원 · 검사 결과 · 방마다 한 줄. 눌렀던 행동 목록과 자유 질문 · 답만 담고 리포트 글은 담지 않는다 */
+export type TalkRoomRecord = { assessmentId: string; roomKey: string; userId: string; actions: unknown[]; updatedAt: string };
+
 export interface MiyuRepository {
   /** 동의 기록 (지우지 않고 쌓는다) */
   listConsents(userId: string): Promise<ConsentRecord[]>;
@@ -220,6 +223,21 @@ export interface MiyuRepository {
   listConcernRecordSummaries(userId: string): Promise<ConcernRecordSummary[]>;
   /** 내용만 지운다 (기록 자리와 주제 · 작성 시점 · 발급한 리포트는 남는다). 이미 지웠으면 그대로 */
   scrubConcernRecord(id: string, at: string): Promise<void>;
+
+  /**
+   * 대화(채팅방) 저장 — 쓰기 · 지우기는 서비스에서 소유자를 확인한 뒤에만. 테이블이 없으면(DB 변경 12번 전) 조회는 빈 값, 쓰기는 오류(코드 42P01).
+   * roomKey는 방 이름이고 오늘의 한 장 방은 daily:YYYY-MM-DD 로 날짜별로 나뉜다.
+   */
+  getTalkRoom(assessmentId: string, roomKey: string): Promise<TalkRoomRecord | null>;
+  /** 이 검사 결과에서 저장된 대화가 있는 방 이름들 */
+  listTalkRoomKeys(assessmentId: string): Promise<string[]>;
+  upsertTalkRoom(input: { assessmentId: string; userId: string; roomKey: string; actions: unknown[] }): Promise<void>;
+  deleteTalkRoom(assessmentId: string, roomKey: string): Promise<void>;
+  /** roomKey가 prefix로 시작하고 keepKey보다 앞서는 방을 지운다 (지난 날짜의 오늘의 한 장 정리) */
+  deleteTalkRoomsBefore(assessmentId: string, prefix: string, keepKey: string): Promise<void>;
+  /** 자유 질문 횟수 기록 — 질문 내용은 담지 않는다. 테이블이 없으면 조회 · 쓰기 모두 오류(코드 42P01) */
+  addChatQuestion(input: { userId: string; assessmentId: string; roomKey: string }): Promise<void>;
+  countChatQuestionsSince(userId: string, since: string): Promise<number>;
 
   /** 서버 전용 (브라우저 권한으로는 읽을 수 없다) — 주문 소유자를 확인한 뒤에만 쓴다 */
   listPaymentEvents(orderId: string): Promise<PaymentEventRecord[]>;

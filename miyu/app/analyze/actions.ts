@@ -13,6 +13,7 @@ import { submitAssessment } from "@/lib/services/assessment-service";
 import { isAuthConfigured } from "@/server/env";
 import { kakaoAuthorizeUrl } from "@/server/kakao";
 import { savePendingSubmission } from "@/server/pending-submission";
+import { pathAfterSave } from "@/server/room-choice";
 import { sajuEngine, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 
@@ -59,10 +60,10 @@ export type SaveResult = { ok: false; message: string };
 
 /**
  * 결과 저장. 로그인돼 있으면 바로 저장하고 결과 화면으로 이동한다.
- * 로그인 전이면 결과를 암호화 쿠키에 잠시 보관하고 카카오 로그인으로 보낸다
- * (로그인 후 /auth/callback에서 저장).
+ * 로그인 전이면 결과를 암호화 쿠키에 잠시 보관하고 카카오 로그인(또는 이메일 로그인 · 가입)으로 보낸다
+ * (로그인 후 /auth/callback 또는 이메일 로그인 동작에서 저장).
  */
-export async function saveResultAndContinue(input: { info: unknown; answers: unknown }): Promise<SaveResult> {
+export async function saveResultAndContinue(input: { info: unknown; answers: unknown }, via: "kakao" | "email" = "kakao"): Promise<SaveResult> {
   if (!isAuthConfigured()) return { ok: false, message: "로그인이 아직 설정되지 않았습니다." };
 
   const info = parseBasicInfo(input?.info);
@@ -86,10 +87,12 @@ export async function saveResultAndContinue(input: { info: unknown; answers: unk
       { userId: member.userId, channel: "web", info, answers, today: new Date() },
     );
     if (!saved.ok) return { ok: false, message: saved.message };
-    redirect(`/results/${saved.assessment.id}`);
+    redirect(await pathAfterSave(saved.assessment.id));
   }
 
   await savePendingSubmission(info, answers);
+  // 이메일로 로그인 · 가입하는 경우 — 같은 보관 쿠키로 로그인을 마친 뒤 저장한다(server/auth-complete.ts)
+  if (via === "email") redirect(`/auth/email?mode=signup&next=${encodeURIComponent("/my")}`);
   const url = await kakaoAuthorizeUrl("/my");
   if (!url) return { ok: false, message: "카카오 로그인을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요." };
   redirect(url);

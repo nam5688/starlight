@@ -131,6 +131,9 @@ const SHORT_TRAIT: Record<string, string> = {
   계: "조용히 스며드는",
 };
 
+/** 일간의 한 줄 비유 — 카드 · 맛보기에서 "촛불처럼 한곳을 오래 비추는 섬세한 사람" 같은 문장에 쓴다 */
+export const dayMasterShort = (stem: string): { image: string; short: string } | null => (DAY_MASTER[stem] && SHORT_TRAIT[stem] ? { image: DAY_MASTER[stem].image, short: SHORT_TRAIT[stem] } : null);
+
 const name = (e: FiveElement) => `${e}(${ELEMENT_INFO[e].image})`;
 
 export function plainSajuReading(saju: SajuOk): PlainReading {

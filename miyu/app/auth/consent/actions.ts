@@ -5,6 +5,7 @@ import type { ConsentType } from "@/lib/membership/terms";
 import { submitAssessment } from "@/lib/services/assessment-service";
 import { agreeToTerms, canRemoveOnDecline } from "@/lib/services/member-service";
 import { clearPendingSubmission, readPendingSubmission } from "@/server/pending-submission";
+import { pathAfterSave } from "@/server/room-choice";
 import { sajuEngine, writeRepository } from "@/server/services";
 import { getSessionUserId, safeNextPath } from "@/server/session";
 import { createAdminSupabase, createServerSupabase } from "@/server/supabase";
@@ -34,7 +35,7 @@ export async function agreeTermsAction(_prev: ConsentFormState, formData: FormDa
       { userId, channel: "web", info: pending.info, answers: pending.answers, today: new Date() },
     );
     if (!saved.ok) redirect("/auth/error?reason=save");
-    redirect(`/results/${saved.assessment.id}`);
+    redirect(await pathAfterSave(saved.assessment.id));
   }
   redirect(safeNextPath(formData.get("next")));
 }

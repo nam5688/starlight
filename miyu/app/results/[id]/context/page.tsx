@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
-import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
+import { LoginOptions } from "@/components/auth/login-options";
 import { ConcernIssuePanel, ISSUE_NOTICE } from "@/components/results/concern-issue-panel";
 import { ConcernRecords } from "@/components/results/concern-records";
 import { ContextDelete, ContextForm } from "@/components/results/context-form";
@@ -45,9 +45,9 @@ async function ContextContent({ params, searchParams }: Pick<PageProps<"/results
     return (
       <div>
         <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
-        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">적은 내용은 본인만 볼 수 있습니다. 카카오로 로그인해 주세요.</p>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">적은 내용은 본인만 볼 수 있습니다. 로그인해 주세요.</p>
         <div className="mt-8">
-          <KakaoLoginForm next={`/results/${id}/context`} />
+          <LoginOptions next={`/results/${id}/context`} />
         </div>
       </div>
     );

@@ -5,6 +5,7 @@ import { CompareSection } from "@/components/home/compare-section";
 import { Faq } from "@/components/home/faq";
 import { ReportPreview } from "@/components/home/report-preview";
 import { RoomCards } from "@/components/home/room-cards";
+import { SignalRow } from "@/components/home/signal-row";
 import { MiyuAvatar } from "@/components/talk/miyu-character";
 import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
@@ -37,11 +38,6 @@ const PERSPECTIVES = [
   },
 ];
 
-const HERO_POINTS = [
-  { title: "직접 확인한 내 모습", desc: "내가 답한 응답으로 평소의 반응을 확인합니다." },
-  { title: "자료를 연결한 종합 해석", desc: "사주 · 응답 · MBTI가 겹치는 부분과 다른 부분을 나눠 보여 줍니다." },
-  { title: "확인할 수 있는 분석 이유", desc: "영역마다 무엇을 근거로 봤는지와 한계를 함께 적습니다." },
-];
 
 const QUESTION_COUNT = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
 
@@ -55,9 +51,9 @@ const STEPS = [
 ];
 
 const FLOW = [
-  { title: "분석 한 장", desc: "사주 · 응답 · MBTI를 연결한 해석을 짧은 카드 한 장으로 정리해요. 이미지로 저장할 수 있어요." },
-  { title: "주제별 풀이", desc: "궁금한 주제를 고르면 결론 한 줄과 쉬운 설명이 말풍선으로 도착해요. 어려운 사주 용어 대신 생활 장면으로 풀어요." },
-  { title: "내 경우는 어떤지 확인", desc: "“실제로 어때요?” 질문에 답하며 내 상황에 맞는지 살펴봐요. 눌러 준 답이 풀이를 바꾸지는 않아요." },
+  { title: "무료 분석", desc: `생년월일과 질문 ${QUESTION_COUNT}개에 답하면 내 맛보기 분석이 카드 한 장으로 나와요. 이미지로 저장할 수 있어요.` },
+  { title: "주제별 맛보기", desc: "궁금한 주제의 미유 채팅방에서, 공감 가는 부분을 먼저 풀어 줘요. 어려운 사주 용어 대신 생활 장면으로 말해요." },
+  { title: "깊은 풀이는 리포트에서", desc: `더 깊은 풀이와 월별 흐름은 리포트(${formatKrw(PERSONAL_REPORT.priceKrw)})에서 이어져요. 눌러 준 답이 풀이를 바꾸지는 않아요.` },
 ];
 
 export default function Home() {
@@ -72,26 +68,16 @@ export default function Home() {
             <br />
             궁금한 건 대화로.
           </h1>
-          <p className="mt-4 max-w-[34rem] text-[16px] leading-[1.75] text-ink-2 md:text-[18px]">
-            사주 원국에 내가 직접 답한 기질 · 성격 · 가까운 관계 반응과 입력한 MBTI를 연결해 한 사람의 해석으로 읽고, 분석 한 장으로 정리한 뒤 미유와 이야기하듯 이어서 풀어 봐요.
-          </p>
-          <ul className="mt-6 max-w-[34rem] space-y-3.5">
-            {HERO_POINTS.map((p) => (
-              <li key={p.title} className="flex gap-3">
-                <CheckIcon className="mt-0.5 size-5 shrink-0 text-accent" />
-                <p className="text-[15px] leading-[1.65]">
-                  <span className="font-semibold">{p.title}</span>
-                  <span className="block text-ink-2">{p.desc}</span>
-                </p>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-3 max-w-[34rem] text-[16px] leading-[1.7] text-ink-2 md:text-[18px]">사주만 보지 않아요. 내가 직접 답한 질문까지 더해 종합해요.</p>
+          <div className="mt-6">
+            <SignalRow />
+          </div>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/analyze" className={buttonPrimary}>
-              내 분석 시작하기
+              무료 분석 해보기
             </Link>
-            <Link href="/report/sample/talk" className={buttonSecondary}>
-              예시 대화 보기
+            <Link href="/report/sample" className={buttonSecondary}>
+              리포트 예시 보기
             </Link>
           </div>
           <p className="mt-4 text-[14px] leading-[1.65] text-ink-2">
@@ -134,7 +120,7 @@ export default function Home() {
               ))}
             </ol>
             <p className="mt-6 text-[13px] leading-[1.7] text-ink-3">
-              오른쪽의 대화는 가상 인물 서윤의 예시이며 실제 이용 후기가 아니에요. 이용 후기는 이용자의 동의를 받은 뒤에만 싣겠습니다. 미유는 저장된 분석을 풀어 주는 안내이고, 결과를 보장하거나 진단하지 않아요.
+              오른쪽의 대화는 가상 인물 서윤의 리포트로 만든 예시이며 실제 이용 후기가 아니에요. 이용 후기는 이용자의 동의를 받은 뒤에만 싣겠습니다. 미유는 분석을 풀어 주는 안내이고, 결과를 보장하거나 진단하지 않아요.
             </p>
           </div>
           <ChatExample />

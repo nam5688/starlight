@@ -16,6 +16,7 @@ import type {
   OrderRecord,
   ProfileRecord,
   ReportRecord,
+  TalkRoomRecord,
 } from "../ports.ts";
 
 export function createMemoryRepository(now: () => Date = () => new Date()) {
@@ -30,6 +31,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const consents = new Map<string, ConsentRecord[]>();
   const contexts = new Map<string, PersonalContext>();
   const concernRecords = new Map<string, ConcernRecord>();
+  const talkRooms = new Map<string, TalkRoomRecord>();
+  const chatQuestions: { userId: string; assessmentId: string; roomKey: string; createdAt: string }[] = [];
   const opsEvents: OpsEventRecord[] = [];
   const aiUsage: AiUsageRecord[] = [];
   const funnel: FunnelEventRecord[] = [];
@@ -59,7 +62,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const mine = (o: OrderRecord) => o.userId === userId;
       if ([...orders.values()].some((o) => mine(o) && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)) return { ok: false, reason: "pending-order" };
       if ([...reports.values()].some((r) => r.userId === userId && (r.status === "queued" || r.status === "generating"))) return { ok: false, reason: "report-in-progress" };
-      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0 };
+      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0 };
       for (const [k, f] of [...feedback]) {
         if (f.userId !== userId) continue;
         feedback.delete(k);
@@ -74,6 +77,16 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         if (c.userId !== userId) continue;
         concernRecords.delete(k);
         counts.concern_records++;
+      }
+      for (const [k, t] of [...talkRooms]) {
+        if (t.userId !== userId) continue;
+        talkRooms.delete(k);
+        counts.talk_rooms++;
+      }
+      for (let i = chatQuestions.length - 1; i >= 0; i--) {
+        if (chatQuestions[i].userId !== userId) continue;
+        chatQuestions.splice(i, 1);
+        counts.chat_questions++;
       }
       for (const [k, r] of [...reports]) {
         if (r.userId !== userId) continue;
@@ -301,6 +314,28 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       if (!c || c.scrubbedAt) return;
       concernRecords.set(recordId, { ...c, question: "", situation: "", matched: "", differed: "", excerpt: "", scrubbedAt: at });
     },
+    async getTalkRoom(assessmentId, roomKey) {
+      return talkRooms.get(`${assessmentId}|${roomKey}`) ?? null;
+    },
+    async listTalkRoomKeys(assessmentId) {
+      return [...talkRooms.values()].filter((t) => t.assessmentId === assessmentId).map((t) => t.roomKey);
+    },
+    async upsertTalkRoom(input) {
+      if (assessments.get(input.assessmentId)?.userId !== input.userId) throw new Error("talk room owner mismatch");
+      talkRooms.set(`${input.assessmentId}|${input.roomKey}`, { assessmentId: input.assessmentId, roomKey: input.roomKey, userId: input.userId, actions: input.actions, updatedAt: iso() });
+    },
+    async deleteTalkRoom(assessmentId, roomKey) {
+      talkRooms.delete(`${assessmentId}|${roomKey}`);
+    },
+    async deleteTalkRoomsBefore(assessmentId, prefix, keepKey) {
+      for (const [k, t] of [...talkRooms]) if (t.assessmentId === assessmentId && t.roomKey.startsWith(prefix) && t.roomKey < keepKey) talkRooms.delete(k);
+    },
+    async addChatQuestion(input) {
+      chatQuestions.push({ ...input, createdAt: iso() });
+    },
+    async countChatQuestionsSince(userId, since) {
+      return chatQuestions.filter((q) => q.userId === userId && q.createdAt >= since).length;
+    },
     async listPaymentEvents(orderId) {
       return events.filter((e) => e.orderId === orderId).map(({ source, status, detail, createdAt }) => ({ source, status, detail, createdAt }));
     },
@@ -339,5 +374,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, opsEvents, aiUsage, funnel, feedback };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, opsEvents, aiUsage, funnel, feedback };
 }

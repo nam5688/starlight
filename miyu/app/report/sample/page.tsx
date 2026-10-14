@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ReadingReportView } from "@/components/report/reading-report-view";
 import { TalkEntry } from "@/components/results/talk-entry";
+import { ROOM_ORDER } from "@/lib/report/reading/talk-room";
 import { SourceBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
 import { sampleReport } from "@/lib/samples/sample-report";
@@ -26,7 +27,7 @@ export default function SampleReportPage() {
         <h1 className="mt-3 text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">{report.personName} 님의 개인 통합 리포트</h1>
       </div>
 
-      <TalkEntry sample report={report} />
+      <TalkEntry sample rooms={ROOM_ORDER.slice()} />
       <ReadingReportView
         report={report}
         tendencyName={sampleReport.tendency.name}

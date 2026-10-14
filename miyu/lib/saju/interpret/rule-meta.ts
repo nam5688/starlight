@@ -123,6 +123,62 @@ export const MONTH_RULE_META: RuleMeta[] = [
   }),
 ];
 
+/**
+ * 인연의 경향 규칙(partner.ts)과 오늘의 한 장 규칙(day-plain.ts)의 이력 — 월 단위 달력처럼 코드가 직접 읽는 규칙이라 RULE_META와 따로 둔다.
+ * 운영자가 2026-10-15에 "전통 해석에 따른 경향"을 보여 주기로 결정했다. 검증된 사실이 아니고 통계 · 조사 근거도 없으며, 구체적인 나이 · 직업 · 날짜는 말하지 않는다.
+ */
+const PARTNER_EXCEPTIONS = [
+  "상대의 정확한 나이 · 직업 · 마음 · 만나는 날짜 · 결혼 여부와 시기를 말하는 데 쓰지 않는다",
+  "나이 차는 연상 · 또래 · 연하 쪽의 큰 방향까지만 말하고 몇 살 차이라고 말하지 않는다",
+  "통계 · 조사 결과를 쓴 것처럼 쓰지 않는다 (이 규칙에는 그런 근거가 없다)",
+  "화면에 \"전통 해석이고 100% 정확하거나 검증된 사실이 아니에요\"를 작게 함께 적는다",
+  "출생 시각을 모르면 시주 없이 일지 · 원국만 쓴다. 일주가 uncertain(절기 당일 · 경계 · 자시 관법)이면 참고로만 보라고 안내한다",
+];
+
+export const PARTNER_RULE_META: RuleMeta[] = [
+  saju({
+    id: "partner-mood", title: "배우자 자리(일지)의 십신 그룹으로 읽는 편한 상대의 분위기", match: /^saju\.partner\.mood$/,
+    interpretation: "일지의 십신 그룹이 비겁이면 친구처럼 동등한 분위기, 식상이면 말이 잘 통하고 즐거운 분위기, 재성이면 생활이 단단하고 현실적인 분위기, 관성이면 믿음직하고 중심이 잡힌 분위기, 인성이면 이해해 주고 보살펴 주는 분위기에 마음이 편해지기 쉽다고 읽는다.",
+    conditions: ["일지의 십신 그룹이 정해질 때 (다섯 그룹 각각 한 문장)"], exceptions: PARTNER_EXCEPTIONS,
+  }),
+  saju({
+    id: "partner-age", title: "육친의 세대 비유로 읽는 나이 차의 큰 방향", match: /^saju\.partner\.age$/,
+    interpretation: "인성 · 관성(나를 돕거나 이끄는 기운, 위 세대 비유)이면 연상으로 느껴지는 쪽, 비겁(같은 기운)이면 또래 쪽, 식상 · 재성(내가 낳거나 다스리는 기운, 아래 세대 비유)이면 어리게 느껴지는 쪽으로 기울기 쉽다고 읽는다. 몇 살 차이라는 뜻이 아니다.",
+    conditions: ["일지의 십신 그룹이 정해질 때 — 다섯 그룹이 세 방향으로 나뉜다"], exceptions: [...PARTNER_EXCEPTIONS, "세대 비유는 한 가지 전통 서술이며 학파마다 다를 수 있다 — 검증되지 않았다"],
+  }),
+  saju({
+    id: "partner-long-term", title: "오래 가는 관계에서 중요하게 여기기 쉬운 것(결혼박사 방)", match: /^saju\.partner\.long$/,
+    interpretation: "일지의 십신 그룹에 따라 오래 가는 관계에서 중요하게 여기기 쉬운 것(비겁 동등함 · 식상 표현과 즐거움 · 재성 현실의 약속 · 관성 책임과 신뢰 · 인성 이해와 보살핌)을 읽는다. 결혼 여부나 시기를 정하지 않는다.",
+    conditions: ["일지의 십신 그룹이 정해질 때"], exceptions: PARTNER_EXCEPTIONS,
+  }),
+  saju({
+    id: "partner-star", title: "배우자 별의 개수", match: /^saju\.partner\.star$/,
+    interpretation: "성별을 입력한 경우 배우자 별(여성 원국 관성 · 남성 원국 재성)이 원국에 없으면 그 기운이 들어오는 시기에 관계 이야기가 크게 느껴질 수 있고, 3자리 이상이면 관계에서 기대와 생각이 많아질 수 있다고 읽는다.",
+    conditions: ["성별을 입력한 경우에만"], exceptions: [...PARTNER_EXCEPTIONS, "성별 구분이 해석의 한 학파 기준이라는 점을 단정하지 않는다", "개수만으로 관계의 좋고 나쁨이나 시기를 단정하지 않는다"],
+  }),
+];
+
+const DAY_EXCEPTIONS = [
+  "오늘 무슨 일이 생긴다고 말하는 데 쓰지 않는다 — 하루의 분위기를 읽는 전통 해석일 뿐이다",
+  "다섯 그룹 모두 같은 무게로 읽고, 좋은 날 · 나쁜 날을 가르거나 점수를 매기지 않는다",
+  "돈 · 투자 · 건강 · 계약 같은 결정을 이 한 장으로 정하지 말라고 안내한다",
+  "화면에 \"전통 해석이고 100% 정확하거나 검증된 사실이 아니에요\"를 작게 함께 적는다",
+  "일주가 uncertain(절기 당일 · 경계 · 자시 관법)이면 참고로만 보라고 안내한다",
+];
+
+export const DAY_RULE_META: RuleMeta[] = [
+  saju({
+    id: "day-stem-group", title: "오늘 일진 천간의 십신 그룹으로 읽는 하루의 분위기", match: /^saju\.day\.stem$/,
+    interpretation: "오늘 일진의 천간이 내 일간 기준으로 비겁이면 내 기준과 페이스가 또렷해지는 날, 식상이면 표현하고 시도하고 싶어지는 날, 재성이면 현실을 챙기고 정리하고 싶어지는 날, 관성이면 책임과 약속이 눈에 들어오는 날, 인성이면 배우고 쉬며 정리하고 싶어지는 날로 읽는다. 영역별(일 · 사람 · 돈 · 마음) 한 줄 팁은 그 분위기에 맞춘 고정 문구다.",
+    conditions: ["오늘(한국 날짜)의 일진과 내 일간으로 정해진다 — 같은 날 같은 원국이면 같은 결과"], exceptions: DAY_EXCEPTIONS,
+  }),
+  saju({
+    id: "day-branch-relation", title: "오늘 지지와 내 일지의 육합 · 충", match: /^saju\.day\.branch$/,
+    interpretation: "오늘 일진의 지지가 내 일지와 육합이면 사람 사이가 부드럽게 이어지기 쉬운 쪽의 주제, 충이면 계획이 바뀌거나 조정할 일이 생기기 쉬운 쪽의 주제를 가볍게 덧붙여 읽는다. 반합 · 형은 쓰지 않는다.",
+    conditions: ["오늘 지지와 내 일지가 육합 또는 충일 때만"], exceptions: DAY_EXCEPTIONS,
+  }),
+];
+
 /** 근거 ID가 나온 규칙 (없으면 null — 새 근거를 만들면서 이 기록을 빠뜨리지 않았는지 테스트가 확인한다) */
 export function ruleFor(evidenceId: string): RuleMeta | null {
   return RULE_META.find((r) => r.match.test(evidenceId)) ?? null;

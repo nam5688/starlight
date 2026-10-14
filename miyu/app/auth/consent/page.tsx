@@ -33,8 +33,8 @@ async function ConsentContent({ searchParams }: Pick<PageProps<"/auth/consent">,
         {member.isNew ? "미유 가입을 위해 동의해 주세요" : "약관이 바뀌어 다시 동의가 필요해요"}
       </h1>
       <p className="mt-3 text-[16px] leading-relaxed text-ink-2">
-        카카오 계정으로 가입합니다. 회원은 카카오 이메일이 아니라 미유 내부 회원번호로 구분하며, 검사 결과와 구매한 리포트는
-        이 회원번호에 저장됩니다.
+        카카오 또는 이메일 계정으로 가입합니다. 회원은 카카오 · 이메일 주소가 아니라 미유 내부 회원번호로 구분하며, 검사 결과와 구매한
+        리포트는 이 회원번호에 저장됩니다.
       </p>
       {pending && (
         <p className="mt-4 rounded-md bg-accent-soft px-4 py-3 text-[15px] leading-relaxed text-ink">

@@ -63,6 +63,7 @@ export const CONSENT_TABLES = ["user_consents"];
 export const OPTIONAL_TABLES: Record<string, string> = {
   personal_contexts: "‘내 고민 자세히 알려주기’를 쓰려면 SQL Editor에서 5번 파일(20261015000000_personal_context.sql)을 실행합니다.",
   concern_records: "고민을 반영한 새 리포트를 발급하려면 SQL Editor에서 11번 파일(20261021000000_concern_records.sql)을 실행합니다.",
+  talk_rooms: "대화를 서버에 저장해 다른 기기에서도 이어 보려면 SQL Editor에서 12번 파일(20261022000000_talk_rooms.sql)을 실행합니다.",
   ops_events: "운영 기록 · 알림 · 결제 재확인 기록을 남기려면 SQL Editor에서 6번 파일(20261016000000_ops_events.sql)을 실행합니다.",
 };
 

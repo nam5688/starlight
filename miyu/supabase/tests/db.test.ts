@@ -55,7 +55,7 @@ async function makeUser(): Promise<{ id: string; client: SupabaseClient }> {
 }
 
 const answers = Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i, n) => [i.id, (n % 5) + 1])));
-const info = { ...EMPTY_BASIC_INFO, nickname: "테스트", birthYear: "1990", birthMonth: "1", birthDay: "15", birthTime: "09:30" };
+const info = { ...EMPTY_BASIC_INFO, nickname: "테스트", birthYear: "1990", birthMonth: "1", birthDay: "15", birthTime: "09:30", gender: "female" as const };
 
 const gateway: PaymentGateway = {
   provider: "tosspayments",
@@ -764,4 +764,74 @@ test("회원 탈퇴(10번 마이그레이션): 서버만 부를 수 있고, 그 
   const authRow = execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-tAc", `select deleted_at is not null, raw_user_meta_data::text from auth.users where id='${W.id}'`], { encoding: "utf8" }).trim();
   assert.match(authRow, /^t\|\{\}$/);
   assert.equal((await repo.getOrderByNumber(order.orderNumber))?.status, "paid", "회원 계정 행이 남아 주문 기록은 그대로");
+});
+
+test("대화 저장(12번 마이그레이션): 서버가 저장하고 본인만 보며, 브라우저 직접 쓰기 · 남의 결과 · 잘못된 방 이름 · 너무 큰 목록은 막히고, 질문 횟수 표는 브라우저가 읽지 못하며, 탈퇴하면 함께 지워진다", async () => {
+  const U = await makeUser();
+  const V = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const mine = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "대화저장" }, answers, today: new Date() });
+  const theirs = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: V.id, channel: "web", info: { ...info, nickname: "남의검사2" }, answers, today: new Date() });
+  assert.ok(mine.ok && theirs.ok);
+  const aid = mine.ok ? mine.assessment.id : "";
+  const vid = theirs.ok ? theirs.assessment.id : "";
+  const actions = [{ t: "intake", option: "some" }, { t: "free", q: "연락이 뜸한 사람이 있어요", a: ["정해서 말할 수는 없어요."] }];
+
+  // 1) 서버(비밀키)가 저장 · 덮어쓰기, 같은 방은 한 줄
+  await server.upsertTalkRoom({ assessmentId: aid, userId: U.id, roomKey: "love", actions });
+  await server.upsertTalkRoom({ assessmentId: aid, userId: U.id, roomKey: "love", actions: actions.slice(0, 1) });
+  await server.upsertTalkRoom({ assessmentId: aid, userId: U.id, roomKey: "daily:2026-10-15", actions: actions.slice(0, 1) });
+  assert.deepEqual((await server.getTalkRoom(aid, "love"))?.actions, actions.slice(0, 1));
+  assert.deepEqual((await server.listTalkRoomKeys(aid)).sort(), ["daily:2026-10-15", "love"]);
+  await server.deleteTalkRoomsBefore(aid, "daily:", "daily:2026-10-16");
+  assert.deepEqual(await server.listTalkRoomKeys(aid), ["love"], "지난 날짜의 오늘의 한 장 방은 정리된다");
+
+  // 2) 접근 정책: 본인만 조회, 다른 회원 · 비로그인은 못 본다
+  assert.equal((await createSupabaseRepository(U.client).getTalkRoom(aid, "love"))?.userId, U.id);
+  assert.equal(await createSupabaseRepository(V.client).getTalkRoom(aid, "love"), null);
+  assert.deepEqual(await createSupabaseRepository(V.client).listTalkRoomKeys(aid), []);
+  const anonRead = await anon.from("talk_rooms").select();
+  assert.ok(anonRead.error || (anonRead.data ?? []).length === 0, "비로그인은 조회할 수 없다");
+
+  // 3) 브라우저(로그인 회원)의 직접 쓰기는 모두 거부
+  const ins = await U.client.from("talk_rooms").insert({ assessment_id: aid, user_id: U.id, room_key: "money", actions: [] });
+  assert.ok(ins.error, "직접 저장");
+  const upd = await U.client.from("talk_rooms").update({ actions: [] }).eq("assessment_id", aid).eq("room_key", "love").select();
+  assert.ok(upd.error || (upd.data ?? []).length === 0, "직접 수정");
+  const del = await U.client.from("talk_rooms").delete().eq("assessment_id", aid).eq("room_key", "love").select();
+  assert.ok(del.error || (del.data ?? []).length === 0, "직접 삭제");
+  assert.equal((await server.getTalkRoom(aid, "love"))?.actions.length, 1, "직접 쓰기를 시도해도 그대로");
+
+  // 4) 서버가 실수로 남의 결과에 붙이려 해도 DB가 막는다 · 방 이름 형식 · 크기 한도
+  await assert.rejects(server.upsertTalkRoom({ assessmentId: vid, userId: U.id, roomKey: "love", actions }), /owner mismatch/);
+  for (const bad of ["Love", "../x", "a", "daily:2026-1-5", "love;drop"]) {
+    const r = await admin.from("talk_rooms").insert({ assessment_id: aid, user_id: U.id, room_key: bad, actions: [] });
+    assert.ok(r.error, `잘못된 방 이름 ${bad}`);
+  }
+  const tooMany = await admin.from("talk_rooms").insert({ assessment_id: aid, user_id: U.id, room_key: "career", actions: Array.from({ length: 201 }, () => ({ t: "topic", id: "love" })) });
+  assert.ok(tooMany.error, "행동 201개");
+  const notArray = await admin.from("talk_rooms").insert({ assessment_id: aid, user_id: U.id, room_key: "career", actions: { t: "x" } });
+  assert.ok(notArray.error, "목록이 아닌 값");
+
+  // 5) 자유 질문 횟수 표: 내용 없이 한 줄씩, 브라우저는 읽지도 쓰지도 못한다
+  await server.addChatQuestion({ userId: U.id, assessmentId: aid, roomKey: "love" });
+  await server.addChatQuestion({ userId: U.id, assessmentId: aid, roomKey: "concern" });
+  assert.equal(await server.countChatQuestionsSince(U.id, new Date(Date.now() - 3600_000).toISOString()), 2);
+  assert.equal(await server.countChatQuestionsSince(U.id, new Date(Date.now() + 3600_000).toISOString()), 0);
+  assert.equal(await server.countChatQuestionsSince(V.id, new Date(Date.now() - 3600_000).toISOString()), 0);
+  const seen = await U.client.from("chat_questions").select();
+  assert.ok(seen.error || (seen.data ?? []).length === 0, "브라우저는 질문 횟수 표를 읽지 못한다");
+  const cheat = await U.client.from("chat_questions").delete().eq("user_id", U.id).select();
+  assert.ok(cheat.error || (cheat.data ?? []).length === 0, "횟수를 지워 한도를 피할 수 없다");
+  const cols = execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-tAc", "select string_agg(column_name, ',' order by ordinal_position) from information_schema.columns where table_name='chat_questions'"], { encoding: "utf8" }).trim();
+  assert.equal(cols, "id,user_id,assessment_id,room_key,created_at", "질문 내용을 담는 열이 없다");
+
+  // 6) 탈퇴: 대화와 질문 횟수가 함께 지워진다
+  const gone = await server.withdrawMemberData(U.id);
+  assert.ok(gone.ok && gone.counts.talk_rooms === 1 && gone.counts.chat_questions === 2, JSON.stringify(gone));
+  assert.deepEqual(await server.listTalkRoomKeys(aid), []);
+  assert.equal(await server.countChatQuestionsSince(U.id, new Date(0).toISOString()), 0);
+  // 다른 회원의 대화는 그대로
+  await server.upsertTalkRoom({ assessmentId: vid, userId: V.id, roomKey: "love", actions });
+  assert.deepEqual(await server.listTalkRoomKeys(vid), ["love"]);
 });

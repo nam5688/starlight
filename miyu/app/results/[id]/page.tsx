@@ -4,9 +4,14 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ReportFeedback } from "@/components/results/report-feedback";
 import { TalkEntry } from "@/components/results/talk-entry";
+import { buildTalkModel } from "@/lib/report/reading/talk";
+import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
+import { availableRooms } from "@/lib/report/reading/talk-room";
+import { seoulDate } from "@/lib/saju/interpret/day-plain";
+import { peekRoomChoice } from "@/server/room-choice";
 import { Track } from "@/components/analytics/track";
 import { ClearAnalyzeDraft } from "@/components/analyze/clear-draft";
-import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
+import { LoginOptions } from "@/components/auth/login-options";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { FullReportView } from "@/components/report/full-report-view";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
@@ -23,7 +28,7 @@ import { seoulReference } from "@/lib/report/reference";
 import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { currentSaleGate } from "@/server/capacity";
-import { readRepository, reportGenerator } from "@/server/services";
+import { now, readRepository, reportGenerator } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
 import { PageFallback } from "@/components/ui/page-fallback";
@@ -52,9 +57,9 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
     return (
       <div className={`${pageNarrow} py-14 md:py-20`}>
         <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
-        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있습니다. 카카오로 로그인해 주세요.</p>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있습니다. 로그인해 주세요.</p>
         <div className="mt-8">
-          <KakaoLoginForm next={`/results/${id}`} />
+          <LoginOptions next={`/results/${id}`} />
         </div>
       </div>
     );
@@ -104,7 +109,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
           source={content.source}
           meta={`검사일 ${created} · 저장된 리포트`}
         />
-        {isReadingReport(content) && <TalkEntry id={assessment.id} report={content} />}
+        {isReadingReport(content) && <TalkEntry id={assessment.id} rooms={availableRooms(buildTalkModel(content, { saju: assessment.saju, today: seoulDate(now()) }))} remembered={await peekRoomChoice()} />}
         {isReadingReport(content) ? (
           <ReadingReportView report={content} idPrefix="r-" footer={footer} />
         ) : isPersonalV2(content) ? (
@@ -126,6 +131,14 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
       <ClearAnalyzeDraft />
       <Track name="preview_view" />
       <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위입니다." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      <TalkEntry
+        id={assessment.id}
+        tasting
+        rooms={availableRooms(
+          buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" } }),
+        )}
+        remembered={await peekRoomChoice()}
+      />
       <ReadingNav
         expandAll={false}
         items={[

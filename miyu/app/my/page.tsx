@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { signOut } from "@/app/auth/actions";
 import { setMarketingAction } from "@/app/my/actions";
-import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
+import { LoginOptions } from "@/components/auth/login-options";
 import { ConcernRow, ReportRow } from "@/components/my/report-rows";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
@@ -64,7 +64,7 @@ async function MyContent() {
           결과를 그대로 볼 수 있습니다.
         </p>
         <div className="mt-6">
-          <KakaoLoginForm next="/my" />
+          <LoginOptions next="/my" />
         </div>
       </div>
     );

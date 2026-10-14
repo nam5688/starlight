@@ -70,3 +70,10 @@ export const REPORT_SCOPE: { name: string; desc: string; free: string | null; pa
 export function formatKrw(amount: number): string {
   return `${amount.toLocaleString("ko-KR")}원`;
 }
+
+/**
+ * 원데이 미유(오늘의 한 장) 무료 정책 — 운영자 2026-10-15: "일일 운세는 하루 한 번 무료(초기에만)".
+ * 오늘의 한 장은 날짜별 방이라 하루에 한 장이고, 켜져 있으면 무료 맛보기에서도 그날의 한 장을 전부 보여 준다.
+ * 초기 혜택을 끝낼 때는 enabled를 false로 바꾼다 — 무료 맛보기에서는 "리포트를 받으면 열려요"와 이어지는 질문만 보이고, 구매한 분은 그대로 본다.
+ */
+export const DAILY_FREE = { enabled: true } as const;

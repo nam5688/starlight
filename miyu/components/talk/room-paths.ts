@@ -5,3 +5,6 @@ export const sampleRoomPath = (room: RoomId) => (room === "main" ? "/report/samp
 
 /** 내 리포트 채팅방의 주소 */
 export const talkRoomPath = (id: string, room: RoomId) => (room === "main" ? `/results/${id}/talk` : `/results/${id}/talk/${room}`);
+
+/** 무료 맛보기 예시(가상 인물 서윤이 무료 분석만 마쳤을 때)의 채팅방 주소 */
+export const sampleTastePath = (room: RoomId) => (room === "main" ? "/report/sample/taste" : `/report/sample/taste/${room}`);

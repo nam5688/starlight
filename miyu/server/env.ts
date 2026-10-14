@@ -1,5 +1,6 @@
 import "server-only";
 import type { CapacityConfig } from "@/lib/services/capacity-service";
+import { DEFAULT_DAILY_LIMIT, type ChatServiceConfig } from "@/lib/services/chat-service";
 import type { PaymentEnv } from "@/lib/services/ports";
 import { isTossDocsKey } from "./setup-checks";
 
@@ -154,6 +155,14 @@ export function capacityConfig(): CapacityConfig {
     // 0이면 기본값. 멈춤 판단(300초)보다 짧게만 허용한다 (그래야 시간 초과가 먼저 실패로 기록된다)
     generationTimeoutMs: Math.min(readInt("AI_GENERATION_TIMEOUT_SECONDS", 0), 280) * 1000,
   };
+}
+
+/**
+ * 자유 질문(채팅에서 직접 적는 질문) 한도 — AI_CHAT_DAILY_LIMIT: 한 회원이 하루(한국 날짜)에 보낼 수 있는 질문 수 (기본 10, 0이면 닫힘).
+ * 질문마다 AI 호출 비용이 든다. 실제 질문 한 번의 비용을 잰 뒤 운영자가 정한다(docs/maintenance.md). 하루 AI 예산(AI_DAILY_BUDGET_KRW)에 닿아도 새 질문만 멈춘다.
+ */
+export function chatConfig(): ChatServiceConfig {
+  return { dailyLimit: readInt("AI_CHAT_DAILY_LIMIT", DEFAULT_DAILY_LIMIT) };
 }
 
 /** 공개 주소 — 검색 · 공유용 주소(sitemap · robots · 공유 이미지)의 기준. 배포 전에는 로컬 주소 */

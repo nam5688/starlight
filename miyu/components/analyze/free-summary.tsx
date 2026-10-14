@@ -35,11 +35,11 @@ export function FreeSummaryView({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function save() {
+  function save(via: "kakao" | "email" = "kakao") {
     setError(null);
     startTransition(async () => {
-      // 성공하면 서버가 카카오 로그인(또는 결과 화면)으로 이동시킨다
-      const result = await saveResultAndContinue({ info, answers });
+      // 성공하면 서버가 로그인 화면(또는 결과 화면)으로 이동시킨다
+      const result = await saveResultAndContinue({ info, answers }, via);
       if (result && !result.ok) setError(result.message);
     });
   }
@@ -80,12 +80,17 @@ export function FreeSummaryView({
 
           <ol className="divide-y divide-line">
             <li className="grid gap-3 px-5 py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-7">
-              <Step index={1} title="카카오 로그인하고 결과 저장" detail="이 결과가 회원 정보에 저장됩니다." />
+              <Step index={1} title="로그인하고 결과 저장" detail="이 결과가 회원 정보에 저장됩니다." />
               {authReady ? (
-                <button type="button" onClick={save} disabled={pending} aria-busy={pending} className={`${kakaoButtonClass} w-full md:w-auto`}>
-                  <KakaoSymbol />
-                  {pending ? "이동 중…" : "카카오로 로그인하고 저장"}
-                </button>
+                <div className="flex flex-col items-stretch gap-2 md:items-end">
+                  <button type="button" onClick={() => save("kakao")} disabled={pending} aria-busy={pending} className={`${kakaoButtonClass} w-full md:w-auto`}>
+                    <KakaoSymbol />
+                    {pending ? "이동 중…" : "카카오로 로그인하고 저장"}
+                  </button>
+                  <button type="button" onClick={() => save("email")} disabled={pending} className={`${textLink} min-h-11 text-center text-[15px] disabled:opacity-50`}>
+                    이메일로 로그인 · 가입하고 저장
+                  </button>
+                </div>
               ) : (
                 <p className="text-[14px] text-ink-3 md:text-right">
                   <StatusBadge>로그인 설정 전</StatusBadge>

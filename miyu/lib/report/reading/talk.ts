@@ -3,9 +3,11 @@
 // 자유 질문 · "내 경우는 달라"에 AI가 답하는 기능은 아직 없다(2단계, 운영자 결정 뒤) — 화면에서 "준비 중"으로 밝힌다.
 // 이 파일은 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
 import { tendencyPhrase } from "../../assessment/dev-rules.ts";
+import type { SajuResult } from "../../saju/engine.ts";
 import { periodPlain } from "../../saju/interpret/period-plain.ts";
 import type { MonthCalendar } from "../../saju/interpret/months.ts";
 import { basisFor } from "./assemble.ts";
+import { codeTopicsFor } from "./talk-code.ts";
 import { CALENDAR_CHAT_NOTES, MONTH_NOTES, upcomingMonthTexts, upcomingSummary, type CalendarTopic } from "./calendar-text.ts";
 import type { IntegratedReadingReport, LuckSlot, ReadingBasis, ReadingBlock } from "./types.ts";
 
@@ -40,8 +42,18 @@ export type TalkTopic = {
   detail: TalkPiece[];
   /** [이렇게 분석한 이유] — 저장된 분석 근거 */
   basis: ReadingBasis | null;
-  /** 앞으로의 시기 — 저장된 월별 달력(코드 계산). 있으면 [가까운 관계가 움직이는 달은?] · [재물이 눈에 띄는 달은?] 버튼을 보인다 */
+  /** 앞으로의 시기 — 저장된 월별 달력(코드 계산). 있으면 [인연이 움직이는 달은?] · [재물이 눈에 띄는 달은?] 버튼을 보인다 */
   calendar?: { items: MonthCalendar[]; reference: { year: number; month: number } };
+  /** 먼저 묻는 질문에서 고른 답(선택지 번호)에 따라 풀이 뒤에 덧붙는 말풍선 — 예: 오늘의 한 장에서 고른 영역의 한 줄 팁 · 올해의 흐름에서 고른 달력 */
+  picks?: Record<string, TalkBubble[]>;
+  /** 무료 맛보기 — 이 풀이의 나머지는 리포트에서 이어진다. 여기에는 질문(무엇에 답하는지)만 담고 잠긴 문장은 담지 않는다 */
+  locked?: { hooks: string[] };
+  /** 풀이를 읽은 뒤 [맞아요] 같은 내 경험 답장을 보이지 않는다 (오늘의 한 장처럼 한 번으로 끝나는 풀이) */
+  noFeel?: boolean;
+  /** 마지막 질문 대신 보이는 맺음말 (한 번으로 끝나는 풀이) */
+  closing?: string;
+  /** 풀이 뒤의 질문을 이 문장으로 바꾼다 (없으면 주제별 기본 질문) */
+  askText?: string;
 };
 
 /** 답장 버튼이 여는 조각 */
@@ -62,7 +74,26 @@ export type TalkCard = {
 /** 첫 화면에서 고르는 큰 묶음 — 묶음 안의 풀이는 이어서 고른다 (예: 내 성향 → 강한 포인트 · 힘들 수 있는 포인트 → 중요하게 여기는 것) */
 export type TalkGroup = { id: string; chip: string; topicIds: string[] };
 
-export type TalkModel = { name: string; card: TalkCard; topics: TalkTopic[]; groups: TalkGroup[] };
+/** 자유 질문 · 이야기 이어 가기의 상태 — ready: 입력창을 연다 · pending: AI 연결 전이라 준비 중 · locked: 리포트를 받은 분에게 열린다 */
+export type TalkChat = { state: "ready" | "pending" | "locked" };
+/** 무료 맛보기에서 잠긴 내용으로 이어지는 버튼 — owned: 이미 구매한 분(리포트 보기)인지 */
+export type TalkBuy = { href: string; label: string; owned: boolean };
+
+export type TalkModel = {
+  name: string;
+  card: TalkCard;
+  /** 리포트의 주제 풀이 (저장된 글 그대로) */
+  topics: TalkTopic[];
+  groups: TalkGroup[];
+  /** 리포트 주제가 아니라 코드가 계산해 만든 풀이(오늘의 한 장 · 인연의 경향 · 오래 가는 관계) — 방이 id로 직접 연다. AI가 쓰지 않는다 */
+  codeTopics: TalkTopic[];
+  /** paid: 저장된 리포트 전체 · free: 무료 맛보기(잠긴 내용은 담지 않는다) */
+  tier: "paid" | "free";
+  buy: TalkBuy | null;
+  /** 오늘(한국 날짜, YYYY-MM-DD) — 오늘의 한 장 방의 이어 보기 저장은 날짜별로 나눈다 */
+  dayKey: string;
+  chat: TalkChat;
+};
 
 /**
  * 말풍선 하나에 담기는 내용 — 저장된 리포트의 글을 문단 단위로 보여 준다(글자는 바꾸지 않는다). 답변 한 번에 말풍선은 1~2개다(운영자 2026-10-15).
@@ -75,7 +106,9 @@ export type TalkBubble =
   | { kind: "timeline"; slots: LuckSlot[]; reference: { year: number; month: number } }
   | { kind: "flow"; when: string; steps: { label: string; text: string }[]; helpful: string }
   | { kind: "comfort"; comfortable: string[]; clash: string[]; note: string }
-  | { kind: "basis"; basis: ReadingBasis };
+  | { kind: "basis"; basis: ReadingBasis }
+  /** 무료 맛보기의 잠금 안내 — 이어지는 내용이 답하는 질문들(문장이 아니라 질문만). 구매 버튼은 화면이 model.buy로 붙인다 */
+  | { kind: "lock"; title: string; hooks: string[] };
 
 export const CARD_DISCLAIMER = "참고용 해석이며 예측이나 진단이 아닙니다.";
 
@@ -93,6 +126,8 @@ export const TALK_COPY = {
     "work-money": () => "일이나 돈 앞에서는 실제로 어때요?",
     flow: () => "지금 시기는 어떻게 느껴져요?",
     focus: () => "이 고민, 지금은 어떤 상태예요?",
+    partner: () => "이 분위기, 끌렸던 사람과 닿는 부분이 있어요?",
+    marriage: () => "이 조건, 내가 생각하는 오래 가는 관계와 닮았어요?",
     other: (name: string) => `${name} 님은 실제로 어때요?`,
   },
   /** 내 경험을 고르는 답장 — 고정 문구로만 답하고 눌러 준 답을 저장하거나 해석에 반영하지 않는다 */
@@ -103,10 +138,13 @@ export const TALK_COPY = {
       lead: "상황에 따라 다른 건 아주 자연스러워요. 어떤 때는 맞고 어떤 때는 다르다는 걸 알아 두는 것도 이 풀이를 쓰는 방법이에요.",
       pending: "어떤 상황에서 달랐는지 대화로 이어 가는 기능은 아직 준비 중이에요.",
       pendingLink: "지금은 ‘나의 고민 기록소’에 적어 둘 수 있어요.",
+      locked: "어떤 상황에서 달랐는지 이어서 이야기 나누는 건 리포트를 받은 분께 열려 있어요.",
     },
     unsure: { label: "잘 모르겠어요", lead: "괜찮아요. 한 번에 정할 필요 없어요. 일상 예시나 분석한 이유를 보고 맞는 부분만 가져가세요." },
-    note: "눌러 준 답은 풀이를 바꾸지 않고, 이 기기 화면에만 남아요.",
+    note: "눌러 준 답은 풀이를 바꾸지 않아요.",
   },
+  /** 무료 맛보기의 잠금 안내 */
+  lock: { title: "여기서부터는 리포트에서 이어져요", sub: "리포트에는 이런 질문의 답이 들어 있어요" },
   basisIntro: "이 풀이는 아래 자료를 보고 썼어요. 사주 계산은 만세력 엔진이 한 값이고, 해석 규칙은 아직 검증된 사실이 아니에요.",
   concernPending: "지금 고민을 대화로 이어 가는 기능은 아직 준비 중이에요.",
   concernPendingLink: "고민을 적어 두는 건 ‘나의 고민 기록소’에서 할 수 있어요.",
@@ -115,7 +153,10 @@ export const TALK_COPY = {
   menuTitle: "다른 이야기 보기",
   freeQuestion: "자유롭게 질문하기 · 준비 중",
   freeQuestionPending: "자유 질문은 준비 중이에요. 지금은 버튼으로 이어 볼 수 있어요.",
-  buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "가까운 관계가 움직이는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
+  freeQuestionReady: "궁금한 것을 직접 물어보세요",
+  freeQuestionAsking: "어떤 상황에서 달랐는지 적어 주세요",
+  freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
+  buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "인연이 움직이는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },
 } as const;
 
 const CHIP: Record<string, string> = {
@@ -158,7 +199,16 @@ function blockTopic(b: ReadingBlock, number: number): TalkTopic {
   };
 }
 
-export function buildTalkModel(report: IntegratedReadingReport, opts: { tendencyName?: string } = {}): TalkModel {
+export type TalkModelOptions = {
+  tendencyName?: string;
+  /** 사주 계산 결과 — 있으면 인연의 경향 · 오래 가는 관계 · 오늘의 한 장을 코드로 계산해 더한다 */
+  saju?: SajuResult | null;
+  /** 오늘(한국 날짜) — 오늘의 한 장에 쓴다. 없으면 오늘의 한 장은 만들지 않는다 */
+  today?: { year: number; month: number; day: number };
+  chat?: TalkChat;
+};
+
+export function buildTalkModel(report: IntegratedReadingReport, opts: TalkModelOptions = {}): TalkModel {
   const topics: TalkTopic[] = report.blocks.map((b, i) => blockTopic(b, i + 1));
 
   const f = report.flow;
@@ -178,6 +228,10 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: { tendency
     basis: f.basis,
     ...(report.calendars && report.calendars.items.length > 0 ? { calendar: { items: report.calendars.items, reference: report.timelineReference } } : {}),
   });
+  const calendar = report.calendars && report.calendars.items.length > 0 ? { items: report.calendars.items, reference: report.timelineReference } : undefined;
+  // 올해의 흐름 방: 먼저 묻는 질문에서 고른 쪽(재물 · 인연)의 월별 달력을 시기 풀이 뒤에 바로 보여 준다
+  const flowTopic = topics.find((t) => t.id === "flow");
+  if (flowTopic && calendar) flowTopic.picks = { money: calendarBubbles(calendar, "money"), love: calendarBubbles(calendar, "love") };
 
   if (report.focus?.length) {
     topics.push({
@@ -211,6 +265,11 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: { tendency
     },
     topics,
     groups: groupsOf(topics),
+    codeTopics: codeTopicsFor({ saju: opts.saju ?? null, today: opts.today ?? null, calendar, tier: "paid" }),
+    tier: "paid",
+    buy: null,
+    dayKey: opts.today ? `${opts.today.year}-${String(opts.today.month).padStart(2, "0")}-${String(opts.today.day).padStart(2, "0")}` : "",
+    chat: opts.chat ?? { state: "pending" },
   };
 }
 
@@ -222,7 +281,7 @@ const GROUPS: { id: string; chip: string; ids: string[] }[] = [
   { id: "flow", chip: "앞으로의 시기", ids: ["flow"] },
   { id: "focus", chip: "알려 주신 고민", ids: ["focus"] },
 ];
-function groupsOf(topics: TalkTopic[]): TalkGroup[] {
+export function groupsOf(topics: TalkTopic[]): TalkGroup[] {
   const have = new Set(topics.map((t) => t.id));
   const placed = new Set(GROUPS.flatMap((g) => g.ids));
   const groups = GROUPS.map((g) => ({ id: g.id, chip: g.chip, topicIds: g.ids.filter((id) => have.has(id)) })).filter((g) => g.topicIds.length > 0);
@@ -258,16 +317,20 @@ export function askFor(topicId: string, name: string): string {
 }
 
 /**
- * 주제를 골랐을 때 이어서 도착하는 짧은 풀이 — 결론 한 줄 + 요약을 한 말풍선으로 묶고, (특징 · 시기 그림) → 안내 → 내 경험을 묻는 질문 순서다.
+ * 주제를 골랐을 때 이어서 도착하는 짧은 풀이 — 결론 한 줄 + 요약을 한 말풍선으로 묶고, (특징 · 시기 그림) → 먼저 묻는 질문에서 고른 답에 맞춘 덧붙임(pick) → 안내 → (무료 맛보기면 잠금 안내) → 내 경험을 묻는 질문(또는 맺음말) 순서다.
  * 답변 한 번에 말풍선은 풀이 하나 · 질문 하나다(그림 · 작은 안내는 말풍선으로 세지 않는다).
  */
-export function answerBubbles(t: TalkTopic, name = ""): TalkBubble[] {
+export function answerBubbles(t: TalkTopic, name = "", pick?: string): TalkBubble[] {
   const out: TalkBubble[] = [{ kind: "answer", number: t.number, title: t.title, headline: t.headline, paragraphs: t.summary }];
   if (t.traits) out.push({ kind: "traits", traits: t.traits });
   if (t.timeline) out.push({ kind: "timeline", slots: t.timeline.slots, reference: t.timeline.reference });
   if (t.periodExample) out.push({ kind: "text", text: t.periodExample });
+  const picked = pick ? t.picks?.[pick] : undefined;
+  if (picked) out.push(...picked);
   if (t.caveat) out.push({ kind: "text", text: t.caveat, muted: true });
-  out.push({ kind: "text", text: askFor(t.id, name || "당신") });
+  if (t.locked) out.push({ kind: "lock", title: TALK_COPY.lock.title, hooks: t.locked.hooks });
+  if (t.closing) out.push({ kind: "text", text: t.closing });
+  else out.push({ kind: "text", text: t.askText ?? askFor(t.id, name || "당신") });
   return out;
 }
 

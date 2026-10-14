@@ -16,6 +16,7 @@ import type {
   OrderRecord,
   ReportRecord,
   ReportStatusRecord,
+  TalkRoomRecord,
 } from "../../services/ports.ts";
 
 type Row = Record<string, unknown>;
@@ -49,6 +50,10 @@ function fail(context: string, error: { message: string; code?: string }): never
   const e = new Error(`${context}: ${error.message}`) as Error & { code?: string };
   e.code = error.code;
   throw e;
+}
+
+function toTalkRoom(r: Row): TalkRoomRecord {
+  return { assessmentId: r.assessment_id as string, roomKey: r.room_key as string, userId: r.user_id as string, actions: Array.isArray(r.actions) ? (r.actions as unknown[]) : [], updatedAt: r.updated_at as string };
 }
 
 function toAssessment(r: Row): AssessmentRecord {
@@ -717,6 +722,46 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         if (isMissingTableError(error) || (status === 404 && !error.code)) return;
         fail("고민 기록 내용 지우기", error);
       }
+    },
+
+    async getTalkRoom(assessmentId, roomKey) {
+      const { data, error } = await db.from("talk_rooms").select().eq("assessment_id", assessmentId).eq("room_key", roomKey).maybeSingle();
+      if (error) {
+        if (isMissingTableError(error)) return null;
+        fail("대화 조회", error);
+      }
+      return data ? toTalkRoom(data as Row) : null;
+    },
+    async listTalkRoomKeys(assessmentId) {
+      const { data, error } = await db.from("talk_rooms").select("room_key").eq("assessment_id", assessmentId);
+      if (error) {
+        if (isMissingTableError(error)) return [];
+        fail("대화 목록 조회", error);
+      }
+      return (data ?? []).map((r) => (r as Row).room_key as string);
+    },
+    async upsertTalkRoom(input) {
+      const { error, status } = await db
+        .from("talk_rooms")
+        .upsert({ assessment_id: input.assessmentId, user_id: input.userId, room_key: input.roomKey, actions: input.actions, version: 2 }, { onConflict: "assessment_id,room_key" });
+      if (error) fail("대화 저장", status === 404 && !error.code ? { code: "42P01", message: "talk_rooms 테이블이 없습니다" } : error);
+    },
+    async deleteTalkRoom(assessmentId, roomKey) {
+      const { error } = await db.from("talk_rooms").delete().eq("assessment_id", assessmentId).eq("room_key", roomKey);
+      if (error && !isMissingTableError(error)) fail("대화 삭제", error);
+    },
+    async deleteTalkRoomsBefore(assessmentId, prefix, keepKey) {
+      const { error } = await db.from("talk_rooms").delete().eq("assessment_id", assessmentId).like("room_key", `${prefix}%`).lt("room_key", keepKey);
+      if (error && !isMissingTableError(error)) fail("지난 대화 정리", error);
+    },
+    async addChatQuestion(input) {
+      const { error, status } = await db.from("chat_questions").insert({ user_id: input.userId, assessment_id: input.assessmentId, room_key: input.roomKey });
+      if (error) fail("자유 질문 횟수 기록", status === 404 && !error.code ? { code: "42P01", message: "chat_questions 테이블이 없습니다" } : error);
+    },
+    async countChatQuestionsSince(userId, since) {
+      const { count, error } = await db.from("chat_questions").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
+      if (error) fail("자유 질문 횟수 조회", error);
+      return count ?? 0;
     },
 
     async listPaymentEvents(orderId) {

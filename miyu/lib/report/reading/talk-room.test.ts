@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { SAMPLE_CHART } from "../../samples/sample-report.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
-import { askFor, buildTalkModel, TALK_COPY, type TalkModel } from "./talk.ts";
+import { dayReading } from "../../saju/interpret/day-plain.ts";
+import { askFor, buildTalkModel, TALK_COPY, type TalkChat, type TalkModel } from "./talk.ts";
 import {
   applyAction,
+  availableRooms,
   parseRoomSave,
   replayRoom,
   replyOptions,
   roomAvailable,
+  roomSaveKey,
   roomTopics,
   ROOM_COPY,
   ROOM_ORDER,
@@ -16,14 +20,17 @@ import {
   startRoom,
   TALK_MOODS,
   type RoomAction,
+  type RoomId,
   type TalkLine,
 } from "./talk-room.ts";
 
 const R = sampleReadingReport;
-const model = (): TalkModel => buildTalkModel(R, { tendencyName: "확인추구형" });
+const TODAY = { year: 2026, month: 10, day: 15 };
+const model = (chat: TalkChat = { state: "pending" }): TalkModel => buildTalkModel(R, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: TODAY, chat });
 const miyuText = (lines: TalkLine[]) => lines.flatMap((l) => (l.from === "miyu" && l.say.kind === "text" ? [l.say.text] : []));
+const kinds = (lines: TalkLine[]) => lines.map((l) => (l.from === "miyu" ? l.say.kind : "me"));
 
-/** 리포트 안의 모든 문자열 */
+/** 리포트 · 코드가 계산한 풀이 안의 모든 문자열 */
 function allStrings(v: unknown, out = new Set<string>()): Set<string> {
   if (typeof v === "string") out.add(v);
   else if (Array.isArray(v)) v.forEach((x) => allStrings(x, out));
@@ -34,50 +41,69 @@ const norm = (t: string) => t.replace(/\s+/g, " ").trim();
 
 const flat = (v: unknown): string[] => (typeof v === "string" ? [v] : typeof v === "function" ? [String((v as (n: string) => string)("서윤"))] : v && typeof v === "object" ? Object.values(v).flatMap(flat) : []);
 /** 이 파일의 고정 문구 전부 (방 정의 · 대화 문구) */
-const fixedCopy = (): string[] => [
-  ...flat(TALK_COPY),
-  ...flat(ROOM_COPY),
-  ...ROOM_ORDER.flatMap((id) => {
-    const r = ROOMS[id];
-    return [r.label, r.mode, r.blurb, r.connect ?? "", r.connectNote ?? "", r.greeting("서윤"), ...(r.intake ? [r.intake.question, ...r.intake.options.flatMap((o) => [o.label, o.lead]), r.intake.skip.label, r.intake.skip.lead] : [])];
-  }),
-].filter(Boolean);
+const fixedCopy = (): string[] =>
+  [
+    ...flat(TALK_COPY),
+    ...flat(ROOM_COPY),
+    ...ROOM_ORDER.flatMap((id) => {
+      const r = ROOMS[id];
+      return [r.label, r.mode, r.blurb, r.connect ?? "", r.connectNote ?? "", r.greeting("서윤"), ...(r.intake ? [r.intake.question, ...r.intake.options.flatMap((o) => [o.label, o.lead]), r.intake.skip.label, r.intake.skip.lead] : [])];
+    }),
+  ].filter(Boolean);
 
-test("방 정의: 기본 · 연애 · 일 · 돈 네 곳이고, 모드 방은 '○○ 미유 모드로 접속합니다'로 들어가며 먼저 묻는 질문이 있다", () => {
-  assert.deepEqual([...ROOM_ORDER], ["main", "love", "work", "money"]);
+test("방 정의: 여덟 곳이고 이름은 운영자가 정한 대로이며, 모드 방은 '○○ 미유 모드로 접속합니다'로 들어가고 먼저 묻는 질문이 있다", () => {
+  assert.deepEqual([...ROOM_ORDER], ["main", "daily", "year", "love", "marriage", "career", "money", "concern"]);
+  assert.deepEqual(
+    ROOM_ORDER.map((id) => ROOMS[id].mode),
+    ["미유", "원데이 미유", "흐름박사 미유", "연애박사 미유", "결혼박사 미유", "진로박사 미유", "재무박사 미유", "고민해결소 미유"],
+  );
+  assert.deepEqual(
+    ROOM_ORDER.map((id) => ROOMS[id].label),
+    ["나를 알아보기", "오늘의 운세", "올해의 흐름", "연애", "결혼", "일 · 진로", "돈 · 재무", "고민 상담"],
+  );
   assert.equal(ROOMS.main.connect, null);
-  assert.equal(ROOMS.main.mode, "미유");
-  assert.equal(ROOMS.love.mode, "연애박사 미유");
-  assert.equal(ROOMS.love.connect, "연애박사 미유 모드로 접속합니다");
-  for (const id of ["love", "work", "money"] as const) {
+  for (const id of ROOM_ORDER.filter((r) => r !== "main")) {
     const r = ROOMS[id];
     assert.equal(r.connect, `${r.mode} 모드로 접속합니다`);
-    assert.ok(r.intake && r.intake.options.length >= 4, `${id}: 먼저 묻는 질문`);
+    assert.ok(r.intake && r.intake.options.length >= 3, `${id}: 먼저 묻는 질문`);
     assert.equal(new Set(r.intake!.options.map((o) => o.id)).size, r.intake!.options.length, `${id}: 답 번호가 겹치지 않는다`);
     assert.ok(!r.intake!.options.some((o) => o.id === "skip"), "skip은 따로");
     for (const o of [...r.intake!.options, r.intake!.skip]) assert.ok(TALK_MOODS.includes(o.mood), `${id}/${o.id}: 알 수 없는 표정`);
   }
-  // 연애 방의 첫 질문 — 운영자가 정한 일곱 가지 상황
   assert.deepEqual(ROOMS.love.intake!.options.map((o) => o.label), ["솔로예요", "짝사랑하는 사람이 있어요", "썸 타는 중이에요", "연애 중이에요", "헤어진 지 얼마 안 됐어요", "결혼 준비 중이에요", "결혼했어요"]);
   assert.equal(ROOMS.love.intake!.skip.label, "말하고 싶지 않아요", "답하지 않을 수 있다");
   assert.equal(ROOMS.love.intake!.options.find((o) => o.id === "breakup")!.mood, "worried", "헤어진 직후에는 걱정하는 표정");
+  assert.equal(ROOMS.concern.chatOnly, true);
+  // 궁합 비교는 아직 없으므로 연애 · 결혼 방은 준비 중이라고 밝힌다
+  assert.match(ROOMS.love.connectNote ?? "", /궁합 비교는 준비 중/);
+  assert.match(ROOMS.marriage.connectNote ?? "", /궁합 비교는 준비 중/);
 });
 
-test("방 열기: 예시 리포트는 네 방이 모두 열리고, 풀이가 없는 리포트에서는 그 방이 열리지 않는다", () => {
+test("방 열기: 예시 리포트는 여덟 방이 모두 열리고, 풀이 자료가 없으면 그 방이 열리지 않는다 (이야기만 하는 방은 늘 열린다)", () => {
   const m = model();
   for (const id of ROOM_ORDER) assert.ok(roomAvailable(m, id), id);
-  assert.deepEqual(roomTopics(m, "love").map((t) => t.id), ["love"]);
-  assert.deepEqual(roomTopics(m, "work").map((t) => t.id), ["work-money"]);
+  assert.deepEqual(availableRooms(m), [...ROOM_ORDER]);
+  assert.deepEqual(roomTopics(m, "love").map((t) => t.id), ["love", "partner"]);
+  assert.deepEqual(roomTopics(m, "marriage").map((t) => t.id), ["marriage", "partner"]);
+  assert.deepEqual(roomTopics(m, "career").map((t) => t.id), ["work-money"]);
+  assert.deepEqual(roomTopics(m, "money").map((t) => t.id), ["work-money"]);
+  assert.deepEqual(roomTopics(m, "year").map((t) => t.id), ["flow"]);
+  assert.deepEqual(roomTopics(m, "daily").map((t) => t.id), ["daily"]);
   const noLove: TalkModel = { ...m, topics: m.topics.filter((t) => t.id !== "love") };
-  assert.equal(roomAvailable(noLove, "love"), false);
-  assert.equal(roomAvailable(noLove, "main"), true);
+  assert.deepEqual(roomTopics(noLove, "love").map((t) => t.id), ["partner"], "리포트 주제가 없어도 계산한 풀이는 열린다");
+  // 사주 계산 결과가 없으면 계산한 풀이(오늘의 한 장 · 인연의 경향)가 없어 그 방들은 열리지 않는다
+  const noSaju = buildTalkModel(R, { tendencyName: "확인추구형" });
+  assert.equal(roomAvailable(noSaju, "daily"), false);
+  assert.equal(roomAvailable(noSaju, "marriage"), false);
+  assert.equal(roomAvailable(noSaju, "main"), true);
+  assert.equal(roomAvailable(noSaju, "concern"), true);
 });
 
 test("기본 방: 인사 → 분석 카드 → 주제 질문으로 시작하고, 주제 버튼은 첫 화면에 2×2로 놓을 네 묶음이다", () => {
   const m = model();
   const s = startRoom(m, "main");
   assert.equal(s.phase, "pick");
-  assert.deepEqual(s.lines.map((l) => (l.from === "miyu" ? l.say.kind : "me")), ["text", "card", "text"]);
+  assert.deepEqual(kinds(s.lines), ["text", "card", "text"]);
   assert.equal(s.lines[1].from === "miyu" && s.lines[1].mood, "happy", "분석 카드는 웃는 얼굴");
   const r = replyOptions(m, "main", s);
   assert.equal(r.kind, "pick");
@@ -88,9 +114,10 @@ test("연애 방: 모드 접속 안내 → 인사 → 먼저 묻는 질문으로
   const m = model();
   const s = startRoom(m, "love");
   assert.equal(s.phase, "intake");
-  assert.deepEqual(s.lines.map((l) => (l.from === "miyu" ? l.say.kind : "me")), ["system", "text", "text"]);
+  assert.deepEqual(kinds(s.lines), ["system", "text", "text"]);
   const sys = s.lines[0];
   assert.ok(sys.from === "miyu" && sys.say.kind === "system" && sys.say.text === "연애박사 미유 모드로 접속합니다");
+  assert.equal(miyuText(s.lines)[0], ROOMS.love.greeting("서윤"));
   assert.equal(miyuText(s.lines)[1], ROOMS.love.intake!.question);
   const r = replyOptions(m, "love", s);
   assert.equal(r.kind, "intake");
@@ -101,27 +128,23 @@ test("연애 방: 모드 접속 안내 → 인사 → 먼저 묻는 질문으로
   assert.equal(a.state.intake, "breakup");
   assert.equal(a.state.current, "love");
   assert.ok(a.state.opened.includes("love"));
-  assert.equal(a.added[0].from, "me");
   assert.deepEqual(a.added[0], { from: "me", text: "헤어진 지 얼마 안 됐어요" });
   const lead = a.added[1];
   assert.ok(lead.from === "miyu" && lead.mood === "worried" && lead.say.kind === "text" && /지금 마음을 돌보는 참고/.test(lead.say.text));
-  assert.ok(a.added.some((l) => l.from === "miyu" && l.say.kind === "text" && l.say.muted && l.say.text === ROOM_COPY.intakeNote), "이 답은 풀이를 바꾸지 않고 이 기기에만 남는다고 알린다");
+  assert.ok(a.added.some((l) => l.from === "miyu" && l.say.kind === "text" && l.say.muted && l.say.text === ROOM_COPY.intakeNote), "이 답은 풀이를 바꾸지 않는다고 알린다");
   const ans = a.added.find((l) => l.from === "miyu" && l.say.kind === "answer");
   assert.ok(ans && ans.from === "miyu" && ans.say.kind === "answer" && ans.say.number === 4);
-  // 풀이를 읽은 뒤: 내 경험 답장 3개 + 보조 버튼(연애 방에서는 가까운 관계 달력만, 재물 달력은 없다)
   const after = replyOptions(m, "love", a.state);
   assert.equal(after.kind, "chat");
   if (after.kind === "chat") {
     assert.deepEqual(after.feel.map((c) => c.label), ["맞아요", "상황에 따라 달라요", "잘 모르겠어요"]);
-    const helperKeys = after.helpers.map((c) => c.key);
-    assert.deepEqual(helperKeys, ["example", "detail", "calendar-love", "basis"]);
-    assert.equal(after.next, null, "연애 방에는 다음 풀이가 없다");
+    assert.deepEqual(after.helpers.map((c) => c.key), ["example", "detail", "calendar-love", "basis"]);
+    assert.equal(after.next?.label, "다음 풀이 · 끌리는 사람의 경향", "연애 방의 다음 풀이는 사주로 읽은 인연의 경향");
+    assert.equal(after.buy, null, "리포트를 받은 분에게는 구매 버튼이 없다");
   }
-  // 같은 질문에 다시 답하거나 모르는 답은 아무것도 바꾸지 않는다
   assert.equal(applyAction(m, "love", a.state, { t: "intake", option: "solo" }).added.length, 0);
   assert.equal(applyAction(m, "love", s, { t: "intake", option: "없는답" }).added.length, 0);
-  // 방마다 따로 시작한다
-  assert.equal(startRoom(m, "work").phase, "intake");
+  assert.equal(startRoom(m, "career").phase, "intake");
   assert.equal(startRoom(m, "main").lines.length, 3);
 });
 
@@ -133,7 +156,7 @@ test("건너뛰기: 말하고 싶지 않아요를 고르면 괜찮다고 하고 
   assert.ok(a.added.some((l) => l.from === "miyu" && l.say.kind === "answer"));
 });
 
-test("내 경험 답장: 맞아요는 예시를 보여 주고, 상황에 따라 달라요는 준비 중인 기능을 밝히며 고민 기록소로 안내하고, 어느 답도 풀이에 반영하지 않는다고 알린다", () => {
+test("내 경험 답장: 맞아요는 예시를 보여 주고, 상황에 따라 달라요는 자유 질문 상태에 따라 이어 가거나 준비 중 · 잠금을 밝히고, 어느 답도 풀이에 반영하지 않는다고 알린다", () => {
   const m = model();
   const base = applyAction(m, "love", startRoom(m, "love"), { t: "intake", option: "solo" }).state;
   const yes = applyAction(m, "love", base, { t: "feel", topic: "love", kind: "yes" });
@@ -146,12 +169,24 @@ test("내 경험 답장: 맞아요는 예시를 보여 주고, 상황에 따라 
     assert.equal(afterYes.feel.length, 0, "한 번 답하면 내 경험 답장은 접힌다");
     assert.ok(!afterYes.helpers.some((c) => c.key === "example"), "예시를 이미 보여 줬다");
   }
+  // 준비 중: 고민 기록소로 안내
   const mixed = applyAction(m, "love", base, { t: "feel", topic: "love", kind: "mixed" }, { contextHref: "/results/x/context" });
-  assert.ok(mixed.added.some((l) => l.from === "miyu" && l.say.kind === "link" && l.say.href === "/results/x/context" && /준비 중/.test(l.say.text)), "준비 중이라고 밝히고 고민 기록소로 안내");
-  assert.ok(mixed.added.every((l) => l.from === "me" || l.mood !== "happy"));
+  assert.ok(mixed.added.some((l) => l.from === "miyu" && l.say.kind === "link" && l.say.href === "/results/x/context" && /준비 중/.test(l.say.text)));
+  assert.equal(mixed.state.asking, null);
+  // 열림: 어떤 상황에서 달랐는지 묻고, 다음 자유 질문이 이 풀이에 이어진다
+  const mr = model({ state: "ready" });
+  const baseReady = applyAction(mr, "love", startRoom(mr, "love"), { t: "intake", option: "solo" }).state;
+  const open = applyAction(mr, "love", baseReady, { t: "feel", topic: "love", kind: "mixed" });
+  assert.ok(miyuText(open.added).includes(ROOM_COPY.mixedAsk));
+  assert.deepEqual(open.state.asking, { topic: "love" });
+  const ask = replyOptions(mr, "love", open.state);
+  assert.ok(ask.kind === "chat" && ask.asking);
+  // 잠금(무료 맛보기)
+  const ml = model({ state: "locked" });
+  const lock = applyAction(ml, "love", applyAction(ml, "love", startRoom(ml, "love"), { t: "intake", option: "solo" }).state, { t: "feel", topic: "love", kind: "mixed" });
+  assert.ok(miyuText(lock.added).includes(TALK_COPY.feel.mixed.locked));
   const unsure = applyAction(m, "love", base, { t: "feel", topic: "love", kind: "unsure" });
   assert.ok(miyuText(unsure.added).includes(TALK_COPY.feel.unsure.lead));
-  // 답장은 풀이 글을 새로 쓰지 않는다 — 알 수 없는 주제는 무시
   assert.equal(applyAction(m, "love", base, { t: "feel", topic: "없는주제", kind: "yes" }).added.length, 0);
 });
 
@@ -167,9 +202,8 @@ test("보조 버튼: 일상 예시 · 더 자세히 · 분석 이유(안경) · 
   assert.ok(basis.added.some((l) => l.from === "miyu" && l.say.kind === "basis" && l.mood === "glasses"), "분석 이유는 안경을 쓴 표정");
   const r1 = replyOptions(m, "money", cal.state);
   assert.ok(r1.kind === "chat" && !r1.helpers.some((c) => c.key === "calendar-money"), "한 번 연 버튼은 다시 보이지 않는다");
-  // 일 방에는 달력 버튼이 없다
-  const work = applyAction(m, "work", startRoom(m, "work"), { t: "intake", option: "way" }).state;
-  const rw = replyOptions(m, "work", work);
+  const career = applyAction(m, "career", startRoom(m, "career"), { t: "intake", option: "way" }).state;
+  const rw = replyOptions(m, "career", career);
   assert.ok(rw.kind === "chat" && !rw.helpers.some((c) => c.key.startsWith("calendar")));
 });
 
@@ -185,15 +219,109 @@ test("기본 방 흐름: 묶음 고르기 → 풀이 → 다음 풀이로 이어
   for (const t of m.topics) st = applyAction(m, "main", st, { t: "topic", id: t.id }).state;
   const done = replyOptions(m, "main", st);
   assert.ok(done.kind === "chat" && done.report && done.next === null);
-  // 앞으로의 시기에서는 두 달력 버튼이 모두 있다
   const flow = applyAction(m, "main", startRoom(m, "main"), { t: "topic", id: "flow" }).state;
   const rf = replyOptions(m, "main", flow);
   assert.ok(rf.kind === "chat" && rf.helpers.some((c) => c.key === "calendar-love") && rf.helpers.some((c) => c.key === "calendar-money"));
 });
 
-test("이어 보기: 행동 목록을 처음부터 다시 적용하면 같은 대화가 되살아나고, 저장은 행동 목록뿐이라 리포트 글 · 이름이 들어 있지 않다", () => {
+test("오늘의 한 장(원데이 미유): 고른 영역의 한 줄 팁이 풀이 뒤에 붙고 한 번으로 끝나며, 내 경험 답장은 없고 맺음말로 끝난다", () => {
   const m = model();
-  const actions: RoomAction[] = [{ t: "intake", option: "some" }, { t: "feel", topic: "love", kind: "yes" }, { t: "extra", topic: "love", which: "detail" }, { t: "extra", topic: "love", which: "calendar-love" }, { t: "concern" }];
+  const d = dayReading(SAMPLE_CHART, TODAY);
+  const s = startRoom(m, "daily");
+  assert.equal(s.phase, "intake");
+  const a = applyAction(m, "daily", s, { t: "intake", option: "people" });
+  const answer = a.added.find((l) => l.from === "miyu" && l.say.kind === "answer");
+  assert.ok(answer && answer.from === "miyu" && answer.say.kind === "answer" && answer.say.headline === `오늘은 ${d.title}이에요` && answer.say.number === 0);
+  const tip = a.added.find((l) => l.from === "miyu" && l.say.kind === "text" && l.say.label === "사람 · 연애");
+  assert.ok(tip && tip.from === "miyu" && tip.say.kind === "text" && tip.say.text === d.tips.people);
+  assert.ok(!miyuText(a.added).includes(d.tips.work), "고르지 않은 영역의 팁은 보내지 않는다 (하루 한 번의 무료 한 장)");
+  assert.equal(miyuText(a.added).at(-1), "오늘의 무료 운세는 여기까지예요. 내일 새로운 한 장으로 다시 만나요.");
+  const r = replyOptions(m, "daily", a.state);
+  assert.ok(r.kind === "chat" && r.feel.length === 0 && r.next === null, "내 경험 답장 · 다음 풀이가 없다");
+  assert.ok(r.kind === "chat" && r.helpers.map((c) => c.key).join() === "basis", "분석 이유만 열 수 있다");
+  // 건너뛰면 영역 팁 없이 오늘의 분위기만
+  const skip = applyAction(m, "daily", s, { t: "intake", option: "skip" });
+  assert.ok(!miyuText(skip.added).some((t) => Object.values(d.tips).includes(t)));
+  // 이어 보기는 날짜별로 나뉜다 — 내일은 새 한 장
+  assert.equal(roomSaveKey(m, "daily"), "daily:2026-10-15");
+  assert.equal(roomSaveKey(m, "love"), "love");
+});
+
+test("올해의 흐름(흐름박사 미유): 고른 쪽의 월별 달력이 시기 풀이 바로 뒤에 붙고, 전체 분위기를 고르면 달력 없이 풀이만 온다", () => {
+  const m = model();
+  const money = applyAction(m, "year", startRoom(m, "year"), { t: "intake", option: "money" });
+  const texts = miyuText(money.added);
+  const flow = m.topics.find((t) => t.id === "flow")!;
+  const moneyBubbles = flow.picks!.money.flatMap((b) => (b.kind === "text" ? [b.text] : []));
+  assert.ok(moneyBubbles.length >= 2);
+  for (const t of moneyBubbles) assert.ok(texts.includes(t), "재물 달력의 말이 풀이 뒤에 온다");
+  const love = applyAction(m, "year", startRoom(m, "year"), { t: "intake", option: "love" });
+  assert.ok(miyuText(love.added).some((t) => /가까운 관계|인연|성별/.test(t)));
+  const all = applyAction(m, "year", startRoom(m, "year"), { t: "intake", option: "all" });
+  assert.ok(!moneyBubbles.some((t) => miyuText(all.added).includes(t)));
+  const r = replyOptions(m, "year", money.state);
+  assert.ok(r.kind === "chat" && r.helpers.map((c) => c.key).includes("calendar-love"));
+});
+
+test("결혼박사 미유: 오래 가는 관계 풀이로 시작해 인연의 경향으로 이어지고, 결혼 여부 · 시기를 정하지 않고 궁합 비교는 준비 중이라고 밝힌다", () => {
+  const m = model();
+  const a = applyAction(m, "marriage", startRoom(m, "marriage"), { t: "intake", option: "thinking" });
+  assert.equal(a.state.current, "marriage");
+  const text = miyuText(a.added).join("\n");
+  assert.match(text, /결혼 여부나 시기를 사주로 정하지/);
+  assert.match(text, /궁합은 준비 중이에요/);
+  assert.match(text, /100% 정확하거나 검증된 사실이 아니에요/);
+  const r = replyOptions(m, "marriage", a.state);
+  assert.ok(r.kind === "chat" && r.next?.action.t === "topic" && r.next.action.id === "partner");
+  const partner = applyAction(m, "marriage", a.state, { t: "topic", id: "partner" });
+  const answer = partner.added.find((l) => l.from === "miyu" && l.say.kind === "answer");
+  assert.ok(answer && answer.from === "miyu" && answer.say.kind === "answer" && /에게 마음이 편해지기 쉬워요$/.test(answer.say.headline));
+  assert.ok(answer.say.paragraphs.length === 2 && /큰 방향만 본 거예요/.test(answer.say.paragraphs[1]), "나이 차는 큰 방향까지만");
+  const detail = applyAction(m, "marriage", partner.state, { t: "extra", topic: "partner", which: "detail" });
+  assert.ok(miyuText(detail.added).some((t) => /정확한 나이 · 직업 · 마음, 만나는 날짜는 말하지 않고/.test(t)));
+  const months = replyOptions(m, "marriage", partner.state);
+  assert.ok(months.kind === "chat" && months.helpers.some((c) => c.key === "calendar-love" && c.label === "인연이 움직이는 달은?"));
+});
+
+test("고민해결소 미유: 먼저 묻는 질문 뒤 자유 질문 상태에 따라 이어 간다 — 준비 중이면 고민 기록소로, 잠겨 있으면 리포트 안내로, 열려 있으면 입력창으로", () => {
+  const pend = model({ state: "pending" });
+  const a = applyAction(pend, "concern", startRoom(pend, "concern"), { t: "intake", option: "love" }, { contextHref: "/x/context" });
+  assert.equal(a.state.phase, "chat");
+  assert.ok(a.added.some((l) => l.from === "miyu" && l.say.kind === "link" && l.say.href === "/x/context" && /준비 중/.test(l.say.text)));
+  const locked = model({ state: "locked" });
+  const b = applyAction(locked, "concern", startRoom(locked, "concern"), { t: "intake", option: "work" });
+  const lock = b.added.find((l) => l.from === "miyu" && l.say.kind === "lock");
+  assert.ok(lock && lock.from === "miyu" && lock.say.kind === "lock" && lock.say.hooks.length === 3 && lock.say.hooks.every((h) => h.endsWith("?")));
+  const rl = replyOptions({ ...locked, tier: "free", buy: { href: "/results/x#r-purchase", label: "리포트로 이어 보기 · 9,900원", owned: false } }, "concern", b.state);
+  assert.ok(rl.kind === "chat" && rl.buy?.href === "/results/x#r-purchase", "이야기만 하는 방의 잠금에도 구매로 이어지는 버튼이 있다");
+  const ready = model({ state: "ready" });
+  const c = applyAction(ready, "concern", startRoom(ready, "concern"), { t: "intake", option: "money" });
+  assert.ok(miyuText(c.added).includes(ROOM_COPY.chatReady));
+  assert.equal(c.state.current, null);
+});
+
+test("자유 질문과 답: 내 질문과 미유의 답이 대화에 놓이고, 이어 가기 상태가 풀리며, 같은 행동 목록에서 같은 대화가 되살아난다", () => {
+  const m = model({ state: "ready" });
+  const act: RoomAction = { t: "free", q: "요즘 연락이 뜸한 사람이 있어요. 제가 뭘 잘못한 걸까요?", a: ["잘못했다고 정해서 말할 수는 없어요.", "대신 연락이 뜸할 때 내가 어떻게 반응하는지 같이 살펴볼 수 있어요."] };
+  let st = applyAction(m, "love", startRoom(m, "love"), { t: "intake", option: "some" }).state;
+  st = applyAction(m, "love", st, { t: "feel", topic: "love", kind: "mixed" }).state;
+  assert.ok(st.asking);
+  const r = applyAction(m, "love", st, act);
+  assert.deepEqual(r.added[0], { from: "me", text: act.q });
+  assert.deepEqual(miyuText(r.added), act.a);
+  assert.equal(r.state.asking, null);
+  const actions: RoomAction[] = [{ t: "intake", option: "some" }, { t: "feel", topic: "love", kind: "mixed" }, act];
+  assert.deepEqual(replayRoom(m, "love", actions), r.state);
+  assert.deepEqual(parseRoomSave(JSON.parse(JSON.stringify({ v: ROOM_SAVE_VERSION, actions })), m, "love"), actions);
+  // 빈 질문 · 빈 답은 무시하고, 너무 긴 글은 저장에서 버린다
+  assert.equal(applyAction(m, "love", st, { t: "free", q: " ", a: ["x"] }).added.length, 0);
+  assert.equal(applyAction(m, "love", st, { t: "free", q: "질문", a: [] }).added.length, 0);
+  assert.deepEqual(parseRoomSave({ v: ROOM_SAVE_VERSION, actions: [{ t: "free", q: "가".repeat(301), a: ["x"] }, { t: "free", q: "질문", a: ["가".repeat(601)] }] }, m, "love"), []);
+});
+
+test("이어 보기: 행동 목록을 처음부터 다시 적용하면 같은 대화가 되살아나고, 저장에는 리포트 글 · 이름이 들어 있지 않다", () => {
+  const m = model();
+  const actions: RoomAction[] = [{ t: "intake", option: "some" }, { t: "feel", topic: "love", kind: "yes" }, { t: "extra", topic: "love", which: "detail" }, { t: "extra", topic: "love", which: "calendar-love" }, { t: "topic", id: "partner" }];
   let st = startRoom(m, "love");
   for (const a of actions) st = applyAction(m, "love", st, a).state;
   assert.deepEqual(replayRoom(m, "love", actions), st);
@@ -201,41 +329,40 @@ test("이어 보기: 행동 목록을 처음부터 다시 적용하면 같은 �
   assert.ok(saved.length < 400, "행동 목록은 아주 작다");
   assert.ok(!saved.includes(R.headline) && !saved.includes(R.personName), "리포트 글 · 이름이 저장에 없다");
   assert.deepEqual(parseRoomSave(JSON.parse(saved), m, "love"), actions);
-  // 깨졌거나 없는 것을 가리키는 행동은 그 행동만 버린다
   assert.deepEqual(parseRoomSave(null, m, "love"), []);
-  assert.deepEqual(parseRoomSave({ v: 99, actions }, m, "love"), []);
-  assert.deepEqual(parseRoomSave({ v: ROOM_SAVE_VERSION, actions: [{ t: "topic", id: "없음" }, { t: "intake", option: "왜" }, { t: "x" }, null, { t: "concern" }] }, m, "love"), [{ t: "concern" }]);
-  // 방마다 따로 되살아난다
-  assert.notDeepEqual(replayRoom(m, "work", [{ t: "intake", option: "way" }]).lines, replayRoom(m, "love", actions).lines);
-  // 연애 방의 답 번호는 다른 방에서 쓸 수 없다
+  assert.deepEqual(parseRoomSave({ v: 1, actions }, m, "love"), [], "옛 저장 형식은 새 대화로 시작한다");
+  assert.deepEqual(parseRoomSave({ v: ROOM_SAVE_VERSION, actions: [{ t: "topic", id: "없음" }, { t: "intake", option: "왜" }, { t: "x" }, null, { t: "concern" }] }, m, "love"), []);
+  assert.notDeepEqual(replayRoom(m, "career", [{ t: "intake", option: "way" }]).lines, replayRoom(m, "love", actions).lines);
   assert.deepEqual(parseRoomSave({ v: ROOM_SAVE_VERSION, actions: [{ t: "intake", option: "solo" }] }, m, "money"), []);
 });
 
-test("미유의 모든 말은 저장된 리포트의 글이거나 이 파일의 고정 문구다 — 새로 쓴 글이 없다 (AI 호출 없음)", () => {
-  const m = model();
-  const pool = [...allStrings(R)].map(norm);
-  const fixed = new Set(fixedCopy().map(norm));
-  const derived = (t: string) => m.topics.some((x) => x.periodExample && norm(x.periodExample) === t) || m.topics.some((x) => norm(askFor(x.id, m.name)) === t);
-  for (const room of ROOM_ORDER) {
-    const intake = ROOMS[room].intake;
-    const script: RoomAction[][] = [
-      ...(intake ? [...intake.options, intake.skip].map((o) => [{ t: "intake", option: o.id } as RoomAction]) : [[{ t: "group", id: "me" } as RoomAction], [{ t: "topic", id: "flow" } as RoomAction]]),
-    ];
-    for (const actions of script) {
-      let st = startRoom(m, room);
-      const seen: TalkLine[] = [...st.lines];
-      for (const a of [...actions, ...["yes", "mixed", "unsure"].map((kind) => ({ t: "feel", topic: st.current ?? roomTopics(m, room)[0].id, kind }) as RoomAction)]) {
-        const r = applyAction(m, room, st, a, { contextHref: "/x" });
-        st = r.state;
-        seen.push(...r.added);
-      }
-      for (const l of seen) {
-        if (l.from === "me") continue;
-        const say = l.say;
-        const texts = say.kind === "text" ? [say.text] : say.kind === "link" ? [say.text] : say.kind === "system" ? [say.text, say.sub ?? ""] : say.kind === "answer" ? [say.headline, ...say.paragraphs] : [];
-        for (const raw of texts.filter(Boolean)) {
-          const t = norm(raw.replace(/ ?지금은 ‘나의 고민 기록소’에 적어 둘 수 있어요\.$/, ""));
-          assert.ok(pool.some((p) => p.includes(t)) || fixed.has(t) || derived(t) || [...fixed].some((f) => norm(raw).startsWith(f) || f.includes(t)), `${room}: 출처를 알 수 없는 말 — ${raw.slice(0, 40)}`);
+test("미유의 모든 말은 저장된 리포트의 글 · 사주 계산에서 고른 고정 문구 · 이 파일의 고정 문구다 — 새로 쓴 글이 없다 (AI 호출 없음)", () => {
+  const states: TalkChat["state"][] = ["pending", "locked", "ready"];
+  for (const state of states) {
+    const m = model({ state });
+    const pool = [...allStrings(R), ...allStrings(m.codeTopics), ...allStrings(m.topics.map((t) => t.picks))].map(norm);
+    const fixed = new Set(fixedCopy().map(norm));
+    const derived = (t: string) => [...m.topics, ...m.codeTopics].some((x) => (x.periodExample && norm(x.periodExample) === t) || norm(askFor(x.id, m.name)) === t || (x.askText && norm(x.askText) === t));
+    for (const room of ROOM_ORDER) {
+      const intake = ROOMS[room].intake;
+      const script: RoomAction[][] = intake ? [...intake.options, intake.skip].map((o) => [{ t: "intake", option: o.id } as RoomAction]) : [[{ t: "group", id: "me" } as RoomAction], [{ t: "topic", id: "flow" } as RoomAction]];
+      for (const actions of script) {
+        let st = startRoom(m, room);
+        const seen: TalkLine[] = [...st.lines];
+        const topic = () => st.current ?? roomTopics(m, room)[0]?.id;
+        for (const a of [...actions, ...["yes", "mixed", "unsure"].map((kind) => ({ t: "feel", topic: topic() ?? "tendency", kind }) as RoomAction)]) {
+          const r = applyAction(m, room, st, a, { contextHref: "/x" });
+          st = r.state;
+          seen.push(...r.added);
+        }
+        for (const l of seen) {
+          if (l.from === "me") continue;
+          const say = l.say;
+          const texts = say.kind === "text" ? [say.text] : say.kind === "link" ? [say.text] : say.kind === "system" ? [say.text, say.sub ?? ""] : say.kind === "answer" ? [say.headline, ...say.paragraphs] : say.kind === "lock" ? [say.title, ...say.hooks] : [];
+          for (const raw of texts.filter(Boolean)) {
+            const t = norm(raw.replace(/ ?지금은 ‘나의 고민 기록소’에 적어 둘 수 있어요\.$/, ""));
+            assert.ok(pool.some((p) => p.includes(t)) || fixed.has(t) || derived(t) || [...fixed].some((f) => norm(raw).startsWith(f) || f.includes(t)) || /^오늘은 .+이에요$/.test(t), `${state}/${room}: 출처를 알 수 없는 말 — ${raw.slice(0, 40)}`);
+          }
         }
       }
     }
@@ -244,8 +371,7 @@ test("미유의 모든 말은 저장된 리포트의 글이거나 이 파일의 
 
 test("고정 문구: 해요체이고, 사건 예언 · 단정 · 점수 · 투자 권유가 없고, 돈 방은 투자 · 대출 결정을 사주로 정하지 않는다고 밝힌다", () => {
   const copy = fixedCopy();
-  assert.ok(copy.length > 40);
-  // 모드 접속 안내("○○ 미유 모드로 접속합니다")는 운영자가 정한 문구라 합쇼체 그대로 둔다 — 나머지는 모두 해요체
+  assert.ok(copy.length > 60);
   const connects = new Set(ROOM_ORDER.map((id) => ROOMS[id].connect).filter(Boolean));
   for (const t of copy) {
     if (!connects.has(t)) assert.doesNotMatch(t, /습니다|합니다|됩니다/, `합쇼체: ${t}`);
@@ -255,9 +381,13 @@ test("고정 문구: 해요체이고, 사건 예언 · 단정 · 점수 · 투�
   }
   assert.match(ROOMS.money.connectNote ?? "", /투자 · 대출 결정은 사주로 정하지 않아요/);
   assert.match(ROOMS.money.intake!.options.find((o) => o.id === "big")!.lead, /투자나 대출 결정에는 쓰지 말고/);
-  // 상대의 속마음 · 나이 · 직업을 정해서 말하지 않는다
   assert.match(ROOMS.love.intake!.options.find((o) => o.id === "crush")!.lead, /속마음을 단정하지는 않아요/);
   assert.match(ROOMS.love.intake!.options.find((o) => o.id === "wedding")!.lead, /결혼 여부나 시기를 사주로 정하지 않고/);
-  // 모드 안내는 보장하지 않는다고 밝힌다
-  assert.match(ROOMS.love.connectNote ?? "", /보장하는 상담은 아니에요/);
+  assert.match(ROOMS.love.connectNote ?? "", /보장하는 상담은 아니고/);
+  assert.match(ROOMS.concern.connectNote ?? "", /상대의 속마음을 단정하지 않아요/);
+  assert.match(ROOMS.year.connectNote ?? "", /예측은 아니에요/);
+  assert.match(ROOMS.daily.connectNote ?? "", /무슨 일이 생긴다는 뜻은 아니에요/);
+  // 방 이름 목록 자체도 하나씩 열 수 있어야 한다
+  const rooms: RoomId[] = [...ROOM_ORDER];
+  assert.equal(new Set(rooms).size, 8);
 });

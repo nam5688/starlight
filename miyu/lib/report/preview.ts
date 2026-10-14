@@ -30,7 +30,7 @@ export type FreePreview = {
    * 대표 경향 아래의 해석 — 응답이 뒷받침하는 문단이 있으면 전체를 보여 주고(근거 문항 번호는 보내지 않는다),
    * 없으면 일반 한 줄 요약의 앞부분만 보여 준다.
    */
-  lead: { kind: "insight"; text: string; basisNote: string } | { kind: "oneLiner"; shown: string };
+  lead: { kind: "insight"; text: string; basisNote: string; /** 어느 검사 영역의 응답이 근거인가 (무료 맛보기 대화가 어느 방에서 이 문단을 보일지 정하는 데 쓴다) */ module: "relationship" | "temperament" } | { kind: "oneLiner"; shown: string };
   /** 잠긴 핵심 요약 2가지 — 문장 대신 "무엇에 답하는지"(질문)만 */
   core: { shown: { label: string; text: string }[]; locked: { label: string; question: string }[] };
   mbti: FreeSummary["mbti"];
@@ -149,6 +149,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
         kind: "insight",
         text: insight.text,
         basisNote: `${insight.basisModule === "relationship" ? "관계(애착)" : "기질"} 문항에 답하신 내용 중 ${insight.basis.length}개가 이 문단의 근거입니다. 모든 사람에게 같은 문장이 나오지 않고, 응답이 뒷받침할 때만 들어갑니다.`,
+        module: insight.basisModule,
       }
     : { kind: "oneLiner", shown: maskOneLiner(summary.oneLiner) };
 

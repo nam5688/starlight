@@ -1,19 +1,26 @@
 import { notFound, redirect } from "next/navigation";
-import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
+import { LoginOptions } from "@/components/auth/login-options";
 import { talkRoomPath } from "@/components/talk/room-paths";
 import { TalkView } from "@/components/talk/talk-view";
 import { pageNarrow } from "@/components/ui/styles";
 import { isReadingReport } from "@/lib/report/generator";
+import { buildFreePreview } from "@/lib/report/preview";
+import { seoulReference } from "@/lib/report/reference";
 import { buildTalkModel } from "@/lib/report/reading/talk";
-import { ROOM_ORDER, roomAvailable, type RoomId } from "@/lib/report/reading/talk-room";
+import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
+import { seoulDate } from "@/lib/saju/interpret/day-plain";
+import { ROOM_ORDER, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
+import type { TalkModel } from "@/lib/report/reading/talk";
 import { getResultView } from "@/lib/services/report-service";
+import { listSavedRoomKeys, loadTalkRoom } from "@/lib/services/talk-service";
+import { chatStateFor } from "@/server/chat";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
-import { readRepository } from "@/server/services";
+import { now, readRepository } from "@/server/services";
 
 /**
- * 구매해 준비된 개인 통합 리포트(읽기 구조)만 대화로 풀어 볼 수 있다 — 저장된 글을 나눠서 보여 줄 뿐 AI를 부르지 않는다.
- * 방마다 새 대화로 시작하고, 이어 보기는 이 기기의 브라우저에만 남는다.
+ * 대화로 풀어보기 — 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖의 경우(무료 분석만 마쳤거나 리포트를 준비 중)는 무료 맛보기로 이야기한다.
+ * 어느 쪽이든 새 글을 쓰는 AI를 부르지 않는다. 방마다 새 대화로 시작한다.
  */
 export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }) {
   const here = talkRoomPath(id, room);
@@ -23,9 +30,9 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
     return (
       <div className={`${pageNarrow} py-14 md:py-20`}>
         <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
-        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있습니다. 카카오로 로그인해 주세요.</p>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있습니다. 로그인해 주세요.</p>
         <div className="mt-8">
-          <KakaoLoginForm next={here} />
+          <LoginOptions next={here} />
         </div>
       </div>
     );
@@ -36,14 +43,50 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
   const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId: id });
   if (!view) notFound();
   const { assessment, report } = view;
-  // 구매 전 · 생성 중 · 이전 형식의 리포트는 대화로 풀지 않고 결과 화면으로 돌려보낸다
-  if (!view.paidOrder || report?.status !== "ready" || !report.content || !isReadingReport(report.content)) redirect(`/results/${id}`);
-
-  const content = report.content;
-  const model = buildTalkModel(content);
-  if (!roomAvailable(model, room)) notFound();
+  const today = seoulDate(now());
   const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
-  const sample = content.source === "sample";
+  const roomHrefs = Object.fromEntries(ROOM_ORDER.map((r) => [r, talkRoomPath(id, r)]));
+  const repo = await readRepository();
+  /** 서버에 저장된 이 방의 대화와 저장된 방 목록 — 폰을 바꿔도 이어 본다 */
+  const persistFor = async (model: TalkModel) => ({
+    assessmentId: id,
+    initial: await loadTalkRoom(repo, { userId: member.userId, assessmentId: id, roomKey: roomSaveKey(model, room) }).catch(() => []),
+    savedKeys: await listSavedRoomKeys(repo, { userId: member.userId, assessmentId: id }).catch(() => []),
+  });
+
+  // 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖에는 무료 맛보기(잠긴 내용 없음)로 이야기한다
+  if (view.paidOrder && report?.status === "ready" && report.content && isReadingReport(report.content)) {
+    const content = report.content;
+    const model = buildTalkModel(content, { saju: assessment.saju, today, chat: chatStateFor("paid") });
+    if (!roomAvailable(model, room)) notFound();
+    const sample = content.source === "sample";
+    return (
+      <TalkView
+        model={model}
+        room={room}
+        scope={id}
+        dateLabel={created}
+        reportHref={`/results/${id}`}
+        dataHref={`/results/${id}#r-data`}
+        contextHref={`/results/${id}/context`}
+        roomHrefs={roomHrefs}
+        persist={await persistFor(model)}
+        badge={{ label: sample ? "개발용 샘플" : "내 리포트", text: `저장된 리포트 · 검사일 ${created}${sample ? " · 개발용 샘플" : ""}` }}
+      />
+    );
+  }
+
+  const owned = Boolean(view.paidOrder);
+  const model = buildFreeTalkModel({
+    name: assessment.nickname,
+    preview: buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(now()) }),
+    saju: assessment.saju,
+    today,
+    href: owned ? `/results/${id}` : `/results/${id}#r-purchase`,
+    owned,
+    chat: chatStateFor("free"),
+  });
+  if (!roomAvailable(model, room)) notFound();
   return (
     <TalkView
       model={model}
@@ -51,10 +94,13 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
       scope={id}
       dateLabel={created}
       reportHref={`/results/${id}`}
-      dataHref={`/results/${id}#r-data`}
-      contextHref={`/results/${id}/context`}
-      roomHrefs={Object.fromEntries(ROOM_ORDER.map((r) => [r, talkRoomPath(id, r)]))}
-      badge={{ label: sample ? "개발용 샘플" : "내 리포트", text: `저장된 리포트 · 검사일 ${created}${sample ? " · 개발용 샘플" : ""}` }}
+      dataHref={`/results/${id}`}
+      roomHrefs={roomHrefs}
+      persist={await persistFor(model)}
+      badge={{
+        label: owned ? "리포트 준비 중" : "무료 맛보기",
+        text: owned ? `검사일 ${created} · 리포트를 준비하고 있어요. 준비되면 같은 방에서 전체 풀이를 이어 볼 수 있어요.` : `무료 분석으로 만든 맛보기예요 · 검사일 ${created}. 이어지는 깊은 풀이는 리포트에서 볼 수 있어요.`,
+      }}
     />
   );
 }

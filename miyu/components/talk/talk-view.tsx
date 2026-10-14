@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
-import { AdjustIcon, ArrowIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
+import { AdjustIcon, ArrowIcon, LockIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
 import { TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
 import {
   applyAction,
+  FREE_QUESTION_MAX,
   parseRoomSave,
   replayRoom,
   replyOptions,
   roomAvailable,
+  roomSaveKey,
   roomTopics,
+  ROOM_COPY,
   ROOM_ORDER,
   ROOMS,
   ROOM_SAVE_VERSION,
@@ -24,6 +27,7 @@ import {
   type TalkMood,
   type TalkSay,
 } from "@/lib/report/reading/talk-room";
+import { askMiyuAction, resetTalkRoomAction, saveTalkRoomAction } from "@/app/results/[id]/talk/actions";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
 import { MiyuAvatar, TypingDots } from "./miyu-character";
@@ -48,6 +52,11 @@ type Props = {
   contextHref?: string;
   /** 채팅방 이동 주소 — 메뉴에는 여기 적힌 방만 보인다(개발용 비교 화면은 방이 하나뿐이다). 서버 화면에서 넘기므로 함수가 아니라 주소 표다 */
   roomHrefs: Partial<Record<RoomId, string>>;
+  /**
+   * 대화를 서버에도 저장하는 화면(로그인한 회원의 내 결과) — 폰을 바꿔도 이어 본다.
+   * initial: 이 방에 서버에 저장돼 있던 행동 목록(없으면 빈 목록) · savedKeys: 저장된 대화가 있는 방 이름들. 없으면 이 기기의 브라우저에만 저장한다(예시 화면).
+   */
+  persist?: { assessmentId: string; initial: unknown[]; savedKeys: string[] };
 };
 
 /** 넓고 충분히 높은 화면에서는 가운데 채팅 틀로 보이고, 그 반대(모바일)에서는 화면 전체를 쓴다 (globals.css의 chat-frame 조건과 같아야 한다) */
@@ -66,22 +75,21 @@ const chipBase = "inline-flex min-h-11 shrink-0 items-center justify-center gap-
 const chip = `${chipBase} bg-accent-soft text-accent-strong hover:brightness-95`;
 const chipSub = "inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-mist px-3.5 py-1.5 text-[14px] font-medium whitespace-nowrap text-ink-2 transition-colors hover:brightness-95";
 const chipPrimary = `${chipBase} bg-accent text-white whitespace-nowrap hover:bg-accent-strong`;
-const pending = <span className="text-[13px] font-medium text-ink-3">· 준비 중</span>;
 
-const saveKey = (scope: string, room: RoomId) => `miyu-talk:v${ROOM_SAVE_VERSION}:${scope}:${room}`;
+const saveKey = (scope: string, key: string) => `miyu-talk:v${ROOM_SAVE_VERSION}:${scope}:${key}`;
 /** 이 기기의 브라우저에만 둔다 — 눌렀던 행동 목록뿐이고 리포트 글 · 고민 내용은 담지 않는다. 막혀 있어도 대화는 그대로 된다 */
-const readSave = (scope: string, room: RoomId): unknown => {
+const readSave = (scope: string, key: string): unknown => {
   try {
-    const raw = window.localStorage.getItem(saveKey(scope, room));
+    const raw = window.localStorage.getItem(saveKey(scope, key));
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 };
-const writeSave = (scope: string, room: RoomId, actions: RoomAction[]) => {
+const writeSave = (scope: string, key: string, actions: RoomAction[]) => {
   try {
-    if (actions.length === 0) window.localStorage.removeItem(saveKey(scope, room));
-    else window.localStorage.setItem(saveKey(scope, room), JSON.stringify({ v: ROOM_SAVE_VERSION, actions }));
+    if (actions.length === 0) window.localStorage.removeItem(saveKey(scope, key));
+    else window.localStorage.setItem(saveKey(scope, key), JSON.stringify({ v: ROOM_SAVE_VERSION, actions }));
   } catch {
     // 저장이 막힌 브라우저 — 이어 보기만 안 될 뿐이다
   }
@@ -92,9 +100,10 @@ const writeSave = (scope: string, room: RoomId, actions: RoomAction[]) => {
  * 모두 저장된 리포트의 글(답변 한 번에 말풍선 1~2개)과 고정 문구이며 AI를 부르지 않는다. 풀이를 읽은 뒤에는 내 경험을 말하는 질문과 보조 버튼이 따라온다.
  * 대화는 이 기기에만 이어 보기로 남는다(서버 저장 없음). 자유 질문 · 고민 말하기(AI가 답하는 부분)는 아직 준비 중이라고 밝힌다. 모션을 줄이는 설정이면 말풍선이 한꺼번에 나타난다.
  */
-export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, badge, contextHref, roomHrefs }: Props) {
+export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, badge, contextHref, roomHrefs, persist }: Props) {
   const def = ROOMS[room];
   const { name } = model;
+  const key = roomSaveKey(model, room);
   const noteId = useId();
   const seq = useRef(100);
   const ctx = { contextHref };
@@ -104,6 +113,17 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const [actions, setActions] = useState<RoomAction[]>([]);
   const [log, setLog] = useState<Item[]>(() => startRoom(model, room).lines.map((l, i) => ({ ...l, id: i })));
   const [typing, setTyping] = useState(false);
+  /** 직접 적은 질문의 답을 서버에서 만드는 중 — 말풍선이 도착하는 동안과 같은 "입력 중" 모양을 쓴다 */
+  const [waiting, setWaiting] = useState(false);
+  const [draft, setDraft] = useState("");
+  /** 오늘 더 물어볼 수 있는 횟수 — 답을 한 번 받은 뒤부터 안다 */
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  /** 직접 적어 보낸 뒤에는 초점을 입력창에 둔다 (눌러서 이어 간 뒤에는 답장 버튼 쪽) */
+  const wantInput = useRef(false);
+  /** 자유 질문은 리포트를 받아 AI가 연결돼 있고, 서버에 저장하는 화면(로그인한 내 결과)에서만 열린다 */
+  const canAsk = model.chat.state === "ready" && Boolean(persist);
+  const busy = typing || waiting;
   const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [saved, setSaved] = useState<Partial<Record<RoomId, boolean>>>({});
@@ -189,7 +209,9 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   // 이 기기에 남은 이 방의 대화가 있으면 이어서 보여 준다(처음 그릴 때는 새 대화와 같은 모양이라 어긋나지 않는다)
   useEffect(() => {
     const t = window.setTimeout(() => {
-      const restored = parseRoomSave(readSave(scope, room), model, room);
+      // 서버에 저장된 대화가 있으면 그것을 먼저(어느 기기에서나 이어 보기), 없으면 이 기기에 남은 것
+      const fromServer = persist && persist.initial.length > 0 ? parseRoomSave({ v: ROOM_SAVE_VERSION, actions: persist.initial }, model, room) : [];
+      const restored = fromServer.length > 0 ? fromServer : parseRoomSave(readSave(scope, key), model, room);
       if (restored.length === 0) return;
       const state = replayRoom(model, room, restored, { contextHref });
       setEngine(state);
@@ -231,23 +253,71 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
 
   /** 눌러서 이어 가기 — 엔진이 새 말과 바뀐 상태를 돌려주고, 행동은 이 기기에 이어 보기로 남긴다 */
   const act = (action: RoomAction) => {
+    if (waiting) return;
     if (running.current) skip();
+    wantInput.current = false;
     const r = applyAction(model, room, engine, action, ctx);
     if (r.added.length === 0) return;
     setEngine(r.state);
     const next = [...actions, action];
     setActions(next);
-    writeSave(scope, room, next);
+    writeSave(scope, key, next);
+    // 서버 저장은 기다리지 않는다 — 실패해도 대화는 그대로이고 이 기기에는 남는다
+    if (persist) void saveTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key, actions: next }).catch(() => undefined);
     deliver(r.added);
   };
 
+  /** 직접 적은 질문 보내기 — 내 말은 바로 보이고, 답은 서버가 저장된 리포트의 글을 근거로 AI에게 받아 온다. 검사를 통과한 답만 대화에 놓고 저장한다 */
+  const send = async (e?: FormEvent) => {
+    e?.preventDefault();
+    const q = draft.trim();
+    if (!canAsk || !persist || !q || busy) return;
+    if (running.current) skip();
+    acted.current = true;
+    wantInput.current = true;
+    stick.current = true;
+    setDraft("");
+    setWaiting(true);
+    setLog((l) => [...l, { from: "me", text: q, id: ++seq.current }]);
+    const topic = engine.asking?.topic ?? engine.current;
+    const reply = await Promise.race([
+      askMiyuAction({ assessmentId: persist.assessmentId, room, roomKey: key, question: q, topicId: topic, intake: engine.intake, followUp: engine.asking !== null }),
+      new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 75_000)),
+    ]).catch(() => null);
+    setWaiting(false);
+    const say = (texts: string[]): TalkLine[] => texts.map((text, i) => ({ from: "miyu", say: { kind: "text", text }, mood: i === 0 ? "thinking" : "basic" }));
+    if (reply?.ok && reply.kind === "answer") {
+      setRemaining(reply.remaining);
+      // 저장하는 질문은 서버가 개인정보를 가린 글이다
+      const action: RoomAction = { t: "free", q: reply.question, a: reply.paragraphs, ...(topic ? { topic } : {}) };
+      const r = applyAction(model, room, engine, action, ctx);
+      if (r.added.length === 0) return;
+      setEngine(r.state);
+      const next = [...actions, action];
+      setActions(next);
+      writeSave(scope, key, next);
+      void saveTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key, actions: next }).catch(() => undefined);
+      deliver(r.added.filter((l) => l.from === "miyu"));
+      return;
+    }
+    // 마음이 힘든 글의 안내 · 한도 · 실패 안내는 대화에 보이되 저장하지 않는다 (실패하면 쓴 글을 되돌려 다시 보낼 수 있게 한다)
+    if (reply?.ok) deliver(say(reply.paragraphs));
+    else {
+      deliver(say([reply ? reply.message : "답이 늦어지고 있어요. 잠시 뒤에 다시 물어봐 주세요."]));
+      if (reply && reply.reason === "limit") setRemaining(0);
+      if (!reply || reply.reason === "failed" || reply.reason === "budget") setDraft((d) => d || q);
+    }
+  };
+
   const restart = () => {
+    if (waiting) return;
     stopTimer();
     running.current = false;
     queue.current = [];
     setTyping(false);
     setMenuOpen(false);
-    writeSave(scope, room, []);
+    writeSave(scope, key, []);
+    if (persist) void resetTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key }).catch(() => undefined);
     const fresh = startRoom(model, room);
     setEngine(fresh);
     setActions([]);
@@ -263,7 +333,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   };
   const showFromTop = (box: HTMLElement, el: HTMLElement, behavior: ScrollBehavior) => box.scrollTo({ top: el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8, behavior });
   useEffect(() => {
-    if (log.length === shownLen.current && !typing) return;
+    if (log.length === shownLen.current && !busy) return;
     const grew = log.length !== shownLen.current;
     shownLen.current = log.length;
     const box = scrollRef.current;
@@ -277,16 +347,17 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     if (anchorEl) showFromTop(box, anchorEl, behavior);
     else if (last && last.offsetHeight > box.clientHeight - 32) showFromTop(box, last, behavior);
     else box.scrollTo({ top: box.scrollHeight, behavior });
-  }, [log, typing]);
-  // 대화가 끝나면 선택지로 초점을 옮긴다 (누른 버튼이 사라져 초점이 몸통으로 빠지는 것을 막는다)
+  }, [log, busy]);
+  // 대화가 끝나면 선택지로 초점을 옮긴다 (누른 버튼이 사라져 초점이 몸통으로 빠지는 것을 막는다). 직접 적어 보낸 뒤에는 입력창에 둔다
   useEffect(() => {
-    if (!typing && acted.current) optionsRef.current?.focus({ preventScroll: true });
-  }, [typing, log]);
+    if (busy || !acted.current) return;
+    (wantInput.current ? inputRef.current : optionsRef.current)?.focus({ preventScroll: true });
+  }, [busy, log]);
 
   // 메뉴: 열면 첫 항목으로 초점, Esc · 바깥을 누르면 닫고 메뉴 버튼으로 초점을 돌려준다 · 열 때 이 기기에 남은 방을 확인한다
   useEffect(() => {
     if (!menuOpen) return;
-    const t = window.setTimeout(() => setSaved(Object.fromEntries(ROOM_ORDER.map((r) => [r, parseRoomSave(readSave(scope, r), model, r).length > 0]))), 0);
+    const t = window.setTimeout(() => setSaved(Object.fromEntries(ROOM_ORDER.map((r) => [r, Boolean(persist?.savedKeys.includes(roomSaveKey(model, r))) || parseRoomSave(readSave(scope, roomSaveKey(model, r)), model, r).length > 0]))), 0);
     menuRef.current?.querySelector<HTMLElement>("button, a")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -305,15 +376,18 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onDown);
     };
-  }, [menuOpen, scope, model]);
+  }, [menuOpen, scope, model, persist]);
 
   const replies = replyOptions(model, room, engine);
   const visibleMiyu = log.filter((l): l is Item & { from: "miyu" } => l.from === "miyu" && l.say.kind !== "system" && l.say.kind !== "card");
   const lastMood: TalkMood = visibleMiyu.length > 0 ? visibleMiyu[visibleMiyu.length - 1].mood : "basic";
   const lastLine = log[log.length - 1];
   const afterMiyuText = lastLine?.from === "miyu" && lastLine.say.kind !== "system";
-  const byTopic = new Map(model.topics.map((t) => [t.id, t]));
+  const byTopic = new Map([...model.topics, ...model.codeTopics].map((t) => [t.id, t]));
   const topicsHere = roomTopics(model, room);
+  // 자유 질문 입력창의 안내 — 열려 있으면 묻는 말, 아니면 왜 닫혀 있는지 (작동하는 것처럼 보이지 않게)
+  const placeholder = canAsk ? (engine.asking ? TALK_COPY.freeQuestionAsking : TALK_COPY.freeQuestionReady) : model.chat.state === "locked" ? TALK_COPY.freeQuestionLocked : TALK_COPY.freeQuestion;
+  const note = canAsk ? ROOM_COPY.chatAiNote : model.chat.state === "locked" ? ROOM_COPY.chatLocked : TALK_COPY.freeQuestionPending;
   const menuTopics = room === "main" ? model.groups : topicsHere.length > 1 ? topicsHere.map((t) => ({ id: t.id, chip: t.chip, topicIds: [t.id] })) : [];
 
   return (
@@ -325,7 +399,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         <Link href={reportHref} aria-label="전체 리포트로 돌아가기" className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
           <ArrowIcon className="size-5 rotate-180" />
         </Link>
-        <MiyuAvatar className="size-11" mood={typing ? "thinking" : lastMood} bob={typing} />
+        <MiyuAvatar className="size-11" mood={busy ? "thinking" : lastMood} bob={busy} />
         <div className="min-w-0 flex-1">
           <h1 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[17px] leading-tight font-bold">
             <span>
@@ -347,8 +421,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           </h1>
           {/* 대표 경향 설명은 분석 카드가 위로 올라가도 계속 보인다 — 후보 설명이며 진단이 아니다. 답을 쓰는 동안에는 "입력하고 있어요"가 겹쳐 보인다(높이는 그대로) */}
           <div className="relative">
-            <p className={`line-clamp-2 text-[13px] leading-snug text-ink-3 transition-opacity ${typing ? "opacity-0" : ""}`}>{model.card.tendency ?? def.blurb}</p>
-            {typing && (
+            <p className={`line-clamp-2 text-[13px] leading-snug text-ink-3 transition-opacity ${busy ? "opacity-0" : ""}`}>{model.card.tendency ?? def.blurb}</p>
+            {busy && (
               <p aria-hidden="true" className="absolute inset-x-0 top-0 flex items-center gap-2 text-[13px] leading-snug font-semibold text-accent-strong">
                 {TALK_COPY.typing}
                 <TypingDots className="size-1.5" />
@@ -401,7 +475,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
             </div>
           );
         })}
-        {typing && (
+        {busy && (
           <div className={`motion-safe:animate-miyu-in ${afterMiyuText ? "mt-1.5" : "mt-4"}`}>
             <div className="flex items-start gap-2">
               <div className="w-9 shrink-0">{!afterMiyuText && <MiyuAvatar className="size-9" mood="thinking" bob />}</div>
@@ -416,15 +490,17 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       </div>
 
       <div ref={optionsRef} tabIndex={-1} role="group" aria-label="답장 고르기" className="max-h-[46dvh] overflow-y-auto bg-page pt-2.5 pb-2 outline-none">
-        {typing ? (
+        {busy ? (
           <div className="flex min-h-11 items-center justify-between gap-3 px-3">
             <p className="flex items-center gap-2 text-[14px] text-ink-3">
               미유가 답하고 있어요
               <TypingDots className="size-1.5" />
             </p>
-            <button type="button" onClick={skip} className="min-h-11 px-1 text-[14px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">
-              바로 모두 보기
-            </button>
+            {typing && (
+              <button type="button" onClick={skip} className="min-h-11 px-1 text-[14px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">
+                바로 모두 보기
+              </button>
+            )}
           </div>
         ) : replies.kind === "pick" ? (
           // 첫 화면의 주제는 카드 다음에 2×2로 — 대화가 시작되면 접히고, 다른 이야기는 입력창 왼쪽 메뉴에 있다
@@ -442,7 +518,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           // 풀이를 읽은 뒤: 내 경험을 말하는 답장이 먼저, 일상 예시 · 분석 이유 같은 보조 버튼은 그 아래
           <div className="space-y-2">
             {replies.feel.length > 0 && <div className="flex gap-2 overflow-x-auto px-3 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{replies.feel.map((c) => <ChipButton key={c.key} chip={c} className={`${chip} whitespace-nowrap`} onPick={act} />)}</div>}
-            {(replies.helpers.length > 0 || replies.next || replies.report) && (
+            {(replies.helpers.length > 0 || replies.next || replies.report || replies.buy) && (
               <div className="flex gap-2 overflow-x-auto px-3 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {replies.helpers.map((c) => <ChipButton key={c.key} chip={c} className={chipSub} onPick={act} />)}
                 {replies.next && <ChipButton chip={replies.next} className={chipPrimary} onPick={act} />}
@@ -451,13 +527,24 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
                     {TALK_COPY.buttons.fullReport}
                   </Link>
                 )}
+                {replies.buy && (
+                  <Link href={replies.buy.href} className={chipPrimary}>
+                    {replies.buy.label}
+                  </Link>
+                )}
               </div>
             )}
           </div>
         )}
       </div>
 
-      <div className="relative flex items-center gap-2 bg-page px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {canAsk && (
+        <p className="bg-page px-4 pt-1 text-center text-[12px] leading-snug text-ink-3">
+          {ROOM_COPY.chatAiNote}
+          {remaining !== null && ` · 오늘 ${remaining}번 더 물어볼 수 있어요`}
+        </p>
+      )}
+      <form onSubmit={send} className="relative flex items-center gap-2 bg-page px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {menuOpen && (
           <div ref={menuRef} id={menuId} role="group" aria-label="채팅방 · 메뉴" className="absolute right-3 bottom-full left-3 mb-2 max-h-[min(30rem,70dvh)] overflow-y-auto rounded-2xl bg-canvas p-2 shadow-pop">
             <p className="px-3 pt-1.5 pb-0.5 text-[13px] font-semibold text-ink-3">채팅방 · 방마다 새 대화로 시작해요</p>
@@ -470,8 +557,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
                   className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2 text-left hover:bg-mist aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent-strong"
                 >
                   <span className="min-w-0">
-                    <span className="block text-[15px] font-semibold">{ROOMS[r].mode === "미유" ? "기본 미유" : ROOMS[r].mode}</span>
-                    <span className="block truncate text-[12px] text-ink-3">{ROOMS[r].blurb}</span>
+                    <span className="block text-[15px] font-semibold">{ROOMS[r].label}</span>
+                    <span className="block truncate text-[12px] text-ink-3">{ROOMS[r].mode === "미유" ? "기본 미유" : ROOMS[r].mode}</span>
                   </span>
                   <span className="shrink-0 text-[13px] font-medium text-ink-3">{r === room ? "지금 여기" : saved[r] ? "이어 보기" : "새로 시작"}</span>
                 </Link>
@@ -506,17 +593,6 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
               </div>
             )}
             <div className="mt-1 px-1 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  act({ t: "concern" });
-                }}
-                className="flex min-h-11 w-full items-center gap-1.5 rounded-lg px-2 text-left text-[15px] font-semibold hover:bg-mist"
-              >
-                {TALK_COPY.buttons.concern}
-                {pending}
-              </button>
               <Link href={dataHref} className="flex min-h-11 w-full items-center justify-between rounded-lg px-2 text-[15px] font-semibold hover:bg-mist">
                 {TALK_COPY.buttons.data}
                 <ArrowIcon className="size-4" />
@@ -544,28 +620,39 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         </button>
         <div className="relative min-w-0 flex-1">
           <input
+            ref={inputRef}
             type="text"
-            disabled
-            aria-label={TALK_COPY.freeQuestion}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={!canAsk || busy}
+            maxLength={FREE_QUESTION_MAX}
+            enterKeyHint="send"
+            autoComplete="off"
+            aria-label={placeholder}
             aria-describedby={noteId}
-            placeholder={typing ? "" : TALK_COPY.freeQuestion}
-            className={`h-11 w-full min-w-0 rounded-full bg-canvas px-4 text-[15px] ring-1 ring-line placeholder:text-ink-3 disabled:cursor-not-allowed ${typing ? "motion-safe:animate-miyu-glow" : ""}`}
+            placeholder={busy ? "" : placeholder}
+            className={`h-11 w-full min-w-0 rounded-full bg-canvas px-4 text-[15px] ring-1 ring-line placeholder:text-ink-3 disabled:cursor-not-allowed ${busy ? "motion-safe:animate-miyu-glow" : ""}`}
           />
-          {/* 미유가 답을 쓰는 동안 입력창에도 "입력 중"을 보인다 (글자 입력은 아직 준비 중이라 입력창 자체는 계속 비활성) */}
-          {typing && (
+          {/* 미유가 답을 쓰는 동안 입력창에도 "입력 중"을 보인다 */}
+          {busy && (
             <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center gap-2 px-4 text-[15px] font-medium text-accent-strong">
               {TALK_COPY.typing}
               <TypingDots className="size-1.5" />
             </span>
           )}
         </div>
-        <button type="button" disabled aria-label="보내기 (준비 중)" className="grid size-11 shrink-0 place-items-center rounded-full bg-accent-soft text-ink-3 opacity-70 disabled:cursor-not-allowed">
+        <button
+          type="submit"
+          disabled={!canAsk || busy || draft.trim().length === 0}
+          aria-label={canAsk ? "보내기" : "보내기 (사용할 수 없어요)"}
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-white transition-opacity hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-accent-soft disabled:text-ink-3 disabled:opacity-70"
+        >
           <ArrowIcon className="size-5 -rotate-90" />
         </button>
         <span id={noteId} className="sr-only">
-          {TALK_COPY.freeQuestionPending}
+          {note}
         </span>
-      </div>
+      </form>
     </div>
   );
 }
@@ -645,7 +732,7 @@ function Content({ say, model, dateLabel, dataHref }: { say: TalkSay; model: Tal
       return (
         <div className={`${bubble} inline-block max-w-full chat-frame:max-w-[36rem]`}>
           <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent-strong">
-            <span className="grid size-5 place-items-center rounded-full bg-accent-soft text-[12px] font-bold tabular-nums">{say.number}</span>
+            {say.number > 0 && <span className="grid size-5 place-items-center rounded-full bg-accent-soft text-[12px] font-bold tabular-nums">{say.number}</span>}
             {say.title}
           </p>
           <p className="mt-1 text-[18px] leading-snug font-bold tracking-tight">{say.headline}</p>
@@ -687,6 +774,25 @@ function Content({ say, model, dateLabel, dataHref }: { say: TalkSay; model: Tal
       return (
         <div className={`${bubble} w-full`}>
           <BasisList basis={say.basis} />
+        </div>
+      );
+    case "lock":
+      // 잠금은 접힘(화살표 · 열리는 상자)과 모양이 달라야 한다 — 자물쇠와 "리포트에서 이어져요", 이어지는 내용이 답하는 질문만 보인다(문장은 담지 않는다)
+      return (
+        <div className="inline-block max-w-full rounded-2xl rounded-tl-md bg-mist px-3.5 py-3 chat-frame:max-w-[36rem]">
+          <p className="flex items-center gap-1.5 text-[15px] font-bold text-ink-2">
+            <LockIcon className="size-4 shrink-0 text-ink-3" />
+            {say.title}
+          </p>
+          <p className="mt-1 text-[13px] text-ink-3">{TALK_COPY.lock.sub}</p>
+          <ul className="mt-2 space-y-1.5">
+            {say.hooks.map((h) => (
+              <li key={h} className="flex items-start gap-2 text-[15px] leading-[1.5] text-ink-2">
+                <span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-ink-3" />
+                {h}
+              </li>
+            ))}
+          </ul>
         </div>
       );
   }

@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { PageFallback } from "@/components/ui/page-fallback";
+import { pageNarrow } from "@/components/ui/styles";
 import { SampleTalk } from "./talk-sample";
 
 export const metadata: Metadata = {
@@ -11,7 +14,9 @@ export const metadata: Metadata = {
 export default function SampleTalkPage() {
   return (
     <main className="bg-page">
-      <SampleTalk room="main" />
+      <Suspense fallback={<PageFallback text="채팅방을 불러오고 있어요." className={`${pageNarrow} py-16`} tall />}>
+        <SampleTalk room="main" />
+      </Suspense>
     </main>
   );
 }

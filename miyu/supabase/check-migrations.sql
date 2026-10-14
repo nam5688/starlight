@@ -22,7 +22,9 @@ t as (
     to_regclass('public.ai_usage')            is not null as ai_usage,
     to_regclass('public.funnel_events')       is not null as funnel_events,
     to_regclass('public.report_feedback')     is not null as report_feedback,
-    to_regclass('public.concern_records')     is not null as concern_records
+    to_regclass('public.concern_records')     is not null as concern_records,
+    to_regclass('public.talk_rooms')          is not null as talk_rooms,
+    to_regclass('public.chat_questions')      is not null as chat_questions
 ),
 wd as (
   select
@@ -33,6 +35,12 @@ wd as (
 -- 11번: 탈퇴 함수가 고민 기록 삭제를 포함하도록 갱신됐는가
 wd11 as (
   select coalesce((select bool_or(pg_get_functiondef(p.oid) like '%concern_records%')
+                   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                   where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as fn_updated
+),
+-- 12번: 탈퇴 함수가 대화 삭제를 포함하도록 갱신됐는가
+wd12 as (
+  select coalesce((select bool_or(pg_get_functiondef(p.oid) like '%talk_rooms%')
                    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                    where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as fn_updated
 ),
@@ -126,5 +134,11 @@ select * from (
               when t.concern_records or wd11.fn_updated then '일부만' else '아직 안 함' end,
          '표 concern_records / 탈퇴 함수에 고민 기록 삭제 포함: ' || wd11.fn_updated::text
   from t, wd11
+  union all
+  select 12, '20261022000000_talk_rooms.sql',
+         case when t.talk_rooms and t.chat_questions and wd12.fn_updated then '적용됨'
+              when t.talk_rooms or t.chat_questions or wd12.fn_updated then '일부만' else '아직 안 함' end,
+         '표 talk_rooms, chat_questions / 탈퇴 함수에 대화 삭제 포함: ' || wd12.fn_updated::text
+  from t, wd12
 ) r
 order by "번호";

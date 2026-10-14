@@ -10,6 +10,11 @@
 | **고민 반영 리포트 가격** · 상품 이름 (내 고민 자세히 알려주기 → 새 리포트 발급) | `lib/config/product.ts`의 `CONCERN_REPORT` | 4,900원(운영자 확정 2026-10-13). 발급 버튼 문구 · 결제 금액이 이 값을 읽는다. 이미 만들어진 주문은 그때의 금액 그대로. 무료 발급 횟수는 정해지지 않았고 코드에도 없다 ([`concern-records.md`](./concern-records.md) 6장) |
 | **무료 / 유료 범위 표** (홈의 비교표 · 가격 상자 · 안내 문구) | `lib/config/product.ts`의 `REPORT_SCOPE` | 홈 화면 표가 이 표를 읽는다. 표에 적은 것은 실제 리포트에 있어야 한다 — `lib/report/preview.test.ts`가 일부를 확인 |
 | 무료 미리보기에서 보이는 항목 · 잠금 질문 | `lib/report/preview.ts` | 잠긴 내용은 이 파일이 만든 값에 **없어야** 한다 (테스트가 확인). 질문을 늘리면 구매 리포트에 그 답이 있어야 한다 |
+| **상담방 이름 · 모드 이름 · 먼저 묻는 질문 · 열 수 있는 풀이** (8개) | `lib/report/reading/talk-room.ts`의 `ROOMS`(순서는 `ROOM_ORDER`) | 홈 카드 · 채팅방 목록 · 메뉴가 모두 이 표를 읽는다. 진로 / 재무 방은 지금 같은 "일과 돈" 풀이를 쓴다. `talk-room.test.ts` |
+| **일일 운세 무료 혜택**(초기에만) | `lib/config/product.ts`의 `DAILY_FREE.enabled` | false로 바꾸면 무료 맛보기에서는 그날의 풀이 대신 질문만 보이고, 구매한 분은 그대로 본다. `talk-code.test.ts` |
+| **자유 질문 하루 횟수** | 환경변수 `AI_CHAT_DAILY_LIMIT` (기본 10, 0이면 닫힘) | 질문 한 번의 실제 비용을 잰 뒤 정한다. 하루 AI 예산(`AI_DAILY_BUDGET_KRW`)에 닿아도 새 질문만 멈춘다 |
+| 자유 질문 지시문 · 답 검사 · 한도 · 힘든 글 안내 | `lib/report/chat/`(`prompt.ts` · `validate.ts` · `plan.ts` · `question.ts`) | 지시문을 고치면 `CHAT_PROMPT_VERSION`을 올린다. `chat.test.ts`. 실제 AI로는 아직 시험하지 않았다 |
+| 인연의 경향 · 오늘의 한 장 문구 규칙 | `lib/saju/interpret/partner.ts` · `day-plain.ts` (+ `rule-meta.ts`의 규칙 이력) | 고친 뒤 `node scripts/render-data-docs.ts`로 `docs/saju-rules.md`를 다시 만든다. 구체적 나이 · 직업 · 날짜 · 속마음은 쓰지 않는다 (`partner-day.test.ts`) |
 | 홈 · 안내 화면 문구 | `app/page.tsx` · `components/home/*` | 가격 · 범위는 위 파일을 읽으므로 여기서 고치지 않는다 |
 | 이용약관 · 개인정보 처리방침 | `app/terms/page.tsx` · `app/privacy/page.tsx` + **`lib/membership/terms.ts`의 `TERMS_VERSION` 올리기** | 버전을 올려야 기존 회원이 다시 동의한다 |
 | 알림 문구 · 오류 안내 | `lib/ops/*` · `components/site/error-view.tsx` | 고객 정보 · 키를 넣지 않는다 |
@@ -65,7 +70,7 @@
 - **앞으로만 나아가는(forward-only) 변경**: 열 · 표 · 색인 · 함수를 **더하고**, 지우거나 이름을 바꾸는 일은 두 번에 나눈다 — ① 새 구조를 더하고 코드가 둘 다 읽을 수 있게 배포 → ② 모두 옮겨진 것을 확인한 뒤 옛 구조를 지우는 새 마이그레이션.
 - **코드가 먼저 배포돼도 깨지지 않게 쓴다.** 새 표 · 열이 없을 때를 견디는 방식(`isMissingTableError` · 출처 열 없이 주문 생성 · 합계 함수가 없으면 나눠서 합산)이 이미 들어 있다. 이 방식으로 배포 순서가 틀려도 결제 · 리포트가 멈추지 않는다.
 - 기존 검사 · 회원 · 주문 · 결제 데이터를 지우거나 초기화하는 마이그레이션은 만들지 않는다.
-- `supabase/apply-4-to-10.sql`은 4~10번을 한 번에 적용하는 **고정된 묶음**이다 (`scripts/render-apply-sql.ts`가 마이그레이션 파일을 그대로 이어 붙여 만들며 직접 고치지 않는다 — 마이그레이션 4~10번을 고치면 서버 테스트가 알려 준다). 11번 이후는 묶지 않고 새 파일 하나씩 적용한다.
+- `supabase/apply-4-to-10.sql`은 4~10번을 한 번에 적용하는 **고정된 묶음**이다 (`scripts/render-apply-sql.ts`가 마이그레이션 파일을 그대로 이어 붙여 만들며 직접 고치지 않는다 — 마이그레이션 4~10번을 고치면 서버 테스트가 알려 준다). 11번 이후(12번 대화 저장 포함)는 묶지 않고 새 파일 하나씩 적용한다.
 - 새 표는 **RLS를 켜고 필요한 권한만** 준다. 서버만 쓰는 표(`ops_events` · `ai_usage` · `funnel_events`)는 정책을 두지 않고 비밀키(`service_role`)에만 권한을 준다. 기록 표는 고치기 방지 트리거를 둔다.
 - 새 마이그레이션을 만들면 같은 작업에서 `supabase/tests/db.test.ts`에 접근 정책 · 쌓기만 가능 · 실제 동작 시험을 더하고, `docs/setup-guide.md`의 번호 표에 올린다.
 - 코드 되돌리기와 DB 되돌리기는 **따로** 판단한다 → [`runbook.md`](./runbook.md)의 "되돌리기".

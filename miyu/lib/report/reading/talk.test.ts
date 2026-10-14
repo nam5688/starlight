@@ -308,7 +308,7 @@ test("달력 답장: 성별 정보가 없으면 가까운 관계 달력은 이�
 });
 
 test("달력 답장: 버튼 이름이 있고 같은 입력이면 같은 말풍선이다(저장된 달력만 쓴다)", () => {
-  assert.equal(TALK_COPY.buttons["calendar-love"], "가까운 관계가 움직이는 달은?");
+  assert.equal(TALK_COPY.buttons["calendar-love"], "인연이 움직이는 달은?");
   assert.equal(TALK_COPY.buttons["calendar-money"], "재물이 눈에 띄는 달은?");
   const flow = buildTalkModel(R).topics.find((t) => t.id === "flow")!;
   assert.deepEqual(extraBubbles(flow, "calendar-love"), extraBubbles(flow, "calendar-love"));
