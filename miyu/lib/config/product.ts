@@ -24,6 +24,39 @@ export const CONCERN_REPORT = {
   priceNote: "기존 구매자 전용",
 } as const;
 
+/**
+ * 미유캐시 — 자유 질문을 무료 한도 밖에서 이어 갈 때 쓰는 선불 충전 포인트(운영자 2026-10-15: "1질문당 캐시 3개 · 10개 단위 충전 · 많이 충전하면 보너스").
+ * 아래 값은 모두 **제안(가안)** 이다 — 운영자가 확정하기 전에는 "가안"으로 다루고, 바꿀 때는 여기 한 곳에서만 바꾼다(결제 금액은 서버가 이 값으로 계산해 주문에 적고, 브라우저가 보낸 금액은 믿지 않는다).
+ *  - 1캐시 = 100원(가안). 질문 한 번에 3캐시 → 한 번에 300원 안팎. 한 번 호출 비용 어림(약 17원)과 결제 수수료 · 운영비를 넘기는 폭을 두고 정한 제안이다.
+ *  - 충전은 10캐시 단위(1,000원)이고 한 번에 최대 500캐시(50,000원).
+ *  - 보너스: 한 번에 충전한 캐시가 구간 기준 이상이면 비율만큼 더 얹는다(소수점은 버림). 보너스 캐시도 질문에 똑같이 쓰이지만, 결제를 취소하면 함께 회수된다.
+ *  - 마감 타이머 · "원래 가격" 같은 표시는 쓰지 않는다. 보너스는 항상 같은 표(아래)로 보인다.
+ * 환불 · 유효기간 · 보너스의 환불 여부 같은 정책은 운영자(필요하면 법무) 확인 전이며 화면에는 "정책 확정 전"으로 밝힌다(docs/cash-policy.md).
+ */
+export const MIYU_CASH = {
+  id: "cash-charge",
+  name: "미유캐시",
+  /** 화면에 함께 표시하는 가격 상태 */
+  priceNote: "가안",
+  /** 충전은 이 개수의 배수로만 */
+  unit: 10,
+  /** 1캐시의 값 (원) */
+  krwPerCash: 100,
+  /** 질문 한 번에 쓰는 캐시 */
+  perQuestion: 3,
+  /** 한 번에 충전할 수 있는 범위 (개) */
+  minCash: 10,
+  maxCash: 500,
+  /** 보너스 구간 — 충전 캐시가 minCash 이상이면 ratePct(%)를 더 얹는다 (가장 높은 구간 하나만 적용) */
+  bonusTiers: [
+    { minCash: 50, ratePct: 10 },
+    { minCash: 100, ratePct: 15 },
+    { minCash: 300, ratePct: 20 },
+  ],
+  /** 충전 화면의 빠른 선택 (개) */
+  packages: [10, 30, 50, 100, 300],
+} as const;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -39,12 +72,33 @@ export function parseConcernProductId(productId: string): string | null {
   return UUID.test(id) ? id.toLowerCase() : null;
 }
 
+/**
+ * 미유캐시 충전 주문의 상품 번호 — `cash-charge:<충전 캐시>:<보너스 캐시>:<임의 번호>`.
+ * 서버가 주문을 만들 때 금액에서 정한 충전량을 번호에 함께 적는다(결제 승인 때 DB가 이 값을 읽어 지갑에 넣는다 — 승인과 같은 처리 안에서).
+ * 임의 번호는 같은 검사 결과에서 충전을 여러 번 해도 주문마다 번호가 달라지게 한다(DB의 "같은 검사 · 상품에 결제 완료 하나" 조건을 피하는 용도가 아니라, 충전은 반복해도 되는 상품이기 때문이다).
+ */
+export const cashProductId = (p: { cash: number; bonus: number; nonce: string }) => `${MIYU_CASH.id}:${p.cash}:${p.bonus}:${p.nonce}`;
+
+const CASH_PRODUCT = /^cash-charge:([0-9]{1,6}):([0-9]{1,6}):([A-Za-z0-9]{6,32})$/;
+
+/** 상품 번호에서 충전 캐시 · 보너스 캐시를 꺼낸다. 미유캐시 충전 주문이 아니면 null */
+export function parseCashProductId(productId: string): { cash: number; bonus: number; nonce: string } | null {
+  const m = CASH_PRODUCT.exec(productId);
+  if (!m) return null;
+  return { cash: Number(m[1]), bonus: Number(m[2]), nonce: m[3] };
+}
+
+/** 미유캐시 충전 주문인가 (리포트 주문이 아니다 — 리포트를 만들지 않고 지갑에 캐시를 넣는다) */
+export const isCashProduct = (productId: string) => parseCashProductId(productId) !== null;
+
 /** 개인 통합 리포트 주문인가 (고민 반영 리포트 주문과 구분 — 같은 검사 결과에 두 종류가 함께 붙는다) */
 export const isPersonalProduct = (productId: string) => productId === PERSONAL_REPORT.id;
 
 /** 상품 번호 → 화면에 보이는 상품 이름 */
 export function productNameOf(productId: string): string {
   if (productId === PERSONAL_REPORT.id) return PERSONAL_REPORT.name;
+  const cash = parseCashProductId(productId);
+  if (cash) return `${MIYU_CASH.name} ${cash.cash}개 충전`;
   return parseConcernProductId(productId) ? CONCERN_REPORT.name : productId;
 }
 

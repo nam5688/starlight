@@ -2,11 +2,13 @@
 // 운영 코드에서 쓰지 않는다.
 
 import { canTransition } from "../../commerce/order.ts";
+import { parseCashProductId } from "../../config/product.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
 import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AiUsageRecord,
+  CashLedgerRecord,
   FeedbackRecord,
   FunnelEventRecord,
   OpsEventRecord,
@@ -33,6 +35,33 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const concernRecords = new Map<string, ConcernRecord>();
   const talkRooms = new Map<string, TalkRoomRecord>();
   const chatQuestions: { userId: string; assessmentId: string; roomKey: string; createdAt: string }[] = [];
+  // 미유캐시 — DB의 지갑 · 내역 · 트리거(충전 · 회수) · 함수(차감 · 되돌림)를 흉내 낸다
+  const wallets = new Map<string, number>();
+  const ledger: (CashLedgerRecord & { userId: string; ref: string | null })[] = [];
+  let ledgerSeq = 0;
+  const addLedger = (row: { userId: string; kind: CashLedgerRecord["kind"]; amount: number; orderId?: string | null; ref?: string | null; shortfall?: number }): boolean => {
+    // 같은 주문의 같은 종류 · 같은 참조번호의 같은 종류는 한 번만 (DB 고유 조건)
+    if (row.orderId && ledger.some((l) => l.orderId === row.orderId && l.kind === row.kind)) return false;
+    if (row.ref && ledger.some((l) => l.ref === row.ref && l.kind === row.kind)) return false;
+    ledger.push({ id: ++ledgerSeq, userId: row.userId, kind: row.kind, amount: row.amount, orderId: row.orderId ?? null, ref: row.ref ?? null, shortfall: row.shortfall ?? 0, createdAt: new Date(now().getTime() + ledgerSeq).toISOString() });
+    return true;
+  };
+  /** 주문 상태가 바뀔 때의 충전 · 회수 — DB 트리거(orders_cash_change)와 같은 규칙 */
+  const onOrderChange = (before: OrderRecord, after: OrderRecord) => {
+    const cash = parseCashProductId(after.productId);
+    if (!cash || before.status === after.status) return;
+    if (after.status === "paid") {
+      if (!wallets.has(after.userId)) wallets.set(after.userId, 0);
+      if (cash.cash > 0 && addLedger({ userId: after.userId, kind: "charge", amount: cash.cash, orderId: after.id })) wallets.set(after.userId, wallets.get(after.userId)! + cash.cash);
+      if (cash.bonus > 0 && addLedger({ userId: after.userId, kind: "bonus", amount: cash.bonus, orderId: after.id })) wallets.set(after.userId, wallets.get(after.userId)! + cash.bonus);
+    } else if (after.status === "refunded" && before.status === "paid") {
+      const credited = ledger.filter((l) => l.orderId === after.id && (l.kind === "charge" || l.kind === "bonus")).reduce((s, l) => s + l.amount, 0);
+      if (credited > 0) {
+        const take = Math.min(wallets.get(after.userId) ?? 0, credited);
+        if (addLedger({ userId: after.userId, kind: "clawback", amount: -take, orderId: after.id, shortfall: credited - take })) wallets.set(after.userId, (wallets.get(after.userId) ?? 0) - take);
+      }
+    }
+  };
   const opsEvents: OpsEventRecord[] = [];
   const aiUsage: AiUsageRecord[] = [];
   const funnel: FunnelEventRecord[] = [];
@@ -62,6 +91,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const mine = (o: OrderRecord) => o.userId === userId;
       if ([...orders.values()].some((o) => mine(o) && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)) return { ok: false, reason: "pending-order" };
       if ([...reports.values()].some((r) => r.userId === userId && (r.status === "queued" || r.status === "generating"))) return { ok: false, reason: "report-in-progress" };
+      if ((wallets.get(userId) ?? 0) > 0) return { ok: false, reason: "cash-balance" };
       const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0 };
       for (const [k, f] of [...feedback]) {
         if (f.userId !== userId) continue;
@@ -172,6 +202,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       }
       const next = { ...current, ...patch, updatedAt: iso() };
       orders.set(orderId, next);
+      onOrderChange(current, next);
       return next;
     },
     async addPaymentEvent(event) {
@@ -336,6 +367,36 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async countChatQuestionsSince(userId, since) {
       return chatQuestions.filter((q) => q.userId === userId && q.createdAt >= since).length;
     },
+    async countChatQuestionsInRoom(userId, roomKey) {
+      return chatQuestions.filter((q) => q.userId === userId && q.roomKey === roomKey).length;
+    },
+    async getCashBalance(userId) {
+      return wallets.get(userId) ?? 0;
+    },
+    async listCashLedger(userId, limit) {
+      return ledger
+        .filter((l) => l.userId === userId)
+        .sort((a, b) => b.id - a.id)
+        .slice(0, limit)
+        .map(({ id: lid, kind, amount, orderId, shortfall, createdAt }) => ({ id: lid, kind, amount, orderId, shortfall, createdAt }));
+    },
+    async spendCash({ userId, amount, ref }) {
+      if (!Number.isInteger(amount) || amount <= 0) throw new Error("cash_invalid_amount");
+      if (ledger.some((l) => l.ref === ref && l.kind === "spend")) throw Object.assign(new Error("duplicate cash spend"), { code: "23505" });
+      const balance = wallets.get(userId);
+      if (balance === undefined || balance < amount) return null;
+      wallets.set(userId, balance - amount);
+      addLedger({ userId, kind: "spend", amount: -amount, ref });
+      return balance - amount;
+    },
+    async restoreCashSpend({ userId, ref }) {
+      const spent = ledger.find((l) => l.userId === userId && l.ref === ref && l.kind === "spend");
+      if (!spent) return null;
+      if (!addLedger({ userId, kind: "spend_restore", amount: -spent.amount, ref })) return null;
+      const next = (wallets.get(userId) ?? 0) - spent.amount;
+      wallets.set(userId, next);
+      return next;
+    },
     async listPaymentEvents(orderId) {
       return events.filter((e) => e.orderId === orderId).map(({ source, status, detail, createdAt }) => ({ source, status, detail, createdAt }));
     },
@@ -374,5 +435,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, opsEvents, aiUsage, funnel, feedback };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, opsEvents, aiUsage, funnel, feedback, wallets, ledger };
 }

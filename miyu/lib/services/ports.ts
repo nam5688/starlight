@@ -67,7 +67,8 @@ export type PaymentEnv = "test" | "test-docs" | "live";
 export type Acquisition = { source: string | null; medium: string | null; campaign: string | null };
 export type WithdrawDataResult =
   | { ok: true; counts: Record<string, number> }
-  | { ok: false; reason: "pending-order" | "report-in-progress" | "not-found" };
+  /** cash-balance: 남은 미유캐시가 있다 (다 쓰거나 환불 문의를 마친 뒤에 탈퇴) */
+  | { ok: false; reason: "pending-order" | "report-in-progress" | "cash-balance" | "not-found" };
 
 export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv"> & { acquisition?: Acquisition | null };
 export type OrderPatch = Partial<
@@ -166,6 +167,10 @@ export type NewPersonalContext = PersonalContextInput & Pick<PersonalContext, "a
 /** 목록용 — 적은 내용은 담지 않는다 */
 export type PersonalContextSummary = Pick<PersonalContext, "assessmentId" | "topic" | "updatedAt">;
 
+/** 미유캐시 거래 내역 — charge 충전 · bonus 보너스 · spend 질문에 사용 · spend_restore 사용 되돌림 · clawback 결제 취소로 회수. 질문 내용은 담지 않는다 */
+export type CashLedgerKind = "charge" | "bonus" | "spend" | "spend_restore" | "clawback";
+export type CashLedgerRecord = { id: number; kind: CashLedgerKind; amount: number; orderId: string | null; shortfall: number; createdAt: string };
+
 /** 대화(상담방) 저장 — 회원 · 검사 결과 · 방마다 한 줄. 눌렀던 행동 목록과 자유 질문 · 답만 담고 리포트 글은 담지 않는다 */
 export type TalkRoomRecord = { assessmentId: string; roomKey: string; userId: string; actions: unknown[]; updatedAt: string };
 
@@ -238,6 +243,19 @@ export interface MiyuRepository {
   /** 자유 질문 횟수 기록 — 질문 내용은 담지 않는다. 테이블이 없으면 조회 · 쓰기 모두 오류(코드 42P01) */
   addChatQuestion(input: { userId: string; assessmentId: string; roomKey: string }): Promise<void>;
   countChatQuestionsSince(userId: string, since: string): Promise<number>;
+  /** 이 방(roomKey)에서 이 회원이 지금까지 한 질문 수 — 방마다 무료 질문 수를 세는 데 쓴다. 테이블이 없으면 오류(코드 42P01) */
+  countChatQuestionsInRoom(userId: string, roomKey: string): Promise<number>;
+
+  /**
+   * 미유캐시 — 서버만 쓴다(충전은 결제 완료 처리 안에서 DB가 한다). 테이블 · 함수가 없으면(DB 변경 13번 전) 오류(코드 42P01)를 던진다.
+   * - getCashBalance: 지갑이 없으면 0
+   * - spendCash: 잔액이 충분하면 차감하고 새 잔액을, 모자라면 아무것도 바꾸지 않고 null. 같은 참조번호(ref)로 두 번 차감할 수 없다
+   * - restoreCashSpend: 그 참조번호의 차감을 한 번만 되돌려 새 잔액을 돌려준다 (되돌릴 차감이 없거나 이미 되돌렸으면 null)
+   */
+  getCashBalance(userId: string): Promise<number>;
+  listCashLedger(userId: string, limit: number): Promise<CashLedgerRecord[]>;
+  spendCash(input: { userId: string; amount: number; ref: string }): Promise<number | null>;
+  restoreCashSpend(input: { userId: string; ref: string }): Promise<number | null>;
 
   /** 서버 전용 (브라우저 권한으로는 읽을 수 없다) — 주문 소유자를 확인한 뒤에만 쓴다 */
   listPaymentEvents(orderId: string): Promise<PaymentEventRecord[]>;

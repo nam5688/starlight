@@ -9,6 +9,7 @@ import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AssessmentRecord,
+  CashLedgerRecord,
   FunnelEventName,
   InsertResult,
   MiyuRepository,
@@ -251,6 +252,7 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         const msg = error.message ?? "";
         if (msg.includes("withdraw_blocked_pending_order")) return { ok: false, reason: "pending-order" };
         if (msg.includes("withdraw_blocked_report_in_progress")) return { ok: false, reason: "report-in-progress" };
+        if (msg.includes("withdraw_blocked_cash_balance")) return { ok: false, reason: "cash-balance" };
         if (msg.includes("withdraw_not_found")) return { ok: false, reason: "not-found" };
         if (["PGRST202", "42883"].includes(error.code ?? "")) throw new Error("회원 탈퇴 처리 실패: DB 변경 10번(회원 탈퇴)을 먼저 적용해야 합니다.");
         fail("회원 탈퇴 처리", error);
@@ -762,6 +764,33 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       const { count, error } = await db.from("chat_questions").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
       if (error) fail("자유 질문 횟수 조회", error);
       return count ?? 0;
+    },
+    async countChatQuestionsInRoom(userId, roomKey) {
+      const { count, error } = await db.from("chat_questions").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("room_key", roomKey);
+      if (error) fail("방별 질문 횟수 조회", error);
+      return count ?? 0;
+    },
+
+    // 미유캐시 — 표 · 함수가 없으면(DB 변경 13번 전) 코드 42P01로 통일해 던진다 (호출한 쪽이 "캐시 준비 중"으로 다룬다)
+    async getCashBalance(userId) {
+      const { data, error } = await db.from("cash_wallets").select("balance").eq("user_id", userId).maybeSingle();
+      if (error) fail("미유캐시 잔액 조회", isMissingTableError(error) ? { code: "42P01", message: "cash_wallets 테이블이 없습니다" } : error);
+      return Number((data as { balance?: number } | null)?.balance ?? 0);
+    },
+    async listCashLedger(userId, limit) {
+      const { data, error } = await db.from("cash_ledger").select("id, kind, amount, order_id, shortfall, created_at").eq("user_id", userId).order("id", { ascending: false }).limit(limit);
+      if (error) fail("미유캐시 내역 조회", isMissingTableError(error) ? { code: "42P01", message: "cash_ledger 테이블이 없습니다" } : error);
+      return (data ?? []).map((r) => ({ id: Number(r.id), kind: r.kind as CashLedgerRecord["kind"], amount: Number(r.amount), orderId: (r.order_id as string | null) ?? null, shortfall: Number(r.shortfall ?? 0), createdAt: r.created_at as string }));
+    },
+    async spendCash({ userId, amount, ref }) {
+      const { data, error } = await db.rpc("spend_cash", { p_user_id: userId, p_amount: amount, p_ref: ref });
+      if (error) fail("미유캐시 차감", ["PGRST202", "42883"].includes(error.code ?? "") || isMissingTableError(error) ? { code: "42P01", message: "spend_cash 함수가 없습니다 (DB 변경 13번 필요)" } : error);
+      return data === null || data === undefined ? null : Number(data);
+    },
+    async restoreCashSpend({ userId, ref }) {
+      const { data, error } = await db.rpc("restore_cash_spend", { p_user_id: userId, p_ref: ref });
+      if (error) fail("미유캐시 되돌림", ["PGRST202", "42883"].includes(error.code ?? "") || isMissingTableError(error) ? { code: "42P01", message: "restore_cash_spend 함수가 없습니다 (DB 변경 13번 필요)" } : error);
+      return data === null || data === undefined ? null : Number(data);
     },
 
     async listPaymentEvents(orderId) {

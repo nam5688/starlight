@@ -58,12 +58,15 @@ export async function canRemoveOnDecline(repo: MiyuRepository, userId: string): 
   return assessments.length === 0 && orders.length === 0;
 }
 
-/** 탈퇴를 막는 상태 (진행 중인 결제 확인 · 리포트 생성) — 화면에서 미리 알려 주기 위한 확인. 실제 판단은 DB 함수가 다시 한다 */
+/** 탈퇴를 막는 상태 (진행 중인 결제 확인 · 리포트 생성 · 남은 미유캐시) — 화면에서 미리 알려 주기 위한 확인. 실제 판단은 DB 함수가 다시 한다 */
 export async function withdrawalBlockers(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<WithdrawalBlocker[]> {
   const [orders, reports] = await Promise.all([repo.listOrdersForUser(userId), repo.listReportStatuses(userId)]);
   const blockers: WithdrawalBlocker[] = [];
   if (orders.some((o) => o.userId === userId && o.status === "pending" && now.getTime() - new Date(o.createdAt).getTime() < 3600_000)) blockers.push("pending-order");
   if (reports.some((r) => r.status === "queued" || r.status === "generating")) blockers.push("report-in-progress");
+  // 남은 미유캐시 — 표가 없으면(DB 변경 13번 전) 캐시가 없는 것으로 본다
+  const balance = await repo.getCashBalance(userId).catch(() => 0);
+  if (balance > 0) blockers.push("cash-balance");
   return blockers;
 }
 

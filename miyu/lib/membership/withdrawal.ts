@@ -19,11 +19,13 @@ export const WITHDRAWAL_DELETED: readonly string[] = [
 export const WITHDRAWAL_KEPT: readonly string[] = [
   `주문 · 결제 기록: 주문번호 · 금액 · 결제 시각 · 결제 승인 / 취소 기록. 이름 · 생년월일 · 응답은 포함되지 않으며, 법령이 정한 기간(${TRANSACTION_RETENTION_YEARS}년 가정) 동안 보관한 뒤 삭제합니다.`,
   "가입 동의 기록: 동의한 항목 · 약관 버전 · 시각",
+  "미유캐시 충전 · 사용 내역(거래 기록, 질문 내용은 담지 않음) — 남은 캐시가 없을 때만 탈퇴할 수 있습니다",
 ];
 
-export type WithdrawalBlocker = "pending-order" | "report-in-progress";
+export type WithdrawalBlocker = "pending-order" | "report-in-progress" | "cash-balance";
 
 export const WITHDRAWAL_BLOCKER_TEXT: Record<WithdrawalBlocker, string> = {
   "pending-order": "결제 결과를 확인하고 있는 주문이 있습니다. 결제 확인이 끝난 뒤(보통 몇 분, 최대 1시간)에 다시 탈퇴해 주세요.",
   "report-in-progress": "리포트를 만들고 있는 중입니다. 완성된 뒤에 다시 탈퇴해 주세요.",
+  "cash-balance": "남은 미유캐시가 있습니다. 질문에 쓰거나, 환불이 필요하면 문의한 뒤에 탈퇴해 주세요. (미사용 캐시의 환불 정책은 확정 전 초안입니다)",
 };

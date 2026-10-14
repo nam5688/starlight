@@ -26,6 +26,7 @@ const ERRORS: Record<string, string> = {
   auth: "개인정보 삭제는 끝났지만 로그인 연결을 지우는 단계가 끝나지 않았습니다. 같은 화면에서 한 번 더 눌러 마무리해 주세요.",
   "pending-order": WITHDRAWAL_BLOCKER_TEXT["pending-order"],
   "report-in-progress": WITHDRAWAL_BLOCKER_TEXT["report-in-progress"],
+  "cash-balance": WITHDRAWAL_BLOCKER_TEXT["cash-balance"],
 };
 
 export default function WithdrawPage({ searchParams }: PageProps<"/my/withdraw">) {
