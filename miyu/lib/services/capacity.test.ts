@@ -18,7 +18,7 @@ import { claimReport, completeReport, queueReport, runReport } from "./report-se
 import { createFakeToss } from "./testing/fake-toss.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
-const INFO = { ...EMPTY_BASIC_INFO, nickname: "지민", birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true, knownMbti: "INFJ" };
+const INFO = { ...EMPTY_BASIC_INFO, nickname: "지민", birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true, gender: "female" as const, knownMbti: "INFJ" };
 const answers = Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i) => [i.id, 4])));
 const cfg = (over: Partial<CapacityConfig> = {}): CapacityConfig => ({ ...NO_LIMITS, ...over });
 const userId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;

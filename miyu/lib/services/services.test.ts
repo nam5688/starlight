@@ -30,6 +30,7 @@ const INFO: BasicInfo = {
   birthMonth: "4",
   birthDay: "12",
   birthTimeUnknown: true,
+  gender: "female",
   knownMbti: "INFJ",
   regionProvince: "서울특별시",
   regionDistrict: "마포구",
@@ -88,22 +89,27 @@ test("검사 저장: 서버에서 채점하고 모르는 문항 키는 버린다
   assert.deepEqual(mem.regions.get(USER), { province: "서울특별시", district: "마포구" });
 });
 
-test("검사 저장: 성별을 고르면 대운 · 배우자 별 계산에 쓰고 결과와 함께 저장하며, 답하지 않으면 계산하지 않는다", async () => {
+test("검사 저장: 성별은 필수 — 여성 · 남성을 고르면 대운 · 배우자 별 계산에 쓰고 결과와 함께 저장하며, 고르지 않으면 저장하지 않는다", async () => {
   const mem = createMemoryRepository(() => TODAY);
   const d = { repo: mem.repo, saju: sajuEngine };
-  const withGender = await submitAssessment(d, { userId: USER, channel: "web", info: { ...INFO, gender: "female" }, answers: answersAll(3), today: TODAY });
-  assert.ok(withGender.ok);
-  const a = withGender.ok ? withGender.assessment : (null as never);
-  assert.equal(a.saju.status, "ok");
-  assert.equal(a.saju.status === "ok" ? a.saju.gender : null, "female");
-  assert.ok(a.saju.status === "ok" && a.saju.luck && a.saju.luck.periods.length > 0, "성별이 있으면 대운을 계산한다");
-  assert.equal(reportInputOf(a).gender, "female", "리포트 생성에 성별 기준이 전달된다");
+  for (const [g, user] of [["female", USER], ["male", OTHER]] as const) {
+    const saved = await submitAssessment(d, { userId: user, channel: "web", info: { ...INFO, gender: g }, answers: answersAll(3), today: TODAY });
+    assert.ok(saved.ok, g);
+    const a = saved.ok ? saved.assessment : (null as never);
+    assert.equal(a.saju.status, "ok");
+    assert.equal(a.saju.status === "ok" ? a.saju.gender : null, g);
+    assert.ok(a.saju.status === "ok" && a.saju.luck && a.saju.luck.periods.length > 0, "성별이 있으면 대운을 계산한다");
+    assert.equal(reportInputOf(a).gender, g, "리포트 생성에 성별 기준이 전달된다");
+  }
+  // 여성 · 남성 기준은 대운 방향이 달라 결과가 다르다
+  const [f, m] = [...mem.assessments.values()].map((x) => x.saju);
+  assert.ok(f.status === "ok" && m.status === "ok" && JSON.stringify(f.luck) !== JSON.stringify(m.luck));
 
-  const without = await submitAssessment(d, { userId: OTHER, channel: "web", info: { ...INFO, gender: "" }, answers: answersAll(3), today: TODAY });
-  assert.ok(without.ok);
-  const b = without.ok ? without.assessment : (null as never);
-  assert.ok(b.saju.status === "ok" && b.saju.luck === null && b.saju.gender === undefined, "답하지 않으면 대운 · 성별 기준을 만들지 않는다");
-  assert.equal(reportInputOf(b).gender, null);
+  for (const g of ["", undefined] as const) {
+    const none = await submitAssessment(d, { userId: "33333333-3333-4333-8333-333333333333", channel: "web", info: { ...INFO, gender: g }, answers: answersAll(3), today: TODAY });
+    assert.equal(none.ok, false);
+    assert.match(none.ok ? "" : none.message, /성별을 선택해 주세요/);
+  }
 });
 
 test("검사 저장: 기본 정보나 응답이 잘못되면 거부한다", async () => {

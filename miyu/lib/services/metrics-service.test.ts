@@ -12,7 +12,7 @@ import { queueReport } from "./report-service.ts";
 import { createFakeToss } from "./testing/fake-toss.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
-const INFO = { ...EMPTY_BASIC_INFO, nickname: "지민", birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true };
+const INFO = { ...EMPTY_BASIC_INFO, nickname: "지민", birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true, gender: "female" as const };
 const answers = Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i) => [i.id, 4])));
 const user = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const ev = (anonId: string, name: FunnelEventInput["name"], src: string | null = null, referrerHost: string | null = null): FunnelEventInput => ({ anonId, name, path: "/", src, medium: src ? "cpc" : null, campaign: null, referrerHost });

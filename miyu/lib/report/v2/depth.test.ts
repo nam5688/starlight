@@ -25,7 +25,7 @@ async function persona(): Promise<Evidence[]> {
   await mem.repo.ensureProfile(USER);
   const items = ASSESSMENT_MODULES.flatMap((m) => m.items);
   const answers = Object.fromEntries(items.map((i, n) => [i.id, n % 2 ? 2 : 5]));
-  const r = await submitAssessment({ repo: mem.repo, saju: manseryeokEngine }, { userId: USER, channel: "web", info: { ...EMPTY_BASIC_INFO, nickname: "하린", birthYear: "2001", birthMonth: "7", birthDay: "29", birthTime: "06:10", knownMbti: "INFJ" }, answers, today: now() });
+  const r = await submitAssessment({ repo: mem.repo, saju: manseryeokEngine }, { userId: USER, channel: "web", info: { ...EMPTY_BASIC_INFO, gender: "female" as const, nickname: "하린", birthYear: "2001", birthMonth: "7", birthDay: "29", birthTime: "06:10", knownMbti: "INFJ" }, answers, today: now() });
   if (!r.ok) throw new Error("save");
   return buildEvidence({ nickname: "하린", knownMbti: "INFJ", birthText: "", summary: r.assessment.summary, saju: r.assessment.saju, gender: "female", context: null } as never, { year: 2026, month: 10 });
 }

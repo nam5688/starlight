@@ -30,7 +30,7 @@ const mem = createMemoryRepository(now);
 await mem.repo.ensureProfile(USER);
 const items = ASSESSMENT_MODULES.flatMap((m) => m.items);
 const answers = Object.fromEntries(items.map((i, n) => [i.id, n % 2 ? 2 : 5]));
-const saved = await submitAssessment({ repo: mem.repo, saju: manseryeokEngine }, { userId: USER, channel: "web", info: { ...EMPTY_BASIC_INFO, nickname: NAME, birthYear: "2001", birthMonth: "7", birthDay: "29", birthTime: "06:10", knownMbti: "INFJ" }, answers, today: now() });
+const saved = await submitAssessment({ repo: mem.repo, saju: manseryeokEngine }, { userId: USER, channel: "web", info: { ...EMPTY_BASIC_INFO, gender: "female" as const, nickname: NAME, birthYear: "2001", birthMonth: "7", birthDay: "29", birthTime: "06:10", knownMbti: "INFJ" }, answers, today: now() });
 if (!saved.ok) throw new Error("save");
 const evidence = buildEvidence({ nickname: NAME, knownMbti: "INFJ", birthText: "", summary: saved.assessment.summary, saju: saved.assessment.saju, gender: "female", context: null } as never, { year: 2026, month: 10 });
 const byId = new Map(evidence.map((e) => [e.id, e]));

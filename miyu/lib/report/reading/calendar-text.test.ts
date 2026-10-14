@@ -51,11 +51,11 @@ test("달력 문장: 입춘 기준 해의 마지막 달(1월 초)은 다음 해�
   assert.equal(startsLabel(c.months[0]), "입춘 2.4부터");
 });
 
-test("달력 문장: 성별을 답하지 않으면 가까운 관계 달력은 보여 주지 않고 이유를 밝히며, 재물 달력은 그대로 보인다", () => {
+test("달력 문장: 성별 정보가 없으면 가까운 관계 달력은 보여 주지 않고 이유를 밝히며, 재물 달력은 그대로 보인다", () => {
   const c = monthCalendar(chart(null), { year: 2026, gender: null });
-  assert.match(topicUnavailable(c, "love") ?? "", /성별을 답하지 않아/);
+  assert.match(topicUnavailable(c, "love") ?? "", /성별 정보가 없어/);
   assert.equal(topicUnavailable(c, "money"), null);
-  assert.match(summaryLine(c, "love"), /성별을 답하지 않아/);
+  assert.match(summaryLine(c, "love"), /성별 정보가 없어/);
   assert.doesNotMatch(summaryLine(c, "money"), /성별/);
   const f = monthCalendar(chart("female"), { year: 2026, gender: "female" });
   assert.equal(topicUnavailable(f, "love"), null);

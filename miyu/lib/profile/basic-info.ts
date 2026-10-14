@@ -1,12 +1,11 @@
 // 기본 정보 입력값과 검증.
 // 지역은 성향 분석에 쓰지 않는다 — 향후 장소 추천용으로만 따로 보관할 예정이다.
 
-/** 성별(선택) — 대운 순서와 배우자 별 계산에만 쓴다. ""는 답하지 않음 */
+/** 성별(필수, 운영자 결정 2026-10-14) — 대운 순서와 배우자 별 · 월별 달력 계산에만 쓴다. ""는 아직 고르지 않은 상태이며 저장할 수 없다 */
 export type Gender = "" | "male" | "female";
-export const GENDER_OPTIONS: readonly (readonly [Gender, string])[] = [
+export const GENDER_OPTIONS: readonly (readonly ["female" | "male", string])[] = [
   ["female", "여성"],
   ["male", "남성"],
-  ["", "답하지 않음"],
 ];
 
 export type BasicInfo = {
@@ -21,7 +20,7 @@ export type BasicInfo = {
   knownMbti: string;
   regionProvince: string;
   regionDistrict: string;
-  /** 선택. 없으면(이전 버전의 임시 저장 · 테스트 입력) 답하지 않음으로 본다 */
+  /** 필수. 이전 버전의 임시 저장에는 없을 수 있어 선택 속성으로 두고, 비어 있으면 검증에서 막는다 */
   gender?: Gender;
 };
 
@@ -40,10 +39,10 @@ export const EMPTY_BASIC_INFO: BasicInfo = {
   gender: "",
 };
 
-/** 사주 계산에 넘기는 성별 (답하지 않으면 null — 대운 · 배우자 별은 계산하지 않는다) */
+/** 사주 계산에 넘기는 성별 (고르지 않은 값은 null — 저장 전에는 검증이 막는다) */
 export const genderOf = (info: Pick<BasicInfo, "gender">): "male" | "female" | null => (info.gender === "male" || info.gender === "female" ? info.gender : null);
 
-export type BasicInfoErrors = Partial<Record<"nickname" | "birthDate" | "birthTime", string>>;
+export type BasicInfoErrors = Partial<Record<"nickname" | "birthDate" | "birthTime" | "gender", string>>;
 
 export const NICKNAME_MAX = 12;
 
@@ -73,6 +72,7 @@ export function validateBasicInfo(info: BasicInfo, today: Date): BasicInfoErrors
   if (!info.birthTimeUnknown && !/^\d{2}:\d{2}$/.test(info.birthTime)) {
     errors.birthTime = "출생시간을 입력하거나 ‘출생시간을 몰라요’를 선택해 주세요.";
   }
+  if (info.gender !== "male" && info.gender !== "female") errors.gender = "성별을 선택해 주세요.";
   return errors;
 }
 
@@ -83,7 +83,8 @@ export function hasRequiredBasicInfo(info: BasicInfo): boolean {
     info.birthYear !== "" &&
     info.birthMonth !== "" &&
     info.birthDay !== "" &&
-    (info.birthTimeUnknown || info.birthTime !== "")
+    (info.birthTimeUnknown || info.birthTime !== "") &&
+    (info.gender === "male" || info.gender === "female")
   );
 }
 
@@ -124,7 +125,7 @@ export function parseBasicInfo(raw: unknown): BasicInfo | null {
     regionProvince: str("regionProvince", 20),
     regionDistrict: str("regionDistrict", 20),
   };
-  // 성별은 선택이고 이전 버전이 보관한 값에는 없다 — 알려진 값이 아니면 답하지 않음으로 받는다
+  // 성별은 필수지만 이전 버전이 보관한 값에는 없다 — 알려진 값이 아니면 "고르지 않음"으로 받아 두고, 저장할 때 검증이 다시 고르게 한다
   const gender: Gender = r.gender === "male" || r.gender === "female" ? r.gender : "";
   return Object.values(info).some((v) => v === null) ? null : ({ ...info, gender } as BasicInfo);
 }

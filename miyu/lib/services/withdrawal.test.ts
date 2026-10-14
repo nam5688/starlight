@@ -16,7 +16,7 @@ import { createMemoryRepository } from "./testing/memory-repository.ts";
 const ME = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const answers = Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i) => [i.id, 4])));
-const info = (nickname: string) => ({ ...EMPTY_BASIC_INFO, nickname, birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true, knownMbti: "INFJ" });
+const info = (nickname: string) => ({ ...EMPTY_BASIC_INFO, nickname, birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true, gender: "female" as const, knownMbti: "INFJ" });
 
 async function setup() {
   const now = () => new Date("2026-10-12T00:00:00Z");

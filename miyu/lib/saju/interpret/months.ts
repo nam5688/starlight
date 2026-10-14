@@ -135,7 +135,7 @@ export function monthCalendar(saju: SajuOk, input: { year: number; gender?: "mal
 
 /**
  * 리포트에 싣는 달력 — 기준 날짜가 속한 해부터 3년(세운과 같은 길이). 입춘 전(1 · 2월)에는 전년도 달력이 아직 진행 중이라 한 해 앞에서 시작한다.
- * 성별은 계산 결과(saju.gender)에서 가져온다 — 답하지 않았거나 이전에 저장된 결과는 배우자 별을 쓰지 않는다.
+ * 성별은 계산 결과(saju.gender)에서 가져온다 — 성별을 받기 전에 저장한 결과에는 없어 배우자 별을 쓰지 않는다.
  */
 export const CALENDAR_YEARS = 3;
 export function monthCalendars(saju: SajuOk, reference: { year: number; month: number }): MonthCalendar[] {

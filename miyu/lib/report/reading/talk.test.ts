@@ -246,11 +246,11 @@ test("달력 답장: 첫 말풍선은 앞으로 12개월 요약이고, 큰 달�
   }
 });
 
-test("달력 답장: 성별을 답하지 않으면 가까운 관계 달력은 이유만 알리고, 달력이 없는 이전 리포트에는 버튼 자체가 없다", () => {
+test("달력 답장: 성별 정보가 없으면 가까운 관계 달력은 이유만 알리고, 달력이 없는 이전 리포트에는 버튼 자체가 없다", () => {
   const noGender = { ...R, calendars: { ...R.calendars!, items: R.calendars!.items.map((c) => ({ ...c, usedSpouseStar: false })) } } satisfies IntegratedReadingReport;
   const flow = buildTalkModel(noGender).topics.find((t) => t.id === "flow")!;
   const love = bubbleTexts(extraBubbles(flow, "calendar-love")).join(" ");
-  assert.match(love, /성별을 답하지 않아/);
+  assert.match(love, /성별 정보가 없어/);
   assert.doesNotMatch(love, MONTH_REF);
   assert.ok(bubbleTexts(extraBubbles(flow, "calendar-money")).join(" ").match(MONTH_REF) || /눈에 띄는 달이 없어요/.test(bubbleTexts(extraBubbles(flow, "calendar-money")).join(" ")));
 

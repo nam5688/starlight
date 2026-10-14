@@ -17,9 +17,9 @@ export function startsLabel(m: MonthCell): string {
   return `${m.termName} ${mm}.${dd}부터`;
 }
 
-/** 이 주제의 달력을 보여 줄 수 없으면 이유 (성별을 답하지 않으면 배우자 별을 쓰지 못해 가까운 관계 달력이 거의 비므로 만들지 않는다) */
+/** 이 주제의 달력을 보여 줄 수 없으면 이유 (성별 정보가 없는 결과 — 성별을 받기 전에 저장한 결과 — 는 배우자 별을 쓰지 못해 가까운 관계 달력이 거의 비므로 만들지 않는다) */
 export function topicUnavailable(cal: MonthCalendar, topic: CalendarTopic): string | null {
-  return topic === "love" && !cal.usedSpouseStar ? `성별을 답하지 않아 가까운 관계 달력은 보여 드리지 못해요. ${MONTH_NOTES.noGender}` : null;
+  return topic === "love" && !cal.usedSpouseStar ? `${MONTH_NOTES.noGender} 그래서 가까운 관계 달력은 보여 드리지 못해요.` : null;
 }
 
 export const monthsOf = (cal: MonthCalendar, topic: CalendarTopic, level: MonthLevel): MonthCell[] => cal.months.filter((m) => m[topic].level === level);

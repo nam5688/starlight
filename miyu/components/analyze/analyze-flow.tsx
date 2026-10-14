@@ -166,9 +166,9 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     if (step === 0) {
       const errors = validateBasicInfo(info, new Date());
       setInfoErrors(errors);
-      const first = (["nickname", "birthDate", "birthTime"] as const).find((k) => errors[k]);
+      const first = (["nickname", "birthDate", "birthTime", "gender"] as const).find((k) => errors[k]);
       if (first) {
-        document.getElementById(first === "birthDate" ? "birthYear" : first)?.focus();
+        document.getElementById(first === "birthDate" ? "birthYear" : first === "gender" ? "gender-female" : first)?.focus();
         return;
       }
       if (info.calendar === "solar") {

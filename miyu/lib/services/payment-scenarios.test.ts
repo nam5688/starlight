@@ -16,7 +16,7 @@ import { createMemoryRepository } from "./testing/memory-repository.ts";
 import type { MiyuRepository, OrderRecord } from "./ports.ts";
 
 const USER = "11111111-1111-4111-8111-111111111111";
-const INFO = { ...EMPTY_BASIC_INFO, nickname: "지민", birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true, knownMbti: "INFJ" };
+const INFO = { ...EMPTY_BASIC_INFO, nickname: "지민", birthYear: "1995", birthMonth: "4", birthDay: "12", birthTimeUnknown: true, gender: "female" as const, knownMbti: "INFJ" };
 const answers = Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i) => [i.id, 4])));
 
 /** 시계를 움직일 수 있는 테스트 환경 */
