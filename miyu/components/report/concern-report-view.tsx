@@ -80,7 +80,7 @@ export function ConcernReportView({ report, idPrefix = "", footer }: { report: C
             {report.timeline.map((t) => (
               <Fold key={t.period} label={t.period} hint={t.theme} wide>
                 <div className="space-y-5">
-                  <div className="border-l-[3px] border-positive pl-3.5">
+                  <div className="border-l-[3px] border-positive-fill pl-3.5">
                     <p className="flex items-center gap-1.5 text-[13px] font-semibold text-positive">
                       <StrengthIcon />
                       살릴 기회

@@ -37,3 +37,17 @@ test("토큰 규칙: 주의 색은 빨간색 계열이 아니고(경고처럼 �
   assert.ok(!(r > 170 && g < 90 && b < 90), "주의 색이 붉다");
   assert.equal(new Set([token("accent"), token("positive"), token("caution")]).size, 3);
 });
+
+test("토큰 규칙(2026-10-15 팔레트): 바탕은 따뜻한 아이보리, 청록 장식색은 따로 있고 글자색보다 연하지 않게 같은 계열이다", () => {
+  assert.equal(token("page"), "#f7f5f1");
+  assert.equal(token("canvas"), "#ffffff");
+  // 청록 장식색(띠 · 아이콘)은 글자로 쓰지 않는다 — 글자는 positive(대비 4.5 이상)
+  assert.ok(ratio(token("positive"), token("canvas")) >= 4.5);
+  const [pr, pg, pb] = [1, 3, 5].map((i) => parseInt(token("positive").slice(i, i + 2), 16));
+  const [fr, fg, fb] = [1, 3, 5].map((i) => parseInt(token("positive-fill").slice(i, i + 2), 16));
+  assert.ok(fr >= pr && fg >= pg && fb >= pb, "장식색은 글자색과 같은 계열의 더 밝은 색이다");
+  // 라벤더 말풍선 위의 차콜 글자
+  assert.ok(ratio(token("ink"), token("accent-soft")) >= 4.5, "내 말풍선 글자");
+  // 살구 바탕 위의 황토 글자
+  assert.ok(ratio(token("caution"), token("caution-soft")) >= 4.5, "주의 카드 글자");
+});

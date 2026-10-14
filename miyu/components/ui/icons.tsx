@@ -51,6 +51,16 @@ export function StrengthIcon({ className = "size-4" }: { className?: string }) {
   );
 }
 
+/** 마음이 편해지는 조건 — 새싹 잎 (이모지 대신 쓰는 선 그림) */
+export function LeafIcon({ className = "size-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className={className}>
+      <path d="M3 13c0-5.2 3.1-8.6 9.5-9 .3 6.2-3 9.6-8.4 9.3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 13c1.6-3 3.6-5 6-6.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** 단점이 될 수 있는 부분 · 조절이 필요한 때 — 슬라이더 (경고 표시가 아니라 "맞춰 본다"는 뜻) */
 export function AdjustIcon({ className = "size-4" }: { className?: string }) {
   return (

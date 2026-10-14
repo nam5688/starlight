@@ -7,6 +7,7 @@ import { AdjustIcon, ArrowIcon, MenuIcon, StrengthIcon } from "@/components/ui/i
 import { answerBubbles, extraBubbles, nextTopic, TALK_COPY, type TalkBubble, type TalkExtra, type TalkGroup, type TalkModel, type TalkTopic } from "@/lib/report/reading/talk";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
+import { MiyuAvatar, TypingDots } from "./miyu-character";
 
 type Extra = TalkExtra;
 /** 미유가 보내는 말 하나 — 저장된 리포트의 글을 나눈 말풍선(TalkBubble), 분석 카드, 링크가 달린 안내 */
@@ -31,9 +32,10 @@ const OVERLAY_QUERY = "not all and (min-width: 768px) and (min-height: 600px)";
 
 const delayFor = (s: Say) => (s.kind === "text" ? Math.min(1000, (s.muted ? 240 : 360) + s.text.length * 8) : s.kind === "headline" ? 520 : 680);
 
-const chipBase = "inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full border px-4 py-2 text-[15px] font-semibold whitespace-nowrap transition-colors";
-const chip = `${chipBase} border-line-strong bg-canvas text-ink hover:bg-mist`;
-const chipPrimary = `${chipBase} border-transparent bg-accent text-white hover:bg-accent-strong`;
+// 추천 질문은 흰 테두리 버튼이 아니라 연보라 둥근 버튼으로, 다음으로 이어 가는 버튼만 진한 보라로 둔다
+const chipBase = "inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-[15px] font-semibold whitespace-nowrap transition-colors";
+const chip = `${chipBase} bg-accent-soft text-accent-strong hover:brightness-95`;
+const chipPrimary = `${chipBase} bg-accent text-white hover:bg-accent-strong`;
 const pending = <span className="text-[13px] font-medium text-ink-3">· 준비 중</span>;
 
 /**
@@ -206,11 +208,7 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
   };
   const openExtra = (t: TalkTopic, which: Extra) => {
     echo(TALK_COPY.buttons[which]);
-    say(
-      ...(which === "basis" ? [{ kind: "text", text: TALK_COPY.basisIntro } as const] : []),
-      ...extraBubbles(t, which),
-      ...(which === "example" ? [{ kind: "text", text: TALK_COPY.afterExample } as const] : which === "detail" ? [{ kind: "text", text: TALK_COPY.afterDetail } as const] : []),
-    );
+    say(...(which === "basis" ? [{ kind: "text", text: TALK_COPY.basisIntro } as const] : []), ...extraBubbles(t, which));
     mark(t.id, which);
   };
   const differ = (t: TalkTopic) => {
@@ -264,13 +262,13 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
   return (
     <div
       ref={rootRef}
-      className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh w-full max-w-[560px] flex-col border-x border-line bg-canvas chat-frame:static chat-frame:z-auto chat-frame:my-8 chat-frame:h-[max(560px,min(800px,calc(100dvh-9rem)))] chat-frame:w-[420px] chat-frame:overflow-hidden chat-frame:rounded-[28px] chat-frame:border chat-frame:border-line-strong"
+      className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh w-full max-w-[560px] flex-col bg-page chat-frame:static chat-frame:z-auto chat-frame:my-8 chat-frame:h-[max(560px,min(800px,calc(100dvh-9rem)))] chat-frame:w-[420px] chat-frame:overflow-hidden chat-frame:rounded-[28px] chat-frame:shadow-pop chat-frame:ring-1 chat-frame:ring-line"
     >
-      <header className="flex items-center gap-2 border-b border-line bg-canvas px-2 py-2">
+      <header className="relative z-10 flex items-center gap-2 bg-page px-2 py-2 shadow-[0_6px_10px_-10px_rgb(48_49_59/0.4)]">
         <Link href={reportHref} aria-label="전체 리포트로 돌아가기" className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
           <ArrowIcon className="size-5 rotate-180" />
         </Link>
-        <Avatar className="size-10 text-[17px]" />
+        <MiyuAvatar className="size-11" mood={typing ? "thinking" : "smile"} blink bob={typing} />
         <div className="min-w-0 flex-1">
           <h1 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[17px] leading-tight font-bold">
             <span>
@@ -278,13 +276,22 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
             </span>
             {/* 대표 경향(~형)은 분석 카드가 위로 올라가도 계속 보인다 — 후보 이름이며 진단이 아니다 */}
             {model.card.tendency && (
-              <span className="inline-flex items-center rounded-md bg-accent-soft px-2 py-0.5 text-[13px] font-bold text-accent-strong">
+              <span className="inline-flex items-center rounded-full bg-accent-soft px-2.5 py-0.5 text-[13px] font-bold text-accent-strong">
                 <span className="sr-only">나의 대표 경향 </span>
                 {model.card.tendency}
               </span>
             )}
           </h1>
-          <p className="line-clamp-2 text-[13px] leading-snug text-ink-3">{subtitle}</p>
+          {/* 답을 쓰는 동안에는 머리글 아래 줄이 "입력하고 있어요"로 바뀐다 — 높이가 변하지 않게 글 위에 겹쳐 둔다 */}
+          <div className="relative">
+            <p className={`line-clamp-2 text-[13px] leading-snug text-ink-3 transition-opacity ${typing ? "opacity-0" : ""}`}>{subtitle}</p>
+            {typing && (
+              <p aria-hidden="true" className="absolute inset-x-0 top-0 flex items-center gap-2 text-[13px] leading-snug font-semibold text-accent-strong">
+                {TALK_COPY.typing}
+                <TypingDots className="size-1.5" />
+              </p>
+            )}
+          </div>
         </div>
       </header>
 
@@ -317,32 +324,32 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
         {log.map((m, i) => {
           const sameSender = i > 0 && log[i - 1].from === m.from;
           return (
-            <div key={m.id} data-msg={m.id} className={i === 0 ? "" : sameSender ? "mt-1.5" : "mt-4"}>
+            <div key={m.id} data-msg={m.id} className={`motion-safe:animate-miyu-in ${i === 0 ? "" : sameSender ? "mt-1.5" : "mt-4"}`}>
               {m.from === "me" ? <MeBubble text={m.text} /> : <MiyuRow say={m.say} first={!sameSender} model={model} dateLabel={dateLabel} />}
             </div>
           );
         })}
         {typing && (
-          <div className={log[log.length - 1]?.from === "miyu" ? "mt-1.5" : "mt-4"}>
+          <div className={`motion-safe:animate-miyu-in ${log[log.length - 1]?.from === "miyu" ? "mt-1.5" : "mt-4"}`}>
             <div className="flex items-start gap-2">
-              <div className="w-8 shrink-0">{log[log.length - 1]?.from !== "miyu" && <Avatar className="size-8 text-[14px]" />}</div>
-              <div className="rounded-2xl rounded-tl-md border border-line bg-canvas px-4 py-3.5">
-                <span className="sr-only">미유가 입력하고 있어요</span>
-                <span aria-hidden="true" className="flex gap-1.5">
-                  {[0, 1, 2].map((i) => (
-                    <span key={i} className="size-2 rounded-full bg-ink-3 motion-safe:animate-pulse" style={{ animationDelay: `${i * 180}ms` }} />
-                  ))}
-                </span>
+              <div className="w-9 shrink-0">{log[log.length - 1]?.from !== "miyu" && <MiyuAvatar className="size-9" mood="thinking" blink bob />}</div>
+              {/* 점 세 개가 차례로 튀는 "입력 중" 말풍선 — AI가 답을 만드는 동안에도 같은 모양을 쓴다 */}
+              <div className="rounded-2xl rounded-tl-md bg-canvas px-4 py-3.5 shadow-soft">
+                <span className="sr-only">{TALK_COPY.typing}</span>
+                <TypingDots />
               </div>
             </div>
           </div>
         )}
       </div>
 
-      <div ref={optionsRef} tabIndex={-1} role="group" aria-label="답장 고르기" className="border-t border-line bg-canvas pt-2.5 pb-2 outline-none">
+      <div ref={optionsRef} tabIndex={-1} role="group" aria-label="답장 고르기" className="bg-page pt-2.5 pb-2 outline-none">
         {typing ? (
           <div className="flex min-h-11 items-center justify-between gap-3 px-3">
-            <p className="text-[14px] text-ink-3">미유가 답하고 있어요</p>
+            <p className="flex items-center gap-2 text-[14px] text-ink-3">
+              미유가 답하고 있어요
+              <TypingDots className="size-1.5" />
+            </p>
             <button type="button" onClick={skip} className="min-h-11 px-1 text-[14px] font-semibold text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">
               바로 모두 보기
             </button>
@@ -406,9 +413,9 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
         )}
       </div>
 
-      <div className="relative flex items-center gap-2 border-t border-line bg-canvas px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="relative flex items-center gap-2 bg-page px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {menuOpen && (
-          <div ref={menuRef} id={menuId} role="group" aria-label={TALK_COPY.menuTitle} className="absolute right-3 bottom-full left-3 mb-2 max-h-[min(30rem,70dvh)] overflow-y-auto rounded-2xl border border-line-strong bg-canvas p-2">
+          <div ref={menuRef} id={menuId} role="group" aria-label={TALK_COPY.menuTitle} className="absolute right-3 bottom-full left-3 mb-2 max-h-[min(30rem,70dvh)] overflow-y-auto rounded-2xl bg-canvas p-2 shadow-pop">
             {groups.map((g) => (
               <div key={g.id} className="px-1">
                 {g.topicIds.length > 1 && <p className="px-2 pt-1.5 pb-0.5 text-[13px] font-semibold text-ink-3">{g.chip}</p>}
@@ -423,7 +430,7 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
                 })}
               </div>
             ))}
-            <div className="mt-1 border-t border-line px-1 pt-1">
+            <div className="mt-1 px-1 pt-1">
               <button type="button" onClick={goConcern} className="flex min-h-11 w-full items-center gap-1.5 rounded-lg px-2 text-left text-[15px] font-semibold hover:bg-mist">
                 {TALK_COPY.buttons.concern}
                 {pending}
@@ -446,19 +453,28 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
           aria-label={menuOpen ? TALK_COPY.buttons.menuClose : TALK_COPY.buttons.menu}
           aria-expanded={menuOpen}
           aria-controls={menuOpen ? menuId : undefined}
-          className="grid size-11 shrink-0 place-items-center rounded-full border border-line-strong bg-canvas text-ink hover:bg-mist"
+          className="grid size-11 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-strong hover:brightness-95"
         >
           <MenuIcon />
         </button>
-        <input
-          type="text"
-          disabled
-          aria-label={TALK_COPY.freeQuestion}
-          aria-describedby={noteId}
-          placeholder={TALK_COPY.freeQuestion}
-          className="h-11 min-w-0 flex-1 rounded-full border border-line bg-mist px-4 text-[15px] placeholder:text-ink-3 disabled:cursor-not-allowed"
-        />
-        <button type="button" disabled aria-label="보내기 (준비 중)" className="grid size-11 shrink-0 place-items-center rounded-full bg-mist text-ink-3 disabled:cursor-not-allowed">
+        <div className="relative min-w-0 flex-1">
+          <input
+            type="text"
+            disabled
+            aria-label={TALK_COPY.freeQuestion}
+            aria-describedby={noteId}
+            placeholder={typing ? "" : TALK_COPY.freeQuestion}
+            className={`h-11 w-full min-w-0 rounded-full bg-canvas px-4 text-[15px] shadow-soft placeholder:text-ink-3 disabled:cursor-not-allowed ${typing ? "motion-safe:animate-miyu-glow" : ""}`}
+          />
+          {/* 미유가 답을 쓰는 동안 입력창에도 "입력 중"을 보인다 (글자 입력은 아직 준비 중이라 입력창 자체는 계속 비활성) */}
+          {typing && (
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center gap-2 px-4 text-[15px] font-medium text-accent-strong">
+              {TALK_COPY.typing}
+              <TypingDots className="size-1.5" />
+            </span>
+          )}
+        </div>
+        <button type="button" disabled aria-label="보내기 (준비 중)" className="grid size-11 shrink-0 place-items-center rounded-full bg-accent-soft text-ink-3 opacity-70 disabled:cursor-not-allowed">
           <ArrowIcon className="size-5 -rotate-90" />
         </button>
         <span id={noteId} className="sr-only">
@@ -469,28 +485,21 @@ export function TalkView({ model, dateLabel, reportHref, dataHref, subtitle, con
   );
 }
 
-function Avatar({ className }: { className: string }) {
-  return (
-    <span aria-hidden="true" className={`grid shrink-0 place-items-center rounded-xl bg-accent-soft font-bold text-accent-strong ${className}`}>
-      미
-    </span>
-  );
-}
-
 function MeBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
-      <p className="max-w-[85%] rounded-2xl rounded-tr-md bg-accent px-3.5 py-2.5 text-[15px] leading-[1.5] font-semibold text-white">{text}</p>
+      <p className="max-w-[85%] rounded-2xl rounded-tr-md bg-accent-soft px-3.5 py-2.5 text-[15px] leading-[1.5] font-medium text-ink">{text}</p>
     </div>
   );
 }
 
-const bubble = "rounded-2xl rounded-tl-md border border-line bg-canvas px-3.5 py-2.5";
+// 일반 답변은 테두리 없이 하얀 말풍선에 아주 옅은 그림자만 — 박스를 덜 쓴다
+const bubble = "rounded-2xl rounded-tl-md bg-canvas px-3.5 py-2.5 shadow-soft";
 
 function MiyuRow({ say, first, model, dateLabel }: { say: Say; first: boolean; model: TalkModel; dateLabel: string }) {
   return (
     <div className="flex items-start gap-2">
-      <div className="w-8 shrink-0">{first && <Avatar className="size-8 text-[14px]" />}</div>
+      <div className="w-9 shrink-0">{first && <MiyuAvatar className="size-9" mood={say.kind === "text" && say.muted ? "listening" : "smile"} />}</div>
       <div className="min-w-0 flex-1">
         <Content say={say} model={model} dateLabel={dateLabel} />
       </div>
@@ -511,7 +520,7 @@ function Content({ say, model, dateLabel }: { say: Say; model: TalkModel; dateLa
       if (say.muted) return <Prose text={say.text} className="px-1 text-[13px] leading-[1.6] text-ink-3" />;
       return (
         <div className={`${bubble} inline-block max-w-full`}>
-          {say.label && <p className="mb-0.5 text-[13px] font-semibold text-ink-3">{say.label}</p>}
+          {say.label && <p className="mb-0.5 text-[13px] font-semibold text-accent-strong">{say.label}</p>}
           <Prose text={say.text} className="text-[16px] leading-[1.6]" />
         </div>
       );
@@ -529,26 +538,27 @@ function Content({ say, model, dateLabel }: { say: Say; model: TalkModel; dateLa
     case "headline":
       return (
         <div className={`${bubble} inline-block max-w-full`}>
-          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
-            <span className="grid size-5 place-items-center rounded bg-accent-soft text-[12px] font-bold text-accent-strong tabular-nums">{say.number}</span>
+          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent-strong">
+            <span className="grid size-5 place-items-center rounded-full bg-accent-soft text-[12px] font-bold tabular-nums">{say.number}</span>
             {say.title}
           </p>
           <p className="mt-1 text-[18px] leading-snug font-bold tracking-tight">{say.text}</p>
         </div>
       );
     case "traits":
+      // 강점 · 단점이 될 수 있는 부분은 꼭 기억할 정보라 색이 있는 칸으로 — 바깥 테두리 · 구분선 없이 이름 아래에 바로 놓는다
       return (
-        <ul className="divide-y divide-line rounded-2xl rounded-tl-md border border-line bg-canvas">
+        <ul className="space-y-3.5">
           {say.traits.map((x) => (
-            <li key={x.name} className="px-3.5 py-3">
-              <p className="text-[16px] font-bold">{x.name}</p>
-              <p className="mt-1.5 flex items-start gap-1.5 text-[14px] leading-snug">
+            <li key={x.name}>
+              <p className="px-1 text-[16px] font-bold">{x.name}</p>
+              <p className="mt-1.5 flex items-start gap-2 rounded-xl bg-positive-soft px-3 py-2.5 text-[14px] leading-snug">
                 <StrengthIcon className="mt-0.5 size-4 shrink-0 text-positive" />
                 <span>
                   <span className="font-semibold text-positive">장점</span> {x.shinesShort}
                 </span>
               </p>
-              <p className="mt-1.5 flex items-start gap-1.5 text-[14px] leading-snug">
+              <p className="mt-1.5 flex items-start gap-2 rounded-xl bg-caution-soft px-3 py-2.5 text-[14px] leading-snug">
                 <AdjustIcon className="mt-0.5 size-4 shrink-0 text-caution" />
                 <span>
                   <span className="font-semibold text-caution">단점이 될 수 있는 부분</span> {x.burdenShort}
@@ -559,7 +569,7 @@ function Content({ say, model, dateLabel }: { say: Say; model: TalkModel; dateLa
         </ul>
       );
     case "timeline":
-      return <LuckTimelineCard className="" timeline={say.slots} text={say.text} reference={say.reference} />;
+      return <LuckTimelineCard soft className="" timeline={say.slots} text={say.text} reference={say.reference} />;
     case "flow":
       return <ReactionStepper compact className="" flow={{ when: say.when, steps: say.steps, helpful: say.helpful }} />;
     case "comfort":

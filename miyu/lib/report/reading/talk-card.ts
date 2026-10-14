@@ -4,11 +4,13 @@
 // 카드에는 생년월일 · 고민 · 응답 점수가 들어갈 자리가 없다 (TalkCard에 그런 값이 없다). 점수 그래프 · 정확도도 그리지 않는다.
 import { CARD_DISCLAIMER, type TalkCard } from "./talk.ts";
 
-export type CardColor = "canvas" | "ink" | "ink-2" | "ink-3" | "accent" | "accent-strong" | "accent-soft" | "positive" | "positive-soft" | "caution" | "caution-soft" | "line";
+export type CardColor = "canvas" | "ink" | "ink-2" | "ink-3" | "accent" | "accent-strong" | "accent-soft" | "positive" | "positive-fill" | "positive-soft" | "caution" | "caution-soft" | "line";
 
+/** r은 모서리 둥글기(px), mark는 안내 캐릭터 "미유"를 그리는 자리(size는 한 변의 길이) — 그림은 브라우저(card-image.ts)가 그린다 */
 export type CardOp =
-  | { type: "rect"; x: number; y: number; w: number; h: number; color: CardColor }
-  | { type: "text"; x: number; y: number; text: string; size: number; weight: 400 | 600 | 700; color: CardColor; align?: "left" | "right" };
+  | { type: "rect"; x: number; y: number; w: number; h: number; color: CardColor; r?: number }
+  | { type: "text"; x: number; y: number; text: string; size: number; weight: 400 | 600 | 700; color: CardColor; align?: "left" | "right" }
+  | { type: "mark"; x: number; y: number; size: number };
 
 /** 글자 폭(px)을 재는 함수 — 브라우저에서는 Canvas가, 테스트에서는 가짜 함수가 맡는다 */
 export type Measure = (text: string, size: number, weight: number) => number;
@@ -76,36 +78,38 @@ export function layoutCard(card: TalkCard, o: CardLayoutOptions): { ops: CardOp[
   const showName = o.variant === "save" || o.includeName === true;
   const name = o.name?.trim();
 
-  // 맨 위 띠 · 이름표
-  ops.push({ type: "rect", x: 0, y: 0, w: width, h: 12, color: "accent" });
-  text("ME:U 미유", MARGIN, y, 30, 700, "accent");
-  if (o.variant === "save" && o.dateLabel) text(o.dateLabel, width - MARGIN, y + 4, 26, 400, "ink-3", "right");
-  y += 56;
-  text(showName && name ? `${name} 님의 분석 카드` : "나의 분석 카드", MARGIN, y, 32, 600, "ink-2");
-  y += 60;
-
-  // 대표 경향 (~형)
+  // 맨 위 연보라 띠 — 작은 캐릭터 · 이름표 · 이름 · 대표 경향 (저장하고 싶은 카드의 얼굴)
+  const MARK = 132;
+  const textX = MARGIN + MARK + 36;
+  const headTop = 60;
+  // 띠와 캐릭터는 글보다 먼저 그려야 글을 덮지 않는다 — 띠 높이는 아래에서 정해지므로 이 자리에 나중에 끼워 넣는다
+  const headStart = ops.length;
+  text("ME:U 미유", textX, headTop, 28, 700, "accent-strong");
+  if (o.variant === "save" && o.dateLabel) text(o.dateLabel, width - MARGIN, headTop + 3, 24, 400, "ink-3", "right");
+  text(showName && name ? `${name} 님의 분석 카드` : "나의 분석 카드", textX, headTop + 46, 34, 700, "ink");
+  let bandH = headTop + MARK + 56;
   if (card.tendency) {
-    const w = Math.ceil(o.measure(card.tendency, 34, 700)) + 40;
-    ops.push({ type: "rect", x: MARGIN, y, w, h: 56, color: "accent-soft" });
-    text(card.tendency, MARGIN + 20, y + 9, 34, 700, "accent-strong");
-    text("나의 대표 경향", MARGIN + w + 20, y + 15, 26, 400, "ink-3");
-    y += 56 + 28;
+    const w = Math.ceil(o.measure(card.tendency, 32, 700)) + 48;
+    const chipY = headTop + 46 + 34 + 26;
+    ops.push({ type: "rect", x: textX, y: chipY, w, h: 56, color: "canvas", r: 28 });
+    text(card.tendency, textX + 24, chipY + 10, 32, 700, "accent-strong");
+    text("나의 대표 경향", textX + w + 20, chipY + 16, 24, 400, "ink-3");
+    bandH = Math.max(bandH, chipY + 56 + 48);
   }
+  ops.splice(headStart, 0, { type: "rect", x: 0, y: 0, w: width, h: bandH, color: "accent-soft" }, { type: "mark", x: MARGIN, y: headTop - 8, size: MARK });
+  y = bandH + 52;
 
   // 핵심 해석 한 문장
   block(card.headline, MARGIN, inner, 52, 700, "ink");
-  y += 24;
-  ops.push({ type: "rect", x: MARGIN, y, w: inner, h: 2, color: "line" });
-  y += 34;
+  y += 36;
 
-  // 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 — 칸마다 왼쪽에 띠
-  const box = (c: { label: string; keyword: string; note: string }, face: CardColor, band: CardColor, tone: CardColor) => {
-    const pad = 32;
-    const textW = inner - pad * 2 - 8;
+  // 장점 · 단점이 될 수 있는 부분 · 지금 나의 시기 — 색이 있는 둥근 칸 (테두리 · 띠 없이, 이름과 색을 함께)
+  const box = (c: { label: string; keyword: string; note: string }, face: CardColor, tone: CardColor) => {
+    const pad = 34;
+    const textW = inner - pad * 2;
     const h = pad + Math.round(26 * LH) + measureBlock(c.keyword, textW, 38, 700) + 6 + measureBlock(c.note, textW, 30, 400) + pad;
-    ops.push({ type: "rect", x: MARGIN, y, w: inner, h, color: face }, { type: "rect", x: MARGIN, y, w: 8, h, color: band });
-    const x = MARGIN + 8 + pad;
+    ops.push({ type: "rect", x: MARGIN, y, w: inner, h, color: face, r: 32 });
+    const x = MARGIN + pad;
     const top = y;
     y += pad;
     text(c.label, x, y, 26, 700, tone);
@@ -113,12 +117,11 @@ export function layoutCard(card: TalkCard, o: CardLayoutOptions): { ops: CardOp[
     block(c.keyword, x, textW, 38, 700, "ink");
     y += 6;
     block(c.note, x, textW, 30, 400, "ink-2");
-    y = top + h + 20;
+    y = top + h + 22;
   };
-  y += 4;
-  box(card.strength, "positive-soft", "positive", "positive");
-  box(card.caution, "caution-soft", "caution", "caution");
-  box(card.flow, "accent-soft", "accent", "accent-strong");
+  box(card.strength, "positive-soft", "positive");
+  box(card.caution, "caution-soft", "caution");
+  box(card.flow, "accent-soft", "accent-strong");
 
   // 사용한 정보 — 저장용에만
   if (o.variant === "save" && card.inputs.length > 0) {
@@ -128,10 +131,8 @@ export function layoutCard(card: TalkCard, o: CardLayoutOptions): { ops: CardOp[
     block(card.inputs.join(" · "), MARGIN, inner, 28, 400, "ink-2");
   }
 
-  // 맺음
-  y += 34;
-  ops.push({ type: "rect", x: MARGIN, y, w: inner, h: 2, color: "line" });
-  y += 28;
+  // 맺음 — 선 없이 작은 글로
+  y += 30;
   block(CARD_DISCLAIMER, MARGIN, inner, 26, 400, "ink-3");
 
   const height = y + MARGIN;

@@ -81,7 +81,7 @@ export function CardActions({ card, name, dateLabel }: { card: TalkCard; name: s
     }
   };
 
-  const btn = "inline-flex h-11 items-center justify-center rounded-lg border border-line-strong bg-canvas px-4 text-[15px] font-semibold transition-colors hover:bg-mist disabled:cursor-wait disabled:opacity-60";
+  const btn = "inline-flex h-11 items-center justify-center rounded-full bg-accent-soft px-4 text-[15px] font-semibold text-accent-strong transition-colors hover:brightness-95 disabled:cursor-wait disabled:opacity-60";
   return (
     <div className="mt-3">
       <div className="flex flex-wrap gap-2">
@@ -98,7 +98,7 @@ export function CardActions({ card, name, dateLabel }: { card: TalkCard; name: s
         </p>
       )}
       {share && (
-        <div className="mt-3 rounded-xl border border-line bg-canvas p-3">
+        <div className="mt-3 rounded-2xl bg-canvas p-3 shadow-soft">
           <p className="text-[14px] leading-[1.6] text-ink-2">공유용 카드예요. 생년월일과 고민은 들어 있지 않고, 이름과 분석일도 기본으로 뺐어요.</p>
           {/* 이미지는 이 기기 안에서 만든 임시 주소라 next/image를 쓰지 않는다 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { AdjustIcon, ChevronIcon, FlowIcon, InfoIcon, StrengthIcon } from "@/components/ui/icons";
+import { AdjustIcon, ChevronIcon, FlowIcon, InfoIcon, LeafIcon, StrengthIcon } from "@/components/ui/icons";
 import { lineGroups } from "@/lib/report/reading/line-breaks";
 import type { LuckSlot, ReadingBasis, ReadingBlock, ReadingSection, ReadingSummaryCard, ReadingTrait } from "@/lib/report/reading/types";
 
@@ -29,7 +29,7 @@ export function Prose({ text, className, as: Tag = "p" }: { text: string; classN
 export const TRAIT_LABEL = { strong: "장점", hard: "단점이 될 수 있는 부분" } as const;
 
 const KIND = {
-  strength: { Icon: StrengthIcon, label: "text-positive", band: "before:bg-positive" },
+  strength: { Icon: StrengthIcon, label: "text-positive", band: "before:bg-positive-fill" },
   caution: { Icon: AdjustIcon, label: "text-caution", band: "before:bg-caution" },
   flow: { Icon: FlowIcon, label: "text-accent", band: "before:bg-accent" },
 } as const;
@@ -136,7 +136,7 @@ export function TraitSentences({ traits }: { traits: ReadingTrait[] }) {
         <li key={t.name} className="py-6 first:pt-0 last:pb-0">
           <p className="text-[17px] leading-snug font-bold tracking-tight">{t.name}</p>
 
-          <div className="mt-4 border-l-[3px] border-positive pl-3.5">
+          <div className="mt-4 border-l-[3px] border-positive-fill pl-3.5">
             <p className="flex items-center gap-1.5 text-[13px] font-semibold text-positive">
               <StrengthIcon />
               {TRAIT_LABEL.strong}
@@ -162,24 +162,24 @@ export function TraitSentences({ traits }: { traits: ReadingTrait[] }) {
   );
 }
 
-/** 편안하게 느끼는 조건 / 부딪히기 쉬운 상황 — 상대 없이 보는 관계 스타일 */
+/** 마음이 편해지는 관계 조건 / 부딪히기 쉬운 상황 — 상대 없이 보는 관계 스타일. 꼭 기억할 정보라 색이 있는 칸으로 둔다(테두리 없이) */
 export function ComfortPair({ comfort, compact = false, className = "mt-4" }: { comfort: NonNullable<ReadingBlock["comfort"]>; /** 좁은 칸(대화 말풍선 안)에서는 세로로만 쌓는다 */ compact?: boolean; className?: string }) {
   const lists = [
-    { title: "편안하게 느끼는 조건", items: comfort.comfortable, Icon: StrengthIcon, tone: "text-positive" },
-    { title: "부딪히기 쉬운 상황", items: comfort.clash, Icon: AdjustIcon, tone: "text-caution" },
+    { title: "이런 관계에서 마음이 편해져요", items: comfort.comfortable, Icon: LeafIcon, tone: "text-positive", face: "bg-positive-soft", dot: "before:bg-positive-fill" },
+    { title: "이럴 땐 마음이 부딪히기 쉬워요", items: comfort.clash, Icon: AdjustIcon, tone: "text-caution", face: "bg-caution-soft", dot: "before:bg-caution" },
   ];
   return (
     <div className={className}>
       <div className={compact ? "grid gap-3" : "grid gap-3 md:grid-cols-2"}>
         {lists.map((l) => (
-          <div key={l.title} className="rounded-xl border border-line bg-canvas p-4">
+          <div key={l.title} className={`rounded-xl ${l.face} p-4`}>
             <p className={`flex items-center gap-1.5 text-[14px] font-semibold ${l.tone}`}>
               <l.Icon />
               {l.title}
             </p>
             <ul className="mt-2 space-y-1.5 text-[15px] leading-[1.6]">
               {l.items.map((i) => (
-                <li key={i} className="relative pl-3.5 before:absolute before:top-[0.72em] before:left-0 before:size-1 before:rounded-full before:bg-line-strong">
+                <li key={i} className={`relative pl-3.5 before:absolute before:top-[0.72em] before:left-0 before:size-1 before:rounded-full ${l.dot}`}>
                   {i}
                 </li>
               ))}
@@ -195,7 +195,7 @@ export function ComfortPair({ comfort, compact = false, className = "mt-4" }: { 
 /** 상대의 반응이 이어지는 모습 — 단계 그림 (모바일은 세로, PC는 가로) */
 export function ReactionStepper({ flow, compact = false, className = "mt-5" }: { flow: NonNullable<ReadingBlock["reactionFlow"]>; /** 좁은 칸(대화 말풍선 안)에서는 세로로만 쌓는다 */ compact?: boolean; className?: string }) {
   return (
-    <div className={`${className} rounded-xl border border-line bg-canvas p-4 ${compact ? "" : "md:p-5"}`}>
+    <div className={`${className} rounded-xl bg-canvas p-4 ${compact ? "shadow-soft" : "border border-line md:p-5"}`}>
       <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent">
         <FlowIcon />
         반응이 이어지는 모습
@@ -221,7 +221,7 @@ const fmtMonth = (s: string) => s.replace("-", ".");
 const monthIndex = (s: string) => Number(s.slice(0, 4)) * 12 + Number(s.slice(5, 7));
 
 /** 지금 지나는 시기 — 계산된 기간으로 이전 · 지금 · 다음을 한 줄에 놓고 현재 위치를 표시한다. 곡선 · 점수는 그리지 않는다 */
-export function LuckTimelineCard({ timeline, text, reference, className = "mt-5" }: { timeline: LuckSlot[]; text: string; reference: { year: number; month: number }; className?: string }) {
+export function LuckTimelineCard({ timeline, text, reference, className = "mt-5", soft = false }: { timeline: LuckSlot[]; text: string; reference: { year: number; month: number }; className?: string; /** 대화 말풍선 안에서는 테두리 대신 옅은 그림자로 */ soft?: boolean }) {
   const cur = timeline.find((s) => s.role === "current");
   if (!cur) return null;
   const pct = Math.round((cur.progress ?? 0) * 100);
@@ -232,7 +232,7 @@ export function LuckTimelineCard({ timeline, text, reference, className = "mt-5"
   const others = timeline.filter((s) => s.role !== "current");
   const NAME = { previous: "이전", current: "지금", next: "다음" } as const;
   return (
-    <div className={`${className} rounded-xl border border-line bg-canvas p-4 md:p-5`}>
+    <div className={`${className} rounded-xl bg-canvas p-4 md:p-5 ${soft ? "shadow-soft" : "border border-line"}`}>
       <p className="flex items-center gap-1.5 text-[13px] font-semibold text-accent">
         <FlowIcon />
         지금 나의 시기 · 10년 단위

@@ -119,7 +119,7 @@ export function SituationsSection({ situations, id }: { situations: ReportExtras
                 <p className="text-[13px] font-semibold text-ink-3">이런 모습이라면</p>
                 <p className="mt-1 text-[15px] leading-[1.75] text-ink-2">{s.scenario}</p>
               </div>
-              <div className="border-l-[3px] border-positive pl-3.5">
+              <div className="border-l-[3px] border-positive-fill pl-3.5">
                 <p className="flex items-center gap-1.5 text-[13px] font-semibold text-positive">
                   <StrengthIcon />
                   잘 발휘될 때 · {s.strengthLabel}

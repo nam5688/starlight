@@ -134,6 +134,7 @@ test("카드 배치: 모든 글이 이미지 안에 들어가고 높이는 글�
   assert.ok(a.height > 1200);
   for (const op of a.ops) {
     if (op.type === "rect") assert.ok(op.x >= 0 && op.y >= 0 && op.x + op.w <= a.width && op.y + op.h <= a.height, "칸이 이미지 밖으로 나가지 않는다");
+    else if (op.type === "mark") assert.ok(op.x >= 0 && op.y >= 0 && op.x + op.size <= a.width && op.y + op.size <= a.height, "캐릭터가 이미지 밖으로 나가지 않는다");
     else {
       const w = measure(op.text, op.size, op.weight);
       const left = op.align === "right" ? op.x - w : op.x;
@@ -144,6 +145,31 @@ test("카드 배치: 모든 글이 이미지 안에 들어가고 높이는 글�
   const longer = layoutCard({ ...card, headline: `${card.headline} ${card.headline} ${card.headline}` }, { variant: "save", measure, name: "서윤", dateLabel: "예시" });
   assert.ok(longer.height > a.height, "글이 길어지면 카드가 길어진다 (글을 자르지 않는다)");
   assert.equal(a.ops[0].type, "rect", "바탕이 맨 먼저");
+});
+
+test("카드 배치: 맨 위 연보라 띠에 캐릭터 자리가 있고, 글은 캐릭터와 겹치지 않으며, 칸은 둥글게 색으로만 나눈다(띠 · 선 없음)", () => {
+  const { card } = buildTalkModel(R, { tendencyName: "확인추구형" });
+  for (const variant of ["save", "share"] as const) {
+    const { ops } = layoutCard(card, { variant, measure, name: "서윤", dateLabel: "2026. 10. 13." });
+    const marks = ops.filter((op) => op.type === "mark");
+    assert.equal(marks.length, 1, "캐릭터 자리는 하나");
+    const mark = marks[0] as Extract<(typeof ops)[number], { type: "mark" }>;
+    const band = ops.find((op) => op.type === "rect" && op.color === "accent-soft" && op.y === 0 && op.x === 0) as Extract<(typeof ops)[number], { type: "rect" }> | undefined;
+    assert.ok(band && mark.y + mark.size <= band.h, "캐릭터는 연보라 띠 안에 있다");
+    const head = ops.filter((op): op is Extract<(typeof ops)[number], { type: "text" }> => op.type === "text" && op.y < band!.h);
+    assert.ok(head.length >= 3 && head.some((t) => t.text === "ME:U 미유") && head.some((t) => t.text.includes("분석 카드")) && head.some((t) => t.text === "확인추구형"));
+    for (const t of head) if (t.align !== "right") assert.ok(t.x >= mark.x + mark.size, `띠 안의 글이 캐릭터를 가리지 않는다: ${t.text}`);
+    // 그리는 순서: 띠 → 캐릭터 → 띠 안의 글 (띠를 글보다 나중에 그리면 글이 가려진다)
+    const order = (op: (typeof ops)[number]) => ops.indexOf(op);
+    assert.ok(order(band!) < order(mark) && head.every((t) => order(t) > order(band!)), "띠가 띠 안의 글보다 먼저 그려진다");
+    for (const chipRect of ops.filter((op) => op.type === "rect" && op.color === "canvas" && op.r !== undefined && op.y < band!.h)) {
+      assert.ok(order(chipRect) > order(band!), "대표 경향 칸(흰색)도 띠 위에 그려진다");
+    }
+    // 칸마다 왼쪽 띠(너비 8px 막대)를 두지 않고 모서리만 둥글린다
+    assert.ok(!ops.some((op) => op.type === "rect" && op.w <= 10 && op.h > 40), "왼쪽 띠가 없다");
+    assert.ok(ops.filter((op) => op.type === "rect" && op.r !== undefined).length >= 4, "칸(대표 경향 · 장점 · 단점 · 시기)은 둥근 모서리");
+    assert.ok(!ops.some((op) => op.type === "rect" && op.color === "line"), "구분선(line 색)을 쓰지 않는다");
+  }
 });
 
 const norm = (t: string) => t.replace(/\s+/g, " ").trim();
