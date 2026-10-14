@@ -116,12 +116,30 @@ export function parseCashProductId(productId: string): { cash: number; bonus: nu
 /** 미유캐시 충전 주문인가 (리포트 주문이 아니다 — 리포트를 만들지 않고 지갑에 캐시를 넣는다) */
 export const isCashProduct = (productId: string) => parseCashProductId(productId) !== null;
 
-/** 개인 통합 리포트 주문인가 (고민 반영 리포트 주문과 구분 — 같은 검사 결과에 두 종류가 함께 붙는다) */
-export const isPersonalProduct = (productId: string) => productId === PERSONAL_REPORT.id;
+/**
+ * 개인 통합 리포트 주문의 상품 번호 — 첫 구매는 `personal-integrated-report`(이미 저장된 주문 그대로),
+ * 같은 결과로 새 리포트를 다시 받는 주문(운영자 2026-10-15: "한 사람이 여러 개의 리포트를 받을 수 있고 재결제도 가능")은 `personal-integrated-report:r<번째>`.
+ * 번째가 달라야 DB의 "같은 검사 · 상품에 결제 완료 · 결제 대기 하나" 조건과 부딪히지 않고(기존 주문 · 인덱스는 그대로), 같은 번째를 동시에 두 번 만들면 그 조건이 막는다.
+ */
+export const personalProductId = (seq: number) => (seq <= 1 ? PERSONAL_REPORT.id : `${PERSONAL_REPORT.id}:r${seq}`);
+
+const PERSONAL_REPEAT = new RegExp(`^${PERSONAL_REPORT.id}:r([0-9]{1,3})$`);
+
+/** 개인 통합 리포트 주문이면 몇 번째 구매인지(1 = 첫 구매), 아니면 null */
+export function parsePersonalSeq(productId: string): number | null {
+  if (productId === PERSONAL_REPORT.id) return 1;
+  const m = PERSONAL_REPEAT.exec(productId);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isInteger(n) && n >= 2 ? n : null;
+}
+
+/** 개인 통합 리포트 주문인가 (첫 구매 · 다시 받기 모두. 고민 반영 리포트 주문과 구분 — 같은 검사 결과에 여러 종류가 함께 붙는다) */
+export const isPersonalProduct = (productId: string) => parsePersonalSeq(productId) !== null;
 
 /** 상품 번호 → 화면에 보이는 상품 이름 */
 export function productNameOf(productId: string): string {
-  if (productId === PERSONAL_REPORT.id) return PERSONAL_REPORT.name;
+  const seq = parsePersonalSeq(productId);
+  if (seq !== null) return seq > 1 ? `${PERSONAL_REPORT.name} (${seq}번째 받기)` : PERSONAL_REPORT.name;
   const cash = parseCashProductId(productId);
   if (cash) return `${MIYU_CASH.name} ${cash.cash}개 충전`;
   return parseConcernProductId(productId) ? CONCERN_REPORT.name : productId;

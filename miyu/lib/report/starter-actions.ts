@@ -16,8 +16,8 @@ export const STARTER_ACTIONS: Record<TendencyId, StarterAction[]> = {
       detail: "기대하는 연락 빈도를 먼저 맞춰 두면, 답이 늦을 때 덜 흔들립니다.",
     },
     {
-      title: "확인하고 싶은 것 중 하나만 먼저 묻기",
-      detail: "여러 가지를 한 번에 묻기보다 가장 중요한 하나를 먼저 확인합니다.",
+      title: "답을 기다리는 동안 할 일을 미리 하나 정해 두기",
+      detail: "연락을 기다리는 시간이 추측으로 채워지지 않도록, 손에 잡히는 일 하나를 정해 두면 답이 늦어도 덜 흔들립니다.",
     },
   ],
   distance: [

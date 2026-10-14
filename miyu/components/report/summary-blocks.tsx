@@ -63,11 +63,14 @@ const CORE_ROWS: { key: keyof CoreSummary; label: string }[] = [
   { key: "tryNow", label: "바로 적용해볼 행동" },
 ];
 
-/** 3) 핵심 요약 — 한 면 안에서 줄로 나눈다 (카드 안에 카드를 넣지 않는다) */
-export function CoreSummaryTable({ core }: { core: CoreSummary }) {
+/**
+ * 3) 핵심 요약 — 한 면 안에서 줄로 나눈다 (카드 안에 카드를 넣지 않는다).
+ * omit: 같은 화면의 다른 구역이 이미 같은 내용을 보여 줄 때 줄을 뺀다 (구매한 리포트는 "실천 제안"이 "바로 적용해볼 행동"과 같은 제안이라 뺀다 — 같은 말을 두 번 보이지 않는다)
+ */
+export function CoreSummaryTable({ core, omit = [] }: { core: CoreSummary; omit?: (keyof CoreSummary)[] }) {
   return (
     <dl className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-canvas">
-      {CORE_ROWS.map(({ key, label }) => (
+      {CORE_ROWS.filter(({ key }) => !omit.includes(key)).map(({ key, label }) => (
         <div
           key={key}
           className={`grid gap-1 px-4 py-3.5 md:grid-cols-[180px_minmax(0,1fr)] md:gap-5 ${key === "tryNow" ? "bg-accent-soft" : ""}`}

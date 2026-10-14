@@ -96,7 +96,7 @@ export type ReportPatch = Partial<
   Pick<ReportRecord, "status" | "content" | "generator" | "generatorVersion" | "attempts" | "lastError" | "readyAt">
 >;
 /** 목록용 — 리포트 본문은 담지 않는다 */
-export type ReportStatusRecord = Pick<ReportRecord, "id" | "orderId" | "assessmentId" | "status">;
+export type ReportStatusRecord = Pick<ReportRecord, "id" | "orderId" | "assessmentId" | "status" | "generator" | "generatorVersion" | "readyAt">;
 
 /** AI 호출 한 번의 사용 기록 (서버 전용 · 쌓기만 한다). 요청 · 응답 내용은 담지 않는다 */
 export type AiUsageInput = {

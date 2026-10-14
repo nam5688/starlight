@@ -161,6 +161,25 @@ test("고유 조건: 같은 검사에 결제 완료 주문은 하나만", async 
   assert.equal(dup.error?.code, "23505");
 });
 
+test("고유 조건: 같은 결과로 다시 받는 주문(…:r2)은 따로 결제 완료될 수 있고, 같은 번째 안에서만 하나로 막힌다 (한 사람이 리포트를 여러 번 받는다)", async () => {
+  const stamp = Date.now();
+  const insert = (n: string, productId: string) =>
+    admin.from("orders").insert({ order_number: `MEU-REPEAT-${n}-${stamp}`, user_id: A.id, assessment_id: assessmentId, product_id: productId, amount: 9900 }).select().single();
+  const r2 = await insert("a", "personal-integrated-report:r2");
+  assert.ok(r2.data, "두 번째 받기 주문을 만들 수 있다");
+  const paid2 = await admin.from("orders").update({ status: "paid" }).eq("id", r2.data.id);
+  assert.equal(paid2.error, null, "첫 구매가 결제 완료여도 두 번째 번째는 결제 완료될 수 있다");
+  const r2b = await insert("b", "personal-integrated-report:r2");
+  assert.ok(r2b.data);
+  const dup = await admin.from("orders").update({ status: "paid" }).eq("id", r2b.data.id);
+  assert.equal(dup.error?.code, "23505", "같은 번째에 결제 완료는 하나만");
+  // 본인 주문만 보인다
+  const mine = await A.client.from("orders").select("product_id").eq("assessment_id", assessmentId);
+  assert.ok((mine.data ?? []).some((o) => o.product_id === "personal-integrated-report:r2"));
+  const others = await B.client.from("orders").select("id").eq("assessment_id", assessmentId);
+  assert.equal(others.data?.length ?? 0, 0, "다른 회원은 볼 수 없다");
+});
+
 test("트리거: 완성된 리포트는 바꿀 수 없다", async () => {
   const change = await admin.from("reports").update({ content: { tampered: true } }).eq("order_id", orderId);
   assert.match(change.error?.message ?? "", /immutable/);

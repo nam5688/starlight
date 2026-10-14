@@ -7,10 +7,10 @@ import { reportStatusAction } from "@/app/results/[id]/actions";
 import { concernReportStatusAction } from "@/app/results/[id]/context/actions";
 
 /**
- * 리포트가 만들어지는 동안 몇 초마다 상태를 확인하고, 끝나면 화면을 새로 그린다 (recordId가 있으면 그 고민 기록의 리포트).
+ * 리포트가 만들어지는 동안 몇 초마다 상태를 확인하고, 끝나면 화면을 새로 그린다 (recordId가 있으면 그 고민 기록의 리포트, orderNumber가 있으면 같은 결과로 받은 그 주문의 리포트).
  * (확인 요청이 멈춘 작업을 이어받기도 한다 — 서버의 reportStatusAction)
  */
-export function ReportStatusPoller({ assessmentId, recordId }: { assessmentId: string; recordId?: string }) {
+export function ReportStatusPoller({ assessmentId, recordId, orderNumber }: { assessmentId: string; recordId?: string; orderNumber?: string }) {
   const router = useRouter();
   const [seconds, setSeconds] = useState(0);
   const [info, setInfo] = useState<Pick<ReportStatusResult, "waiting" | "delayed">>({ waiting: null, delayed: false });
@@ -24,7 +24,7 @@ export function ReportStatusPoller({ assessmentId, recordId }: { assessmentId: s
       const elapsed = Date.now() - (started.current ?? Date.now());
       setSeconds(Math.floor(elapsed / 1000));
       try {
-        const { status, waiting, delayed } = recordId ? await concernReportStatusAction(assessmentId, recordId) : await reportStatusAction(assessmentId);
+        const { status, waiting, delayed } = recordId ? await concernReportStatusAction(assessmentId, recordId) : await reportStatusAction(assessmentId, orderNumber);
         if (stopped) return;
         setInfo({ waiting, delayed });
         if (status === "ready" || status === "failed") {
@@ -42,7 +42,7 @@ export function ReportStatusPoller({ assessmentId, recordId }: { assessmentId: s
       stopped = true;
       clearTimeout(timer);
     };
-  }, [assessmentId, recordId, router]);
+  }, [assessmentId, recordId, orderNumber, router]);
 
   return (
     <div role="status" aria-live="polite" className="space-y-2 text-[15px] leading-relaxed text-ink-2">

@@ -1,7 +1,7 @@
 // 리포트 생성과 조회. 결제가 확인된 주문에만 만들고, 완성된 리포트는 다시 만들지 않는다.
 
 import { REPORT_GENERATING_STALE_MS, REPORT_GENERATION_TIMEOUT_MS, REPORT_MAX_ATTEMPTS, REPORT_RETRY_COOLDOWN_MS } from "../commerce/report.ts";
-import { isPersonalProduct, parseConcernProductId } from "../config/product.ts";
+import { parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
 import { concernInputOf } from "../personalization/concern.ts";
 import type { AiUsageSample, ConcernInput, ReportGenerator, ReportInput } from "../report/generator.ts";
 import { reportTexts } from "../report/concern/texts.ts";
@@ -11,6 +11,7 @@ import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { PersonalContext } from "../personalization/context.ts";
 import { estimateCostKrw, type CapacityConfig } from "./capacity-service.ts";
 import type { AssessmentRecord, MiyuRepository, OrderRecord, ReportRecord } from "./ports.ts";
+import { paidPersonalOrders } from "./purchases.ts";
 
 type ReportDeps = {
   repo: MiyuRepository;
@@ -157,8 +158,15 @@ async function concernInputFor(repo: MiyuRepository, generator: ReportGenerator,
   if (!record || record.userId !== order.userId || record.assessmentId !== order.assessmentId) throw new Error("고민 기록을 찾을 수 없습니다.");
   if (record.scrubbedAt) throw new Error("고민 기록의 내용이 지워져 리포트를 만들 수 없습니다.");
   const orders = await repo.listOrdersForAssessment(order.assessmentId);
-  const basePaid = orders.find((o) => o.status === "paid" && isPersonalProduct(o.productId));
-  const baseReport = basePaid ? await repo.getReportByOrder(basePaid.id) : null;
+  // 같은 결과로 개인 통합 리포트를 여러 번 받았다면 가장 최근에 완성된 것을 기준으로 삼는다
+  let baseReport: ReportRecord | null = null;
+  for (const paidOrder of paidPersonalOrders(orders)) {
+    const candidate = await repo.getReportByOrder(paidOrder.id);
+    if (candidate?.status === "ready") {
+      baseReport = candidate;
+      break;
+    }
+  }
   // 이미 준 개인 통합 리포트가 없어도(환불 등) 발급은 이미 결제된 건이므로 막지 않고, 중복 검사만 건너뛴다
   const base = baseReport?.status === "ready" && baseReport.content ? reportTexts(baseReport.content) : null;
 
@@ -227,29 +235,58 @@ export function reportInputOf(a: AssessmentRecord, context: PersonalContext | nu
   };
 }
 
+/** 같은 결과로 받은 개인 통합 리포트 중 "지금 기준"이 되는 하나 — 가장 최근에 완성된 것, 완성된 것이 없으면 가장 최근에 받은 것 (받은 것이 없으면 null) */
+export async function currentPersonalReport(repo: MiyuRepository, orders: readonly OrderRecord[]): Promise<{ order: OrderRecord; report: ReportRecord | null } | null> {
+  const paid = paidPersonalOrders(orders);
+  let first: { order: OrderRecord; report: ReportRecord | null } | null = null;
+  for (const order of paid) {
+    const report = await repo.getReportByOrder(order.id);
+    if (report?.status === "ready") return { order, report };
+    first ??= { order, report };
+  }
+  return first;
+}
+
+/** 이 검사 결과로 받은(결제한) 개인 통합 리포트 한 건 */
+export type ReceivedReport = {
+  order: OrderRecord;
+  /** 몇 번째로 받았는지 (1 = 첫 구매) */
+  seq: number;
+  report: ReportRecord | null;
+};
+
 export type ResultView = {
   assessment: AssessmentRecord;
-  /** 결제가 끝난 주문 (없으면 null) */
+  /** 지금 보고 있는 리포트의 결제 주문 (받은 리포트가 없으면 null) — 고르지 않으면 가장 최근에 완성된 리포트 */
   paidOrder: OrderRecord | null;
   refunded: boolean;
+  /** 지금 보고 있는 리포트 */
   report: ReportRecord | null;
   /** 내 고민 자세히 알려주기에 적은 내용 (없으면 null) */
   context: PersonalContext | null;
+  /** 이 결과로 받은 개인 통합 리포트 전부 — 최근에 받은 것부터. 이미 받은 리포트는 새로 받아도 그대로 남는다 */
+  received: ReceivedReport[];
 };
 
-/** 결과 화면용 조회. 본인 것이 아니면 null (화면에서는 '찾을 수 없음'으로 처리) */
+/**
+ * 결과 화면용 조회. 본인 것이 아니면 null (화면에서는 '찾을 수 없음'으로 처리).
+ * 같은 결과로 리포트를 여러 번 받을 수 있다 — `orderNumber`로 그중 하나를 고르고(내 것이 아니면 무시하고 기본으로), 고르지 않으면 가장 최근에 완성된 리포트를,
+ * 완성된 것이 없으면 가장 최근에 받은 리포트(만드는 중 · 실패)를 보여 준다.
+ */
 export async function getResultView(
   repo: MiyuRepository,
-  input: { userId: string; assessmentId: string },
+  input: { userId: string; assessmentId: string; orderNumber?: string | null },
 ): Promise<ResultView | null> {
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return null;
   const orders = await repo.listOrdersForAssessment(assessment.id);
-  const personal = orders.filter((o) => isPersonalProduct(o.productId));
-  const paidOrder = personal.find((o) => o.status === "paid") ?? null;
-  const refunded = !paidOrder && personal.some((o) => o.status === "refunded");
-  const [report, context] = await Promise.all([paidOrder ? repo.getReportByOrder(paidOrder.id) : null, repo.getContext(assessment.id)]);
-  return { assessment, paidOrder, refunded, report, context };
+  const paid = paidPersonalOrders(orders);
+  const refunded = paid.length === 0 && orders.some((o) => o.status === "refunded" && parsePersonalSeq(o.productId) !== null);
+  const [reports, context] = await Promise.all([Promise.all(paid.map((o) => repo.getReportByOrder(o.id))), repo.getContext(assessment.id)]);
+  const received: ReceivedReport[] = paid.map((order, i) => ({ order, seq: parsePersonalSeq(order.productId) ?? 1, report: reports[i] }));
+  const chosen =
+    (input.orderNumber ? received.find((r) => r.order.orderNumber === input.orderNumber) : undefined) ?? received.find((r) => r.report?.status === "ready") ?? received[0] ?? null;
+  return { assessment, paidOrder: chosen?.order ?? null, refunded, report: chosen?.report ?? null, context, received };
 }
 
 export type MyItem = {
@@ -268,7 +305,7 @@ export async function listMyItems(repo: MiyuRepository, userId: string): Promise
   return assessments
     .filter((a) => a.userId === userId)
     .map((a) => {
-      const mine = orders.filter((o) => o.assessmentId === a.id && isPersonalProduct(o.productId));
+      const mine = orders.filter((o) => o.assessmentId === a.id && parsePersonalSeq(o.productId) !== null);
       const paid = mine.find((o) => o.status === "paid");
       const report = paid ? reports.find((r) => r.orderId === paid.id) : undefined;
       return {

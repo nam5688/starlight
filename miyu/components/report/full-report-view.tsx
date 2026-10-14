@@ -37,7 +37,7 @@ export function FullReportView({
       <section aria-labelledby={id("tendency")}>
         <TendencyBlock summary={report} headingId={id("tendency")} />
         <div className="mt-6">
-          <CoreSummaryTable core={report.core} />
+          <CoreSummaryTable core={report.core} omit={["tryNow"]} />
         </div>
       </section>
 

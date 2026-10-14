@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { retryReportAction, startCheckoutAction } from "@/app/results/[id]/actions";
+import { retryReceivedReportAction, retryReportAction, startCheckoutAction } from "@/app/results/[id]/actions";
 import { ReportStatusPoller } from "@/components/results/report-status-poller";
 import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
@@ -44,7 +44,7 @@ export function PurchasePanel({
         </h2>
         <div className="mt-2">
           {!failed ? (
-            <ReportStatusPoller assessmentId={assessment.id} />
+            <ReportStatusPoller assessmentId={assessment.id} orderNumber={paidOrder?.orderNumber} />
           ) : canRetry ? (
             <p className="text-[15px] leading-relaxed text-ink-2">
               리포트를 만들지 못했습니다. 결제는 정상 처리되었으니 다시 결제하지 말고 아래 버튼을 눌러 주세요. 계속 실패하면 재처리 또는
@@ -58,7 +58,7 @@ export function PurchasePanel({
           )}
         </div>
         {failed && canRetry && (
-          <form action={retryReportAction.bind(null, assessment.id)} className="mt-5">
+          <form action={paidOrder ? retryReceivedReportAction.bind(null, assessment.id, paidOrder.orderNumber) : retryReportAction.bind(null, assessment.id)} className="mt-5">
             <button type="submit" className={buttonPrimary}>
               {action.label}
             </button>

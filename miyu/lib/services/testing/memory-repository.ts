@@ -406,7 +406,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async listReportStatuses(userId) {
       return [...reports.values()]
         .filter((r) => r.userId === userId)
-        .map((r) => ({ id: r.id, orderId: r.orderId, assessmentId: r.assessmentId, status: r.status }));
+        .map((r) => ({ id: r.id, orderId: r.orderId, assessmentId: r.assessmentId, status: r.status, generator: r.generator, generatorVersion: r.generatorVersion, readyAt: r.readyAt }));
     },
     async insertReport(r) {
       if ([...reports.values()].some((x) => x.orderId === r.orderId)) return { ok: false, reason: "conflict" };

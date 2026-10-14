@@ -2,15 +2,30 @@
 // 결제 상태(orders)와 리포트 생성 상태(reports)는 섞지 않는다: 결제했지만 생성에 실패한 고객에게 다시 구매하라고 하지 않는다.
 
 import type { OrderStatus } from "../commerce/order.ts";
-import { isPersonalProduct, parseConcernProductId, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
+import { isPersonalProduct, parseConcernProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
+import { paidPersonalOrders, receivedAt } from "./purchases.ts";
 import { RECONCILE_DEFAULTS } from "./reconcile-service.ts";
 import { topicLabel, type ContextTopic } from "../personalization/context.ts";
 
 export type Entitlement = "free" | "purchased" | "refunded";
 export type Generation = "none" | "in-progress" | "ready" | "failed";
+
+/** 같은 결과로 받은 리포트 한 건 — 받은 리포트는 모두 기록으로 남고 다시 열어 볼 수 있다 */
+export type MyReceivedReport = {
+  orderNumber: string;
+  /** 몇 번째로 받았는지 (1 = 첫 구매) */
+  seq: number;
+  /** 받은 날 (결제 승인 시각) */
+  receivedAt: string;
+  generation: Generation;
+  /** 이 리포트를 만든 생성기 (예: dev-rules dev-0.1) — 완성된 뒤에만 */
+  generatorLabel: string | null;
+  /** 열 때 쓰는 주소 */
+  href: string;
+};
 
 export type MyReportCard = {
   assessmentId: string;
@@ -23,6 +38,8 @@ export type MyReportCard = {
   entitlement: Entitlement;
   generation: Generation;
   paidOrderNumber: string | null;
+  /** 이 결과로 받은 리포트 전부 — 최근에 받은 것부터 (받은 것이 없으면 빈 목록) */
+  received: MyReceivedReport[];
   source: DataSource;
   /** 내 고민 자세히 알려주기에 적은 주제 (적지 않았으면 null) */
   contextTopic: ContextTopic | null;
@@ -107,6 +124,23 @@ export function generationOf(report: Pick<ReportRecord, "status"> | null | undef
   return "in-progress";
 }
 
+/** 받은 리포트 한 건을 화면 줄로 — MY와 결과 화면이 같이 쓴다 */
+export function receivedRowOf(
+  order: OrderRecord,
+  report: Pick<ReportRecord, "status" | "generator" | "generatorVersion"> | null | undefined,
+  assessmentId: string,
+): MyReceivedReport {
+  const generation = generationOf(report);
+  return {
+    orderNumber: order.orderNumber,
+    seq: parsePersonalSeq(order.productId) ?? 1,
+    receivedAt: receivedAt(order),
+    generation,
+    generatorLabel: generation === "ready" && report?.generator ? `${report.generator}${report.generatorVersion ? ` ${report.generatorVersion}` : ""}` : null,
+    href: `/results/${assessmentId}?r=${encodeURIComponent(order.orderNumber)}`,
+  };
+}
+
 export async function getMyPage(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<{ cards: MyReportCard[]; concerns: MyConcernCard[]; orders: MyOrderRow[] }> {
   const [assessments, orders, reports, contexts, records] = await Promise.all([
     repo.listAssessments(userId),
@@ -121,8 +155,11 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
     .filter((a) => a.userId === userId)
     .map((a): MyReportCard => {
       const related = mineOrders.filter((o) => o.assessmentId === a.id && isPersonalProduct(o.productId));
-      const paid = related.find((o) => o.status === "paid");
-      const report = paid ? reports.find((r) => r.orderId === paid.id) : undefined;
+      const receivedOrders = paidPersonalOrders(related);
+      const received = receivedOrders.map((o) => receivedRowOf(o, reports.find((x) => x.orderId === o.id), a.id));
+      // 카드의 상태는 가장 최근에 완성된 리포트를 기준으로 한다 (새로 받는 리포트를 만드는 중이어도 이미 받은 리포트는 열 수 있다)
+      const current = received.find((x) => x.generation === "ready") ?? received[0];
+      const paid = current ? receivedOrders.find((o) => o.orderNumber === current.orderNumber) : undefined;
       return {
         assessmentId: a.id,
         productName: PERSONAL_REPORT.name,
@@ -130,8 +167,9 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
         createdAt: a.createdAt,
         period: null,
         entitlement: paid ? "purchased" : related.some((o) => o.status === "refunded") ? "refunded" : "free",
-        generation: paid ? generationOf(report) : "none",
+        generation: current ? current.generation : "none",
         paidOrderNumber: paid?.orderNumber ?? null,
+        received,
         source: a.source,
         contextTopic: contexts.find((c) => c.assessmentId === a.id)?.topic ?? null,
       };

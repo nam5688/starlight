@@ -7,7 +7,7 @@
 // - 같은 저장본(작성 시점)에는 기록이 하나, 기록마다 결제 완료 · 대기 주문이 하나뿐이다(DB 고유 조건). 두 번 눌러도 한 건만 발급된다.
 // - 발급 권한은 개인 통합 리포트 구매 권한과 따로 본다 (개인 통합 주문과 상품 번호가 다르다).
 
-import { CONCERN_REPORT, concernProductId, isPersonalProduct, parseConcernProductId } from "../config/product.ts";
+import { CONCERN_REPORT, concernProductId, parseConcernProductId } from "../config/product.ts";
 import { createOrderNumber } from "../commerce/order.ts";
 import { sameConcern, concernInputOf, type ConcernRecord } from "../personalization/concern.ts";
 import type { PersonalContext } from "../personalization/context.ts";
@@ -15,6 +15,7 @@ import { salesClosedMessage, type GateReason } from "./capacity-service.ts";
 import { generationOf, type Generation } from "./my-service.ts";
 import type { SaleGateCheck } from "./order-service.ts";
 import type { Acquisition, AssessmentRecord, MiyuRepository, OrderRecord, PaymentEnv, ReportRecord } from "./ports.ts";
+import { currentPersonalReport } from "./report-service.ts";
 
 /** 새 리포트를 발급할 수 있는 환경인가 — 고민을 해석에 반영하는 AI 생성기가 연결돼 있어야 한다 (개발용 규칙 생성기는 고민을 반영하지 못한다) */
 export type IssuingAvailability = { enabled: true } | { enabled: false; reason: "ai-not-connected" };
@@ -82,9 +83,8 @@ export function recordForCurrentConcern(records: ConcernRecord[], orders: OrderR
 
 /** 개인 통합 리포트 — 구매한 주문과 그 리포트 상태 */
 async function personalState(repo: MiyuRepository, orders: OrderRecord[]) {
-  const paid = orders.find((o) => isPersonalProduct(o.productId) && o.status === "paid") ?? null;
-  const report = paid ? await repo.getReportByOrder(paid.id) : null;
-  return { paid, report };
+  const current = await currentPersonalReport(repo, orders);
+  return { paid: current?.order ?? null, report: current?.report ?? null };
 }
 
 export async function getConcernWorkspace(

@@ -8,9 +8,10 @@ import {
   type GatewayPayment,
   type OrderStatus,
 } from "../commerce/order.ts";
-import { PERSONAL_REPORT } from "../config/product.ts";
+import { isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
 import { salesClosedMessage, type GateReason, type SaleGate } from "./capacity-service.ts";
 import type { Acquisition, MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
+import { nextPersonalSeq, paidPersonalOrders } from "./purchases.ts";
 
 /** 새 구매를 받아도 되는지 확인하는 함수 (용량 · 예산). 확인 자체가 실패하면 판매를 막지 않는다 */
 export type SaleGateCheck = (stage: "start" | "confirm") => Promise<SaleGate>;
@@ -28,32 +29,42 @@ async function gateOpen(gate: SaleGateCheck | undefined, stage: "start" | "confi
 export type StartCheckoutResult =
   | { kind: "order"; order: OrderRecord }
   | { kind: "already-paid"; order: OrderRecord }
+  /** 다시 받기를 눌렀지만 가장 최근에 받은 리포트가 아직 완성되지 않았다(만드는 중이거나 실패) — 새로 결제하지 않고 그 리포트의 상태를 안내한다 */
+  | { kind: "report-not-ready"; order: OrderRecord }
   /** 지금은 새 구매를 받지 않음 (리포트 준비 용량 · 하루 예산). 결제는 시작하지 않는다 */
   | { kind: "sales-closed"; reason: GateReason | null }
   | { kind: "not-found" };
 
 /**
  * 결제 시작. 결제를 누를 때마다 새 주문번호를 만들고, 남아 있던 대기 주문은 취소 처리한다.
- * (같은 검사에 대기 주문은 하나만 — DB 고유 조건으로도 막는다)
+ * (같은 검사에 같은 상품의 대기 주문은 하나만 — DB 고유 조건으로도 막는다)
+ *
+ * 같은 검사 결과로 리포트를 이미 받았다면 기본은 "이미 결제함"으로 돌려보낸다(실수로 두 번 결제하지 않게).
+ * `again`을 켠 경우에만(고객이 "같은 결과로 새 리포트 받기"를 직접 눌렀을 때) 다음 번째 주문(상품 번호 `…:r2`, `…:r3`)을 새로 만든다 —
+ * 이전에 받은 리포트 · 주문은 그대로 남고, 새 주문마다 리포트가 따로 만들어진다. 가장 최근 리포트가 아직 완성되지 않았다면 새로 결제하지 않는다.
  */
 export async function startCheckout(
   deps: { repo: MiyuRepository; now: () => Date; newOrderNumber?: (now: Date) => string; gate?: SaleGateCheck },
-  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null },
+  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null; again?: boolean },
 ): Promise<StartCheckoutResult> {
   const { repo } = deps;
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
 
   const orders = await repo.listOrdersForAssessment(assessment.id);
-  const paid = orders.find((o) => o.status === "paid" && o.productId === PERSONAL_REPORT.id);
-  if (paid) return { kind: "already-paid", order: paid };
+  const received = paidPersonalOrders(orders);
+  if (received.length > 0) {
+    if (!input.again) return { kind: "already-paid", order: received[0] };
+    const latestReport = await repo.getReportByOrder(received[0].id);
+    if (latestReport?.status !== "ready") return { kind: "report-not-ready", order: received[0] };
+  }
 
   // 용량이나 예산이 찼으면 결제를 시작하지 않는다 (기다리게 하지 않고 바로 알린다). 이미 진행 중인 주문은 건드리지 않는다
   const sale = await gateOpen(deps.gate, "start");
   if (!sale.open) return { kind: "sales-closed", reason: sale.reason };
 
-  // 같은 상품의 대기 주문만 대체한다 (고민 반영 리포트의 대기 주문은 건드리지 않는다)
-  for (const pending of orders.filter((o) => o.status === "pending" && o.productId === PERSONAL_REPORT.id)) {
+  // 개인 통합 리포트의 대기 주문만 대체한다 (고민 반영 리포트 · 미유캐시의 대기 주문은 건드리지 않는다)
+  for (const pending of orders.filter((o) => o.status === "pending" && isPersonalProduct(o.productId))) {
     const canceled = await repo.updateOrder(pending.id, ["pending"], {
       status: "canceled",
       failureCode: "SUPERSEDED",
@@ -64,12 +75,13 @@ export async function startCheckout(
     }
   }
 
+  const productId = personalProductId(received.length > 0 ? nextPersonalSeq(orders) : 1);
   const makeNumber = deps.newOrderNumber ?? ((now: Date) => createOrderNumber(now));
   const inserted = await repo.insertOrder({
     orderNumber: makeNumber(deps.now()),
     userId: input.userId,
     assessmentId: assessment.id,
-    productId: PERSONAL_REPORT.id,
+    productId,
     amount: PERSONAL_REPORT.priceKrw,
     paymentEnv: input.paymentEnv ?? "test",
     acquisition: input.acquisition ?? null,
@@ -78,8 +90,8 @@ export async function startCheckout(
 
   // 동시에 두 번 눌러 다른 요청이 먼저 만든 경우: 그 주문을 쓴다
   const latest = await repo.listOrdersForAssessment(assessment.id);
-  const personal = latest.filter((o) => o.productId === PERSONAL_REPORT.id);
-  const existing = personal.find((o) => o.status === "pending") ?? personal.find((o) => o.status === "paid");
+  const same = latest.filter((o) => o.productId === productId);
+  const existing = same.find((o) => o.status === "pending") ?? same.find((o) => o.status === "paid");
   if (!existing) throw new Error("주문을 만들지 못했습니다.");
   return existing.status === "paid" ? { kind: "already-paid", order: existing } : { kind: "order", order: existing };
 }

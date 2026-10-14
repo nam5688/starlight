@@ -1,7 +1,7 @@
 // 실행: npm test — 주문이 끝난 뒤 돌아갈 화면: 개인 통합 리포트는 결과 화면, 고민 반영 리포트는 나의 고민 기록소(결제 완료면 그 기록의 리포트)
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { concernProductId, PERSONAL_REPORT } from "../lib/config/product.ts";
+import { concernProductId, PERSONAL_REPORT, personalProductId } from "../lib/config/product.ts";
 import { resultPathOf } from "./order-paths.ts";
 
 const A = "11111111-1111-4111-8111-111111111111";
@@ -20,4 +20,11 @@ test("고민 반영 리포트 주문은 결제 전에는 나의 고민 기록소
 
 test("상품 번호가 고민 기록 번호 형식이 아니면 개인 통합 리포트와 같은 화면으로 둔다", () => {
   assert.equal(resultPathOf({ assessmentId: A, productId: "concern-report:not-a-uuid" }, { paid: true }), `/results/${A}`);
+});
+
+test("같은 결과로 다시 받은 리포트(2번째부터) 주문은 그 주문의 리포트로, 첫 구매는 지금처럼 결과 화면으로 돌아간다", () => {
+  assert.equal(resultPathOf({ assessmentId: A, productId: personalProductId(2), orderNumber: "MIYU-20261015-ABCDEF" }, { paid: true }), `/results/${A}?r=MIYU-20261015-ABCDEF`);
+  assert.equal(resultPathOf({ assessmentId: A, productId: personalProductId(1), orderNumber: "MIYU-20261015-ABCDEF" }), `/results/${A}`);
+  // 주문번호가 없으면(예전 호출) 결과 화면 그대로
+  assert.equal(resultPathOf({ assessmentId: A, productId: personalProductId(3) }), `/results/${A}`);
 });

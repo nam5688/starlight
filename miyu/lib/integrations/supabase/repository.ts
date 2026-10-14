@@ -813,7 +813,7 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     async listReportStatuses(userId): Promise<ReportStatusRecord[]> {
       const { data, error } = await db
         .from("reports")
-        .select("id, order_id, assessment_id, status")
+        .select("id, order_id, assessment_id, status, generator, generator_version, ready_at")
         .eq("user_id", userId);
       if (error) fail("리포트 목록 조회", error);
       return (data ?? []).map((r) => ({
@@ -821,6 +821,9 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         orderId: r.order_id,
         assessmentId: r.assessment_id,
         status: r.status,
+        generator: (r.generator as string | null) ?? null,
+        generatorVersion: (r.generator_version as string | null) ?? null,
+        readyAt: (r.ready_at as string | null) ?? null,
       }));
     },
 

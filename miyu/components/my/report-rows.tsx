@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { retryReportAction } from "@/app/results/[id]/actions";
+import { retryReceivedReportAction, retryReportAction } from "@/app/results/[id]/actions";
+import { ReceivedReports } from "@/components/results/received-reports";
 import { StateBadge } from "@/components/my/state-badge";
 import { formatDate, formatDateTime } from "@/components/ui/format";
 import { StatusBadge } from "@/components/ui/source-badge";
@@ -86,7 +87,7 @@ export function ReportRow({ card, paymentsReady }: { card: MyReportCard; payment
         {card.entitlement === "purchased" ? (
           card.generation === "failed" ? (
             <>
-              <form action={retryReportAction.bind(null, card.assessmentId)}>
+              <form action={card.paidOrderNumber ? retryReceivedReportAction.bind(null, card.assessmentId, card.paidOrderNumber) : retryReportAction.bind(null, card.assessmentId)}>
                 <button type="submit" className={primary}>
                   다시 생성
                 </button>
@@ -117,6 +118,12 @@ export function ReportRow({ card, paymentsReady }: { card: MyReportCard; payment
           </>
         )}
       </div>
+      {card.received.length > 1 && (
+        <div className="mt-3">
+          <p className="mb-2 text-[13px] leading-[1.6] text-ink-3">같은 결과로 받은 리포트 {card.received.length}개 — 모두 그대로 남아 있어요.</p>
+          <ReceivedReports rows={card.received} />
+        </div>
+      )}
       {CONCERN_RECORDS.visible && (
         <p className="mt-3 border-t border-line pt-3 text-[13px] leading-[1.6] text-ink-3">
           내 고민 자세히 알려주기: {card.contextTopic ? topicLabel(card.contextTopic) : "작성 기록 없음"} ·{" "}

@@ -7,18 +7,25 @@ export function IntegratedView({ integrated }: { integrated: FullReport["integra
       <div className="rounded-xl border border-line bg-canvas px-4 py-4">
         <h3 className="text-[16px] font-bold">공통적으로 나타나는 특징</h3>
         <ul className="mt-3 divide-y divide-line">
-          {integrated.common.map((c) => (
-            <li key={c.point} className="py-3.5 first:pt-0 last:pb-0">
-              <p className="text-[15px] leading-snug font-semibold">{c.point}</p>
-              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="근거 지표">
-                {c.basis.map((b) => (
-                  <li key={b} className="rounded bg-mist px-2 py-0.5 text-[13px] text-ink-2">
-                    {b}
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
+          {integrated.common.map((c) =>
+            c.basis.length === 0 ? (
+              // 근거가 없는 항목은 "특징"이 아니라 "겹치는 부분이 뚜렷하지 않았다"는 안내다 — 특징처럼 굵게 보이지 않게 한다
+              <li key={c.point} className="py-3.5 text-[14px] leading-[1.7] text-ink-3 first:pt-0 last:pb-0">
+                {c.point}
+              </li>
+            ) : (
+              <li key={c.point} className="py-3.5 first:pt-0 last:pb-0">
+                <p className="text-[15px] leading-snug font-semibold">{c.point}</p>
+                <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="근거 지표">
+                  {c.basis.map((b) => (
+                    <li key={b} className="rounded bg-mist px-2 py-0.5 text-[13px] text-ink-2">
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ),
+          )}
         </ul>
       </div>
       <div className="rounded-xl border border-line bg-canvas px-4 py-4">
