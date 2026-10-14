@@ -827,6 +827,14 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       }
       return count ?? 0;
     },
+    async deleteExpiredHiddenChatSummaries(before) {
+      const { count, error } = await db.from("chat_summaries").delete({ count: "exact" }).eq("visible", false).lt("created_at", before);
+      if (error) {
+        if (isMissingTableError(error)) return 0;
+        fail("지난 참고 기록 정리", error);
+      }
+      return count ?? 0;
+    },
     async trimHiddenChatSummaries(userId, assessmentId, room, keep) {
       const { data, error } = await db.from("chat_summaries").select("id").eq("user_id", userId).eq("assessment_id", assessmentId).eq("room", room).eq("visible", false).order("created_at", { ascending: false }).range(keep, keep + 199);
       if (error) {

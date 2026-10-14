@@ -101,7 +101,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
       </div>
       {isConcern && (
         <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
-          기존 개인 통합 리포트는 그대로 보관되고, 이 결제로는 지금 적어 둔 고민을 반영한 새 리포트가 따로 만들어집니다. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없습니다.
+          기존 심층 리포트는 그대로 보관되고, 이 결제로는 지금 적어 둔 고민을 반영한 새 리포트가 따로 만들어집니다. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없습니다.
         </p>
       )}
       {isCash && (

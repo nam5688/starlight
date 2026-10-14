@@ -3,6 +3,7 @@
 // 이 파일은 AI를 부르지 않는다. 자유 질문의 답은 서버가 만들어 오고(자유 질문 행동 "free"), 이 파일은 그 글을 대화에 놓고 되살리기만 한다.
 // 눌러 준 답(연애 상태 등)은 풀이를 바꾸지 않는다. 풀이를 어떻게 읽을지 알려 주는 한 줄에만 쓴다.
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
+import { CHAT_SUMMARY_POLICY } from "../../config/product.ts";
 import { answerBubbles, extraBubbles, freeLeftText, nextTopic, QUESTION_MAX, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
 
 /** 미유의 표정 — 운영자가 보낸 캐릭터 시트의 표정 시트 6가지와 액션 포즈 3가지 (그림은 components/talk/miyu-moods.ts) */
@@ -66,7 +67,7 @@ export const ROOM_COPY = {
     noSub: "저장하지 않고 끝내요",
     stay: "계속 대화하기",
     /** 저장하지 않아도 남는 참고 기록을 숨기지 않고 알린다 */
-    closeNote: "저장하지 않아도 이 방에서 나눈 이야기는, 다음에 질문할 때 미유가 이어서 참고하도록 보이지 않는 기록으로 남아요. 화면에서는 볼 수 없고, MY의 저장한 채팅 요약에서 ‘이전 대화 기록 모두 지우기’로 지울 수 있어요.",
+    closeNote: `저장하지 않아도 이 방에서 나눈 이야기는, 다음에 질문할 때 미유가 이어서 참고하도록 보이지 않는 기록으로 남아요. 화면에서는 볼 수 없고 ${CHAT_SUMMARY_POLICY.referenceKeepDays}일이 지나면 자동으로 지워져요. 그 전에 지우고 싶으면 MY의 저장한 채팅 요약에서 ‘이전 대화 기록 모두 지우기’를 눌러 주세요.`,
     closedSaved: "요약을 저장하고 대화를 끝냈어요. 새 대화로 시작해요.",
     closedUnsaved: "대화를 끝냈어요. 새 대화로 시작해요.",
     /** MY의 저장한 채팅 요약 */
@@ -84,7 +85,7 @@ export const ROOM_COPY = {
   chatReady: "아래 입력창에 편하게 적어 주세요. 한두 문장이면 충분해요.",
   chatPending: "자유롭게 이야기를 나누는 기능은 아직 준비 중이에요.",
   chatLocked: "이야기를 이어 가는 건 리포트를 받은 분께 열려 있어요.",
-  /** 간단 리포트로는 질문이 없는 방(나를 알아보기) — 심층 리포트로 이어 준다 */
+  /** 무료 리포트로는 질문이 없는 방(나를 알아보기) — 심층 리포트로 이어 준다 */
   chatDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요.",
   /** 무료 질문을 모두 쓴 뒤 미유캐시로 이어 가는 중 · 캐시가 모자랄 때 */
   chatCashLead: (per: number, balance: number) => `무료 질문은 모두 썼어요. 이제 미유캐시 ${per}개로 이어서 물을 수 있어요 · 지금 ${balance}개`,

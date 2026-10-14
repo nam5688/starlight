@@ -123,7 +123,7 @@ test("AI가 연결되지 않았으면 닫혀 있다 (준비 중)", async () => {
   assert.deepEqual(await askFreeQuestion(deps({ answerer: null }), input(mine)), { ok: false, reason: "closed", message: ASK_MESSAGES.closed });
 });
 
-test("간단 리포트: 연애 방 무료 질문 2번 · 고민해결소 2번 · 오늘의 운세 1번, 다 쓰면 free-used (캐시가 없으면 AI를 부르지 않는다)", async () => {
+test("무료 리포트: 연애 방 무료 질문 2번 · 고민해결소 2번 · 오늘의 운세 1번, 다 쓰면 free-used (캐시가 없으면 AI를 부르지 않는다)", async () => {
   for (const [room, quota] of [["love", 2], ["concern", 2], ["daily", 1]] as const) {
     const { mine, deps, asks, mem } = await setup({ tier: "free", room });
     for (let i = 0; i < quota; i++) {
@@ -136,7 +136,7 @@ test("간단 리포트: 연애 방 무료 질문 2번 · 고민해결소 2번 ·
   }
 });
 
-test("간단 리포트: 나를 알아보기는 질문이 없고(deep-only), 올해의 흐름 · 결혼 · 진로 · 재무 방은 심층 리포트로만 열린다 (room-locked) — 캐시가 있어도 열리지 않는다", async () => {
+test("무료 리포트: 나를 알아보기는 질문이 없고(deep-only), 올해의 흐름 · 결혼 · 진로 · 재무 방은 심층 리포트로만 열린다 (room-locked) — 캐시가 있어도 열리지 않는다", async () => {
   const main = await setup({ tier: "free", room: "main" });
   await main.topUp("u1", main.mine, 100);
   assert.deepEqual(await askFreeQuestion(main.deps(), input(main.mine, "질문", "u1", "main")), { ok: false, reason: "deep-only", message: ASK_MESSAGES["deep-only"] });
@@ -176,7 +176,7 @@ test("오늘의 운세는 날짜별 방이라 날짜마다 무료 질문 1번씩
   assert.ok(ok(await askFreeQuestion(next, input(day1.mine, "내일은요", "u1", "daily:2026-10-16"))));
 });
 
-test("글자 수: 간단 리포트의 무료 질문은 500자, 미유캐시 질문 · 심층 리포트는 1,000자 — 넘으면 AI를 부르지 않고 횟수도 · 캐시도 쓰지 않으며, 위기 표현은 길어도 안내가 먼저다", async () => {
+test("글자 수: 무료 리포트의 무료 질문은 500자, 미유캐시 질문 · 심층 리포트는 1,000자 — 넘으면 AI를 부르지 않고 횟수도 · 캐시도 쓰지 않으며, 위기 표현은 길어도 안내가 먼저다", async () => {
   assert.equal(QUESTION_MAX.free, 500);
   assert.equal(QUESTION_MAX.paid, 1000);
   assert.equal(QUESTION_MAX.paid, QUESTION_MAX.free * 2);
@@ -195,7 +195,7 @@ test("글자 수: 간단 리포트의 무료 질문은 500자, 미유캐시 질�
   const tooLong = await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.paid + 1)));
   assert.ok(!tooLong.ok && tooLong.reason === "too-long");
 
-  // 간단 리포트도 무료 질문을 다 쓰고 미유캐시로 묻는 질문은 1,000자까지
+  // 무료 리포트도 무료 질문을 다 쓰고 미유캐시로 묻는 질문은 1,000자까지
   const cash = await setup({ tier: "free", room: "daily" });
   assert.ok(ok(await askFreeQuestion(cash.deps(), input(cash.mine, "무료", "u1", "daily"))));
   await cash.topUp("u1", cash.mine, 30);
@@ -274,7 +274,7 @@ test("DB 변경이 아직 안 된 환경: 12번 전(횟수 표 없음)에는 열
   assert.deepEqual(await askFreeQuestion(deps({ repo: noCash }), input(mine)), { ok: false, reason: "free-used", message: ASK_MESSAGES["free-used"] });
 });
 
-test("재료가 없는 방(간단 리포트의 맛보기에 내 자료로 읽은 내용이 없음)은 질문을 열지 않고 AI를 부르지 않으며 횟수도 쓰지 않는다 — 심층 리포트는 늘 열린다", async () => {
+test("재료가 없는 방(무료 리포트의 맛보기에 내 자료로 읽은 내용이 없음)은 질문을 열지 않고 AI를 부르지 않으며 횟수도 쓰지 않는다 — 심층 리포트는 늘 열린다", async () => {
   const { mine, deps, asks, mem } = await setup({ tier: "free", noMaterial: true });
   assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "no-material", message: ASK_MESSAGES["no-material"] });
   assert.equal(asks.length, 0);

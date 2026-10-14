@@ -11,7 +11,7 @@ import { sampleReadingReport } from "@/lib/samples/sample-reading-report";
 export const metadata: Metadata = {
   title: "리포트 예시 · ME:U 미유",
   description:
-    "가상 인물의 개인 통합 리포트 예시. 사주에 MBTI · 기질 · 성격 · 가까운 관계 반응을 더해 하나의 해석으로 읽는 형식을 미리 볼 수 있습니다 (실제 검사 · 만세력 계산 결과가 아닙니다).",
+    "가상 인물의 심층 리포트 예시. 사주에 MBTI · 기질 · 성격 · 가까운 관계 반응을 더해 하나의 해석으로 읽는 형식을 미리 볼 수 있습니다 (실제 검사 · 만세력 계산 결과가 아닙니다).",
   alternates: { canonical: "/report/sample" },
 };
 
@@ -24,7 +24,7 @@ export default function SampleReportPage() {
           <SourceBadge source={report.source} />
           <span className="text-[13px] text-ink-3">가상 인물 예시 · 실제 검사 · 만세력 계산 결과가 아닙니다</span>
         </div>
-        <h1 className="mt-3 text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">{report.personName} 님의 개인 통합 리포트</h1>
+        <h1 className="mt-3 text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">{report.personName} 님의 심층 리포트</h1>
       </div>
 
       <TalkEntry sample rooms={ROOM_ORDER.slice()} />

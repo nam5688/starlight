@@ -13,7 +13,7 @@ import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, pageWide } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
-import { formatKrw, PERSONAL_REPORT, REPORT_SCOPE } from "@/lib/config/product";
+import { formatKrw, FREE_ANALYSIS_TIME, PERSONAL_REPORT, REPORT_SCOPE } from "@/lib/config/product";
 
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
@@ -48,7 +48,7 @@ const STEPS = [
   { title: "검사 응답", desc: "MBTI 성향 · 기질 · 관계 문항. 이전 단계로 돌아가 답을 고칠 수 있습니다." },
   { title: "무료 미리보기 확인", desc: "대표 경향 일부, 사주 원국과 오행의 뜻, 내 원국이 던지는 질문" },
   { title: "카카오 로그인", desc: "결과를 회원 정보에 저장" },
-  { title: "개인 통합 리포트 구매", desc: "질문의 답, 상황별 잘하는 점 · 주의할 점, 어울리는 관계 조건, 보완 아이템" },
+  { title: "심층 리포트 구매", desc: "질문의 답, 상황별 잘하는 점 · 주의할 점, 어울리는 관계 조건, 보완 아이템" },
   { title: "MY에서 다시보기 · 대화로 풀어보기", desc: "저장된 같은 버전을 다시 확인하고, 주제별 상담방에서 한 번에 하나씩 이어 읽기" },
 ];
 
@@ -83,7 +83,7 @@ export default function Home() {
             </Link>
           </div>
           <p className="mt-4 text-[14px] leading-[1.65] text-ink-2">
-            미리보기 무료 · {PERSONAL_REPORT.name} <span className="font-semibold tabular-nums text-ink">{formatKrw(PERSONAL_REPORT.priceKrw)}</span> · 문항 {QUESTION_COUNT}개
+            검사 {FREE_ANALYSIS_TIME} · 미리보기 무료 · {PERSONAL_REPORT.name} <span className="font-semibold tabular-nums text-ink">{formatKrw(PERSONAL_REPORT.priceKrw)}</span> · 문항 {QUESTION_COUNT}개
           </p>
           <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[14px] leading-[1.6] text-ink-3">
             내 분석은 이어서
@@ -159,7 +159,7 @@ export default function Home() {
       <section className="border-y border-line bg-canvas py-12 md:py-16">
         <div className={pageWide}>
           <h2 className="text-[24px] font-bold tracking-tight md:text-[28px]">리포트에 담기는 항목</h2>
-          <p className="mt-2 text-[16px] text-ink-2">검사 후 무료 미리보기를 먼저 보고, 필요할 때 개인 통합 리포트를 구매합니다.</p>
+          <p className="mt-2 text-[16px] text-ink-2">검사 후 무료 미리보기를 먼저 보고, 필요할 때 심층 리포트를 구매합니다.</p>
 
           <div className="mt-8 grid gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-14">
             <table className="w-full border-collapse text-left">

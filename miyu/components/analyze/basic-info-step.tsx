@@ -8,6 +8,7 @@ import {
   type BasicInfo,
   type BasicInfoErrors,
 } from "@/lib/profile/basic-info";
+import { FREE_ANALYSIS_TIME } from "@/lib/config/product";
 
 const inputBase =
   "h-12 w-full rounded-lg border bg-canvas px-4 text-[16px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:bg-mist disabled:text-ink-3";
@@ -41,6 +42,7 @@ export function BasicInfoStep({
       <h1 id="step-heading" tabIndex={-1} className="text-[26px] font-bold tracking-tight outline-none md:text-[30px]">
         기본 정보
       </h1>
+      <p className="mt-2 text-[15px] font-semibold text-accent-strong">검사는 {FREE_ANALYSIS_TIME} 걸려요.</p>
       <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
         사주 계산과 결과 화면에 사용합니다. 저장하기 전에는 서버에 보내 두지 않고, 새로고침이나 로그인 이동에 대비해 이 브라우저 탭에만 임시 보관합니다 (탭을 닫으면 지워집니다).
       </p>

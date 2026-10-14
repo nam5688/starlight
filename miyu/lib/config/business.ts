@@ -3,7 +3,7 @@
 
 export const BUSINESS_INFO = {
   /** 하단 저작권 줄 — 운영자가 적어 준 표기 그대로 */
-  copyright: "© PEEKY｜ MI:U",
+  copyright: "© PEEKY｜ ME:U",
   tradeName: "슬링샵",
   representative: "박슬기",
   address: "인천 남동구 장아산로158 112.503",

@@ -2,7 +2,7 @@
 // 규칙: 요약은 코드가 규칙대로 줄인다(lib/report/chat/summary.ts, AI 미사용). 저장마다 "이전 저장 이후의 대화"만 담는다(talk_rooms.saved_upto).
 // 대화를 끝낼 때 저장하지 않으면 요약은 회원에게 보이지 않는 참고 기록(visible = false)으로만 남아 다음 질문에서 AI가 이전 이야기를 참고하는 데 쓰이고,
 // 회원은 MY에서 모두 지울 수 있다. 모든 함수는 먼저 검사 결과의 주인인지 확인한다. 표가 없으면(DB 변경 14번 전) not-ready로 돌려준다.
-import { memoryPairs, parseSummaryItems, SUMMARY_LIMITS, summarizeActions, isEmptySummary, type SummaryItems, type SummaryQa } from "../report/chat/summary.ts";
+import { memoryPairs, parseSummaryItems, referenceCutoff, SUMMARY_LIMITS, summarizeActions, isEmptySummary, type SummaryItems, type SummaryQa } from "../report/chat/summary.ts";
 import { ACTION_LIMIT, ROOM_ORDER, ROOMS, sanitizeRoomActions, type RoomId } from "../report/reading/talk-room.ts";
 import type { TalkModel } from "../report/reading/talk.ts";
 import type { MiyuRepository } from "./ports.ts";
@@ -150,14 +150,24 @@ export async function deleteAllSummaries(repo: MiyuRepository, userId: string): 
 
 /**
  * 다음 질문에서 AI가 참고하는 이전 이야기 — 같은 검사 결과의 같은 방에서 이전에 나눈 질문과 답(직접 저장한 것과 저장하지 않은 것 모두). 방마다 새 대화로 시작하므로 다른 방의 이야기는 가져오지 않고,
- * 날짜별로 새로 시작하는 오늘의 운세 방은 쓰지 않는다. 참고 기록을 읽지 못해도 답을 막지 않는다(빈 목록).
+ * 날짜별로 새로 시작하는 오늘의 운세 방은 쓰지 않는다. **저장하지 않은 대화의 참고 기록은 보관 기간(CHAT_SUMMARY_POLICY, 90일)이 지났으면 아직 지워지지 않았어도 쓰지 않는다.**
+ * 참고 기록을 읽지 못해도 답을 막지 않는다(빈 목록).
  */
-export async function memoryFor(repo: MiyuRepository, input: { userId: string; assessmentId: string; room: string }): Promise<SummaryQa[]> {
+export async function memoryFor(repo: MiyuRepository, input: { userId: string; assessmentId: string; room: string }, now: Date = new Date()): Promise<SummaryQa[]> {
   if (input.room === "daily" || !(input.room in ROOMS)) return [];
   try {
+    const cutoff = referenceCutoff(now);
     const rows = await repo.listRoomChatSummaries(input.userId, input.assessmentId, input.room, 6);
-    return memoryPairs(rows.map((r) => parseSummaryItems(r.items)));
+    return memoryPairs(rows.filter((r) => r.visible || r.createdAt >= cutoff).map((r) => parseSummaryItems(r.items)));
   } catch {
     return [];
   }
+}
+
+/**
+ * 보관 기간이 지난 "저장하지 않은 대화의 참고 기록"을 모든 회원에 걸쳐 지운다 — 정기 점검(/api/cron/reconcile)이 부른다.
+ * 직접 저장한 요약은 회원이 지울 때까지 남는다. 표가 없으면(14번 전) 0. 지운 개수만 돌려주고 내용은 어디에도 남기지 않는다.
+ */
+export async function purgeExpiredReferenceRecords(repo: MiyuRepository, now: Date = new Date()): Promise<number> {
+  return repo.deleteExpiredHiddenChatSummaries(referenceCutoff(now));
 }

@@ -6,7 +6,7 @@ import { ROOMS, type RoomId } from "@/lib/report/reading/talk-room";
 import { MiyuAvatar } from "./miyu-character";
 
 /**
- * 간단 리포트(무료 분석)로는 열리지 않는 방 — 올해의 흐름 · 결혼 · 진로 · 재무(운영자 2026-10-15: 이 방들은 심층 리포트로만 열린다).
+ * 무료 리포트(무료 분석)로는 열리지 않는 방 — 올해의 흐름 · 결혼 · 진로 · 재무(운영자 2026-10-15: 이 방들은 심층 리포트로만 열린다).
  * 방이 무엇을 이야기하는지만 알려 주고(풀이 · 문장은 보이지 않는다), 심층 리포트로 이어 준다. 이미 구매해 리포트를 만드는 중이면 준비되면 열린다고만 알린다.
  */
 export function LockedRoom({ room, buyHref, owned, backHref }: { room: RoomId; buyHref: string; owned: boolean; backHref: string }) {

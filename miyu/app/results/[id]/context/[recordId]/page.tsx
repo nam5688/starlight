@@ -136,7 +136,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
             나의 고민 기록소
           </Link>
           <Link href={`/results/${id}`} className={buttonSecondary}>
-            개인 통합 리포트
+            심층 리포트
           </Link>
           <Link href="/my" className={buttonSecondary}>
             MY로 가기

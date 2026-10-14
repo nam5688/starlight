@@ -7,8 +7,8 @@ import { MiyuAvatar } from "./miyu-character";
 
 /**
  * 안내창의 종류 — 무료 질문을 다 썼을 때의 세 가지 경우와 심층 리포트 안내
- *  free-used: 간단 리포트 회원이 이 방의 무료 질문을 모두 썼다  paid-used: 심층 리포트 회원이 이 방의 무료 질문을 모두 썼다
- *  no-cash: 미유캐시가 모자라다  deep: 간단 리포트로는 더 이어 갈 수 없는 방이다
+ *  free-used: 무료 리포트 회원이 이 방의 무료 질문을 모두 썼다  paid-used: 심층 리포트 회원이 이 방의 무료 질문을 모두 썼다
+ *  no-cash: 미유캐시가 모자라다  deep: 무료 리포트로는 더 이어 갈 수 없는 방이다
  */
 export type RechargeVariant = "free-used" | "paid-used" | "no-cash" | "deep";
 

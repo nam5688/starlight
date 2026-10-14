@@ -264,6 +264,8 @@ export interface MiyuRepository {
   deleteChatSummary(userId: string, id: string): Promise<boolean>;
   /** 이 회원의 채팅 요약을 모두 지운다 (직접 저장한 것과 참고 기록 모두) — 지운 개수 */
   deleteChatSummaries(userId: string): Promise<number>;
+  /** 보관 기간이 지난 참고 기록(visible = false, before보다 앞서 만든 것)을 모든 회원에 걸쳐 지운다 — 지운 개수. 직접 저장한 요약은 건드리지 않는다 */
+  deleteExpiredHiddenChatSummaries(before: string): Promise<number>;
   /** 이 방의 참고 기록(visible = false)을 최근 keep개만 남기고 지운다 */
   trimHiddenChatSummaries(userId: string, assessmentId: string, room: string, keep: number): Promise<void>;
   /** 자유 질문 횟수 기록 — 질문 내용은 담지 않는다. 테이블이 없으면 조회 · 쓰기 모두 오류(코드 42P01) */

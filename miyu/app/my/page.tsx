@@ -133,7 +133,7 @@ async function MyContent() {
           <h2 id="my-concerns" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
             내 고민 반영 리포트
           </h2>
-          <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">개인 통합 리포트와 별도로 발급한 리포트입니다. 발급일 · 고민 주제로 구분하며, 이전 리포트는 새 리포트가 나와도 그대로 남습니다.</p>
+          <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">심층 리포트와 별도로 발급한 리포트입니다. 발급일 · 고민 주제로 구분하며, 이전 리포트는 새 리포트가 나와도 그대로 남습니다.</p>
           <ul className="mt-3 space-y-3">
             {concerns.map((c) => (
               <ConcernRow key={c.recordId} card={c} />

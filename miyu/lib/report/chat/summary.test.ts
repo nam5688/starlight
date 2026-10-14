@@ -5,7 +5,8 @@ import { SAMPLE_CHART } from "../../samples/sample-report.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
 import { buildTalkModel, TALK_COPY, type TalkModel } from "../reading/talk.ts";
 import { ROOMS, type RoomAction } from "../reading/talk-room.ts";
-import { isEmptySummary, memoryPairs, parseSummaryItems, shorten, summarizeActions, SUMMARY_LIMITS } from "./summary.ts";
+import { CHAT_SUMMARY_POLICY } from "../../config/product.ts";
+import { isEmptySummary, memoryPairs, parseSummaryItems, referenceCutoff, shorten, summarizeActions, SUMMARY_LIMITS } from "./summary.ts";
 
 const model = (): TalkModel => buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
 const free = (q: string, a: string[]): RoomAction => ({ t: "free", q, a, topic: "love" });
@@ -83,4 +84,10 @@ test("다음 질문의 참고: 직접 적은 질문만 최근 몇 쌍(먼저 묻
   assert.deepEqual(memoryPairs([]), []);
   const clipped = memoryPairs([{ read: [], qa: [{ q: "가".repeat(200), a: "나".repeat(300) }] }])[0];
   assert.ok(clipped.q.length <= SUMMARY_LIMITS.memory.questionChars + 1 && clipped.a.length <= SUMMARY_LIMITS.memory.answerChars + 1);
+});
+
+test("참고 기록 보관 기간: 운영자 정책 값(90일)을 따르고, 기준 시각은 지금에서 그만큼 앞선 시각이다", () => {
+  assert.equal(CHAT_SUMMARY_POLICY.referenceKeepDays, 90);
+  assert.equal(SUMMARY_LIMITS.hiddenDays, CHAT_SUMMARY_POLICY.referenceKeepDays);
+  assert.equal(referenceCutoff(new Date("2026-10-15T00:00:00.000Z")), "2026-07-17T00:00:00.000Z");
 });

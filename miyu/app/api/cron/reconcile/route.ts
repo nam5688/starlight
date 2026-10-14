@@ -3,9 +3,11 @@ import { cronSecret } from "@/server/env";
 import { logError } from "@/server/ops";
 import { reconcileAllNow } from "@/server/reconcile";
 import { drainQueuedReports, sweepReports } from "@/server/report-sweep";
+import { purgeExpiredReferenceRecords } from "@/lib/services/summary-service";
+import { writeRepository } from "@/server/services";
 
 /**
- * 정기 실행 주소 — 결제 재확인 + 리포트 지연 · 실패 점검.
+ * 정기 실행 주소 — 결제 재확인 + 리포트 지연 · 실패 점검 + (매시 처음 10분 안의 실행에서) 보관 기간이 지난 채팅 참고 기록 정리.
  * CRON_SECRET이 설정돼 있고 요청의 Authorization: Bearer 값이 같을 때만 실행한다 (Vercel Cron은 이 헤더를 자동으로 붙인다).
  * 응답에는 개수만 담는다 (고객 정보 없음).
  */
@@ -25,7 +27,17 @@ async function run(request: Request) {
     const summary = await reconcileAllNow({}, "inline");
     const drained = await drainQueuedReports();
     const reports = await sweepReports();
-    return Response.json({ ok: true, checked: summary.checked, counts: summary.counts, drained: drained.attempted, reports });
+    // 저장하지 않은 대화의 참고 기록은 90일 뒤 지운다 — 한 시간에 한 번이면 충분해 매시 처음 10분 안의 실행에서만 한다(정리 실패가 결제 점검을 막지 않는다)
+    let purgedReferenceRecords = 0;
+    const now = new Date();
+    if (now.getUTCMinutes() < 10) {
+      try {
+        purgedReferenceRecords = await purgeExpiredReferenceRecords(writeRepository(), now);
+      } catch (e) {
+        logError("cron.purge-reference", e);
+      }
+    }
+    return Response.json({ ok: true, checked: summary.checked, counts: summary.counts, drained: drained.attempted, reports, purgedReferenceRecords });
   } catch (e) {
     logError("cron.reconcile", e);
     return new Response("error", { status: 500 });

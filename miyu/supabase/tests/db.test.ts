@@ -929,6 +929,18 @@ test("채팅 요약(14번 마이그레이션): 본인이 저장한 것만 보이
   assert.equal(await deleteAllSummaries(server, U.id), 2, "남은 저장 요약 1개와 참고 기록 1개");
   assert.deepEqual(await server.listChatSummaries(U.id, { visibleOnly: false }), []);
 
+  // 6-2) 보관 기간(90일): 기간이 지난 참고 기록만 지우고, 직접 저장한 요약은 오래돼도 남는다 · 기간 안의 참고 기록도 남는다
+  const longAgo = new Date(Date.now() - 100 * 86_400_000).toISOString();
+  const oldHidden = await admin.from("chat_summaries").insert({ user_id: U.id, assessment_id: aid, room: "love", visible: false, items: { read: [], qa: [{ q: "오래된 질문", a: "오래된 답" }] }, created_at: longAgo }).select("id");
+  const oldSaved = await admin.from("chat_summaries").insert({ user_id: U.id, assessment_id: aid, room: "love", visible: true, items: { read: [], qa: [{ q: "오래 저장한 질문", a: "오래 저장한 답" }] }, created_at: longAgo }).select("id");
+  assert.ok(!oldHidden.error && !oldSaved.error, JSON.stringify([oldHidden.error, oldSaved.error]));
+  await server.insertChatSummary({ userId: U.id, assessmentId: aid, room: "love", visible: false, items: { read: [], qa: [{ q: "최근 질문", a: "최근 답" }] } });
+  assert.equal(await server.deleteExpiredHiddenChatSummaries(new Date(Date.now() - 90 * 86_400_000).toISOString()), 1, "기간이 지난 참고 기록 하나만");
+  const left = (await server.listChatSummaries(U.id, { visibleOnly: false })).map((r) => `${r.visible ? "저장" : "참고"}:${(r.items as { qa: { q: string }[] }).qa[0].q}`).sort();
+  assert.deepEqual(left, ["저장:오래 저장한 질문", "참고:최근 질문"]);
+  assert.equal(await server.deleteExpiredHiddenChatSummaries(new Date(Date.now() - 90 * 86_400_000).toISOString()), 0, "다시 해도 같다");
+  assert.equal(await deleteAllSummaries(server, U.id), 2, "정리를 위한 지우기");
+
   // 7) 탈퇴: 저장한 요약 · 참고 기록이 함께 지워진다
   await server.insertChatSummary({ userId: U.id, assessmentId: aid, room: "love", visible: true, items: { read: ["연애"], qa: [] } });
   await server.insertChatSummary({ userId: U.id, assessmentId: aid, room: "love", visible: false, items: { read: [], qa: [{ q: "q", a: "a" }] } });

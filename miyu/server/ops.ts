@@ -81,8 +81,8 @@ export type NotificationTestResult =
 
 /** 알림 시험 문구 — 종류별 모양을 보여 준다. 실제 주문이 아니며 `[미유·테스트]` 표시가 붙는다 */
 const SAMPLE_ALERTS: Alert[] = [
-  { kind: "test.payment.approved", severity: "info", title: "결제 승인 완료 · 개인 통합 리포트 9,900원 (시험 — 실제 주문 아님)", orderNumber: "MEU-TEST-0000000001", dedupeKey: "", lines: ["결제 환경 테스트"] },
-  { kind: "test.payment.refunded", severity: "info", title: "환불 완료 · 개인 통합 리포트 9,900원 (시험 — 실제 주문 아님)", orderNumber: "MEU-TEST-0000000002", dedupeKey: "" },
+  { kind: "test.payment.approved", severity: "info", title: "결제 승인 완료 · 심층 리포트 9,900원 (시험 — 실제 주문 아님)", orderNumber: "MEU-TEST-0000000001", dedupeKey: "", lines: ["결제 환경 테스트"] },
+  { kind: "test.payment.refunded", severity: "info", title: "환불 완료 · 심층 리포트 9,900원 (시험 — 실제 주문 아님)", orderNumber: "MEU-TEST-0000000002", dedupeKey: "" },
   { kind: "test.reconcile.anomaly", severity: "error", title: "결제 기록 불일치 — 확인 필요 (시험 — 실제 주문 아님)", orderNumber: "MEU-TEST-0000000003", dedupeKey: "", lines: ["환불은 토스페이먼츠 관리자에서 직접 실행합니다 (미유는 환불을 실행하지 않습니다)"] },
   { kind: "test.report.failed", severity: "error", title: "리포트 생성 실패 (시험 — 실제 주문 아님)", orderNumber: "MEU-TEST-0000000004", dedupeKey: "" },
   { kind: "test.budget", severity: "warn", title: "AI 예산 한도 — 하루 예산에 가까워 새 구매를 멈췄습니다 (시험)", dedupeKey: "" },

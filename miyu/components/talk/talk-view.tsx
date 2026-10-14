@@ -136,7 +136,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const cashReady = quotaUsed && cashBalance !== null && cashBalance >= per;
   const canAsk = model.chat.state === "ready" && Boolean(persist) && (!quotaUsed || cashReady);
   const busy = typing || waiting;
-  /** 질문 한 번의 글자 수 한도 — 간단 리포트의 무료 질문은 500자, 그 밖(심층 리포트 · 미유캐시 질문)은 1,000자 */
+  /** 질문 한 번의 글자 수 한도 — 무료 리포트의 무료 질문은 500자, 그 밖(심층 리포트 · 미유캐시 질문)은 1,000자 */
   const questionMax = questionMaxFor(Boolean(model.chat.free) && !quotaUsed);
   /** 무료 질문을 모두 썼을 때 뜨는 안내창 — 마지막 답을 읽을 시간을 준 뒤(답이 다 도착한 다음) 연다 */
   const [rechargeOpen, setRechargeOpen] = useState(false);
@@ -465,7 +465,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     };
   }, [menuOpen, scope, model, persist]);
 
-  // 채팅방 메뉴 — 심층 리포트(paid)는 열 수 있는 방을 한 목록으로, 간단 리포트(free)는 무료로 열리는 방을 위에, 심층 리포트로만 열리는 방은 "심층 리포트로는 아래 상담도 가능해요!" 아래에 잠금 표시로 둔다
+  // 채팅방 메뉴 — 심층 리포트(paid)는 열 수 있는 방을 한 목록으로, 무료 리포트(free)는 무료로 열리는 방을 위에, 심층 리포트로만 열리는 방은 "심층 리포트로는 아래 상담도 가능해요!" 아래에 잠금 표시로 둔다
   const menuRooms = (() => {
     const shown = ROOM_ORDER.filter((r) => roomHrefs[r] && (model.tier === "free" && !isSimpleRoom(r) ? true : roomAvailable(model, r)));
     if (model.tier !== "free") return { simple: shown, deepOnly: [] as RoomId[] };
@@ -538,7 +538,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           : model.chat.state === "locked"
             ? ROOM_COPY.chatLocked
             : TALK_COPY.freeQuestionPending;
-  // 안내창: 어떤 경우인지, 어디로 이어 줄지 — 캐시를 쓸 수 있으면 미유캐시 충전, 간단 리포트의 맛보기라면 심층 리포트 구매
+  // 안내창: 어떤 경우인지, 어디로 이어 줄지 — 캐시를 쓸 수 있으면 미유캐시 충전, 무료 리포트의 맛보기라면 심층 리포트 구매
   const hadCash = (cashBalance ?? 0) > 0 || cashSpent;
   const rechargeVariant: RechargeVariant = model.chat.deepOnly ? "deep" : hadCash ? "no-cash" : model.chat.free ? "free-used" : "paid-used";
   const cashHref = persist ? `/cash?a=${persist.assessmentId}` : null;

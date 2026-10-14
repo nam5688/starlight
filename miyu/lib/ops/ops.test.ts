@@ -82,7 +82,7 @@ test("오류 식별번호: 같은 digest는 항상 같은 번호이고 조회 �
 });
 
 test("알림 표시: 실결제가 아닌 환경은 [미유·테스트]로 시작해 실제 운영 알림과 섞이지 않고, 정보 알림은 오류 · 주의 표시가 없다", () => {
-  const paid: Alert = { kind: "payment.approved", severity: "info", title: "결제 승인 완료 · 개인 통합 리포트 9,900원", orderNumber: "MEU-20261012-ABCDEFGHJK", dedupeKey: "k", lines: ["결제 환경 테스트"] };
+  const paid: Alert = { kind: "payment.approved", severity: "info", title: "결제 승인 완료 · 심층 리포트 9,900원", orderNumber: "MEU-20261012-ABCDEFGHJK", dedupeKey: "k", lines: ["결제 환경 테스트"] };
   assert.match(alertText(paid, { test: true }), /^\[미유·테스트\] 결제 승인 완료/);
   assert.match(alertText(paid), /^\[미유\] 결제 승인 완료/);
   const err: Alert = { kind: "reconcile.anomaly", severity: "error", title: "결제 기록 불일치 — 확인 필요 (DUPLICATE_PAYMENT)", dedupeKey: "k" };

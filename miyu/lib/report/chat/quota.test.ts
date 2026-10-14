@@ -5,12 +5,12 @@ import { CHAT_ROOMS } from "../../config/product.ts";
 import { ROOM_ORDER } from "../reading/talk-room.ts";
 import { isSimpleRoom, roomPolicy, roomQuestionNote, roomSections } from "./quota.ts";
 
-test("운영자 지정값: 간단 리포트는 네 개 방(연애 2 · 고민 2 · 일일 1 · 나를 알아보기 0), 심층 리포트는 방마다 3", () => {
+test("운영자 지정값: 무료 리포트는 네 개 방(연애 2 · 고민 2 · 일일 1 · 나를 알아보기 0), 심층 리포트는 방마다 3", () => {
   assert.deepEqual({ ...CHAT_ROOMS.simple }, { main: 0, daily: 1, concern: 2, love: 2 });
   assert.equal(CHAT_ROOMS.deepFreeQuestions, 3);
 });
 
-test("간단 리포트(free): 네 개 방만 열리고, 나머지(올해의 흐름 · 결혼 · 진로 · 재무)는 심층 리포트로만 열린다", () => {
+test("무료 리포트(free): 네 개 방만 열리고, 나머지(올해의 흐름 · 결혼 · 진로 · 재무)는 심층 리포트로만 열린다", () => {
   const open = ROOM_ORDER.filter((r) => roomPolicy("free", r).open);
   assert.deepEqual([...open].sort(), ["concern", "daily", "love", "main"]);
   for (const r of ["year", "marriage", "career", "money"]) {
@@ -22,7 +22,7 @@ test("간단 리포트(free): 네 개 방만 열리고, 나머지(올해의 흐�
   assert.deepEqual(roomPolicy("free", "daily"), { open: true, freeQuestions: 1, cashAllowed: true, needsDeep: false });
 });
 
-test("나를 알아보기는 간단 리포트로 질문이 없고(캐시로도 열리지 않음) 심층 리포트로 이어 준다", () => {
+test("나를 알아보기는 무료 리포트로 질문이 없고(캐시로도 열리지 않음) 심층 리포트로 이어 준다", () => {
   assert.deepEqual(roomPolicy("free", "main"), { open: true, freeQuestions: 0, cashAllowed: false, needsDeep: true });
 });
 
@@ -38,13 +38,13 @@ test("시험용 추가 질문은 열린 방의 무료 질문만 늘린다 (질�
   assert.equal(roomPolicy("free", "love", -3).freeQuestions, 2);
 });
 
-test("방 나누기: 간단 리포트 방은 운영자 순서(나를 알아보기 · 오늘의 운세 · 고민해결소 · 연애), 나머지는 심층 리포트 방(올해의 흐름 · 결혼 · 진로 · 재무)", () => {
+test("방 나누기: 무료 리포트 방은 운영자 순서(나를 알아보기 · 오늘의 운세 · 고민해결소 · 연애), 나머지는 심층 리포트 방(올해의 흐름 · 결혼 · 진로 · 재무)", () => {
   const order = ["main", "daily", "year", "love", "marriage", "career", "money", "concern"] as const;
   const s = roomSections(order);
   assert.deepEqual(s.simple, ["main", "daily", "concern", "love"]);
   assert.deepEqual(s.deepOnly, ["year", "marriage", "career", "money"]);
   assert.equal(s.simple.length + s.deepOnly.length, order.length, "모든 방이 어느 한쪽에 있다");
-  // 정책에 있는 방은 모두 간단 리포트 쪽
+  // 정책에 있는 방은 모두 무료 리포트 쪽
   for (const r of order) assert.equal(s.simple.includes(r), isSimpleRoom(r));
 });
 

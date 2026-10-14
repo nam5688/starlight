@@ -81,7 +81,7 @@ export type AskDeps = {
   /** 테스트용: 캐시 차감 참조번호를 정한다 */
   newRef?: () => string;
   /**
-   * 이 질문에 쓸 자료와 기준 날짜. tier는 구매해 준비된 리포트가 있으면 paid(심층 리포트), 없으면 free(간단 리포트).
+   * 이 질문에 쓸 자료와 기준 날짜. tier는 구매해 준비된 리포트가 있으면 paid(심층 리포트), 없으면 free(무료 리포트).
    * room · roomKey는 서버가 정한 값이다(오늘의 운세 방은 날짜별 방). 분석 결과를 찾지 못하면 null.
    */
   loadAsk: () => Promise<{
@@ -90,7 +90,7 @@ export type AskDeps = {
     tier: "paid" | "free";
     room: string;
     roomKey: string;
-    /** 간단 리포트에서 이 방의 풀이에 내 자료로 읽은 내용이 없다(무료 질문을 열지 않는다) */
+    /** 무료 리포트에서 이 방의 풀이에 내 자료로 읽은 내용이 없다(무료 질문을 열지 않는다) */
     noMaterial?: boolean;
   } | null>;
 };
@@ -138,7 +138,7 @@ export async function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<A
   }
   const inQuota = used < policy.freeQuestions;
 
-  // 글자 수 한도: 간단 리포트의 무료 질문은 500자, 그 밖(심층 리포트의 무료 질문 · 미유캐시 질문)은 1,000자 (위기 표현 확인 뒤에 센다 — 힘든 글은 길어도 안내가 먼저다)
+  // 글자 수 한도: 무료 리포트의 무료 질문은 500자, 그 밖(심층 리포트의 무료 질문 · 미유캐시 질문)은 1,000자 (위기 표현 확인 뒤에 센다 — 힘든 글은 길어도 안내가 먼저다)
   const max = inQuota && free ? QUESTION_MAX.free : QUESTION_MAX.paid;
   if (q.length > max) return fail(max === QUESTION_MAX.free ? "too-long-free" : "too-long");
 
@@ -177,7 +177,7 @@ export async function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<A
   // 이 대화에서 앞서 나눈 질문 · 답(recent)과, 이 방에서 이미 끝낸 이전 대화의 요약(memory) — 이번 대화에 아직 있는 것은 memory에서 뺀다(같은 말을 두 번 보내지 않는다)
   const recent = recentExchanges(await loadTalkRoom(repo, { userId: input.userId, assessmentId: input.assessmentId, roomKey }));
   const seen = new Set(recent.map((r) => shorten(r.q, SUMMARY_LIMITS.memory.questionChars)));
-  const memory = (await memoryFor(repo, { userId: input.userId, assessmentId: input.assessmentId, room: loaded.room })).filter((m) => !seen.has(m.q));
+  const memory = (await memoryFor(repo, { userId: input.userId, assessmentId: input.assessmentId, room: loaded.room }, deps.now())).filter((m) => !seen.has(m.q));
   const ask: ChatAsk = {
     context: loaded.context,
     question: q.text,

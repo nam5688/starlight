@@ -48,7 +48,7 @@ export function ContextPanel({
           </p>
           <p className="mt-1 text-[14px] leading-relaxed text-ink-3">
             {usesContext
-              ? "개인 통합 리포트를 만들 때 이 고민에 맞춰 해석의 초점과 예시를 고릅니다. 사주 계산은 바뀌지 않습니다."
+              ? "심층 리포트를 만들 때 이 고민에 맞춰 해석의 초점과 예시를 고릅니다. 사주 계산은 바뀌지 않습니다."
               : "지금은 AI 해석 연결 전이라, 개발용 리포트에는 반영되지 않습니다."}
           </p>
           <Link href={href} className={`${buttonSecondary} mt-4`}>
@@ -58,7 +58,7 @@ export function ContextPanel({
       ) : (
         <>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-            지금 가장 궁금한 문제나 최근 반복되는 상황을 알려 주시면, 리포트를 만들 때 그 고민에 맞춰 해석의 초점과 예시를 고릅니다. 사주 계산은 바뀌지 않고, 리포트에는 &ldquo;알려 주신 고민까지 반영한 해석&rdquo;으로 표시합니다. 개인 통합 리포트를 받은 뒤에도 고민을 적어 새 리포트를 따로 발급받을 수 있어요.
+            지금 가장 궁금한 문제나 최근 반복되는 상황을 알려 주시면, 리포트를 만들 때 그 고민에 맞춰 해석의 초점과 예시를 고릅니다. 사주 계산은 바뀌지 않고, 리포트에는 &ldquo;알려 주신 고민까지 반영한 해석&rdquo;으로 표시합니다. 심층 리포트를 받은 뒤에도 고민을 적어 새 리포트를 따로 발급받을 수 있어요.
           </p>
           {!usesContext && <p className="mt-1 text-[14px] text-ink-3">지금은 AI 해석 연결 전이라, 개발용 리포트에는 반영되지 않습니다.</p>}
           <p className="mt-3 text-[15px] font-semibold">작성 기록 없음</p>

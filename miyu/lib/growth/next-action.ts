@@ -39,6 +39,6 @@ export function nextActionForResult(state: ResultState): NextAction {
   if (state.purchase === "refunded") {
     return { kind: "refund-info", label: "환불 안내 보기", allowRelatedOffer: false };
   }
-  // 무료 요약만 본 상태: 관련 없는 여러 상품 대신 개인 통합 리포트 하나만 제안한다
-  return { kind: "buy-report", label: "개인 통합 리포트 보기", allowRelatedOffer: false };
+  // 무료 요약만 본 상태: 관련 없는 여러 상품 대신 심층 리포트 하나만 제안한다
+  return { kind: "buy-report", label: "심층 리포트 보기", allowRelatedOffer: false };
 }

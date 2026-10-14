@@ -85,7 +85,7 @@ export type TalkGroup = { id: string; chip: string; topicIds: string[] };
  */
 export type TalkChat = {
   state: "ready" | "pending" | "locked";
-  /** 간단 리포트(무료) 회원이다 — 무료 질문 한 번의 글자 수가 QUESTION_MAX.free(500자)로 제한된다 (심층 리포트 회원은 1,000자) */
+  /** 무료 리포트(무료) 회원이다 — 무료 질문 한 번의 글자 수가 QUESTION_MAX.free(500자)로 제한된다 (심층 리포트 회원은 1,000자) */
   free?: boolean;
   /** 이 방의 무료 질문을 모두 썼다 (state가 ready면 미유캐시로 이어서 묻는 중, locked면 캐시가 모자라거나 캐시를 쓸 수 없다) */
   used?: boolean;
@@ -95,7 +95,7 @@ export type TalkChat = {
   noMaterial?: boolean;
   /** 미유캐시를 쓸 수 있다 (DB 13번 전이면 없음) — 잔액 · 질문 한 번에 드는 캐시 */
   cash?: { balance: number; per: number };
-  /** 간단 리포트로는 더 이어 갈 수 없는 방이다 (질문이 없는 방) — 심층 리포트로 이어 준다 */
+  /** 무료 리포트로는 더 이어 갈 수 없는 방이다 (질문이 없는 방) — 심층 리포트로 이어 준다 */
   deepOnly?: boolean;
 };
 /** 무료 맛보기에서 잠긴 내용으로 이어지는 버튼 — owned: 이미 구매한 분(리포트 보기)인지 */
@@ -188,13 +188,13 @@ export const TALK_COPY = {
   freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
   freeQuestionNoMaterial: "이 주제는 리포트를 받으면 질문할 수 있어요",
   freeQuestionUsed: "무료 질문을 모두 썼어요",
-  /** 무료 질문을 다 썼고 미유캐시를 쓸 수 있을 때 · 간단 리포트로는 질문이 없는 방 */
+  /** 무료 질문을 다 썼고 미유캐시를 쓸 수 있을 때 · 무료 리포트로는 질문이 없는 방 */
   freeQuestionUsedCash: "무료 질문을 모두 썼어요 · 미유캐시를 충전해 주세요",
   freeQuestionDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요",
   /**
    * 무료 질문을 모두 썼을 때 뜨는 안내창 — 운영자 문구(2026-10-15): 무료 질문을 다 썼다는 것과 "유료 질문은 글자 수가 1,000자로 늘어난다"만 알린다.
    * 버튼은 미유캐시 충전 화면(캐시를 쓸 수 있을 때) 또는 심층 리포트 구매로 이어진다. 세 가지 경우:
-   *  - free-used: 이 방의 무료 질문을 다 썼다  - no-cash: 캐시가 모자라다  - deep: 간단 리포트로는 더 이어 갈 수 없는 방이다
+   *  - free-used: 이 방의 무료 질문을 다 썼다  - no-cash: 캐시가 모자라다  - deep: 무료 리포트로는 더 이어 갈 수 없는 방이다
    */
   recharge: {
     "free-used": { title: "무료 질문을 모두 썼어요", body: `유료 질문은 글자 수 제한이 ${won(QUESTION_MAX.paid)}자로 늘어나요.` },

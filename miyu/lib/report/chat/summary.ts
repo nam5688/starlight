@@ -2,6 +2,7 @@
 // 요약에는 리포트 글을 옮겨 담지 않는다: 읽은 풀이의 이름표 · 먼저 묻는 질문에 고른 답 · 내 경험 답장 · 직접 적은 질문과 미유 답의 앞부분만 담는다.
 // 저장하지 않고 끝낸 대화의 요약(참고 기록)도 같은 모양이며 다음 질문에서 AI가 이전 이야기를 참고하는 데만 쓴다(chat-service.ts).
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다).
+import { CHAT_SUMMARY_POLICY } from "../../config/product.ts";
 import { TALK_COPY, type TalkModel } from "../reading/talk.ts";
 import { ROOMS, roomTopic, type RoomAction, type RoomId } from "../reading/talk-room.ts";
 
@@ -21,9 +22,16 @@ export const SUMMARY_LIMITS = {
   visiblePerUser: 100,
   /** 저장하지 않은 대화의 참고 기록을 방마다 몇 개까지 남기나 — 넘으면 오래된 것부터 지운다 */
   hiddenPerRoom: 12,
+  /** 저장하지 않은 대화의 참고 기록을 보관하는 날 수 — 지나면 다음 질문에서 쓰지 않고 정기 점검이 지운다 */
+  hiddenDays: CHAT_SUMMARY_POLICY.referenceKeepDays,
   /** 다음 질문에서 AI가 참고하는 이전 이야기 */
   memory: { pairs: 4, questionChars: 100, answerChars: 140 },
 } as const;
+
+/** 이 시각보다 앞서 만든 참고 기록은 기간이 지났다 (ISO 시각, 비교용) */
+export function referenceCutoff(now: Date): string {
+  return new Date(now.getTime() - SUMMARY_LIMITS.hiddenDays * 86_400_000).toISOString();
+}
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 

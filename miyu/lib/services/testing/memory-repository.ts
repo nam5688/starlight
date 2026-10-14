@@ -418,6 +418,15 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       }
       return n;
     },
+    async deleteExpiredHiddenChatSummaries(before) {
+      let n = 0;
+      for (let i = chatSummaries.length - 1; i >= 0; i--) {
+        if (chatSummaries[i].visible || chatSummaries[i].createdAt >= before) continue;
+        chatSummaries.splice(i, 1);
+        n++;
+      }
+      return n;
+    },
     async trimHiddenChatSummaries(userId, assessmentId, room, keep) {
       const hidden = chatSummaries
         .filter((s) => s.userId === userId && s.assessmentId === assessmentId && s.room === room && !s.visible)

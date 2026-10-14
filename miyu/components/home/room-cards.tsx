@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { MiyuAvatar } from "@/components/talk/miyu-character";
 import { ArrowIcon, LockIcon } from "@/components/ui/icons";
-import { formatKrw, PERSONAL_REPORT, REPORT_TIER_NAMES } from "@/lib/config/product";
+import { formatKrw, FREE_ANALYSIS_TIME, PERSONAL_REPORT, REPORT_TIER_NAMES } from "@/lib/config/product";
 import { roomQuestionNote, roomSections } from "@/lib/report/chat/quota";
 import { TALK_COPY } from "@/lib/report/reading/talk";
 import { ROOM_ORDER, ROOMS, type RoomId, type TalkMood } from "@/lib/report/reading/talk-room";
@@ -14,7 +14,7 @@ const firstMessage = (room: RoomId) => ROOMS[room].intake?.question ?? TALK_COPY
 
 /**
  * 홈의 상담 입구 — 직설적인 주제 이름(연애 · 결혼 · 일 · 진로 …)을 크게, 그 방의 미유 이름(연애박사 미유 …)을 작게 보인다(운영자 2026-10-15).
- * 두 구역: 간단 리포트(무료 분석)로 바로 이야기할 수 있는 방 4개(강조, 방마다 무료 질문 수)와 "심층 리포트로는 아래 상담도 가능해요!"(나머지 방, 잠금 표시).
+ * 두 구역: 무료 리포트(무료 분석)로 바로 이야기할 수 있는 방 4개(강조, 방마다 무료 질문 수)와 "심층 리포트로는 아래 상담도 가능해요!"(나머지 방, 잠금 표시).
  * 주제를 누르면 무료 분석으로 이어지고(/go/방이름), 분석을 마치면 무료 리포트(결과 화면)를 먼저 보여 준 뒤 거기서 상담방을 고른다(고른 주제는 "이어서 이야기하기" 바로가기로 남는다).
  * chatReady: 자유 질문 AI가 연결돼 있는가 — 아니면 질문 수를 약속하지 않고 "준비 중"으로 밝힌다.
  */
@@ -88,7 +88,7 @@ export function RoomCards({ chatReady = true }: { chatReady?: boolean }) {
         })}
       </ul>
       <p className="mt-4 text-[13px] leading-[1.65] text-ink-3">
-        무료 분석은 생년월일과 질문에 답하면 끝나요. {REPORT_TIER_NAMES.deep}({formatKrw(PERSONAL_REPORT.priceKrw)})를 받으면 모든 상담방이 열리고 방마다 무료 질문을 드려요. 오늘의 운세는 하루 한 번 무료예요(초기 혜택). 궁합 비교는 준비 중이에요.
+        무료 분석은 {FREE_ANALYSIS_TIME}이면 끝나요(생년월일을 넣고 질문에 답하면 돼요). {REPORT_TIER_NAMES.deep}({formatKrw(PERSONAL_REPORT.priceKrw)})를 받으면 모든 상담방이 열리고 방마다 무료 질문을 드려요. 오늘의 운세는 하루 한 번 무료예요(초기 혜택). 궁합 비교는 준비 중이에요.
       </p>
     </section>
   );

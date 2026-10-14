@@ -132,7 +132,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
         <ClearAnalyzeDraft />
         <Track name="report_view" />
         <ResultHeader
-          title={isPersonalV2(content) ? `${assessment.nickname} 님의 개인 종합 사주 리포트` : `${assessment.nickname} 님의 개인 통합 리포트`}
+          title={isPersonalV2(content) ? `${assessment.nickname} 님의 개인 종합 사주 리포트` : `${assessment.nickname} 님의 심층 리포트`}
           subtitle={
             isReadingReport(content)
               ? "사주를 틀로, 성향 응답과 입력한 MBTI를 함께 읽은 하나의 해석입니다."

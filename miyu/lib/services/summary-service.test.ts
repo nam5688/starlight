@@ -7,7 +7,7 @@ import { SUMMARY_LIMITS } from "../report/chat/summary.ts";
 import { buildTalkModel, type TalkModel } from "../report/reading/talk.ts";
 import { ROOMS, type RoomAction } from "../report/reading/talk-room.ts";
 import type { AssessmentRecord, MiyuRepository } from "./ports.ts";
-import { closeRoom, deleteAllSummaries, deleteSavedSummary, listSavedSummaries, memoryFor, saveRoomSummary } from "./summary-service.ts";
+import { closeRoom, deleteAllSummaries, deleteSavedSummary, listSavedSummaries, memoryFor, purgeExpiredReferenceRecords, saveRoomSummary } from "./summary-service.ts";
 import { loadTalkRoom, saveTalkRoom } from "./talk-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
@@ -163,4 +163,31 @@ test("표가 없을 때(14번 DB 변경 전): 저장은 준비 중으로 알리�
   assert.deepEqual(await closeRoom(broken, { ...input([free(1)]), keep: false }), { ok: true, saved: false });
   assert.deepEqual(await loadTalkRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "love" }), [], "저장하지 않고 끝내면 대화는 지워진다");
   assert.deepEqual(await memoryFor(broken, { userId: "u1", assessmentId: mine, room: "love" }), []);
+});
+
+test("참고 기록 보관 기간(90일): 지난 기록은 아직 지워지지 않았어도 다음 질문에서 쓰지 않고, 정기 점검이 지우며, 직접 저장한 요약은 남는다", async () => {
+  let clock = new Date("2026-07-01T03:00:00Z");
+  const mem = createMemoryRepository(() => clock);
+  const base = { channel: "web", nickname: "서윤", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 11, birthDay: 7, birthTime: "08:40", knownMbti: null, answers: {}, contentVersion: "t", source: "sample", summary: {}, saju: { status: "not-connected" } } as unknown as Omit<AssessmentRecord, "id" | "createdAt" | "userId">;
+  const mine = (await mem.repo.insertAssessment({ ...base, userId: "u1" })).id;
+  const input = (actions: unknown[], keep: boolean) => ({ userId: "u1", assessmentId: mine, roomKey: "love", room: "love", actions, model: model(), keep });
+
+  // 7월 1일: 저장하지 않고 끝낸 대화(참고 기록)와 직접 저장한 대화
+  await closeRoom(mem.repo, input([free(1)], false));
+  await closeRoom(mem.repo, input([free(2)], true));
+  assert.deepEqual((await memoryFor(mem.repo, { userId: "u1", assessmentId: mine, room: "love" }, clock)).map((p) => p.q), ["질문1", "질문2"]);
+
+  // 89일 뒤: 아직 보관 기간 안이다
+  clock = new Date("2026-09-28T03:00:00Z");
+  assert.equal((await memoryFor(mem.repo, { userId: "u1", assessmentId: mine, room: "love" }, clock)).length, 2);
+  assert.equal(await purgeExpiredReferenceRecords(mem.repo, clock), 0, "기간 안의 기록은 지우지 않는다");
+
+  // 91일 뒤: 저장하지 않은 대화의 참고 기록은 쓰지 않는다 (지워지기 전에도). 직접 저장한 요약은 계속 쓴다
+  clock = new Date("2026-09-30T03:00:00Z");
+  assert.deepEqual((await memoryFor(mem.repo, { userId: "u1", assessmentId: mine, room: "love" }, clock)).map((p) => p.q), ["질문2"]);
+  assert.equal(mem.chatSummaries.length, 2, "아직 지우지 않았다");
+  assert.equal(await purgeExpiredReferenceRecords(mem.repo, clock), 1, "정기 점검이 기간이 지난 참고 기록만 지운다");
+  assert.deepEqual(mem.chatSummaries.map((x) => x.visible), [true], "직접 저장한 요약은 남는다");
+  assert.equal((await listSavedSummaries(mem.repo, "u1"))[0].entries.length, 1);
+  assert.equal(await purgeExpiredReferenceRecords(mem.repo, clock), 0, "다시 해도 같다");
 });
