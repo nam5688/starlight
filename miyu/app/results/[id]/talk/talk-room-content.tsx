@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { KakaoLoginForm } from "@/components/auth/kakao-login-button";
+import { talkRoomPath } from "@/components/talk/room-paths";
 import { TalkView } from "@/components/talk/talk-view";
 import { pageNarrow } from "@/components/ui/styles";
 import { isReadingReport } from "@/lib/report/generator";
@@ -9,9 +10,6 @@ import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { readRepository } from "@/server/services";
-
-/** 방(상담 모드)의 주소 — 기본 방은 /talk, 나머지는 /talk/방이름 */
-export const talkRoomPath = (id: string, room: RoomId) => (room === "main" ? `/results/${id}/talk` : `/results/${id}/talk/${room}`);
 
 /**
  * 구매해 준비된 개인 통합 리포트(읽기 구조)만 대화로 풀어 볼 수 있다 — 저장된 글을 나눠서 보여 줄 뿐 AI를 부르지 않는다.

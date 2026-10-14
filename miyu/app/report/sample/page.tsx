@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ReadingReportView } from "@/components/report/reading-report-view";
-import { ArrowIcon } from "@/components/ui/icons";
+import { TalkEntry } from "@/components/results/talk-entry";
 import { SourceBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
 import { sampleReport } from "@/lib/samples/sample-report";
@@ -26,15 +26,7 @@ export default function SampleReportPage() {
         <h1 className="mt-3 text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">{report.personName} 님의 개인 통합 리포트</h1>
       </div>
 
-      <div className="mx-auto w-full max-w-[720px] px-5 pb-1">
-        <Link href="/report/sample/talk" className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-accent/40 bg-accent-soft px-4 py-2.5 transition-colors hover:border-accent">
-          <span>
-            <span className="block text-[16px] font-bold text-accent-strong">대화로 풀어보기 (예시)</span>
-            <span className="block text-[13px] leading-[1.5] text-ink-2">같은 리포트를 분석 카드와 한 주제씩 읽는 대화 형식으로 봅니다.</span>
-          </span>
-          <ArrowIcon className="size-5 shrink-0 text-accent-strong" />
-        </Link>
-      </div>
+      <TalkEntry sample report={report} />
       <ReadingReportView
         report={report}
         tendencyName={sampleReport.tendency.name}

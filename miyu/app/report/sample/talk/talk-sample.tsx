@@ -1,11 +1,9 @@
+import { sampleRoomPath } from "@/components/talk/room-paths";
 import { TalkView } from "@/components/talk/talk-view";
 import { buildTalkModel } from "@/lib/report/reading/talk";
 import { ROOM_ORDER, type RoomId } from "@/lib/report/reading/talk-room";
 import { sampleReport } from "@/lib/samples/sample-report";
 import { sampleReadingReport } from "@/lib/samples/sample-reading-report";
-
-/** 방(상담 모드)의 주소 — 기본 방은 /report/sample/talk, 나머지는 /report/sample/talk/방이름 */
-export const sampleRoomPath = (room: RoomId) => (room === "main" ? "/report/sample/talk" : `/report/sample/talk/${room}`);
 
 /** 가상 인물 서윤의 대화 예시 — 구매 없이 볼 수 있고, 실제 리포트도 같은 화면에서 읽는다 */
 export function SampleTalk({ room }: { room: RoomId }) {

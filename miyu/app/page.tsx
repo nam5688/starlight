@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ChatExample } from "@/components/home/chat-example";
 import { CompareSection } from "@/components/home/compare-section";
 import { Faq } from "@/components/home/faq";
 import { ReportPreview } from "@/components/home/report-preview";
-import { AdjustIcon, ArrowIcon, CheckIcon, FlowIcon, StrengthIcon } from "@/components/ui/icons";
+import { RoomCards } from "@/components/home/room-cards";
+import { MiyuAvatar } from "@/components/talk/miyu-character";
+import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, pageWide } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
@@ -48,7 +51,13 @@ const STEPS = [
   { title: "무료 미리보기 확인", desc: "대표 경향 일부, 사주 원국과 오행의 뜻, 내 원국이 던지는 질문" },
   { title: "카카오 로그인", desc: "결과를 회원 정보에 저장" },
   { title: "개인 통합 리포트 구매", desc: "질문의 답, 상황별 잘하는 점 · 주의할 점, 어울리는 관계 조건, 보완 아이템" },
-  { title: "MY에서 다시보기", desc: "저장된 같은 버전을 언제든 다시 확인" },
+  { title: "MY에서 다시보기 · 대화로 풀어보기", desc: "저장된 같은 버전을 다시 확인하고, 주제별 상담방에서 한 번에 하나씩 이어 읽기" },
+];
+
+const FLOW = [
+  { title: "분석 한 장", desc: "사주 · 응답 · MBTI를 연결한 해석을 짧은 카드 한 장으로 정리해요. 이미지로 저장할 수 있어요." },
+  { title: "주제별 풀이", desc: "궁금한 주제를 고르면 결론 한 줄과 쉬운 설명이 말풍선으로 도착해요. 어려운 사주 용어 대신 생활 장면으로 풀어요." },
+  { title: "내 경우는 어떤지 확인", desc: "“실제로 어때요?” 질문에 답하며 내 상황에 맞는지 살펴봐요. 눌러 준 답이 풀이를 바꾸지는 않아요." },
 ];
 
 export default function Home() {
@@ -57,14 +66,14 @@ export default function Home() {
       {/* 핵심 소개 */}
       <section className={`${pageWide} grid gap-10 py-10 md:py-16 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center lg:gap-16 lg:py-20`}>
         <div>
-          <p className="text-[14px] font-semibold text-accent">ME:U 개인 통합 리포트</p>
+          <p className="text-[14px] font-semibold text-accent">ME:U 미유 · 개인 통합 분석</p>
           <h1 className="mt-3 text-[28px] leading-[1.35] font-bold tracking-tight md:text-[42px]">
-            생년월일만으로는
+            내 분석은 한 장으로,
             <br />
-            설명되지 않는 나까지.
+            궁금한 건 대화로.
           </h1>
           <p className="mt-4 max-w-[34rem] text-[16px] leading-[1.75] text-ink-2 md:text-[18px]">
-            사주 원국에 내가 직접 답한 기질 · 성격 · 가까운 관계 반응과 입력한 MBTI를 연결해, 한 사람의 해석으로 읽습니다.
+            사주 원국에 내가 직접 답한 기질 · 성격 · 가까운 관계 반응과 입력한 MBTI를 연결해 한 사람의 해석으로 읽고, 분석 한 장으로 정리한 뒤 미유와 이야기하듯 이어서 풀어 봐요.
           </p>
           <ul className="mt-6 max-w-[34rem] space-y-3.5">
             {HERO_POINTS.map((p) => (
@@ -81,8 +90,8 @@ export default function Home() {
             <Link href="/analyze" className={buttonPrimary}>
               내 분석 시작하기
             </Link>
-            <Link href="/report/sample" className={buttonSecondary}>
-              리포트 예시 보기
+            <Link href="/report/sample/talk" className={buttonSecondary}>
+              예시 대화 보기
             </Link>
           </div>
           <p className="mt-4 text-[14px] leading-[1.65] text-ink-2">
@@ -94,12 +103,42 @@ export default function Home() {
               궁합 비교 <StatusBadge>준비 중</StatusBadge>
             </span>
             <span className="inline-flex items-center gap-1.5">
-              고민 상담 <StatusBadge>준비 중</StatusBadge>
+              자유 질문 상담 <StatusBadge>준비 중</StatusBadge>
             </span>
             으로 이어집니다.
           </p>
         </div>
-        <ConnectDiagram />
+        <MiyuHello />
+      </section>
+
+      <RoomCards />
+
+      {/* 분석 한 장 → 풀이 → 내 경우 확인, 그리고 대화 예시 (후기 자리에는 가상 인물 예시만 둔다) */}
+      <section aria-labelledby="home-flow" className={`${pageWide} py-10 md:py-14`}>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_460px] lg:items-start lg:gap-16">
+          <div>
+            <h2 id="home-flow" className="text-[22px] leading-snug font-bold tracking-tight md:text-[28px]">
+              분석 한 장에서 시작해 대화로 이어져요
+            </h2>
+            <ol className="mt-6 space-y-5">
+              {FLOW.map((f, i) => (
+                <li key={f.title} className="flex gap-4">
+                  <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft text-[14px] font-bold text-accent-strong tabular-nums">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <p className="text-[16px] font-semibold">{f.title}</p>
+                    <p className="mt-0.5 text-[15px] leading-[1.7] text-ink-2">{f.desc}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-6 text-[13px] leading-[1.7] text-ink-3">
+              오른쪽의 대화는 가상 인물 서윤의 예시이며 실제 이용 후기가 아니에요. 이용 후기는 이용자의 동의를 받은 뒤에만 싣겠습니다. 미유는 저장된 분석을 풀어 주는 안내이고, 결과를 보장하거나 진단하지 않아요.
+            </p>
+          </div>
+          <ChatExample />
+        </div>
       </section>
 
       <CompareSection />
@@ -231,43 +270,16 @@ export default function Home() {
   );
 }
 
-/** 어떤 자료가 한 해석으로 이어지는지 — 구현된 자료만 (고민 반영 · 상대 자료는 준비 중이라 넣지 않는다) */
-function ConnectDiagram() {
-  const inputs = [
-    ["사주 원국", "생년월일 · 출생시간으로 계산"],
-    ["기질 · 성격 응답", "내가 직접 답한 문항"],
-    ["가까운 관계 반응", "내가 직접 답한 문항"],
-    ["입력한 MBTI", "알고 있는 값을 그대로"],
-  ];
+/** 홈 첫 화면 오른쪽의 미유 인사 — 큰 화면에서만 보인다. 대화 예시 · 후기가 아니라 안내 인사이다 */
+function MiyuHello() {
   return (
-    <div className="hidden rounded-xl border border-line bg-canvas p-5 lg:block" aria-label="자료가 하나의 해석으로 이어지는 방식">
-      <p className="text-[13px] font-semibold text-ink-3">내가 준 자료</p>
-      <ul className="mt-2 divide-y divide-line border-y border-line">
-        {inputs.map(([name, note]) => (
-          <li key={name} className="flex items-baseline justify-between gap-3 py-2.5">
-            <span className="text-[15px] font-semibold">{name}</span>
-            <span className="text-[13px] text-ink-3">{note}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="my-3 flex items-center gap-1.5 text-[13px] font-semibold text-accent-strong">
-        <ArrowIcon className="size-3.5 rotate-90" />
-        겹치는 부분과 다른 부분을 나눠 한 사람의 해석으로
-      </p>
-      <ul className="space-y-2 text-[15px]">
-        <li className="flex items-center gap-2 font-semibold text-positive">
-          <StrengthIcon />
-          내가 강한 포인트
-        </li>
-        <li className="flex items-center gap-2 font-semibold text-caution">
-          <AdjustIcon />
-          내가 힘들 수 있는 포인트
-        </li>
-        <li className="flex items-center gap-2 font-semibold text-accent-strong">
-          <FlowIcon />
-          상황별로 해볼 선택
-        </li>
-      </ul>
+    <div className="hidden rounded-3xl bg-canvas p-6 shadow-soft lg:block" aria-label="미유의 인사">
+      <MiyuAvatar className="size-28" mood="wave" />
+      <div className="mt-4 space-y-2">
+        <p className="w-fit max-w-full rounded-2xl rounded-tl-md bg-page px-4 py-2.5 text-[16px] leading-[1.6]">안녕하세요, 미유예요.</p>
+        <p className="w-fit max-w-full rounded-2xl rounded-tl-md bg-page px-4 py-2.5 text-[16px] leading-[1.6]">분석은 한 장으로 정리해 두고, 궁금한 건 대화로 이어서 풀어 줄게요.</p>
+        <p className="w-fit max-w-full rounded-2xl rounded-tl-md bg-page px-4 py-2.5 text-[16px] leading-[1.6]">어떤 이야기부터 해 볼까요?</p>
+      </div>
     </div>
   );
 }
