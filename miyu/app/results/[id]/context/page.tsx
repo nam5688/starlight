@@ -10,6 +10,7 @@ import { PageFallback } from "@/components/ui/page-fallback";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDateTime } from "@/components/ui/format";
 import { CONTEXT_FIELDS, topicLabel } from "@/lib/personalization/context";
+import { CONCERN_RECORDS } from "@/lib/config/product";
 import { getConcernWorkspace } from "@/lib/services/concern-service";
 import { isAuthConfigured } from "@/server/env";
 import { issuingAvailability } from "@/server/concern";
@@ -37,6 +38,7 @@ export default function ContextPage({ params, searchParams }: PageProps<"/result
 }
 
 async function ContextContent({ params, searchParams }: Pick<PageProps<"/results/[id]/context">, "params" | "searchParams">) {
+  if (!CONCERN_RECORDS.visible) notFound();
   const { id } = await params;
   const query = await searchParams;
   if (!isAuthConfigured()) notFound();

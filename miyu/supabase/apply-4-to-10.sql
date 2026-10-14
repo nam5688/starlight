@@ -522,7 +522,9 @@ t as (
     to_regclass('public.report_feedback')     is not null as report_feedback,
     to_regclass('public.concern_records')     is not null as concern_records,
     to_regclass('public.talk_rooms')          is not null as talk_rooms,
-    to_regclass('public.chat_questions')      is not null as chat_questions
+    to_regclass('public.chat_questions')      is not null as chat_questions,
+    to_regclass('public.cash_wallets')        is not null as cash_wallets,
+    to_regclass('public.cash_ledger')         is not null as cash_ledger
 ),
 wd as (
   select
@@ -541,6 +543,16 @@ wd12 as (
   select coalesce((select bool_or(pg_get_functiondef(p.oid) like '%talk_rooms%')
                    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
                    where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as fn_updated
+),
+-- 13번: 캐시 함수 · 충전 트리거 · 탈퇴 함수가 캐시 잔액 확인을 포함하도록 갱신됐는가
+wd13 as (
+  select
+    coalesce((select bool_or(pg_get_functiondef(p.oid) like '%cash_wallets%')
+              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as fn_updated,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'spend_cash') as spend_fn,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'restore_cash_spend') as restore_fn,
+    exists (select 1 from pg_trigger g where g.tgname = 'orders_cash_change' and not g.tgisinternal) as trigger_ok
 ),
 col as (
   select
@@ -638,5 +650,11 @@ select * from (
               when t.talk_rooms or t.chat_questions or wd12.fn_updated then '일부만' else '아직 안 함' end,
          '표 talk_rooms, chat_questions / 탈퇴 함수에 대화 삭제 포함: ' || wd12.fn_updated::text
   from t, wd12
+  union all
+  select 13, '20261023000000_miyu_cash.sql',
+         case when t.cash_wallets and t.cash_ledger and wd13.spend_fn and wd13.restore_fn and wd13.trigger_ok and wd13.fn_updated then '적용됨'
+              when t.cash_wallets or t.cash_ledger or wd13.spend_fn or wd13.restore_fn or wd13.trigger_ok or wd13.fn_updated then '일부만' else '아직 안 함' end,
+         '표 cash_wallets, cash_ledger / 함수 spend_cash, restore_cash_spend / 주문 결제 완료 때 충전하는 트리거 / 탈퇴 함수에 캐시 잔액 확인 포함: ' || wd13.fn_updated::text
+  from t, wd13
 ) r
 order by "번호";

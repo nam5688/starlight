@@ -1,7 +1,7 @@
 import "server-only";
 import { resolveChatAi, type ChatAiConfig } from "@/lib/report/chat/ai-config";
 import type { CapacityConfig } from "@/lib/services/capacity-service";
-import { DEFAULT_DAILY_LIMIT, DEFAULT_FREE_LIMIT, type ChatServiceConfig } from "@/lib/services/chat-service";
+import { DEFAULT_EXTRA_QUESTIONS, type ChatServiceConfig } from "@/lib/services/chat-service";
 import type { PaymentEnv } from "@/lib/services/ports";
 import { isTossDocsKey } from "./setup-checks";
 
@@ -159,13 +159,13 @@ export function capacityConfig(): CapacityConfig {
 }
 
 /**
- * 자유 질문(채팅에서 직접 적는 질문) 한도
- * - AI_CHAT_DAILY_LIMIT: 리포트를 받은 회원이 하루(한국 날짜)에 보낼 수 있는 질문 수 (기본 10, 0이면 닫힘)
- * - AI_CHAT_FREE_LIMIT: 무료 맛보기(리포트를 받기 전)의 로그인한 회원이 평생 보낼 수 있는 질문 수 (기본 2 — 3번째부터는 리포트, 0이면 무료 질문은 닫힘)
- * 질문마다 AI 호출 비용이 든다. 실제 질문 한 번의 비용을 잰 뒤 운영자가 정한다(docs/maintenance.md). 하루 AI 예산(AI_DAILY_BUDGET_KRW)에 닿아도 새 질문만 멈춘다.
+ * 자유 질문(채팅에서 직접 적는 질문) 설정
+ * - 방마다 무료 질문 수 · 간단/심층 리포트별 열리는 방은 lib/config/product.ts의 CHAT_ROOMS 한 곳에서 정한다 (환경변수가 아니다).
+ * - AI_CHAT_EXTRA_QUESTIONS: **시험 중에만** 열린 방마다 무료 질문을 이만큼 더 준다 (기본 0). 시험이 끝나면 비운다.
+ * 질문마다 AI 호출 비용이 든다. 하루 AI 예산(AI_DAILY_BUDGET_KRW)에 닿아도 새 질문만 멈춘다. 무료 질문을 다 쓰면 미유캐시(질문 한 번에 3개)로 이어 간다.
  */
 export function chatConfig(): ChatServiceConfig {
-  return { dailyLimit: readInt("AI_CHAT_DAILY_LIMIT", DEFAULT_DAILY_LIMIT), freeLimit: readInt("AI_CHAT_FREE_LIMIT", DEFAULT_FREE_LIMIT) };
+  return { extraQuestions: readInt("AI_CHAT_EXTRA_QUESTIONS", DEFAULT_EXTRA_QUESTIONS) };
 }
 
 /**

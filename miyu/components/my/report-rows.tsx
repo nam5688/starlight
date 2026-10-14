@@ -3,6 +3,7 @@ import { retryReportAction } from "@/app/results/[id]/actions";
 import { StateBadge } from "@/components/my/state-badge";
 import { formatDate, formatDateTime } from "@/components/ui/format";
 import { StatusBadge } from "@/components/ui/source-badge";
+import { CONCERN_RECORDS } from "@/lib/config/product";
 import { topicLabel } from "@/lib/personalization/context";
 import type { MyConcernCard, MyReportCard } from "@/lib/services/my-service";
 
@@ -116,12 +117,14 @@ export function ReportRow({ card, paymentsReady }: { card: MyReportCard; payment
           </>
         )}
       </div>
-      <p className="mt-3 border-t border-line pt-3 text-[13px] leading-[1.6] text-ink-3">
-        내 고민 자세히 알려주기: {card.contextTopic ? topicLabel(card.contextTopic) : "작성 기록 없음"} ·{" "}
-        <Link href={`${href}/context`} className="font-semibold text-accent-strong underline underline-offset-2">
-          나의 고민 기록소
-        </Link>
-      </p>
+      {CONCERN_RECORDS.visible && (
+        <p className="mt-3 border-t border-line pt-3 text-[13px] leading-[1.6] text-ink-3">
+          내 고민 자세히 알려주기: {card.contextTopic ? topicLabel(card.contextTopic) : "작성 기록 없음"} ·{" "}
+          <Link href={`${href}/context`} className="font-semibold text-accent-strong underline underline-offset-2">
+            나의 고민 기록소
+          </Link>
+        </p>
+      )}
       {card.entitlement === "purchased" && card.generation === "failed" && (
         <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">결제는 정상 처리되었습니다. 다시 결제하지 말고 ‘다시 생성’을 눌러 주세요.</p>
       )}

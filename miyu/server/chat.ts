@@ -4,9 +4,11 @@ import { createMockLocalModel } from "@/lib/integrations/ai/mock-local";
 import { tallyUsage, withChatApproval } from "@/lib/report/chat/approval";
 import { createChatAnswerer, type ChatAnswerer } from "@/lib/report/chat/answer";
 import { CHAT_LIMITS } from "@/lib/report/chat/plan";
+import { MIYU_CASH } from "@/lib/config/product";
+import { roomPolicy } from "@/lib/report/chat/quota";
 import type { TalkChat } from "@/lib/report/reading/talk";
+import type { RoomId } from "@/lib/report/reading/talk-room";
 import type { CapacityConfig } from "@/lib/services/capacity-service";
-import { COUNT_ALL_SINCE } from "@/lib/services/chat-service";
 import { capacityConfig, chatAiConfig, chatConfig } from "./env";
 import { now, writeRepository } from "./services";
 
@@ -63,23 +65,36 @@ export function chatCapacity(): CapacityConfig {
   };
 }
 
+/** 미유캐시 잔액 — 표가 없으면(DB 변경 13번 전) undefined (캐시를 쓸 수 없다) */
+async function cashInfo(userId: string): Promise<{ balance: number; per: number } | undefined> {
+  try {
+    return { balance: await writeRepository().getCashBalance(userId), per: MIYU_CASH.perQuestion };
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * 자유 질문 · 이야기 이어 가기의 상태.
- * - 리포트를 받은 분(paid): AI가 연결돼 있으면 열린다(하루 횟수 한도)
- * - 무료 맛보기(free): 로그인한 분께 무료 질문 2번(AI_CHAT_FREE_LIMIT, 기본 2)을 열어 주고, 쓰고 나면 "리포트를 받으면 열려요"로 잠긴다(3번째부터는 리포트).
- *   방의 무료 풀이에 내 자료로 읽은 내용이 없으면 그 방의 무료 질문은 열지 않는다(roomModelFor의 noMaterial)
+ * 이 방의 자유 질문 상태 — 방마다 무료 질문 수(간단 리포트: 연애 2 · 고민 2 · 일일 1 · 나를 알아보기 0, 심층 리포트: 방마다 3)가 다르고, 다 쓰면 미유캐시로 이어 간다.
+ * - ready: 지금 물을 수 있다 (left가 있으면 무료 질문, used면 미유캐시로 묻는 중)
+ * - locked: 지금은 물을 수 없다 (심층 리포트로만 열리는 방 · 질문이 없는 방 · 무료 질문을 다 썼는데 캐시가 모자람)
  * 연결 전에는 "준비 중"으로 밝힌다(작동하는 것처럼 보이지 않게 한다). 12번 DB 변경 전이라 횟수를 셀 수 없을 때도 준비 중이다.
  */
-export async function chatStateFor(tier: "paid" | "free", userId: string): Promise<TalkChat> {
+export async function chatStateFor(tier: "paid" | "free", userId: string, room: RoomId, roomKey: string): Promise<TalkChat> {
   const answerer = chatAnswerer();
-  const cfg = chatConfig();
   if (!answerer) return { state: "pending" };
-  if (tier === "paid") return cfg.dailyLimit > 0 ? { state: "ready" } : { state: "pending" };
-  if (cfg.freeLimit <= 0) return { state: "locked" };
+  const free = tier === "free";
+  const policy = roomPolicy(tier, room, chatConfig().extraQuestions);
+  if (!policy.open || (policy.needsDeep && policy.freeQuestions === 0)) return { state: "locked", free, deepOnly: true };
+  let used: number;
   try {
-    const used = await writeRepository().countChatQuestionsSince(userId, COUNT_ALL_SINCE);
-    return used >= cfg.freeLimit ? { state: "locked", used: true } : { state: "ready", free: true, left: cfg.freeLimit - used };
+    used = await writeRepository().countChatQuestionsInRoom(userId, roomKey);
   } catch {
     return { state: "pending" };
   }
+  const cash = policy.cashAllowed ? await cashInfo(userId) : undefined;
+  const left = policy.freeQuestions - used;
+  if (left > 0) return { state: "ready", free, left, ...(cash ? { cash } : {}) };
+  if (cash && cash.balance >= cash.per) return { state: "ready", free, used: true, cash };
+  return { state: "locked", free, used: true, ...(cash ? { cash } : {}) };
 }

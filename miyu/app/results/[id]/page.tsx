@@ -22,6 +22,7 @@ import { PurchasePanel } from "@/components/results/purchase-panel";
 import { ReadingNav } from "@/components/report/reading-nav";
 import { ResultHeader } from "@/components/report/result-header";
 import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
+import { CONCERN_RECORDS } from "@/lib/config/product";
 import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { buildFreePreview } from "@/lib/report/preview";
@@ -85,7 +86,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
     const footer = (
       <div className="space-y-4">
         <ReportFeedback reportId={report.id} initial={feedback?.rating ?? null} />
-        <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady />
+        {CONCERN_RECORDS.visible && <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady />}
         <p className="text-[13px] text-ink-3">
           주문번호 {view.paidOrder.orderNumber} · 생성 {report.generator} {report.generatorVersion}
         </p>
@@ -161,7 +162,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
         remembered={await peekRoomChoice()}
       />
       <div className="mx-auto w-full max-w-[720px] space-y-12 px-5 pt-12 pb-16">
-        <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady={false} />
+        {CONCERN_RECORDS.visible && <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady={false} />}
         <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null} />
       </div>
     </>

@@ -40,6 +40,6 @@ export function roomModelFor(view: ResultView, chat: { paid: TalkChat; free: Tal
   });
   // 재료가 없는 방은 무료 질문을 열지 않는다 (질문 횟수를 쓰지 않고, 리포트를 받으면 열린다는 안내만 보인다)
   const noMaterial = room !== undefined && !roomHasMaterial(model, room);
-  if (noMaterial && model.chat.state === "ready") return { tier: "free", model: { ...model, chat: { state: "locked", noMaterial: true } }, noMaterial };
+  if (noMaterial && model.chat.state === "ready") return { tier: "free", model: { ...model, chat: { state: "locked", free: true, noMaterial: true } }, noMaterial };
   return { tier: "free", model, noMaterial };
 }

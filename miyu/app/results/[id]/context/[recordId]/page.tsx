@@ -13,7 +13,7 @@ import { PageFallback } from "@/components/ui/page-fallback";
 import { ResultHeader } from "@/components/report/result-header";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, pageNarrow, textLink } from "@/components/ui/styles";
-import { CONCERN_REPORT } from "@/lib/config/product";
+import { CONCERN_RECORDS, CONCERN_REPORT } from "@/lib/config/product";
 import { CONTEXT_FIELDS, topicLabel } from "@/lib/personalization/context";
 import { isConcernReport } from "@/lib/report/concern/types";
 import { getConcernRecordView } from "@/lib/services/concern-service";
@@ -42,7 +42,7 @@ export default function ConcernRecordPage({ params, searchParams }: PageProps<"/
 async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/context/[recordId]">, "params" | "searchParams">) {
   const { id, recordId } = await params;
   const query = await searchParams;
-  if (!isAuthConfigured()) notFound();
+  if (!CONCERN_RECORDS.visible || !isAuthConfigured()) notFound();
   const here = `/results/${id}/context/${recordId}`;
   const member = await getMember();
   if (!member) {

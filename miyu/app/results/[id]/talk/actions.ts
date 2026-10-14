@@ -1,7 +1,7 @@
 "use server";
 
 import { buildChatContext } from "@/lib/report/chat/context";
-import { ROOMS, roomAvailable, type RoomId } from "@/lib/report/reading/talk-room";
+import { ROOMS, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
 import { ASK_MESSAGES, askFreeQuestion, type AskResult } from "@/lib/services/chat-service";
 import { getResultView } from "@/lib/services/report-service";
 import { resetTalkRoom, saveTalkRoom } from "@/lib/services/talk-service";
@@ -61,7 +61,8 @@ export async function askMiyuAction(input: AskInput): Promise<AskResult> {
           const { tier, model, noMaterial } = roomModelFor(view, { paid: { state: "ready" }, free: { state: "ready", free: true } }, room as RoomId);
           if (!roomAvailable(model, room as RoomId)) return null;
           const context = buildChatContext(model, room as RoomId, { topicId: text(input.topicId), intakeId: text(input.intake), followUp: input.followUp === true });
-          return { context, referenceDate: model.dayKey, tier, noMaterial };
+          // 방 이름(날짜별 방 포함)은 브라우저가 보낸 값이 아니라 서버가 정한다 — 방마다 무료 질문 수를 우회하지 못하게
+          return { context, referenceDate: model.dayKey, tier, noMaterial, room, roomKey: roomSaveKey(model, room as RoomId) };
         },
       },
       { userId: member.userId, assessmentId, roomKey, question: input.question },

@@ -1,6 +1,7 @@
 "use server";
 
 import { notFound, redirect } from "next/navigation";
+import { CONCERN_RECORDS } from "@/lib/config/product";
 import { CONTEXT_FIELDS } from "@/lib/personalization/context";
 import { getConcernRecordView, scrubRecordContent, startConcernCheckout } from "@/lib/services/concern-service";
 import { deleteContext, saveContext } from "@/lib/services/context-service";
@@ -27,6 +28,7 @@ const base = (assessmentId: string) => `/results/${assessmentId}/context`;
  * 저장은 리포트를 만들지 않는다 (새 리포트 발급은 startConcernCheckoutAction에서 따로 시작한다).
  */
 export async function saveContextAction(assessmentId: string, _prev: ContextFormState, formData: FormData): Promise<ContextFormState> {
+  if (!CONCERN_RECORDS.visible) notFound(); // 나의 고민 기록소는 노출을 막아 두었다 (lib/config/product.ts CONCERN_RECORDS)
   const member = await getMember();
   if (!member || member.needsConsent) redirect(`/results/${assessmentId}`);
   const raw: Record<string, string> = { topic: String(formData.get("topic") ?? "") };
@@ -53,6 +55,7 @@ export async function saveContextAction(assessmentId: string, _prev: ContextForm
 
 /** 지우기 — 저장한 현재 고민을 삭제한다. 이미 발급한 리포트와 고민 기록은 그대로 남는다 */
 export async function deleteContextAction(assessmentId: string) {
+  if (!CONCERN_RECORDS.visible) notFound();
   const member = await getMember();
   if (!member || member.needsConsent) redirect(`/results/${assessmentId}`);
   try {
@@ -69,6 +72,7 @@ export async function deleteContextAction(assessmentId: string) {
  * 같은 저장본으로 두 번 눌러도 같은 주문으로 이어진다 (서비스의 멱등 처리).
  */
 export async function startConcernCheckoutAction(assessmentId: string) {
+  if (!CONCERN_RECORDS.visible) notFound(); // 새 고민 반영 리포트 발급(4,900원)도 막는다 — 결제가 시작되지 않는다
   const member = await getMember();
   if (!member || member.needsConsent) redirect(`/results/${assessmentId}`);
   const config = paymentConfig();
@@ -87,6 +91,7 @@ export async function startConcernCheckoutAction(assessmentId: string) {
 
 /** 고민 기록의 리포트 다시 만들기 — 같은 주문 · 같은 리포트 건으로 다시 시도한다 (추가 결제 없음). 생성은 백그라운드 */
 export async function retryConcernReportAction(assessmentId: string, recordId: string) {
+  if (!CONCERN_RECORDS.visible) notFound();
   const member = await getMember();
   if (!member || member.needsConsent) redirect(`/results/${assessmentId}`);
   const view = await getConcernRecordView(writeRepository(), { userId: member.userId, assessmentId, recordId });
@@ -100,6 +105,7 @@ export async function retryConcernReportAction(assessmentId: string, recordId: s
 /** 기록 화면의 생성 상태 확인 (몇 초마다). 대기 중이거나 멈춘 작업이 있으면 여기서 이어받는다 */
 export async function concernReportStatusAction(assessmentId: string, recordId: string): Promise<ReportStatusResult> {
   const none: ReportStatusResult = { status: null, canRetry: false, waiting: null, delayed: false };
+  if (!CONCERN_RECORDS.visible) return none;
   const member = await getMember();
   if (!member || member.needsConsent) return none;
   const view = await getConcernRecordView(await readRepository(), { userId: member.userId, assessmentId, recordId });
@@ -118,6 +124,7 @@ export async function concernReportStatusAction(assessmentId: string, recordId: 
 
 /** 그때 적은 고민 내용 지우기 — 리포트 · 기록 자리 · 주제 · 작성 시점은 남는다 */
 export async function scrubConcernRecordAction(assessmentId: string, recordId: string) {
+  if (!CONCERN_RECORDS.visible) notFound();
   const member = await getMember();
   if (!member || member.needsConsent) redirect(`/results/${assessmentId}`);
   const result = await scrubRecordContent(writeRepository(), { userId: member.userId, assessmentId, recordId, now });

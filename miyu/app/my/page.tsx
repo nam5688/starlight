@@ -10,7 +10,7 @@ import { ConcernRow, ReportRow } from "@/components/my/report-rows";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDate } from "@/components/ui/format";
-import { formatKrw } from "@/lib/config/product";
+import { CONCERN_RECORDS, formatKrw } from "@/lib/config/product";
 import { getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
@@ -92,7 +92,7 @@ async function MyContent() {
         )}
       </section>
 
-      {concerns.length > 0 && (
+      {CONCERN_RECORDS.visible && concerns.length > 0 && (
         <section aria-labelledby="my-concerns" className="mt-12">
           <h2 id="my-concerns" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
             내 고민 반영 리포트

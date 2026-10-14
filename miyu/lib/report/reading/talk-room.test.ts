@@ -422,13 +422,15 @@ test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이�
   assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
 });
 
-test("무료 질문을 모두 썼을 때의 안내창 문구: 운영자 문구 그대로(질문 충전 · 1,000자 · 두 배), 해요체, 마감 타이머 · 불안 자극 없음, 글자 수는 상수와 같다", () => {
+test("무료 질문을 모두 썼을 때의 안내창 문구: 운영자 지시대로 \"유료 질문은 글자 수가 1,000자로 늘어난다\"만 알리고, 해요체, 마감 타이머 · 불안 자극 없음, 글자 수는 상수와 같다", () => {
   const c = TALK_COPY.recharge;
-  assert.equal(c.title, "질문 충전이 필요해요!");
-  assert.ok(c.body.includes("유료 질문은 글자 수 제한이 1,000자로 두 배 늘어요!"), c.body);
-  assert.ok(c.body.includes(`${QUESTION_MAX.free}자`), "무료 질문의 한도도 함께 밝힌다");
-  assert.equal(QUESTION_MAX.paid, QUESTION_MAX.free * 2, "\"두 배\"가 사실이어야 한다");
-  for (const text of [c.title, c.body, c.used, c.later, c.open]) {
+  assert.equal(c["free-used"].title, "무료 질문을 모두 썼어요");
+  assert.equal(c["free-used"].body, "유료 질문은 글자 수 제한이 1,000자로 늘어나요.");
+  assert.ok(!/500|두 배|질문 충전/.test(c["free-used"].body), "무료 한도 · 배수 · 다른 말은 덧붙이지 않는다");
+  assert.equal(QUESTION_MAX.paid, 1000);
+  assert.equal(c.cashLabel, "미유캐시 충전하기");
+  const texts: string[] = [...[c["free-used"], c["paid-used"], c["no-cash"], c.deep].flatMap((v) => [v.title, v.body]), c.later, c.cashLabel, c.open];
+  for (const text of texts) {
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정/.test(text), `불안 · 압박 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }

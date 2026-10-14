@@ -3,6 +3,7 @@ import { LoginOptions } from "@/components/auth/login-options";
 import { talkRoomPath } from "@/components/talk/room-paths";
 import { TalkView } from "@/components/talk/talk-view";
 import { pageNarrow } from "@/components/ui/styles";
+import { CONCERN_RECORDS } from "@/lib/config/product";
 import { ROOM_ORDER, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
 import type { TalkModel } from "@/lib/report/reading/talk";
 import { getResultView } from "@/lib/services/report-service";
@@ -10,7 +11,8 @@ import { listSavedRoomKeys, loadTalkRoom } from "@/lib/services/talk-service";
 import { chatStateFor } from "@/server/chat";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
-import { readRepository } from "@/server/services";
+import { now, readRepository } from "@/server/services";
+import { seoulDate } from "@/lib/saju/interpret/day-plain";
 import { roomModelFor, viewTier } from "@/server/talk-model";
 
 /**
@@ -50,7 +52,9 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
 
   // 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖에는 무료 맛보기(잠긴 내용 없음)로 이야기한다
   const tier = viewTier(view);
-  const chat = await chatStateFor(tier, member.userId);
+  // 방마다 무료 질문 수 · 미유캐시를 센다 — 오늘의 운세 방은 날짜별 방이라 오늘 날짜로 센다
+  const roomKey = room === "daily" ? `daily:${seoulDate(now())}` : room;
+  const chat = await chatStateFor(tier, member.userId, room, roomKey);
   const { model } = roomModelFor(view, { paid: chat, free: chat }, room);
   if (tier === "paid") {
     if (!roomAvailable(model, room)) notFound();
@@ -63,7 +67,7 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
         dateLabel={created}
         reportHref={`/results/${id}`}
         dataHref={`/results/${id}#r-data`}
-        contextHref={`/results/${id}/context`}
+        contextHref={CONCERN_RECORDS.visible ? `/results/${id}/context` : undefined}
         roomHrefs={roomHrefs}
         persist={await persistFor(model)}
         badge={{ label: sample ? "개발용 샘플" : "내 리포트", text: `저장된 리포트 · 검사일 ${created}${sample ? " · 개발용 샘플" : ""}` }}

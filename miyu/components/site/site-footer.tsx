@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BUSINESS_FIELDS, BUSINESS_INFO } from "@/lib/config/business";
 
 export function SiteFooter() {
   return (
@@ -15,6 +16,20 @@ export function SiteFooter() {
             개인정보 처리방침
           </Link>
         </p>
+        <div className="space-y-1 border-t border-line pt-4 text-[12px] leading-[1.7]">
+          <p className="font-semibold text-ink-2">{BUSINESS_INFO.copyright}</p>
+          <p>
+            {BUSINESS_FIELDS.map((f, i) => (
+              <span key={f.label}>
+                {i > 0 && <span aria-hidden="true"> | </span>}
+                <span className="inline-block">
+                  {f.label}: {f.value}
+                </span>
+                {i < BUSINESS_FIELDS.length - 1 && " "}
+              </span>
+            ))}
+          </p>
+        </div>
       </div>
     </footer>
   );

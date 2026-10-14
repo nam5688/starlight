@@ -51,6 +51,11 @@ export const ROOM_COPY = {
   chatReady: "아래 입력창에 편하게 적어 주세요. 한두 문장이면 충분해요.",
   chatPending: "자유롭게 이야기를 나누는 기능은 아직 준비 중이에요.",
   chatLocked: "이야기를 이어 가는 건 리포트를 받은 분께 열려 있어요.",
+  /** 간단 리포트로는 질문이 없는 방(나를 알아보기) — 심층 리포트로 이어 준다 */
+  chatDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요.",
+  /** 무료 질문을 모두 쓴 뒤 미유캐시로 이어 가는 중 · 캐시가 모자랄 때 */
+  chatCashLead: (per: number, balance: number) => `무료 질문은 모두 썼어요. 이제 미유캐시 ${per}개로 이어서 물을 수 있어요 · 지금 ${balance}개`,
+  chatCashLow: "무료 질문을 모두 썼어요. 미유캐시를 충전하면 이어서 물을 수 있어요.",
   /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 아직 없을 때 — 무료 질문을 열지 않는다(재료가 있는 방에서만 연다) */
   chatNoMaterial: "이 방의 무료 풀이에는 아직 이야기 나눌 내용이 없어서 무료 질문은 열리지 않았어요. 리포트를 받으면 이어서 물어볼 수 있어요.",
   /** 무료 맛보기에서 로그인한 분께 열어 주는 무료 질문(기본 2번) — 열려 있을 때 · 이미 썼을 때 */
@@ -388,10 +393,16 @@ const EXTRA_MOOD: Record<TalkExtra, TalkMood> = { example: "playful", detail: "b
 /** 이야기만 나누는 방(고민해결소)에서 먼저 묻는 질문에 답한 뒤 이어 가는 안내 — 자유 질문 상태에 따라 다르다 */
 function chatLead(model: TalkModel, ctx: RoomContext): TalkLine[] {
   const c = model.chat.state;
-  if (c === "ready") return [miyu(text(model.chat.free ? `무료 질문이 ${freeLeftText(model.chat.left)} 남아 있어요. 아래 입력창에 편하게 적어 주세요.` : ROOM_COPY.chatReady), "basic")];
+  const ch = model.chat;
+  if (c === "ready") {
+    if (ch.used && ch.cash) return [miyu(text(ROOM_COPY.chatCashLead(ch.cash.per, ch.cash.balance)), "basic")];
+    if (ch.left !== undefined) return [miyu(text(`이 방에서 무료 질문을 ${freeLeftText(ch.left)} 더 할 수 있어요. 아래 입력창에 편하게 적어 주세요.`), "basic")];
+    return [miyu(text(ROOM_COPY.chatReady), "basic")];
+  }
   if (c === "locked") {
+    const line = ch.used ? (ch.cash ? ROOM_COPY.chatCashLow : ROOM_COPY.chatFreeUsed) : ch.noMaterial ? ROOM_COPY.chatNoMaterial : ch.deepOnly ? ROOM_COPY.chatDeepOnly : ROOM_COPY.chatLocked;
     return [
-      miyu(text(model.chat.used ? ROOM_COPY.chatFreeUsed : model.chat.noMaterial ? ROOM_COPY.chatNoMaterial : ROOM_COPY.chatLocked), "thinking"),
+      miyu(text(line), "thinking"),
       miyu({ kind: "lock", title: TALK_COPY.lock.title, hooks: [...ROOM_COPY.concernHooks] }, "basic"),
     ];
   }
