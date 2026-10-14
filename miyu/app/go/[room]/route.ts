@@ -1,14 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { talkRoomPath } from "@/components/talk/room-paths";
 import { isAuthConfigured } from "@/server/env";
 import { getMember } from "@/server/member";
-import { clearRoomChoice, isRoomId, rememberRoomChoice } from "@/server/room-choice";
+import { isRoomId, rememberRoomChoice } from "@/server/room-choice";
 import { readRepository } from "@/server/services";
 import { getSiteUrl } from "@/server/session";
 
 /**
  * 홈의 상담 카드 입구(/go/방이름) — 고른 방을 기억하고 무료 분석으로 보낸다.
- * 이미 분석한 회원이면 가장 최근 분석의 그 방으로 바로 간다(무료 맛보기 또는 내 리포트의 방). 분석을 마치면(검사 · 로그인 뒤) 기억해 둔 방으로 이어진다(server/room-choice.ts).
+ * 이미 분석한 회원이면 가장 최근 분석의 결과 화면(무료 리포트)으로 간다. 분석을 마치면(검사 · 로그인 뒤)도 결과 화면이 먼저이고, 기억해 둔 방은 거기서 "이어서 이야기하기" 바로가기로 보인다(server/room-choice.ts).
  */
 export async function GET(_request: NextRequest, ctx: RouteContext<"/go/[room]">) {
   const { room } = await ctx.params;
@@ -22,8 +21,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/go/[room]">
       if (member && !member.needsConsent) {
         const latest = (await (await readRepository()).listAssessments(member.userId))[0];
         if (latest) {
-          await clearRoomChoice();
-          return to(talkRoomPath(latest.id, room));
+          // 이미 분석한 회원도 무료 리포트(결과 화면)를 먼저 보고, 거기서 방을 고른다. 고른 방은 "이어서 이야기하기" 바로가기로 보인다
+          await rememberRoomChoice(room);
+          return to(`/results/${latest.id}`);
         }
       }
     } catch {

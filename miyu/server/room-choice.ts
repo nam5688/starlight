@@ -1,6 +1,5 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { talkRoomPath } from "@/components/talk/room-paths";
 import { ROOM_ORDER, type RoomId } from "@/lib/report/reading/talk-room";
 
 /**
@@ -23,17 +22,10 @@ export async function rememberRoomChoice(room: RoomId): Promise<void> {
   (await cookies()).set(ROOM_CHOICE_COOKIE, room, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: MAX_AGE_SECONDS });
 }
 
-export async function clearRoomChoice(): Promise<void> {
-  (await cookies()).delete(ROOM_CHOICE_COOKIE);
-}
-
 /**
- * 검사 결과를 저장한 뒤 갈 곳 — 홈에서 방을 골랐다면 그 방(무료 맛보기 또는 내 리포트의 방), 아니면 결과 화면.
- * 쓰면 기억해 둔 방은 지운다 (Route Handler · Server Action에서만).
+ * 검사 결과를 저장한 뒤 갈 곳 — 언제나 결과 화면(무료 리포트)이다(운영자 2026-10-15: 무료 리포트를 먼저 보고, 그 뒤에 상담방을 고른다).
+ * 홈에서 방을 골랐다면 그 방은 기억해 두었다가 결과 화면에서 "OO 방으로 이어서 이야기하기" 바로가기로만 보인다(바로 그 방으로 보내지 않는다).
  */
 export async function pathAfterSave(assessmentId: string): Promise<string> {
-  const room = await peekRoomChoice();
-  if (!room) return `/results/${assessmentId}`;
-  await clearRoomChoice();
-  return talkRoomPath(assessmentId, room);
+  return `/results/${assessmentId}`;
 }

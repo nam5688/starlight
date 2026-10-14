@@ -14,6 +14,7 @@ import { ClearAnalyzeDraft } from "@/components/analyze/clear-draft";
 import { LoginOptions } from "@/components/auth/login-options";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { FullReportView } from "@/components/report/full-report-view";
+import { SectionTitle } from "@/components/report/summary-blocks";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
 import { ReadingReportView } from "@/components/report/reading-report-view";
 import { ContextPanel } from "@/components/results/context-panel";
@@ -131,6 +132,26 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
       <ClearAnalyzeDraft />
       <Track name="preview_view" />
       <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위입니다." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      <ReadingNav
+        expandAll={false}
+        items={[
+          { id: "r-tendency", label: "전체 요약" },
+          { id: "r-saju", label: "사주 원국" },
+          { id: "r-situations", label: "상황별" },
+          { id: "r-scores", label: "점수 · MBTI" },
+          { id: "r-rooms", label: "상담방" },
+          { id: "r-locked", label: "구매 안내" },
+        ]}
+      />
+      <div className="mx-auto w-full max-w-[720px] px-5 pt-6">
+        <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
+      </div>
+      {/* 무료 리포트를 먼저 보고, 그 뒤에 궁금한 주제의 상담방을 고른다(운영자 2026-10-15). 홈에서 고른 주제는 "이어서 이야기하기" 바로가기로 보인다 */}
+      <section id="r-rooms" aria-labelledby="r-rooms-title" className="mx-auto w-full max-w-[720px] px-5 pt-12">
+        <SectionTitle id="r-rooms-title" note="무료 리포트를 읽었다면, 궁금한 주제를 골라 미유와 이야기해 보세요. 방마다 새 대화로 시작해요.">
+          이제 궁금한 이야기를 골라 보세요
+        </SectionTitle>
+      </section>
       <TalkEntry
         id={assessment.id}
         tasting
@@ -139,18 +160,7 @@ async function ResultContent({ params }: Pick<PageProps<"/results/[id]">, "param
         )}
         remembered={await peekRoomChoice()}
       />
-      <ReadingNav
-        expandAll={false}
-        items={[
-          { id: "r-tendency", label: "전체 요약" },
-          { id: "r-saju", label: "사주 원국" },
-          { id: "r-situations", label: "상황별" },
-          { id: "r-scores", label: "점수 · MBTI" },
-          { id: "r-locked", label: "구매 안내" },
-        ]}
-      />
-      <div className="mx-auto w-full max-w-[720px] space-y-12 px-5 pt-6 pb-16">
-        <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
+      <div className="mx-auto w-full max-w-[720px] space-y-12 px-5 pt-12 pb-16">
         <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady={false} />
         <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null} />
       </div>
