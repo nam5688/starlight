@@ -65,6 +65,10 @@ wd13 as (
     exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'restore_cash_spend') as restore_fn,
     exists (select 1 from pg_trigger g where g.tgname = 'orders_cash_change' and not g.tgisinternal) as trigger_ok
 ),
+-- 15번: 운영자 수동 질문 반영 함수
+wd15 as (
+  select exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'admin_credit_question') as fn
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -173,5 +177,10 @@ select * from (
               when t.chat_summaries or wd14.saved_col or wd14.fn_updated then '일부만' else '아직 안 함' end,
          '표 chat_summaries / 열 talk_rooms.saved_upto: ' || wd14.saved_col::text || ' / 탈퇴 함수에 채팅 요약 삭제 포함: ' || wd14.fn_updated::text
   from t, wd14
+  union all
+  select 15, '20261025000000_admin_credit_question.sql',
+         case when wd15.fn then '적용됨' else '아직 안 함' end,
+         '함수 admin_credit_question (결제사 확인 뒤 운영자가 질문 1개를 넣는 함수)'
+  from wd15
 ) r
 order by "번호";

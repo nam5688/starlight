@@ -3,10 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { adminReconcileOrderAction, adminRetryReportAction, adminRunAllAction, adminTestAlertAction } from "@/app/admin/actions";
+import { adminCreditQuestionAction, adminReconcileOrderAction, adminRetryReportAction, adminRunAllAction, adminTestAlertAction } from "@/app/admin/actions";
 import { buttonPrimary, buttonSecondary, pageWide, textLink } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
 import { getAdminOverview, adminLookup, type AdminReportRow, type OrderTraceForAdmin } from "@/lib/services/admin-service";
+import { recentOrdersForAdmin, type AdminRecentOrder } from "@/lib/services/admin-support-service";
 import { costSummary, saleGate, type CapacityConfig, type CostSummary, type SaleGate } from "@/lib/services/capacity-service";
 import type { OpsEventRecord } from "@/lib/services/ports";
 import { capacityConfig, telegramEnv } from "@/server/env";
@@ -39,13 +40,13 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
   const note = typeof params.note === "string" ? params.note.slice(0, 200) : "";
   const repo = writeRepository();
   const cfg = capacityConfig();
-  const [overview, lookup, gate, cost] = await Promise.all([getAdminOverview(repo, now()), adminLookup(repo, q, now()), saleGate(repo, cfg, now(), "start"), costSummary(repo, cfg, now())]);
+  const [overview, lookup, gate, cost, recent] = await Promise.all([getAdminOverview(repo, now()), adminLookup(repo, q, now()), saleGate(repo, cfg, now(), "start"), costSummary(repo, cfg, now()), recentOrdersForAdmin(repo, now(), 30)]);
   const { counts } = overview;
 
   return (
     <div className="mt-6 space-y-10">
       <p className="text-[14px] leading-relaxed text-ink-3">
-        주문 · 결제 · 리포트 생성 상태와 운영 기록만 보입니다. 고객 이름 · 생년월일 · 답변 · 리포트 내용은 이 화면에 없습니다. 환불은 이 화면에서 실행하지 않습니다 — 토스페이먼츠 관리자에서 직접 하세요.
+        주문 · 결제 · 리포트 생성 상태와 운영 기록, 누가(닉네임 · 회원번호 앞 8자) 무엇을 샀는지만 보입니다. 생년월일 · 답변 · 채팅 대화 · 고민은 이 화면에 없고, 리포트 본문은 고객 문의에 답하려고 따로 열 때만 보입니다(열람 기록이 남습니다). 환불은 이 화면에서 실행하지 않습니다 — 토스페이먼츠 관리자에서 직접 하세요.
       </p>
       {note && (
         <p role="status" className="rounded-md bg-mist px-4 py-3 text-[14px]">
@@ -109,6 +110,14 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
           </button>
         </form>
         <Lookup lookup={lookup} />
+      </section>
+
+      <section aria-labelledby="a-recent">
+        <h2 id="a-recent" className="text-[18px] font-bold">
+          최근 주문 30건
+        </h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-ink-3">문의가 오면 닉네임 · 결제 시각 · 금액으로 찾아 주문번호를 눌러 확인하세요. 닉네임은 검사할 때 적은 이름이고, 회원번호는 같은 사람인지 가리는 용도입니다.</p>
+        <RecentOrders rows={recent} />
       </section>
 
       <section aria-labelledby="a-pending">
@@ -248,6 +257,35 @@ function Events({ events }: { events: OpsEventRecord[] }) {
   );
 }
 
+function RecentOrders({ rows }: { rows: AdminRecentOrder[] }) {
+  if (rows.length === 0) return <p className="mt-2 text-[15px] text-ink-2">아직 주문이 없습니다.</p>;
+  return (
+    <Table head={["주문번호", "닉네임 · 회원", "상품", "금액", "상태", "리포트", "결제 요청"]}>
+      {rows.map((o) => (
+        <tr key={o.orderNumber} className="border-b border-line align-top">
+          <td className="py-2.5 pr-3 font-mono text-[13px]">
+            <Link href={`/admin?q=${o.orderNumber}`} className={textLink}>
+              {o.orderNumber}
+            </Link>
+          </td>
+          <td className="py-2.5 pr-3">
+            {o.nickname}
+            <span className="block font-mono text-[12px] text-ink-3">{o.memberShort}</span>
+          </td>
+          <td className="py-2.5 pr-3">{o.productName}</td>
+          <td className="py-2.5 pr-3 tabular-nums">{formatKrw(o.amount)}</td>
+          <td className="py-2.5 pr-3">
+            {o.statusLabel}
+            {o.paymentEnv !== "live" && <span className="block text-[12px] text-ink-3">테스트 결제</span>}
+          </td>
+          <td className="py-2.5 pr-3 text-[13px] text-ink-2">{o.isQuestion ? "-" : o.report}</td>
+          <td className="py-2.5 text-[13px] text-ink-3">{time(o.createdAt)}</td>
+        </tr>
+      ))}
+    </Table>
+  );
+}
+
 function Lookup({ lookup }: { lookup: Awaited<ReturnType<typeof adminLookup>> }) {
   switch (lookup.kind) {
     case "empty":
@@ -272,7 +310,7 @@ function Lookup({ lookup }: { lookup: Awaited<ReturnType<typeof adminLookup>> })
 }
 
 function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
-  const { order, report } = trace;
+  const { order, report, question } = trace;
   return (
     <div className="mt-4 space-y-5 border-t border-ink pt-4">
       <dl className="border-y border-line text-[14px]">
@@ -287,7 +325,14 @@ function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
         <Row label="결제 요청 / 승인">
           {time(order.createdAt)} / {time(order.approvedAt)}
         </Row>
-        <Row label="리포트">{report ? `${reportLabel(report)} · 시도 ${report.attempts}/${report.maxAttempts}${report.lastError ? ` · ${report.lastError}` : ""}` : order.status === "paid" ? "리포트 기록 없음" : "-"}</Row>
+        {question ? (
+          <>
+            <Row label="질문 장부">{!question.ready ? "장부를 읽지 못했습니다 (DB 변경 13번 전)" : question.credited ? `이 주문의 질문이 들어감 (${time(question.creditedAt)})` : order.status === "paid" ? "결제 완료인데 장부에 질문이 없음 — 아래 버튼으로 결제사 확인 뒤 넣을 수 있습니다" : "아직 결제 완료가 아니라 들어가지 않음"}</Row>
+            <Row label="이 회원이 쓸 수 있는 결제한 질문">{question.ready ? `${question.questionsLeft}개` : "-"}</Row>
+          </>
+        ) : (
+          <Row label="리포트">{report ? `${reportLabel(report)} · 시도 ${report.attempts}/${report.maxAttempts}${report.lastError ? ` · ${report.lastError}` : ""}` : order.status === "paid" ? "리포트 기록 없음" : "-"}</Row>
+        )}
       </dl>
       <div className="flex flex-col gap-3 sm:flex-row">
         <form action={adminReconcileOrderAction}>
@@ -296,7 +341,7 @@ function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
             결제사와 대조해 맞추기
           </button>
         </form>
-        {order.status === "paid" && (
+        {order.status === "paid" && !question && (
           <form action={adminRetryReportAction}>
             <input type="hidden" name="orderNumber" value={order.orderNumber} />
             <button type="submit" className={trace.needsReportAction ? buttonPrimary : buttonSecondary}>
@@ -304,7 +349,25 @@ function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
             </button>
           </form>
         )}
+        {order.status === "paid" && !question && (
+          <Link href={`/admin/report/${order.orderNumber}`} className={buttonSecondary}>
+            저장된 리포트 보기
+          </Link>
+        )}
+        {question && order.status === "paid" && question.ready && !question.credited && (
+          <form action={adminCreditQuestionAction}>
+            <input type="hidden" name="orderNumber" value={order.orderNumber} />
+            <button type="submit" className={buttonPrimary}>
+              결제사 확인 후 질문 1개 넣기
+            </button>
+          </form>
+        )}
       </div>
+      {question && (
+        <p className="text-[13px] leading-relaxed text-ink-3">
+          질문 결제는 결제 완료가 되는 순간 자동으로 질문이 들어갑니다. 위 버튼은 결제사 기록으로 결제 완료를 다시 확인한 뒤, 빠진 경우에만 한 번 넣습니다(주문 한 건에 한 번만, 이미 들어가 있으면 더 넣지 않습니다). 결제가 안 된 주문에는 넣지 않습니다.
+        </p>
+      )}
       <div>
         <p className="text-[14px] font-semibold">결제 처리 기록</p>
         {trace.paymentEvents.length === 0 ? (

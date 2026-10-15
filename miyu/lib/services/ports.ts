@@ -284,6 +284,12 @@ export interface MiyuRepository {
   listCashLedger(userId: string, limit: number): Promise<CashLedgerRecord[]>;
   spendCash(input: { userId: string; amount: number; ref: string }): Promise<number | null>;
   restoreCashSpend(input: { userId: string; ref: string }): Promise<number | null>;
+  /**
+   * 운영자 수동 질문 반영(DB 변경 15번) — 결제 완료인 질문 결제 주문에 장부 충전이 빠졌을 때 트리거가 했을 일을 한 번만 한다.
+   * 주문 상태는 바꾸지 않는다. credited: 이번에 넣음 · already: 이미 들어가 있음 · not-paid: 결제 완료가 아님 · not-cash: 질문 결제 주문이 아님 · not-found: 주문 없음.
+   * 함수가 없으면(15번 전) 오류(코드 42P01)를 던진다.
+   */
+  adminCreditQuestion(orderId: string): Promise<"credited" | "already" | "not-paid" | "not-cash" | "not-found">;
 
   /** 서버 전용 (브라우저 권한으로는 읽을 수 없다) — 주문 소유자를 확인한 뒤에만 쓴다 */
   listPaymentEvents(orderId: string): Promise<PaymentEventRecord[]>;

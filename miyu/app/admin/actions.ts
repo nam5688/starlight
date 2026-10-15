@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { adminResetReport } from "@/lib/services/admin-service";
+import { adminCreditQuestionOrder, type AdminCreditResult } from "@/lib/services/admin-support-service";
 import { isValidOrderNumber } from "@/lib/commerce/order";
 import { getAdminMember } from "@/server/member";
 import { recordOps, testTelegram } from "@/server/ops";
@@ -42,6 +43,33 @@ export async function adminRetryReportAction(formData: FormData) {
   if (result === "reset") await claimAndSchedule(order, { retryFailed: true, ignoreCooldown: true });
   await recordOps({ kind: "admin.retry_report", orderNumber: order.orderNumber, message: `운영자가 리포트 재생성 요청: ${result}` });
   back(order.orderNumber, result === "reset" ? "리포트 생성을 다시 시작했습니다." : result === "ready" ? "이미 완성된 리포트입니다 (바꾸지 않았습니다)." : "결제가 확인되지 않은 주문입니다.");
+}
+
+const CREDIT_NOTE = (r: AdminCreditResult): string => {
+  switch (r.kind) {
+    case "credited":
+      return "결제사 기록으로 결제 완료를 확인했고, 질문 1개를 넣었습니다. 고객은 그 방에서 결제 없이 질문할 수 있습니다.";
+    case "already":
+      return r.autoCredited ? "결제사 기록을 확인해 결제 완료로 맞췄고, 질문 1개는 그 처리 안에서 자동으로 들어갔습니다 (더 넣지 않았습니다)." : "이미 이 주문의 질문이 들어가 있습니다 (더 넣지 않았습니다).";
+    case "not-question-order":
+      return "질문 결제 주문이 아니라 질문을 넣지 않았습니다.";
+    case "not-verified":
+      return `결제사 기록으로 결제 완료를 확인하지 못해 질문을 넣지 않았습니다 (대조 결과: ${r.outcome}${r.code ? ` ${r.code}` : ""}). 결제사에서 결제를 확인한 뒤 다시 눌러 주세요.`;
+    case "unavailable":
+      return "이 DB에는 아직 질문 수동 반영 기능이 없습니다. SQL Editor에서 15번 파일(20261025000000_admin_credit_question.sql)을 먼저 실행하세요.";
+  }
+};
+
+/**
+ * 결제는 됐는데 질문이 안 들어갔다는 문의 — 결제사 기록을 먼저 확인하고, 결제 완료로 확인된 질문 결제 주문에만 질문 1개를 넣는다.
+ * 주문을 손으로 "결제 완료"로 바꾸지 않는다(대조가 결제사 기록으로만 맞춘다). 주문 한 건에는 한 번만 들어간다.
+ */
+export async function adminCreditQuestionAction(formData: FormData) {
+  const { order } = await adminOrder(formData);
+  if (!paymentConfig().ok) back(order.orderNumber, "결제 설정이 없어 결제사에 조회할 수 없습니다. 결제사 확인 없이는 질문을 넣지 않습니다.");
+  const result = await adminCreditQuestionOrder({ repo: writeRepository(), verify: reconcileOneNow }, order);
+  await recordOps({ kind: "admin.credit_question", severity: result.kind === "credited" ? "warn" : "info", orderNumber: order.orderNumber, message: `운영자가 결제사 확인 뒤 질문 반영: ${result.kind}${result.kind === "not-verified" ? ` (${result.outcome})` : ""}` });
+  back(order.orderNumber, CREDIT_NOTE(result));
 }
 
 /** 모든 대기 · 최근 결제 주문을 지금 대조하고, 지연 · 실패 리포트를 점검한다 */

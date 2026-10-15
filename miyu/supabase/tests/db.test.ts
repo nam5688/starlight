@@ -1148,3 +1148,88 @@ test("미유캐시: 상품 번호 형식이 맞지 않는 주문은 결제 완�
   assert.equal(await server.getCashBalance(U.id), 0);
   assert.deepEqual(await server.listCashLedger(U.id, 10), []);
 });
+
+test("운영자 수동 질문 반영(15번 마이그레이션): 결제 완료인 질문 결제 주문에 빠진 충전만 한 번 넣고, 주문 상태는 바꾸지 않으며, 브라우저는 부를 수 없고, 환불하면 회수하고, 함수가 없으면 이유를 알려 준다", async () => {
+  const U = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const psql = (q: string) => execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-q", "-c", q]);
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "수동반영" }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+  const quote = questionQuote();
+  const makeOrder = async (productId = questionProductId(createQuestionNonce("love"))) => {
+    const inserted = await server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: U.id, assessmentId: aid, productId, amount: quote.priceKrw, paymentEnv: "test" });
+    if (!inserted.ok) throw new Error("주문을 만들지 못했습니다");
+    return inserted.value;
+  };
+  /** 결제 완료로 바꾸되 충전 트리거는 건너뛴다 — 트리거가 일을 못 한 경우를 흉내 낸다 */
+  const paidWithoutTrigger = async (orderId: string) => {
+    psql("alter table public.orders disable trigger orders_cash_change");
+    try {
+      const r = await admin.from("orders").update({ status: "paid", approved_at: new Date().toISOString() }).eq("id", orderId);
+      assert.equal(r.error, null);
+    } finally {
+      psql("alter table public.orders enable trigger orders_cash_change");
+    }
+  };
+
+  // 없는 주문 · 결제 전 주문 · 질문 결제가 아닌 주문에는 아무것도 넣지 않는다
+  assert.equal(await server.adminCreditQuestion(randomUUID()), "not-found");
+  const pending = await makeOrder();
+  assert.equal(await server.adminCreditQuestion(pending.id), "not-paid");
+  const report = await makeOrder("personal-integrated-report");
+  await paidWithoutTrigger(report.id);
+  assert.equal(await server.adminCreditQuestion(report.id), "not-cash");
+  assert.equal(await server.getCashBalance(U.id), 0);
+  assert.equal((await server.getOrderById(pending.id))?.status, "pending", "함수는 주문 상태를 바꾸지 않는다");
+
+  // 결제 완료인데 장부가 비어 있는 주문 — 한 번만 들어간다
+  const missed = await makeOrder();
+  await paidWithoutTrigger(missed.id);
+  assert.equal(await server.getCashBalance(U.id), 0, "시작 상태: 결제 완료인데 질문이 없다");
+  assert.equal(await server.adminCreditQuestion(missed.id), "credited");
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion);
+  assert.equal(await server.adminCreditQuestion(missed.id), "already");
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "다시 눌러도 더 들어가지 않는다");
+  assert.deepEqual((await server.listCashLedger(U.id, 10)).map((l) => [l.kind, l.amount, l.orderId === missed.id]), [["charge", 3, true]]);
+  assert.equal((await server.getOrderById(missed.id))?.status, "paid");
+
+  // 같은 주문에 동시에 여러 번 눌러도 한 번만
+  const racing = await makeOrder();
+  await paidWithoutTrigger(racing.id);
+  const results = await Promise.all(Array.from({ length: 6 }, () => server.adminCreditQuestion(racing.id)));
+  assert.equal(results.filter((r) => r === "credited").length, 1, JSON.stringify(results));
+  assert.equal(results.filter((r) => r === "already").length, 5);
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion * 2);
+
+  // 이 함수로 넣은 질문도 결제가 취소되면 회수된다
+  const refund = await admin.from("orders").update({ status: "refunded" }).eq("id", racing.id);
+  assert.equal(refund.error, null);
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion);
+  assert.equal(await server.adminCreditQuestion(racing.id), "not-paid", "환불된 주문에는 넣지 않는다");
+
+  // 브라우저(로그인 회원 · 비로그인)는 이 함수를 부를 수 없다
+  const own = await makeOrder();
+  await paidWithoutTrigger(own.id);
+  const byUser = await U.client.rpc("admin_credit_question", { p_order_id: own.id });
+  assert.ok(byUser.error, "로그인 회원은 부를 수 없다");
+  const byAnon = await anon.rpc("admin_credit_question", { p_order_id: own.id });
+  assert.ok(byAnon.error, "비로그인은 부를 수 없다");
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "브라우저 호출로는 아무것도 들어가지 않는다");
+
+  // 15번 변경 전(함수 없음) — 이유를 알려 주는 오류(코드 42P01)
+  psql("alter function public.admin_credit_question(uuid) rename to admin_credit_question_hidden; notify pgrst, 'reload schema'");
+  await sleep(800);
+  try {
+    await assert.rejects(server.adminCreditQuestion(own.id), (e: unknown) => (e as { code?: string }).code === "42P01");
+    assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "함수가 없어도 장부 조회는 그대로다");
+  } finally {
+    psql("alter function public.admin_credit_question_hidden(uuid) rename to admin_credit_question; notify pgrst, 'reload schema'");
+    await sleep(800);
+  }
+  assert.equal(await server.adminCreditQuestion(own.id), "credited", "함수를 되돌린 뒤에는 다시 동작한다");
+
+  // 정리: 남은 질문을 써서 탈퇴를 막지 않게 한다
+  await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion * 2, ref: `q-manual-${randomUUID().slice(0, 8)}` });
+});

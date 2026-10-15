@@ -882,6 +882,16 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       if (error) fail("미유캐시 되돌림", ["PGRST202", "42883"].includes(error.code ?? "") || isMissingTableError(error) ? { code: "42P01", message: "restore_cash_spend 함수가 없습니다 (DB 변경 13번 필요)" } : error);
       return data === null || data === undefined ? null : Number(data);
     },
+    async adminCreditQuestion(orderId) {
+      const { data, error } = await db.rpc("admin_credit_question", { p_order_id: orderId });
+      if (error) {
+        if (error.code === "22P02") return "not-found";
+        fail("질문 수동 반영", ["PGRST202", "42883"].includes(error.code ?? "") || isMissingTableError(error) ? { code: "42P01", message: "admin_credit_question 함수가 없습니다 (DB 변경 15번 필요)" } : error);
+      }
+      const result = String(data ?? "");
+      if (result === "credited" || result === "already" || result === "not_paid" || result === "not_cash" || result === "not_found") return result.replace("_", "-") as "credited" | "already" | "not-paid" | "not-cash" | "not-found";
+      throw new Error("질문 수동 반영: 알 수 없는 결과");
+    },
 
     async listPaymentEvents(orderId) {
       const { data, error } = await db

@@ -469,6 +469,25 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       wallets.set(userId, next);
       return next;
     },
+    async adminCreditQuestion(orderId) {
+      // DB 함수 admin_credit_question과 같은 규칙: 주문 상태는 바꾸지 않고, 결제 완료인 질문 결제 주문에 빠진 충전만 한 번 넣는다
+      const order = orders.get(orderId);
+      if (!order) return "not-found";
+      const cash = parseCashProductId(order.productId);
+      if (!cash) return "not-cash";
+      if (order.status !== "paid") return "not-paid";
+      if (!wallets.has(order.userId)) wallets.set(order.userId, 0);
+      let credited = false;
+      if (cash.cash > 0 && addLedger({ userId: order.userId, kind: "charge", amount: cash.cash, orderId: order.id })) {
+        wallets.set(order.userId, wallets.get(order.userId)! + cash.cash);
+        credited = true;
+      }
+      if (cash.bonus > 0 && addLedger({ userId: order.userId, kind: "bonus", amount: cash.bonus, orderId: order.id })) {
+        wallets.set(order.userId, wallets.get(order.userId)! + cash.bonus);
+        credited = true;
+      }
+      return credited ? "credited" : "already";
+    },
     async listPaymentEvents(orderId) {
       return events.filter((e) => e.orderId === orderId).map(({ source, status, detail, createdAt }) => ({ source, status, detail, createdAt }));
     },

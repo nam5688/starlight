@@ -4,6 +4,7 @@
 import { REPORT_DELAY_ALERT_MS, REPORT_MAX_ATTEMPTS, REPORT_SLA_MS } from "../commerce/report.ts";
 import { isValidOrderNumber } from "../commerce/order.ts";
 import { ERROR_ID_PATTERN } from "../ops/redact.ts";
+import { questionLedgerState, type QuestionLedgerState } from "./admin-support-service.ts";
 import { EVENT_STATUS_LABEL, generationOf, orderStatusLabel, productName, SOURCE_LABEL, type Generation } from "./my-service.ts";
 import type { MiyuRepository, OpsEventRecord, OrderRecord, PaymentEventRecord, ProblemReport } from "./ports.ts";
 import { RECONCILE_DEFAULTS } from "./reconcile-service.ts";
@@ -114,15 +115,18 @@ export type OrderTraceForAdmin = {
   events: OpsEventRecord[];
   /** 결제 완료인데 리포트가 없거나 실패 → 처리 필요 */
   needsReportAction: boolean;
+  /** 질문 결제 주문이면 장부 반영 상태 (질문 · 대화 내용은 없다), 아니면 null */
+  question: QuestionLedgerState | null;
 };
 
 const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
 
 async function traceForAdmin(repo: MiyuRepository, order: OrderRecord, now: Date): Promise<OrderTraceForAdmin> {
-  const [events, report, opsEvents] = await Promise.all([
+  const [events, report, opsEvents, question] = await Promise.all([
     repo.listPaymentEvents(order.id),
     repo.getReportByOrder(order.id),
     repo.listOpsEvents({ orderNumber: order.orderNumber, limit: 30 }),
+    questionLedgerState(repo, order),
   ]);
   const row = report ? await reportRow(repo, report, now) : null;
   return {
@@ -137,7 +141,8 @@ async function traceForAdmin(repo: MiyuRepository, order: OrderRecord, now: Date
     })),
     report: row,
     events: opsEvents,
-    needsReportAction: order.status === "paid" && (!report || report.status === "failed" || (report.status !== "ready" && (row?.delayed ?? false))),
+    needsReportAction: order.status === "paid" && !question && (!report || report.status === "failed" || (report.status !== "ready" && (row?.delayed ?? false))),
+    question,
   };
 }
 
