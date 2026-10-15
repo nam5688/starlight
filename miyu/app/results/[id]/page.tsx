@@ -168,7 +168,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           { id: "r-tendency", label: "전체 요약" },
           { id: "r-saju", label: "사주 원국" },
           { id: "r-situations", label: "상황별" },
-          { id: "r-scores", label: "점수 · MBTI" },
+          { id: "r-scores", label: "점수" },
           { id: "r-rooms", label: "상담방" },
           { id: "r-locked", label: "구매 안내" },
         ]}

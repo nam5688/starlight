@@ -46,22 +46,6 @@ export function toScoreMap(scores: DimensionScore[]): Record<string, number> {
   return Object.fromEntries(scores.map((s) => [s.dimensionId, s.score]));
 }
 
-/**
- * 양극 지표 점수로 네 글자 코드를 만든다. 50보다 크면 높은 쪽 글자, 작으면 낮은 쪽 글자.
- * 정확히 50이면 어느 쪽으로도 정하지 않고 "X"로 둔다.
- */
-export function bipolarCode(module: AssessmentModule, scores: DimensionScore[]): string {
-  const map = toScoreMap(scores);
-  return module.dimensions
-    .map((d) => {
-      const s = map[d.id];
-      if (s > 50) return d.highCode ?? "?";
-      if (s < 50) return d.lowCode ?? "?";
-      return "X";
-    })
-    .join("");
-}
-
 /** 서버로 들어온 응답을 { 문항 id: 숫자 } 형태로만 받아들인다 (형식이 다르면 null) */
 export function parseAnswers(raw: unknown): Answers | null {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;

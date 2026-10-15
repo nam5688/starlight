@@ -23,8 +23,8 @@ function scoreFinding(row: ScoreRow): string {
 }
 
 function axisFinding(axis: AxisRow): string {
-  if (axis.score >= HIGH) return `${axis.label}은 ${axis.highCode} 쪽입니다. ${sentence(axis.highMeaning)}`;
-  if (axis.score <= LOW) return `${axis.label}은 ${axis.lowCode} 쪽입니다. ${sentence(axis.lowMeaning)}`;
+  if (axis.score >= HIGH) return `${axis.label}은 ${axis.highName} 쪽입니다. ${sentence(axis.highMeaning)}`;
+  if (axis.score <= LOW) return `${axis.label}은 ${axis.lowName} 쪽입니다. ${sentence(axis.lowMeaning)}`;
   return `${axis.label}은 중간에 가깝습니다. 상황에 따라 달라질 수 있습니다.`;
 }
 
@@ -37,21 +37,11 @@ export function buildDevReport(input: ReportInput): FullReport {
   const t = Object.fromEntries(summary.temperament.map((r) => [r.id, r.score]));
   const r = Object.fromEntries(summary.relationship.map((row) => [row.id, row.score]));
   const axes = Object.fromEntries(summary.mbti.axes.map((a) => [a.id, a]));
-  const code = summary.mbti.code;
 
-  // 알고 있던 MBTI와 다른 지표
-  const differingAxes =
-    knownMbti && knownMbti.length === 4
-      ? summary.mbti.axes.filter((a, i) => code[i] !== "X" && code[i] !== knownMbti[i]).map((a) => a.label)
-      : [];
-
+  // 이번 응답을 MBTI 유형으로 바꾸지 않는다 — 본인이 입력한 값은 참고용으로만 따로 적는다
   const mbtiFindings = summary.mbti.axes.map(axisFinding);
   if (knownMbti) {
-    mbtiFindings.push(
-      differingAxes.length === 0
-        ? "알고 있던 MBTI와 이번 응답이 같습니다."
-        : `알고 있던 MBTI는 ${knownMbti}이며, 이번 응답과는 ${differingAxes.join(", ")} 지표에서 다릅니다.`,
-    );
+    mbtiFindings.push(`본인이 입력한 MBTI는 ${knownMbti}이며, 참고값으로 따로 보관했고 이번 응답과 비교하거나 유형으로 바꾸지 않습니다.`);
   }
 
   // 공통적으로 나타나는 특징 — 서로 다른 영역의 지표가 같은 방향일 때만 적는다
@@ -59,7 +49,7 @@ export function buildDevReport(input: ReportInput): FullReport {
   if (t.caution >= HIGH && axes.jp && axes.jp.score <= LOW) {
     common.push({
       point: "미리 계획하고 대비하려는 경향",
-      basis: [`기질 · 신중함 ${t.caution}`, `MBTI · ${axes.jp.lowCode} 쪽`],
+      basis: [`기질 · 신중함 ${t.caution}`, `평소 행동 방식 · ${axes.jp.lowName} 쪽`],
     });
   }
   if (t.sensitivity >= HIGH && r.anxiety >= HIGH) {
@@ -71,13 +61,13 @@ export function buildDevReport(input: ReportInput): FullReport {
   if (t.novelty >= HIGH && axes.jp && axes.jp.score >= HIGH) {
     common.push({
       point: "새로운 방식과 유연한 진행을 선호하는 편",
-      basis: [`기질 · 새로움 추구 ${t.novelty}`, `MBTI · ${axes.jp.highCode} 쪽`],
+      basis: [`기질 · 새로움 추구 ${t.novelty}`, `평소 행동 방식 · ${axes.jp.highName} 쪽`],
     });
   }
   if (r.avoidance >= HIGH && axes.ei && axes.ei.score >= HIGH) {
     common.push({
       point: "혼자 정리하는 시간이 중요한 편",
-      basis: [`관계 · 거리 두기 ${r.avoidance}`, `MBTI · ${axes.ei.highCode} 쪽`],
+      basis: [`관계 · 거리 두기 ${r.avoidance}`, `평소 행동 방식 · ${axes.ei.highName} 쪽`],
     });
   }
   if (t.persistence >= HIGH && t.caution >= HIGH) {
@@ -96,19 +86,13 @@ export function buildDevReport(input: ReportInput): FullReport {
     different.push({
       point: "판단 방식과 관계에서의 감정",
       explanation:
-        "MBTI 응답에서는 논리와 기준을 먼저 따지는 T 쪽이었지만, 관계 응답에서는 상대의 반응에 민감했습니다. 판단 방식과 관계에서의 감정은 서로 다른 영역이라 함께 나타날 수 있습니다.",
+        "평소 행동 방식 응답에서는 논리와 기준을 먼저 따지는 쪽이었지만, 관계 응답에서는 상대의 반응에 민감했습니다. 판단 방식과 관계에서의 감정은 서로 다른 영역이라 함께 나타날 수 있습니다.",
     });
   }
   if (t.novelty >= HIGH && t.caution >= HIGH) {
     different.push({
       point: "새로움 추구와 신중함이 함께 높음",
       explanation: "새로운 것에 끌리면서도 시작 전에 위험을 살피는 편이라, 결정에 시간이 걸릴 수 있습니다.",
-    });
-  }
-  if (knownMbti && differingAxes.length > 0) {
-    different.push({
-      point: "알고 있던 MBTI와 이번 응답",
-      explanation: `${differingAxes.join(", ")} 지표가 다르게 나왔습니다. 중간값 50에 가까운 지표는 시기나 상황에 따라 달라질 수 있습니다.`,
     });
   }
   if (different.length === 0) {
@@ -126,10 +110,10 @@ export function buildDevReport(input: ReportInput): FullReport {
     knownMbti,
     details: {
       mbti: {
-        basis: "MBTI 성향 문항 응답 (개발용 예시 문항)",
+        basis: "평소 행동 방식 문항 응답 (개발용 예시 문항)",
         findings: mbtiFindings,
         limits:
-          "공식 MBTI® 검사가 아니며, 개발용 예시 문항으로 계산했습니다. 중간값 50에 가까운 지표는 상황에 따라 다르게 나올 수 있습니다.",
+          "MBTI® 같은 공식 검사가 아니며, 개발용 예시 문항으로 계산했습니다. 중간값 50에 가까운 지표는 상황에 따라 다르게 나올 수 있습니다.",
       },
       temperament: {
         basis: "기질 문항 응답 (개발용 예시 문항)",

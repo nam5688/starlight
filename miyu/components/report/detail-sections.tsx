@@ -16,22 +16,14 @@ export function DetailSections({ report, showChart = true }: { report: FullRepor
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Detail
-        title="MBTI 성향"
-        headline={`이번 응답 ${report.mbti.code}${report.knownMbti ? ` · 본인 입력 ${report.knownMbti}` : ""}`}
-        block={details.mbti}
-      >
-        <dl className="grid grid-cols-2 border-y border-line text-[15px]">
-          <div className="border-r border-line px-1 py-3">
-            <dt className="text-[13px] text-ink-3">이번 응답</dt>
-            <dd className="mt-0.5 text-[20px] font-bold tracking-wide">{report.mbti.code}</dd>
-          </div>
-          <div className="px-4 py-3">
+      <Detail title="평소 행동 방식" headline={report.knownMbti ? `본인이 입력한 MBTI ${report.knownMbti}는 참고값으로 따로 표시` : "네 가지 방향의 응답"} block={details.mbti}>
+        <dl className="border-y border-line text-[15px]">
+          <div className="px-1 py-3">
             <dt className="text-[13px] text-ink-3">본인이 알고 있던 MBTI</dt>
             <dd className="mt-0.5 text-[20px] font-bold tracking-wide">{report.knownMbti ?? "입력 안 함"}</dd>
           </div>
         </dl>
-        <p className="mt-2 text-[13px] text-ink-3">본인이 입력한 값은 참고용이며, 미유 검사 결과와 따로 표시합니다.</p>
+        <p className="mt-2 text-[13px] text-ink-3">본인이 입력한 값은 참고용이며, 미유의 응답 결과와 비교하거나 유형으로 바꾸지 않고 따로 표시합니다.</p>
       </Detail>
 
       <Detail title="기질" headline={`두드러진 지표: ${strongest}`} block={details.temperament} />

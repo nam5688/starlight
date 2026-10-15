@@ -38,8 +38,11 @@ export function QuestionStep({
       </div>
       <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{NEUTRAL_INTRO}</p>
       {module.status === "dev-example" && (
-        <p className="mt-3 inline-flex rounded-md border border-line-strong bg-mist px-2 py-0.5 text-[13px] font-medium text-ink-2">
-          개발용 예시 문항 · {module.version}
+        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="inline-flex rounded-md border border-line-strong bg-mist px-2 py-0.5 text-[13px] font-medium text-ink-2">미유 성향 질문 · 개발용 예시 · {module.version}</span>
+          <a href="/assessment-basis" target="_blank" rel="noopener" className="text-[13px] text-ink-3 underline underline-offset-2 hover:text-ink">
+            어떻게 만들었나요?
+          </a>
         </p>
       )}
 

@@ -33,13 +33,13 @@ export function ScoreBar({ row }: { row: ScoreRow }) {
   );
 }
 
-/** 양극 지표(MBTI 성향). 가운데(50)를 기준으로 어느 쪽에 가까운지 보여준다. */
+/** 양극 지표(평소 행동 방식). 가운데(50)를 기준으로 어느 쪽에 가까운지 보여준다. 글자 코드는 쓰지 않고 쪽의 이름으로 말한다. */
 export function AxisBar({ row }: { row: AxisRow }) {
   const leanHigh = row.score > 50;
   const leanLow = row.score < 50;
   const start = Math.min(row.score, 50);
   const width = Math.abs(row.score - 50);
-  const lean = leanHigh ? `${row.highCode} 쪽` : leanLow ? `${row.lowCode} 쪽` : "중간";
+  const lean = leanHigh ? `${row.highName} 쪽` : leanLow ? `${row.lowName} 쪽` : "중간";
 
   return (
     <div className="py-4">
@@ -52,7 +52,7 @@ export function AxisBar({ row }: { row: AxisRow }) {
       <div
         className="relative mt-2 h-2 rounded-full bg-track"
         role="img"
-        aria-label={`${row.label}: 0은 ${row.lowCode}(${row.lowName}), 100은 ${row.highCode}(${row.highName}). 현재 ${row.score}, ${lean}.`}
+        aria-label={`${row.label}: 0은 ${row.lowName}, 100은 ${row.highName}. 현재 ${row.score}, ${lean}.`}
       >
         <div
           className="absolute inset-y-0 rounded-full bg-accent"
@@ -63,13 +63,13 @@ export function AxisBar({ row }: { row: AxisRow }) {
       <div className="mt-2.5 grid grid-cols-2 gap-4 text-[13px] leading-snug" aria-hidden="true">
         <p className={leanLow ? "text-ink" : "text-ink-3"}>
           <span className="mb-0.5 block font-semibold">
-            {row.lowCode} · {row.lowName}
+            {row.lowName}
           </span>
           {row.lowMeaning}
         </p>
         <p className={`text-right ${leanHigh ? "text-ink" : "text-ink-3"}`}>
           <span className="mb-0.5 block font-semibold">
-            {row.highCode} · {row.highName}
+            {row.highName}
           </span>
           {row.highMeaning}
         </p>

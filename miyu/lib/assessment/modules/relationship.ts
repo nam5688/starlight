@@ -1,5 +1,9 @@
 import type { AssessmentModule } from "../types.ts";
 
+// 출처 점검(2026-10-15, docs/assessment-source-audit.md): 이 파일의 방향 구성은 기존 이론의 구성과 닮았다 — 두 방향이 성인 애착 연구의 두 차원(불안 · 회피)과 대응한다.
+// 문장 · 채점표 · 규준 · 유형 이름은 가져오지 않았지만, "자체 개발"이라는 이름만으로 구성이 독립이 되지는 않는다.
+// 그래서 화면에 연결하지 않고(또는 개발용 예시로만 두고), 생활 행동에서 출발한 독립 설계(drafts/life-behavior-v1.ts)와 검사 저작권 전문가 검토를 거치기 전에는 쓰지 않는다.
+
 // 개발용 예시 문항 — 직접 작성한 화면 확인용 문항이며 기존 애착 검사(ECR 등)의 문항이 아니다.
 // 임상 진단 도구가 아니다. 운영 척도가 정해지면 교체한다.
 export const relationshipModule: AssessmentModule = {

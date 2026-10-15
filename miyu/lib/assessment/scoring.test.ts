@@ -2,8 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { classifyTendency } from "./dev-rules.ts";
-import { ASSESSMENT_MODULES, mbtiModule, relationshipModule, temperamentModule } from "./modules/index.ts";
-import { bipolarCode, scoreModule, toScoreMap, validateAnswers } from "./scoring.ts";
+import { ASSESSMENT_MODULES, relationshipModule, temperamentModule } from "./modules/index.ts";
+import { scoreModule, toScoreMap, validateAnswers } from "./scoring.ts";
 import type { Answers, AssessmentModule } from "./types.ts";
 
 function fill(modules: AssessmentModule[], value: number): Answers {
@@ -51,16 +51,6 @@ test("scoreModule: 역문항을 뒤집어 계산한다", () => {
 
 test("scoreModule: 응답이 빠지면 오류를 던진다", () => {
   assert.throws(() => scoreModule(relationshipModule, {}));
-});
-
-test("bipolarCode: 50 초과는 높은 쪽, 미만은 낮은 쪽, 50은 X", () => {
-  const answers: Answers = {
-    m1: 5, m2: 1, // ei 100 → I
-    m3: 1, m4: 5, // sn 0 → S
-    m5: 3, m6: 3, // tf 50 → X
-    m7: 1, m8: 5, // jp 0 → J
-  };
-  assert.equal(bipolarCode(mbtiModule, scoreModule(mbtiModule, answers)), "ISXJ");
 });
 
 test("classifyTendency: 관계 불안이 가장 크면 확인추구형", () => {

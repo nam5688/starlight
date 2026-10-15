@@ -19,7 +19,7 @@ import { BasicInfoStep } from "./basic-info-step";
 import { FreeSummaryView } from "./free-summary";
 import { QuestionStep } from "./question-step";
 
-// 단계 이름은 무엇을 재는지 알려 주지 않는 중립 이름만 쓴다 — "MBTI 성향 · 기질 · 관계" 같은 이름을 미리 보면 답을 예측해서 고르게 된다(운영자 2026-10-15)
+// 단계 이름은 무엇을 재는지 알려 주지 않는 중립 이름만 쓴다 — "평소 행동 방식 · 기질 · 관계" 같은 이름을 미리 보면 답을 예측해서 고르게 된다(운영자 2026-10-15)
 const STEPS = [
   { key: "basic", label: "기본 정보" },
   ...ASSESSMENT_MODULES.map((m, i) => ({ key: m.id, label: `질문 ${i + 1}` })),

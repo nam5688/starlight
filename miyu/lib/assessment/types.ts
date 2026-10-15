@@ -1,5 +1,5 @@
 // 검사 모듈 공통 타입.
-// MBTI 성향 · 기질 · 관계(애착)는 각각 독립된 모듈이며, 같은 구조를 따른다.
+// 평소 행동 방식(내부 id mbti) · 기질 · 관계(애착)는 각각 독립된 모듈이며, 같은 구조를 따른다.
 
 export type ModuleId = "mbti" | "temperament" | "relationship";
 
@@ -17,9 +17,7 @@ export type Dimension = {
   lowMeaning: string;
   /** 점수가 높을 때의 의미 */
   highMeaning: string;
-  /** 양극 지표(MBTI)의 낮은 쪽/높은 쪽 글자 */
-  lowCode?: string;
-  highCode?: string;
+  /** 양극 지표의 낮은 쪽/높은 쪽 이름 — 글자 코드(E/I 같은)는 쓰지 않는다 */
   lowName?: string;
   highName?: string;
 };

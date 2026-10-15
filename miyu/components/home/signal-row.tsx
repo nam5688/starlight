@@ -1,9 +1,10 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
  * 홈 첫 화면의 "무엇을 종합하나" 그림 — 사주 · MBTI · 성격 · 기질 · 애착을 선 그림 하나씩으로 보여 주고 종합 분석으로 모은다.
  * 글을 줄이고 한눈에 보이게 하려는 것이며(운영자 2026-10-15), 정확도 · 과학적 검증을 주장하지 않는다:
- * 성격 · 기질 · 애착은 미유가 만든 상황형 질문에 직접 답한 내용이고 MBTI는 아는 유형을 입력한 값이다. 공식 검사나 진단이 아니다.
+ * 성격 · 기질 · 애착은 미유가 직접 만든 질문에 답한 내용이고 MBTI는 아는 유형을 입력한 값이다. 공식 검사나 진단이 아니다. 질문을 어떻게 만들었는지는 /assessment-basis에 있다.
  */
 
 type IconProps = { className?: string };
@@ -126,7 +127,10 @@ export function SignalRow() {
       </div>
 
       <p className="mt-3 text-[12px] leading-[1.65] text-ink-3">
-        성격 · 기질 · 애착은 미유가 만든 상황형 질문에 직접 답한 내용이고, MBTI는 아는 유형을 입력해요. 공식 검사나 진단이 아니며 정확도는 검증하지 않았어요.
+        성격 · 기질 · 애착은 미유가 직접 만든 질문에 답한 내용이고, MBTI는 아는 유형을 입력해요. 공식 검사나 진단이 아니며 정확도는 검증하지 않았어요.{" "}
+        <Link href="/assessment-basis" className="underline underline-offset-2 hover:text-ink">
+          질문은 어떻게 만들었나요?
+        </Link>
       </p>
     </div>
   );

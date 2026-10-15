@@ -90,8 +90,8 @@ export function ScoreGroups({ summary }: { summary: Pick<FreeSummary, "temperame
       <ScoreGroup title="기질" rows={summary.temperament.map((r) => <ScoreBar key={r.id} row={r} />)} />
       <ScoreGroup title="관계(애착)" rows={summary.relationship.map((r) => <ScoreBar key={r.id} row={r} />)} />
       <ScoreGroup
-        title="MBTI 성향"
-        meta={`이번 응답 ${summary.mbti.code}`}
+        title="평소 행동 방식"
+        meta="이번 응답"
         rows={summary.mbti.axes.map((r) => <AxisBar key={r.id} row={r} />)}
       />
     </div>

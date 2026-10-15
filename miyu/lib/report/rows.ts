@@ -20,9 +20,7 @@ export function toAxisRows(module: AssessmentModule, scores: Record<string, numb
     score: scores[d.id],
     lowMeaning: d.lowMeaning,
     highMeaning: d.highMeaning,
-    lowCode: d.lowCode ?? "",
     lowName: d.lowName ?? "",
-    highCode: d.highCode ?? "",
     highName: d.highName ?? "",
   }));
 }

@@ -57,7 +57,7 @@ export function FreeSummaryBody({
             </tr>
           </thead>
           <tbody className="border-t border-ink">
-            <StatusRow name="MBTI 성향">
+            <StatusRow name="평소 행동 방식">
               개발용 예시 문항 {itemCount("mbti")}개로 계산
               {knownMbti && (
                 <span className="mt-1 block text-ink-3">본인이 입력한 MBTI {knownMbti} — 참고값으로 따로 보관</span>

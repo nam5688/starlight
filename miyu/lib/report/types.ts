@@ -22,10 +22,11 @@ export type ScoreRow = {
 };
 
 export type AxisRow = ScoreRow & {
-  lowCode: string;
   lowName: string;
-  highCode: string;
   highName: string;
+  /** 예전에 저장된 요약에만 남아 있는 글자 코드 — 지금은 만들지도 화면에 보여 주지도 않는다 */
+  lowCode?: string;
+  highCode?: string;
 };
 
 export type CoreSummary = {
@@ -46,7 +47,8 @@ export type FreeSummary = {
   core: CoreSummary;
   temperament: ScoreRow[];
   relationship: ScoreRow[];
-  mbti: { code: string; axes: AxisRow[] };
+  /** 평소 행동 방식(예전 이름 "MBTI 성향") 네 가지 — code는 예전에 저장된 요약에만 있고 지금은 만들지 않는다 */
+  mbti: { code?: string; axes: AxisRow[] };
 };
 
 export type SajuPillar = {

@@ -10,6 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/report/sample", priority: 0.8 },
     { path: "/terms", priority: 0.3 },
     { path: "/privacy", priority: 0.3 },
+    { path: "/assessment-basis", priority: 0.3 },
   ];
   return pages.map((p) => ({ url: `${base}${p.path === "/" ? "" : p.path}`, priority: p.priority, changeFrequency: "monthly" as const }));
 }

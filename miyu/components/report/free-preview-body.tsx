@@ -242,7 +242,7 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { prev
         </p>
       </section>
 
-      {/* 6. 기질 · 관계(애착) — 잠금 / MBTI — 공개 */}
+      {/* 6. 기질 · 관계(애착) — 잠금 / 평소 행동 방식 — 공개 */}
       <section aria-labelledby={id("scores")}>
         <SectionTitle id={id("scores")} note="0~100은 응답을 환산한 값이며 백분위나 정확도가 아닙니다.">
           항목별 점수
@@ -262,8 +262,8 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { prev
           ))}
           <div>
             <div className="flex items-baseline justify-between gap-3 border-b border-ink pb-2">
-              <h3 className="text-[17px] font-bold">MBTI 성향</h3>
-              <span className="text-[14px] font-semibold text-ink-2">이번 응답 {preview.mbti.code}</span>
+              <h3 className="text-[17px] font-bold">평소 행동 방식</h3>
+              <span className="text-[14px] font-semibold text-ink-2">이번 응답</span>
             </div>
             <div className="divide-y divide-line">
               {preview.mbti.axes.map((r) => (
@@ -342,7 +342,7 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { prev
           분석에 사용한 정보
         </SectionTitle>
         <p className="text-[15px] leading-relaxed text-ink-2">
-          MBTI 성향 문항 {preview.basis.mbtiItems}개 · 기질 문항 {preview.basis.temperamentItems}개 · 관계(애착) 문항 {preview.basis.relationshipItems}개 (모두 개발용 예시 문항)
+          평소 행동 방식 문항 {preview.basis.mbtiItems}개 · 기질 문항 {preview.basis.temperamentItems}개 · 관계(애착) 문항 {preview.basis.relationshipItems}개 (모두 개발용 예시 문항)
           {saju.status === "ok" && saju.chartLine && <> · 사주 {saju.chartLine}</>}
         </p>
       </section>

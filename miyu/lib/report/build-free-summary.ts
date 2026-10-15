@@ -1,6 +1,6 @@
 import { classifyTendency, TENDENCY_NAMES } from "../assessment/dev-rules.ts";
 import { mbtiModule, relationshipModule, temperamentModule } from "../assessment/modules/index.ts";
-import { bipolarCode, scoreModule, toScoreMap } from "../assessment/scoring.ts";
+import { scoreModule, toScoreMap } from "../assessment/scoring.ts";
 import type { Answers } from "../assessment/types.ts";
 import { DEV_SUMMARY_TEMPLATES } from "./dev-summary-templates.ts";
 import { buildFreeInsight } from "./free-insight.ts";
@@ -27,8 +27,8 @@ export function buildDevFreeSummary(answers: Answers): FreeSummary {
     core: template.core,
     temperament: toScoreRows(temperamentModule, temperament),
     relationship: toScoreRows(relationshipModule, relationship),
+    // 자체 응답을 MBTI 유형 글자로 바꾸지 않는다 — 네 가지 방향의 점수(0~100 환산값)만 만든다
     mbti: {
-      code: bipolarCode(mbtiModule, mbtiScores),
       axes: toAxisRows(mbtiModule, toScoreMap(mbtiScores)),
     },
   };

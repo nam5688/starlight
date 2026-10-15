@@ -19,8 +19,8 @@ export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const PERSPECTIVES = [
   {
-    name: "MBTI 성향",
-    sees: "에너지 방향, 정보 인식, 판단 기준, 생활 방식의 선호",
+    name: "평소 행동 방식",
+    sees: "에너지를 채우는 방식, 정보를 받아들이는 방식, 판단하는 기준, 생활을 꾸리는 방식",
     limit: "선호 경향이며 능력이나 성격 전체를 판정하지 않습니다.",
   },
   {
@@ -45,7 +45,7 @@ const QUESTION_COUNT = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0
 
 const STEPS = [
   { title: "기본 정보 입력", desc: "닉네임, 생년월일, 출생시간(몰라도 됨)" },
-  { title: "검사 응답", desc: "MBTI 성향 · 기질 · 관계 문항. 이전 단계로 돌아가 답을 고칠 수 있습니다." },
+  { title: "검사 응답", desc: "평소 행동 방식 · 기질 · 관계 문항. 이전 단계로 돌아가 답을 고칠 수 있습니다." },
   { title: "무료 미리보기 확인", desc: "대표 경향 일부, 사주 원국과 오행의 뜻, 내 원국이 던지는 질문" },
   { title: "카카오 로그인", desc: "결과를 회원 정보에 저장" },
   { title: "심층 리포트 구매", desc: "질문의 답, 상황별 잘하는 점 · 주의할 점, 어울리는 관계 조건, 보완 아이템" },
