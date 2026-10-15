@@ -2,7 +2,7 @@
 // 공개 페이지(/assessment-basis)는 요약만 보여 주고, 문항 문장 · 문항별 기록은 이 문서에만 둔다(운영자 2026-10-15).
 // 실행: node scripts/render-assessment-item-records.ts   (miyu 폴더에서)
 import { writeFileSync } from "node:fs";
-import { CHECKED, DEVELOPMENT, NOT_CHECKED, PROVENANCE_DATE, PROVENANCE_VERSION, provenanceRows } from "../lib/assessment/provenance.ts";
+import { CHECKED, DEVELOPMENT, NOT_CHECKED, PROVENANCE_DATE, PROVENANCE_VERSION, SIMILARITY, SIMILARITY_LABEL, provenanceRows } from "../lib/assessment/provenance.ts";
 
 const modules = provenanceRows()
   .map(({ module, record, items }) => {
@@ -15,6 +15,7 @@ const modules = provenanceRows()
 - 알아보려는 생활 행동: ${r?.behavior ?? "기록 없음"}
 - 점수 읽는 법: ${scoring}
 - 이렇게 쓴 이유: ${r?.why ?? "기록 없음"}
+- 기존 검사와의 닮음 표시: **${SIMILARITY[item.id] ? SIMILARITY_LABEL[SIMILARITY[item.id]!.level] : "표시 없음"}** — ${SIMILARITY[item.id]?.note ?? ""}
 `,
       )
       .join("\n");

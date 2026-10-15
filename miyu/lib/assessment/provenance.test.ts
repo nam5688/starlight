@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "./modules/index.ts";
-import { CHECKED, DEVELOPMENT, ITEM_RECORDS, MODULE_RECORDS, NOT_CHECKED, PROVENANCE_UPDATED, SOURCES, STANCE_NOTE, provenanceRows, scoringText, versionRows } from "./provenance.ts";
+import { CHECKED, DEVELOPMENT, ITEM_RECORDS, MODULE_RECORDS, NOT_CHECKED, PROVENANCE_UPDATED, SIMILARITY, SIMILARITY_LABEL, SOURCES, STANCE_NOTE, provenanceRows, scoringText, versionRows } from "./provenance.ts";
 
 /** 공개 페이지에 그대로 실리는 글 */
 const publicText = () => [...CHECKED, ...NOT_CHECKED, ...DEVELOPMENT, STANCE_NOTE, ...SOURCES.flatMap((s) => [s.name, s.used, s.scope]), ...versionRows().flatMap((v) => [v.label, v.version, v.note])].join("\n");
@@ -80,4 +80,21 @@ test("화면의 문항 문장은 예전 이름 · 글자 코드로 MBTI를 흉�
     assert.ok(!("lowCode" in d) && !("highCode" in d), "글자 코드는 쓰지 않는다");
     assert.ok(!/외향|내향|감각|직관|사고|감정|판단|인식/.test(`${d.lowName} ${d.highName}`), `유형론 용어 대신 행동으로 말한다: ${d.id}`);
   }
+});
+
+test("닮음 표시: 화면 문항마다 있고(내부 기록), 우선 확인 표시는 이유를 적으며, 공개 요약에는 싣지 않는다", () => {
+  for (const item of liveItems) {
+    const s = SIMILARITY[item.id];
+    assert.ok(s, `${item.id} 닮음 표시가 없다`);
+    assert.ok(s.note.length >= 15 && SIMILARITY_LABEL[s.level], item.id);
+  }
+  assert.deepEqual(Object.keys(SIMILARITY).sort(), liveItems.map((i) => i.id).sort());
+  const checks = Object.entries(SIMILARITY).filter(([, s]) => s.level === "check");
+  assert.ok(checks.length >= 1, "우선 확인 표시가 하나도 없다면 점검을 다시 해야 한다");
+  for (const [id, s] of checks) assert.ok(/대조는 못 했/.test(s.note), `${id}: 대조하지 못했다는 것을 적는다`);
+  // 닮지 않았다는 보증으로 읽히는 표현 금지 (표시는 기억과 판단일 뿐이다)
+  const all = Object.values(SIMILARITY).map((s) => s.note).join("\n") + Object.values(SIMILARITY_LABEL).join("\n");
+  for (const bad of [/문제가 없/, /안전하/, /침해(가|는)? 아니/, /독립(적으로)? 개발(됐|했)/]) assert.ok(!bad.test(all), `${bad}`);
+  const pub = publicText();
+  for (const s of Object.values(SIMILARITY)) assert.ok(!pub.includes(s.note), "닮음 표시는 내부 문서에만 둔다");
 });
