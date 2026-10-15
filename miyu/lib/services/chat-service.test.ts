@@ -336,3 +336,68 @@ test("이전 대화의 참고가 없으면 memory 항목 자체를 보내지 않
   await askFreeQuestion(deps(), input(mine));
   assert.equal("memory" in asks[0], false);
 });
+
+// ───────────── 동시에 보낸 질문 · 중복 차감 (질문 3개 묶음) ─────────────
+const slow = (ms = 15) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+test("동시 질문: 무료 질문이 하나 남았을 때 두 개를 동시에 보내도 무료로는 한 개만 답하고, 나머지는 결제가 필요하다고 안내한다 (무료 질문 수를 넘기지 않는다)", async () => {
+  const { mem, repo, mine, deps } = await setup({ answer: async () => (await slow(), ["천천히 해 보면 좋겠어요."]) });
+  for (let i = 0; i < 2; i++) await repo.addChatQuestion({ userId: "u1", assessmentId: mine, roomKey: "love" }); // 방마다 3번 중 2번 씀
+  const results = await Promise.all([askFreeQuestion(deps(), input(mine, "첫 번째 질문이에요")), askFreeQuestion(deps(), input(mine, "두 번째 질문이에요"))]);
+  assert.equal(results.filter(ok).length, 1, JSON.stringify(results.map((r) => (r.ok ? r.kind : r.reason))));
+  const other = results.find((r) => !ok(r));
+  assert.ok(other && !other.ok && other.reason === "need-payment", JSON.stringify(other));
+  assert.equal(mem.chatQuestions.length, 3, "무료 질문 3번을 넘겨 세지 않는다");
+});
+
+test("동시 질문: 결제해 둔 질문 3개를 5개 동시에 보내도 정확히 3개만 답하고 2개는 결제가 필요하며, 잔액은 0이 되고 차감 기록도 3건뿐이다", async () => {
+  const { mem, repo, mine, deps, buy } = await setup({ answer: async () => (await slow(), ["천천히 해 보면 좋겠어요."]) });
+  for (let i = 0; i < 3; i++) await repo.addChatQuestion({ userId: "u1", assessmentId: mine, roomKey: "love" }); // 무료 질문을 모두 씀
+  await buy("u1", mine);
+  assert.equal(await repo.getCashBalance("u1"), QUESTION_PACK_UNITS);
+  const results = await Promise.all(Array.from({ length: 5 }, (_, i) => askFreeQuestion(deps(), input(mine, `동시에 보낸 질문 ${i + 1}번이에요`))));
+  assert.equal(results.filter(ok).length, 3, JSON.stringify(results.map((r) => (r.ok ? r.kind : r.reason))));
+  assert.equal(results.filter((r) => !r.ok && r.reason === "need-payment").length, 2);
+  assert.equal(await repo.getCashBalance("u1"), 0, "잔액은 음수가 되지 않는다");
+  assert.equal(mem.ledger.filter((l) => l.kind === "spend").length, 3);
+  assert.equal(mem.chatQuestions.length, 6, "무료 3 + 결제한 질문 3");
+});
+
+test("실패 시 미차감: 결제해 둔 질문으로 보낸 질문이 답을 받지 못하면(호출 실패) 그 질문은 쓰이지 않고 횟수에도 세지 않으며, 같은 결제로 다시 물으면 답한다 — 동시에 보낸 다른 질문은 영향받지 않는다", async () => {
+  let calls = 0;
+  const { mem, repo, mine, deps, buy } = await setup({
+    answer: async () => {
+      await slow();
+      if (++calls === 1) throw new ChatAnswerError("호출 실패", "MODEL");
+      return ["천천히 해 보면 좋겠어요."];
+    },
+  });
+  for (let i = 0; i < 3; i++) await repo.addChatQuestion({ userId: "u1", assessmentId: mine, roomKey: "love" });
+  await buy("u1", mine);
+  const results = await Promise.all([1, 2, 3].map((n) => askFreeQuestion(deps(), input(mine, `동시에 보낸 질문 ${n}번이에요`))));
+  assert.equal(results.filter(ok).length, 2);
+  assert.equal(results.filter((r) => !r.ok && r.reason === "failed").length, 1);
+  assert.equal(await repo.getCashBalance("u1"), MIYU_CASH.perQuestion, "실패한 질문은 쓰이지 않아 질문 1개가 남았다");
+  assert.equal(mem.chatQuestions.length, 3 + 2, "답을 받은 질문만 횟수에 센다");
+  assert.equal(mem.ledger.filter((l) => l.kind === "spend_restore").length, 1);
+  const retry = await askFreeQuestion(deps(), input(mine, "실패한 질문을 다시 보낼게요"));
+  assert.ok(ok(retry), "추가 결제 없이 다시 물을 수 있다");
+  assert.equal(await repo.getCashBalance("u1"), 0);
+});
+
+test("다른 회원의 질문은 서로 기다리지 않고, 한 질문의 실패가 같은 방의 다음 질문을 막지 않는다", async () => {
+  let n = 0;
+  const { mine, other, deps } = await setup({
+    extra: 10,
+    answer: async () => {
+      if (++n === 1) throw new ChatAnswerError("호출 실패", "MODEL");
+      return ["괜찮아요."];
+    },
+  });
+  const a = await askFreeQuestion(deps(), input(mine, "첫 질문이에요"));
+  assert.ok(!a.ok && a.reason === "failed");
+  const b = await askFreeQuestion(deps(), input(mine, "다음 질문이에요"));
+  assert.ok(ok(b));
+  const c = await askFreeQuestion(deps(), input(other, "다른 사람의 질문이에요", "u2"));
+  assert.ok(ok(c));
+});

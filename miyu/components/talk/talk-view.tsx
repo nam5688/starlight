@@ -133,6 +133,10 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   /** 결제를 다녀온 뒤 이어서 보낼 질문 — 저장된 대화를 되살린 다음에 보낸다(되살리기 전에 보내면 이어 붙일 대화가 어긋난다) */
   const [autoQuestion, setAutoQuestion] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** 질문 3개 구매 버튼 — 구매해야 할 때 Enter는 구매하지 않고 이 버튼으로 초점만 옮긴다 */
+  const buyRef = useRef<HTMLButtonElement>(null);
+  /** 질문을 서버로 보내는 중 — 같은 질문을 두 번 보내거나(두 번 누름 · Enter 두 번) 결제 주문을 두 개 만들지 않게 막는다(state는 다음 화면 갱신 전까지 늦어서 ref로 즉시) */
+  const sending = useRef(false);
   /** 직접 적어 보낸 뒤에는 초점을 입력창에 둔다 (눌러서 이어 간 뒤에는 답장 버튼 쪽) */
   const wantInput = useRef(false);
   // 자유 질문은 AI가 연결돼 있고, 서버에 저장하는 화면(로그인한 내 결과)에서만 열린다.
@@ -320,8 +324,19 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     e?.preventDefault();
     const q = draft.trim();
     if (!canAsk || !persist || !q || busy) return;
-    if (payMode) await pay(q);
-    else await ask(q);
+    // 구매해야 할 때는 Enter · 보내기로 바로 결제 화면에 가지 않는다 — 구매 버튼으로 초점을 옮겨 눌러야 넘어간다
+    if (payMode) {
+      buyRef.current?.focus();
+      return;
+    }
+    await ask(q);
+  };
+
+  /** [질문 3개 구매 · 2,500원] — 적어 둔 질문과 함께 결제 화면으로 간다 */
+  const buy = async () => {
+    const q = draft.trim();
+    if (!canAsk || !persist || !q || busy || !payMode) return;
+    await pay(q);
   };
 
   /**
@@ -329,7 +344,21 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
    * 질문 글은 결제를 다녀오는 동안 이 브라우저에만 남고(pay-pending), 결제가 끝나 돌아오면 자동으로 이어서 보낸다.
    */
   const pay = async (q: string) => {
-    if (!persist) return;
+    if (sending.current) return;
+    sending.current = true;
+    let next: "moved" | "ask" | "done" = "done";
+    try {
+      next = await payInner(q);
+    } finally {
+      // 결제 화면으로 넘어가는 동안은 잠가 두고(화면이 바뀔 때까지), 그 밖에는 바로 푼다
+      if (next === "moved") window.setTimeout(() => (sending.current = false), 4000);
+      else sending.current = false;
+    }
+    // 결제해 둔 질문이 남아 있거나 무료 질문이 있었다 — 결제 없이 바로 묻는다
+    if (next === "ask") await ask(q);
+  };
+  const payInner = async (q: string): Promise<"moved" | "ask" | "done"> => {
+    if (!persist) return "done";
     if (running.current) skip();
     acted.current = true;
     wantInput.current = true;
@@ -342,27 +371,34 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       // 화면이 넘어가는 동안 입력창은 "결제 화면으로 이동하고 있어요"로 둔다 (결제 화면에서 뒤로 돌아오면 다시 쓸 수 있게 잠시 뒤 풀어 둔다)
       router.push(`/checkout/${encodeURIComponent(r.orderNumber)}`);
       window.setTimeout(() => setPaying(false), 4000);
-      return;
+      return "moved";
     }
     setPaying(false);
     // 방금 무료 질문이 남았거나 결제해 둔 질문이 있다 — 결제 없이 바로 묻는다
-    if (r?.ok && r.kind === "ask") {
-      await ask(q);
-      return;
-    }
+    if (r?.ok && r.kind === "ask") return "ask";
     if (r?.ok && r.kind === "safety") {
       // 마음이 힘든 글의 안내 — 결제하지 않고 대화에만 보인다(저장하지 않는다)
       setDraft("");
       setLog((l) => [...l, { from: "me", text: q, id: ++seq.current }]);
       deliver(say(r.paragraphs));
-      return;
+      return "done";
     }
     // 결제를 시작하지 못했다 — 이유를 알리고 쓴 글은 그대로 둔다
     deliver(say([r && !r.ok ? r.message : "결제를 시작하지 못했어요. 잠시 뒤에 다시 시도해 주세요."]));
+    return "done";
   };
 
   /** 질문 보내기 — 내 말은 바로 보이고, 답은 서버가 저장된 리포트의 글을 근거로 AI에게 받아 온다. 검사를 통과한 답만 대화에 놓고 저장한다 */
   const ask = async (q: string) => {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await askInner(q);
+    } finally {
+      sending.current = false;
+    }
+  };
+  const askInner = async (q: string) => {
     if (!canAsk || !persist || !q || busy) return;
     if (running.current) skip();
     acted.current = true;
@@ -581,7 +617,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       : quotaUsed
         ? hasTicket
           ? TALK_COPY.freeQuestionTicket(ticketCount)
-          : TALK_COPY.freeQuestionPay(model.chat.pay?.priceKrw ?? QUESTION_PACK_PRICE_KRW)
+          : TALK_COPY.freeQuestionPay
         : left !== null
           ? model.chat.free
             ? freeQuestionPlaceholder(left)
@@ -818,7 +854,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           {!quotaUsed && left !== null && left > 0 && ` · 이 방 무료 질문 ${left}번 남았어요`}
         </p>
       )}
-      <form onSubmit={send} className="relative flex items-center gap-2 bg-page px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <form onSubmit={send} className="relative flex flex-wrap items-center gap-x-2 gap-y-2 bg-page px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {menuOpen && (
           <div ref={menuRef} id={menuId} role="group" aria-label="채팅방 · 메뉴" className="absolute right-3 bottom-full left-3 mb-2 max-h-[min(30rem,70dvh)] overflow-y-auto rounded-2xl bg-canvas p-2 shadow-pop">
             <p className="px-3 pt-1.5 pb-0.5 text-[13px] font-semibold text-ink-3">채팅방 · 방마다 새 대화로 시작해요</p>
@@ -935,14 +971,33 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
             </span>
           )}
         </div>
-        <button
-          type="submit"
-          disabled={!canAsk || busy || draft.trim().length === 0}
-          aria-label={canAsk ? (payMode ? "보내고 결제하기" : "보내기") : "보내기 (사용할 수 없어요)"}
-          className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-white transition-opacity hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-accent-soft disabled:text-ink-3 disabled:opacity-70"
-        >
-          <ArrowIcon className="size-5 -rotate-90" />
-        </button>
+        {payMode ? (
+          // 구매해야 할 때는 화살표 대신 개수 · 가격이 적힌 구매 버튼 — 누르면 결제 화면으로 가고, 결제가 끝나면 적어 둔 질문에 바로 답한다
+          <div className="basis-full">
+            <button
+              ref={buyRef}
+              type="button"
+              onClick={() => void buy()}
+              disabled={busy || draft.trim().length === 0}
+              className="flex min-h-11 w-full items-center justify-center rounded-full bg-accent px-4 text-[15px] font-semibold text-white transition-opacity hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-accent-soft disabled:text-ink-3 disabled:opacity-70"
+            >
+              {paying ? TALK_COPY.payMoving : TALK_COPY.payButton(model.chat.pay?.priceKrw ?? QUESTION_PACK_PRICE_KRW)}
+            </button>
+            <p className="mt-1.5 text-center text-[12px] leading-snug text-ink-3">
+              {TALK_COPY.payExplain}
+              <span className="block">{TALK_COPY.payExplainRest}</span>
+            </p>
+          </div>
+        ) : (
+          <button
+            type="submit"
+            disabled={!canAsk || busy || draft.trim().length === 0}
+            aria-label={canAsk ? "보내기" : "보내기 (사용할 수 없어요)"}
+            className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-white transition-opacity hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-accent-soft disabled:text-ink-3 disabled:opacity-70"
+          >
+            <ArrowIcon className="size-5 -rotate-90" />
+          </button>
+        )}
         <span id={noteId} className="sr-only">
           {note}
         </span>

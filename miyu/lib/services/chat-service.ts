@@ -176,7 +176,28 @@ export async function gateQuestion(deps: AskDeps, input: AskInput): Promise<Ques
   return { ok: true, q: { text: q.text, length: q.length }, level, loaded, roomKey, inQuota, policy, used };
 }
 
-export async function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<AskResult> {
+/**
+ * 같은 회원이 같은 방에 질문을 동시에 보내면(두 번 누름 · 탭 두 개) 순서대로 하나씩 처리한다 — 무료 질문 수를 세는 일(남은 수 확인 → 답 → 횟수 더하기)이 겹치면 둘 다 "아직 남았다"고 보고 무료 질문을 넘겨 줄 수 있기 때문이다.
+ * 결제해 둔 질문은 이것과 상관없이 DB가 한 번에 하나씩만 차감한다(`spend_cash`). 이 줄 세우기는 한 서버 안에서만 막으며, 서버가 여러 대에 나뉘어 동시에 도착한 요청은 막지 못한다(그 경우 무료 질문이 최대 1개 더 나갈 수 있다 — docs/question-payment.md).
+ */
+const roomQueues = new Map<string, Promise<unknown>>();
+async function inRoomQueue<T>(key: string, job: () => Promise<T>): Promise<T> {
+  const before = roomQueues.get(key) ?? Promise.resolve();
+  const mine = before.then(job, job);
+  const tail = mine.catch(() => undefined);
+  roomQueues.set(key, tail);
+  try {
+    return await mine;
+  } finally {
+    if (roomQueues.get(key) === tail) roomQueues.delete(key);
+  }
+}
+
+export function askFreeQuestion(deps: AskDeps, input: AskInput): Promise<AskResult> {
+  return inRoomQueue(`${input.userId}:${String(input.roomKey)}`, () => askFreeQuestionNow(deps, input));
+}
+
+async function askFreeQuestionNow(deps: AskDeps, input: AskInput): Promise<AskResult> {
   const { repo } = deps;
   const gate = await gateQuestion(deps, input);
   if (!gate.ok) return gate.result;

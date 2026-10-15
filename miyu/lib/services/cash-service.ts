@@ -78,9 +78,24 @@ export async function startQuestionPayment(
       paymentEnv: input.paymentEnv ?? "test",
       acquisition: input.acquisition ?? null,
     });
-    if (inserted.ok) return { kind: "order", order: inserted.value, quote };
+    if (inserted.ok) return { kind: "order", order: await keepNewestPending(repo, assessment.id, inserted.value), quote };
   }
   throw new Error("질문 결제 주문을 만들지 못했습니다.");
+}
+
+/**
+ * 같은 결과에 질문 결제 대기 주문이 둘 이상 남지 않게 한다 — 두 번 누르거나 탭 두 개에서 동시에 시작해도 가장 늦게 만든 주문 하나만 결제할 수 있고,
+ * 어느 요청이 먼저 끝났든 모두 그 주문으로 보낸다(그래서 같은 묶음을 두 번 결제하는 길을 줄인다). 이미 결제를 시작한 주문(대기가 아닌 것)은 건드리지 않는다.
+ */
+async function keepNewestPending(repo: MiyuRepository, assessmentId: string, mine: OrderRecord): Promise<OrderRecord> {
+  const pendings = (await repo.listOrdersForAssessment(assessmentId)).filter((o) => o.status === "pending" && isCashProduct(o.productId));
+  const newest = pendings.reduce<OrderRecord>((best, o) => (o.createdAt > best.createdAt || (o.createdAt === best.createdAt && o.id > best.id) ? o : best), mine);
+  for (const o of pendings) {
+    if (o.id === newest.id) continue;
+    const canceled = await repo.updateOrder(o.id, ["pending"], { status: "canceled", failureCode: "SUPERSEDED", failureMessage: "새 결제 요청으로 대체됨" });
+    if (canceled) await repo.addPaymentEvent({ orderId: o.id, source: "checkout", status: "SUPERSEDED", detail: {} });
+  }
+  return newest;
 }
 
 export const CASH_KIND_LABEL: Record<CashLedgerRecord["kind"], string> = {

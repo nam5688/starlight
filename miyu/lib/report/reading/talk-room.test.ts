@@ -423,11 +423,11 @@ test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이�
   assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
 });
 
-test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 질문을 적어 보내면 질문 3개를 묶어서 결제하는 화면으로 이어진다는 것만 알리고(가격 · 글자 수 문장은 이 창에 없다), 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
+test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 질문을 적고 '질문 3개 구매' 버튼을 누르면 구매한 뒤 그 질문에 바로 답한다는 것만 알리고(가격 · 글자 수 문장은 이 창에 없다), 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
   const c = TALK_COPY.recharge;
   assert.equal(c["free-used"].title, "무료 질문을 모두 썼어요");
-  assert.equal(c["free-used"].body, "이어서 묻고 싶다면 질문을 적어 보내 주세요. 질문 3개를 묶어서 결제하는 화면으로 이어져요.");
-  assert.equal(c["paid-used"].body, "더 묻고 싶다면 질문을 적어 보내 주세요. 질문 3개를 묶어서 결제하는 화면으로 이어 갈 수 있어요.");
+  assert.equal(c["free-used"].body, '이어서 묻고 싶다면 질문을 적고 "질문 3개 구매" 버튼을 눌러 주세요. 구매한 뒤 그 질문에 바로 답해요.');
+  assert.equal(c["paid-used"].body, '더 묻고 싶다면 질문을 적고 "질문 3개 구매" 버튼을 눌러 주세요. 구매한 뒤 그 질문에 바로 답해요.');
   for (const v of [c["free-used"], c["paid-used"]]) assert.ok(!/\d+원|\d+자|두 배|충전|캐시/.test(v.body), `안내창에는 가격 · 글자 수 · 선불 충전 말이 없다(질문 개수만 알린다): ${v.body}`);
   assert.deepEqual(QUESTION_MAX, { free: 300, paid: 500 });
   assert.equal(QUESTION_PACK_PRICE_KRW, 2500);
@@ -437,13 +437,19 @@ test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정|충전|캐시/.test(text), `불안 · 압박 · 선불 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }
-  for (const text of [ROOM_COPY.chatTicketLead(2), ROOM_COPY.chatPayLead(QUESTION_PACK_PRICE_KRW), ROOM_COPY.chatPayLow, ROOM_COPY.chatPayNote(QUESTION_PACK_PRICE_KRW), TALK_COPY.freeQuestionTicket(2), TALK_COPY.freeQuestionPay(QUESTION_PACK_PRICE_KRW), TALK_COPY.payMoving, TALK_COPY.payNotDone]) {
+  for (const text of [ROOM_COPY.chatTicketLead(2), ROOM_COPY.chatPayLead(QUESTION_PACK_PRICE_KRW), ROOM_COPY.chatPayLow, ROOM_COPY.chatPayNote(QUESTION_PACK_PRICE_KRW), TALK_COPY.freeQuestionTicket(2), TALK_COPY.freeQuestionPay, TALK_COPY.payButton(QUESTION_PACK_PRICE_KRW), TALK_COPY.payExplain, TALK_COPY.payExplainRest, TALK_COPY.payMoving, TALK_COPY.payNotDone]) {
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정|충전|캐시/.test(text), `불안 · 압박 · 선불 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }
-  assert.match(ROOM_COPY.chatPayLead(2500), /질문 3개에 2,500원/);
-  assert.match(ROOM_COPY.chatPayNote(2500), /질문 3개에 2,500원/);
-  assert.equal(TALK_COPY.freeQuestionPay(2500), "질문 3개 2,500원 · 적어서 보내면 결제로 이어져요");
+  assert.match(ROOM_COPY.chatPayLead(2500), /"질문 3개 구매 · 2,500원" 버튼/);
+  assert.match(ROOM_COPY.chatPayLead(2500), /적은 질문에 바로 답하고 1회가 사용돼요/);
+  assert.match(ROOM_COPY.chatPayNote(2500), /질문 3개 묶음 2,500원\(부가세 포함\)/);
+  assert.match(ROOM_COPY.chatPayNote(2500), /1개씩 결제하는 방법은 없어요/);
+  // 보내기 화살표 대신 구매 버튼: 이름에 개수와 가격이 있고, 그 아래 한 줄이 구매 뒤에 벌어질 일(바로 답변 · 1회 사용 · 남은 질문)을 말한다
+  assert.equal(TALK_COPY.payButton(2500), "질문 3개 구매 · 2,500원");
+  assert.equal(TALK_COPY.payExplain, "구매 후 작성한 질문에 바로 답변하며 1회가 사용돼요");
+  assert.equal(TALK_COPY.payExplainRest, "남은 2회는 이어서 쓸 수 있어요");
+  assert.equal(TALK_COPY.freeQuestionPay, "먼저 묻고 싶은 질문을 적어 주세요");
   assert.equal(TALK_COPY.freeQuestionTicket(2), "결제해 둔 질문 2개가 남아 있어요");
   assert.match(ROOM_COPY.chatTicketLead(1), /결제해 둔 질문이 1개 남아 있어요/);
   assert.ok(ROOM_COPY.chatFreeNote.includes(`${QUESTION_MAX.free}자`), "무료 질문 안내에도 글자 수 한도가 있다");

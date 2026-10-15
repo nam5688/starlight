@@ -85,6 +85,26 @@ test("결제 시작: 무료 질문을 다 쓴 방에서 서버가 금액(질문 
   assert.ok(!JSON.stringify([...w.mem.orders.values(), w.mem.opsEvents]).includes("연락이 뜸한"));
 });
 
+test("중복 결제 막기: 결제 시작을 동시에 여러 번 눌러도 결제할 수 있는 대기 주문은 하나뿐이고 모두 같은 주문으로 간다 — 이미 결제를 시작한 주문 · 다른 결과의 주문은 건드리지 않는다", async () => {
+  const w = await world({ room: "love" });
+  await w.spendFree(2);
+  const results = await Promise.all(Array.from({ length: 4 }, () => startQuestionPayment(w.deps, { ...w.input(), paymentEnv: "test" })));
+  const orders = results.map((r) => (r.kind === "order" ? r.order : null));
+  assert.ok(orders.every((o) => o !== null), JSON.stringify(results.map((r) => r.kind)));
+  const pending = [...w.mem.orders.values()].filter((o) => o.status === "pending");
+  assert.equal(pending.length, 1, "결제할 수 있는 대기 주문은 하나");
+  assert.equal(new Set(orders.map((o) => o!.orderNumber)).size, 1, "네 요청 모두 같은 주문으로 간다");
+  assert.equal(orders[0]!.orderNumber, pending[0]!.orderNumber);
+  // 대기가 아닌 주문(이미 결제 완료)은 새 요청이 건드리지 않는다
+  const paid = await confirmPayment({ repo: w.mem.repo, gateway: w.toss.gateway }, { userId: USER, orderNumber: pending[0]!.orderNumber, paymentKey: "pk_dup_1", amount: pending[0]!.amount });
+  assert.equal(paid.kind, "paid");
+  assert.equal((await getCashView(w.mem.repo, USER)).questions, 3);
+  // 같은 결제 승인 요청을 여러 번 동시에 보내도 질문 3개는 한 번만 들어간다
+  await Promise.all(Array.from({ length: 4 }, () => confirmPayment({ repo: w.mem.repo, gateway: w.toss.gateway }, { userId: USER, orderNumber: pending[0]!.orderNumber, paymentKey: "pk_dup_1", amount: pending[0]!.amount })));
+  assert.equal((await getCashView(w.mem.repo, USER)).questions, 3);
+  assert.equal(w.toss.byKey.size, 1, "결제사 승인 기록도 한 건");
+});
+
 test("결제 시작: 무료 질문이 남아 있거나 결제해 둔 질문이 하나라도 남아 있으면 새로 결제받지 않는다 (묶음에서 쓰고 남은 질문은 최대 2개)", async () => {
   const w = await world({ room: "love" });
   assert.deepEqual(await startQuestionPayment(w.deps, { ...w.input(), paymentEnv: "test" }), { kind: "ask" }, "무료 질문이 남았다");

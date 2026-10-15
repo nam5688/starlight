@@ -191,9 +191,15 @@ export const TALK_COPY = {
   freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
   freeQuestionNoMaterial: "이 주제는 리포트를 받으면 질문할 수 있어요",
   freeQuestionUsed: "무료 질문을 모두 썼어요",
-  /** 무료 질문을 다 썼을 때 입력창 안내 — 결제해 둔 질문이 남아 있을 때(남은 개수) · 질문을 보내면 결제로 이어질 때(질문 3개 묶음 결제, 낱개 없음) */
+  /**
+   * 무료 질문을 다 썼을 때 입력창 안내 — 결제해 둔 질문이 남아 있을 때(남은 개수) · 새로 구매해야 할 때(질문 3개 묶음 결제, 낱개 없음).
+   * 구매해야 할 때는 보내기 화살표 대신 "질문 3개 구매 · 2,500원" 버튼이 나오고(운영자 2026-10-15: 화살표를 누르자마자 결제 화면으로 가면 당황스럽다), 그 아래에 구매하면 무슨 일이 일어나는지 한 줄(`payExplain`)을 보인다.
+   */
   freeQuestionTicket: (left: number) => `결제해 둔 질문 ${left}개가 남아 있어요`,
-  freeQuestionPay: (priceKrw: number) => `질문 ${QUESTION_PACK_SIZE}개 ${formatKrw(priceKrw)} · 적어서 보내면 결제로 이어져요`,
+  freeQuestionPay: "먼저 묻고 싶은 질문을 적어 주세요",
+  payButton: (priceKrw: number) => `질문 ${QUESTION_PACK_SIZE}개 구매 · ${formatKrw(priceKrw)}`,
+  payExplain: "구매 후 작성한 질문에 바로 답변하며 1회가 사용돼요",
+  payExplainRest: `남은 ${QUESTION_PACK_SIZE - 1}회는 이어서 쓸 수 있어요`,
   freeQuestionDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요",
   /** 유료 질문을 보내 결제 화면으로 넘어가는 동안 입력창에 · 결제를 마치지 못하고 돌아왔을 때 알림 */
   payMoving: "결제 화면으로 이동하고 있어요",
@@ -204,8 +210,8 @@ export const TALK_COPY = {
    *  - free-used: 무료 리포트 회원이 이 방의 무료 질문을 다 썼다  - paid-used: 심층 리포트 회원이 다 썼다  - deep: 무료 리포트로는 더 이어 갈 수 없는 방이다
    */
   recharge: {
-    "free-used": { title: "무료 질문을 모두 썼어요", body: `이어서 묻고 싶다면 질문을 적어 보내 주세요. 질문 ${QUESTION_PACK_SIZE}개를 묶어서 결제하는 화면으로 이어져요.` },
-    "paid-used": { title: "이 방의 무료 질문을 모두 썼어요", body: `더 묻고 싶다면 질문을 적어 보내 주세요. 질문 ${QUESTION_PACK_SIZE}개를 묶어서 결제하는 화면으로 이어 갈 수 있어요.` },
+    "free-used": { title: "무료 질문을 모두 썼어요", body: `이어서 묻고 싶다면 질문을 적고 "질문 ${QUESTION_PACK_SIZE}개 구매" 버튼을 눌러 주세요. 구매한 뒤 그 질문에 바로 답해요.` },
+    "paid-used": { title: "이 방의 무료 질문을 모두 썼어요", body: `더 묻고 싶다면 질문을 적고 "질문 ${QUESTION_PACK_SIZE}개 구매" 버튼을 눌러 주세요. 구매한 뒤 그 질문에 바로 답해요.` },
     deep: { title: "자세한 이야기는 심층 리포트에서 이어져요", body: `${REPORT_TIER_NAMES.deep}로는 모든 상담방을 열 수 있고, 방마다 무료 질문을 ${CHAT_ROOMS.deepFreeQuestions}번 드려요.` },
     later: "다음에 할게요",
     payLabel: "질문 이어가기",

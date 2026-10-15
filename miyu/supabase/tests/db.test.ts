@@ -1137,6 +1137,62 @@ test("유료 질문 결제(질문 한 개당): 승인되면 3단위가 한 번�
   assert.equal(await server.getCashBalance(U.id), 0);
 });
 
+test("실제 DB 동시성(질문 3개 묶음): 같은 승인이 6번 동시에 와도 질문 3개는 한 번만 들어가고, 질문 6개를 동시에 써도 정확히 3개만 쓰이며, 같은 질문을 두 번 보내도 한 번만 차감되고, 같은 되돌림을 여러 번 해도 한 번만 돌아오고, 일부 쓴 뒤 환불하면 남은 질문만 회수한다", async () => {
+  const U = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const tag = randomUUID().slice(0, 8);
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "질문동시" }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+  const quote = questionQuote();
+  const inserted = await server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: U.id, assessmentId: aid, productId: questionProductId(createQuestionNonce("love")), amount: quote.priceKrw, paymentEnv: "test" });
+  assert.ok(inserted.ok);
+  const order = inserted.ok ? inserted.value : null!;
+  const key = `pk-race-${randomUUID()}`;
+  const per = MIYU_CASH.perQuestion;
+
+  // 1) 같은 승인 요청이 6번 동시에 — 질문 3개(9단위)가 한 번만
+  const confirms = await Promise.all(Array.from({ length: 6 }, () => confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: order.orderNumber, paymentKey: key, amount: order.amount })));
+  assert.ok(confirms.every((r) => r.kind === "paid"), JSON.stringify(confirms.map((r) => r.kind)));
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS, "동시에 승인돼도 묶음 하나만 들어간다");
+  assert.equal((await server.listCashLedger(U.id, 50)).filter((l) => l.kind === "charge").length, 1);
+
+  // 2) 질문 6개를 동시에 — 정확히 3개만 쓰이고 나머지는 결제해 둔 질문이 없다(null)
+  const spends = await Promise.all(Array.from({ length: 6 }, (_, i) => server.spendCash({ userId: U.id, amount: per, ref: `q-race-${i}-${tag}` })));
+  assert.equal(spends.filter((b) => b !== null).length, 3, `동시에 6번 써도 3번만 성공: ${JSON.stringify(spends)}`);
+  assert.equal(spends.filter((b) => b === null).length, 3);
+  assert.deepEqual(spends.filter((b): b is number => b !== null).sort((a, b) => a - b), [0, 3, 6], "남은 단위가 겹치지 않고 6 → 3 → 0으로 줄어든다");
+  assert.equal(await server.getCashBalance(U.id), 0, "잔액이 음수가 되지 않는다");
+  const spentRefs = (await server.listCashLedger(U.id, 50)).filter((l) => l.kind === "spend");
+  assert.equal(spentRefs.length, 3, "쓴 기록도 정확히 3건");
+
+  // 3) 같은 질문(같은 참조번호)이 두 번 동시에 — 한 번만 차감된다 (질문 하나를 되돌려 1개를 남긴 뒤 시험)
+  const okRefs = spends.map((b, i) => (b !== null ? `q-race-${i}-${tag}` : null)).filter((r): r is string => r !== null);
+  assert.equal(okRefs.length, 3);
+  assert.equal(await server.restoreCashSpend({ userId: U.id, ref: okRefs[0]! }), per);
+  const twice = await Promise.allSettled([server.spendCash({ userId: U.id, amount: per, ref: `q-same-${tag}` }), server.spendCash({ userId: U.id, amount: per, ref: `q-same-${tag}` })]);
+  assert.equal(twice.filter((r) => r.status === "fulfilled" && r.value !== null).length, 1, `같은 참조번호는 한 번만 차감: ${JSON.stringify(twice.map((r) => (r.status === "fulfilled" ? r.value : "거절")))}`);
+  assert.equal(await server.getCashBalance(U.id), 0, "두 번 차감되지 않았다");
+
+  // 4) 같은 되돌림을 4번 동시에 — 질문 하나(3단위)만 돌아온다
+  const restores = await Promise.all(Array.from({ length: 4 }, () => server.restoreCashSpend({ userId: U.id, ref: `q-same-${tag}` })));
+  assert.equal(restores.filter((b) => b !== null).length, 1, "되돌림은 한 번만");
+  assert.equal(await server.getCashBalance(U.id), per, "질문 1개가 돌아와 남았다");
+
+  // 5) 질문 1개를 쓰고 2개가 남은 상태에서 환불 — 남은 질문(6단위)만 회수하고, 쓴 질문 몫(3단위)은 모자란 몫으로 남는다
+  await server.restoreCashSpend({ userId: U.id, ref: okRefs[1]! });
+  assert.equal(await server.getCashBalance(U.id), per * 2, "질문 2개 남음");
+  const refund = await admin.from("orders").update({ status: "refunded" }).eq("id", order.id);
+  assert.equal(refund.error, null);
+  const claw = (await server.listCashLedger(U.id, 50)).find((l) => l.kind === "clawback");
+  assert.equal(claw?.amount, -per * 2, "남은 질문 2개(6단위)를 회수");
+  assert.equal(claw?.shortfall, per, "이미 쓴 질문 1개(3단위)는 회수하지 못한 몫");
+  assert.equal(await server.getCashBalance(U.id), 0);
+  // 같은 환불 상태를 다시 써도(결제사 대조 · 웹훅이 겹쳐도) 한 번만 회수한다
+  await admin.from("orders").update({ status: "refunded" }).eq("id", order.id);
+  assert.equal((await server.listCashLedger(U.id, 50)).filter((l) => l.kind === "clawback").length, 1);
+});
+
 test("미유캐시: 상품 번호 형식이 맞지 않는 주문은 결제 완료 처리를 막지 않고 지갑에도 넣지 않는다 (check-cash.sql이 찾는다)", async () => {
   const U = await makeUser();
   const server = createSupabaseRepository(admin);
