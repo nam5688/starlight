@@ -1,4 +1,6 @@
 import "server-only";
+import { REPORT_GENERATION_TIMEOUT_LIVE_MS, REPORT_GENERATION_TIMEOUT_MAX_MS } from "@/lib/commerce/report";
+import { resolveReportAnthropic, type ReportAnthropicConfig } from "@/lib/report/ai/live-config";
 import { resolveChatAi, type ChatAiConfig } from "@/lib/report/chat/ai-config";
 import type { CapacityConfig } from "@/lib/services/capacity-service";
 import { DEFAULT_EXTRA_QUESTIONS, type ChatServiceConfig } from "@/lib/services/chat-service";
@@ -100,13 +102,16 @@ export type AiConfig =
   | { kind: "none" }
   /** 로컬 검증용 가짜 AI 서버 (127.0.0.1 / localhost만) — 비용 없음 */
   | { kind: "mock-local"; baseUrl: string }
-  /** 설정에 이름은 있지만 아직 만들지 않은 제공사 · 잘못된 값 — 개발용 생성기로 두고 /setup에 이유를 보여준다 */
+  /** 실제 Anthropic — 운영자가 .env.local에 승인 금액 · 호출 수 · 기간(AI_APPROVED_*)을 직접 적었을 때만. 호출마다 승인 가드가 확인한다(server/live-ai.ts) */
+  | Extract<ReportAnthropicConfig, { kind: "anthropic" }>
+  /** 설정에 이름은 있지만 아직 만들지 않은 제공사 · 잘못된 값 · 승인 값이 빠짐 — 개발용 생성기로 두고 /setup에 이유를 보여준다 */
   | { kind: "invalid"; reason: string };
 
 /**
- * 리포트 AI 설정. 실제 유료 제공사(Anthropic · OpenAI · Google 등)는 운영자가 고른 뒤에 추가한다.
+ * 리포트 AI 설정. 규칙과 환경변수 이름은 lib/report/ai/live-config.ts에 있다.
  * - AI_PROVIDER 비움 → 개발용 규칙 생성기
  * - AI_PROVIDER=mock-local + AI_MOCK_URL=http://127.0.0.1:포트 → 로컬 가짜 AI 서버로 v2 리포트 흐름 검증
+ * - AI_PROVIDER=anthropic → 실제 Claude (ANTHROPIC_API_KEY + AI_APPROVED_KRW · CALLS · FROM · THROUGH를 직접 적어야 하고, 하나라도 없으면 개발용 생성기로 두고 호출하지 않는다)
  */
 export function aiConfig(): AiConfig {
   const provider = read("AI_PROVIDER");
@@ -118,7 +123,8 @@ export function aiConfig(): AiConfig {
     }
     return { kind: "mock-local", baseUrl };
   }
-  return { kind: "invalid", reason: `AI 제공사 ${provider}는 아직 연결하지 않았습니다 (선택 · 승인 후 추가)` };
+  if (provider === "anthropic") return resolveReportAnthropic(read);
+  return { kind: "invalid", reason: `AI 제공사 ${provider}는 아직 연결하지 않았습니다 (anthropic만 있어요)` };
 }
 
 function readInt(name: string, fallback: number): number {
@@ -141,20 +147,25 @@ function readPrice(name: string): number | null {
  * - AI_SALE_QUEUE_LIMIT: 대기 + 생성 중인 리포트가 이 수 이상이면 새 결제를 시작하지 못하게 함 (기본 10)
  * - AI_DAILY_BUDGET_KRW: 하루 AI 예산(원). 0 또는 비움 = 제한 없음
  * - AI_EST_COST_KRW_PER_REPORT: 리포트 한 건의 예상 비용(원) — 대기 중인 건을 예산에 미리 반영
- * - AI_GENERATION_TIMEOUT_SECONDS: 리포트 한 번의 생성 시도에 허용하는 시간(초, 기본 240). 생성 중 상태가 멈춘 것으로 보는 300초보다 짧게만 설정할 수 있다
+ * - AI_GENERATION_TIMEOUT_SECONDS: 리포트 한 번의 생성 시도에 허용하는 시간(초, 기본 240 · 실제 AI 연결 시 480). 생성 중 상태가 멈춘 것으로 보는 600초보다 1분 짧게(최대 540)만 설정할 수 있다
  * - AI_PRICE_INPUT_KRW_PER_MTOK · AI_PRICE_OUTPUT_KRW_PER_MTOK: 토큰 단가(원 / 100만 토큰). 제공사를 정한 뒤 공식 가격표 값을 넣는다
  */
 export function capacityConfig(): CapacityConfig {
-  const connected = aiConfig().kind === "mock-local";
+  const ai = aiConfig();
+  const live = ai.kind === "anthropic";
+  const connected = live || ai.kind === "mock-local";
+  // 실제 AI는 가격표(달러) × 환율로 호출마다 비용을 기록한다(그래야 승인 가드와 하루 예산이 합계를 센다). 운영자가 AI_PRICE_*를 직접 적었다면 그 값이 먼저다
+  const fx = live ? ai.pricing.fxKrwPerUsd : 0;
+  const timeoutSec = readInt("AI_GENERATION_TIMEOUT_SECONDS", 0);
   return {
     maxConcurrent: connected ? readInt("AI_MAX_CONCURRENT", 3) : readInt("AI_MAX_CONCURRENT", 0),
     saleQueueLimit: connected ? readInt("AI_SALE_QUEUE_LIMIT", 10) : readInt("AI_SALE_QUEUE_LIMIT", 0),
     dailyBudgetKrw: readInt("AI_DAILY_BUDGET_KRW", 0),
-    estCostKrwPerReport: readInt("AI_EST_COST_KRW_PER_REPORT", 0),
-    priceInputKrwPerMTok: readPrice("AI_PRICE_INPUT_KRW_PER_MTOK"),
-    priceOutputKrwPerMTok: readPrice("AI_PRICE_OUTPUT_KRW_PER_MTOK"),
-    // 0이면 기본값. 멈춤 판단(300초)보다 짧게만 허용한다 (그래야 시간 초과가 먼저 실패로 기록된다)
-    generationTimeoutMs: Math.min(readInt("AI_GENERATION_TIMEOUT_SECONDS", 0), 280) * 1000,
+    estCostKrwPerReport: readInt("AI_EST_COST_KRW_PER_REPORT", live ? 350 : 0),
+    priceInputKrwPerMTok: readPrice("AI_PRICE_INPUT_KRW_PER_MTOK") ?? (live ? ai.pricing.price.inputUsdPerMTok * fx : null),
+    priceOutputKrwPerMTok: readPrice("AI_PRICE_OUTPUT_KRW_PER_MTOK") ?? (live ? ai.pricing.price.outputUsdPerMTok * fx : null),
+    // 0이면 기본값(실제 AI는 8분, 그 밖은 4분). 멈춤 판단(10분)보다 1분 짧게만 허용한다 (그래야 시간 초과가 먼저 실패로 기록된다)
+    generationTimeoutMs: timeoutSec > 0 ? Math.min(timeoutSec * 1000, REPORT_GENERATION_TIMEOUT_MAX_MS) : live ? REPORT_GENERATION_TIMEOUT_LIVE_MS : 0,
   };
 }
 
@@ -162,7 +173,7 @@ export function capacityConfig(): CapacityConfig {
  * 자유 질문(채팅에서 직접 적는 질문) 설정
  * - 방마다 무료 질문 수 · 간단/심층 리포트별 열리는 방은 lib/config/product.ts의 CHAT_ROOMS 한 곳에서 정한다 (환경변수가 아니다).
  * - AI_CHAT_EXTRA_QUESTIONS: **시험 중에만** 열린 방마다 무료 질문을 이만큼 더 준다 (기본 0). 시험이 끝나면 비운다.
- * 질문마다 AI 호출 비용이 든다. 하루 AI 예산(AI_DAILY_BUDGET_KRW)에 닿아도 새 질문만 멈춘다. 무료 질문을 다 쓰면 미유캐시(질문 한 번에 3개)로 이어 간다.
+ * 질문마다 AI 호출 비용이 든다. 하루 AI 예산(AI_DAILY_BUDGET_KRW)에 닿아도 새 질문만 멈춘다. 무료 질문을 다 쓰면 질문 한 개당 결제(300원)로 이어 간다.
  */
 export function chatConfig(): ChatServiceConfig {
   return { extraQuestions: readInt("AI_CHAT_EXTRA_QUESTIONS", DEFAULT_EXTRA_QUESTIONS) };

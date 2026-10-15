@@ -1,13 +1,17 @@
-// 주문이 끝난 뒤 고객이 돌아갈 화면 — 미유캐시 충전은 충전 화면, 개인 통합 리포트는 결과 화면(다시 받은 리포트는 그 주문의 리포트), 고민 반영 리포트는 나의 고민 기록소(결제 완료 뒤에는 그 기록의 리포트).
+// 주문이 끝난 뒤 고객이 돌아갈 화면 — 유료 질문은 질문했던 채팅방(결제가 끝났으면 이어서 보내라는 표시 paid를 함께), 개인 통합 리포트는 결과 화면(다시 받은 리포트는 그 주문의 리포트), 고민 반영 리포트는 나의 고민 기록소(결제 완료 뒤에는 그 기록의 리포트).
 // (비밀값을 다루지 않는 순수 함수라 "server-only" 없이 두고 테스트한다)
 
 import { isCashProduct, parseConcernProductId, parsePersonalSeq } from "../lib/config/product.ts";
+import { questionRoomOf } from "../lib/commerce/cash.ts";
+import { ROOMS } from "../lib/report/reading/talk-room.ts";
 
 export function resultPathOf(order: { assessmentId: string; productId: string; orderNumber?: string }, opts: { paid?: boolean } = {}): string {
-  // 미유캐시 충전은 리포트가 아니라 충전 화면으로 돌아간다 (결제가 끝났으면 충전 완료 안내를 함께 보인다)
+  // 유료 질문은 질문했던 채팅방으로 돌아간다 (결제가 끝났으면 paid로 알려, 결제 전에 적어 둔 질문을 이어서 보낸다).
+  // 방 이름은 돌아갈 화면을 고르는 데만 쓰고(권한 판단 아님), 없는 방이거나 예전 선불 충전 주문이면 기본 채팅방으로 간다
   if (isCashProduct(order.productId)) {
-    const base = `/cash?a=${order.assessmentId}`;
-    return opts.paid && order.orderNumber ? `${base}&done=${encodeURIComponent(order.orderNumber)}` : base;
+    const room = questionRoomOf(order.productId);
+    const base = room && room in ROOMS && room !== "main" ? `/results/${order.assessmentId}/talk/${room}` : `/results/${order.assessmentId}/talk`;
+    return opts.paid && order.orderNumber ? `${base}?paid=${encodeURIComponent(order.orderNumber)}` : base;
   }
   const recordId = parseConcernProductId(order.productId);
   if (!recordId) {

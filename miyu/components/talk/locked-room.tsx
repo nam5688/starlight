@@ -38,7 +38,7 @@ export function LockedRoom({ room, buyHref, ownedState, backHref }: { room: Room
         <p className="mt-4 text-[15px] leading-[1.7] text-ink-2">
           {ownedState
             ? OWNED_TEXT[ownedState]
-            : `이 방은 ${REPORT_TIER_NAMES.deep}로 열려요. ${REPORT_TIER_NAMES.deep}를 받으면 모든 상담방이 열리고, 방마다 무료 질문을 ${CHAT_ROOMS.deepFreeQuestions}번 드려요. 더 묻고 싶을 땐 미유캐시로 이어 갈 수 있어요.`}
+            : `이 방은 ${REPORT_TIER_NAMES.deep}로 열려요. ${REPORT_TIER_NAMES.deep}를 받으면 모든 상담방이 열리고, 방마다 무료 질문을 ${CHAT_ROOMS.deepFreeQuestions}번 드려요. 더 묻고 싶을 땐 질문 한 개당 결제로 이어 갈 수 있어요.`}
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <Link href={buyHref} className={buttonPrimary}>

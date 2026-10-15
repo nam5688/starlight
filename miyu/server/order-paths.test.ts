@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cashProductId, concernProductId, PERSONAL_REPORT, personalProductId } from "../lib/config/product.ts";
+import { createQuestionNonce, questionProductId } from "../lib/commerce/cash.ts";
 import { resultPathOf } from "./order-paths.ts";
 
 const A = "11111111-1111-4111-8111-111111111111";
@@ -29,9 +30,19 @@ test("같은 결과로 다시 받은 리포트(2번째부터) 주문은 그 주�
   assert.equal(resultPathOf({ assessmentId: A, productId: personalProductId(3) }), `/results/${A}`);
 });
 
-test("미유캐시 충전 주문은 충전 화면으로 돌아가고, 결제가 끝나면 충전 완료 안내(done)를 함께 보인다", () => {
-  const order = { assessmentId: A, productId: cashProductId({ cash: 100, bonus: 15, nonce: "ABCDEF2345" }), orderNumber: "MEU-20261015-ABCDEFGHJK" };
-  assert.equal(resultPathOf(order), `/cash?a=${A}`);
-  assert.equal(resultPathOf(order, { paid: true }), `/cash?a=${A}&done=MEU-20261015-ABCDEFGHJK`);
-  assert.equal(resultPathOf({ assessmentId: A, productId: order.productId }, { paid: true }), `/cash?a=${A}`, "주문번호가 없으면 done 없이");
+test("유료 질문 주문은 질문했던 채팅방으로 돌아가고, 결제가 끝나면 이어서 보내라는 표시(paid)를 함께 붙인다", () => {
+  const order = { assessmentId: A, productId: questionProductId(createQuestionNonce("love")), orderNumber: "MEU-20261015-ABCDEFGHJK" };
+  assert.equal(resultPathOf(order), `/results/${A}/talk/love`);
+  assert.equal(resultPathOf(order, { paid: true }), `/results/${A}/talk/love?paid=MEU-20261015-ABCDEFGHJK`);
+  assert.equal(resultPathOf({ assessmentId: A, productId: order.productId }, { paid: true }), `/results/${A}/talk/love`, "주문번호가 없으면 paid 없이");
+  // 기본 방은 /talk, 날짜별 방(오늘의 운세)도 방 이름으로 간다
+  assert.equal(resultPathOf({ assessmentId: A, productId: questionProductId(createQuestionNonce("main")), orderNumber: "MEU-1" }, { paid: true }), `/results/${A}/talk?paid=MEU-1`);
+  assert.equal(resultPathOf({ assessmentId: A, productId: questionProductId(createQuestionNonce("daily")) }), `/results/${A}/talk/daily`);
+});
+
+test("예전 선불 충전 주문 · 알 수 없는 방 이름은 기본 채팅방으로 돌아간다 (옛 /cash 화면은 없다)", () => {
+  const legacy = { assessmentId: A, productId: cashProductId({ cash: 100, bonus: 15, nonce: "ABCDEF2345" }), orderNumber: "MEU-20261015-ABCDEFGHJK" };
+  assert.equal(resultPathOf(legacy), `/results/${A}/talk`);
+  assert.equal(resultPathOf(legacy, { paid: true }), `/results/${A}/talk?paid=MEU-20261015-ABCDEFGHJK`);
+  assert.equal(resultPathOf({ assessmentId: A, productId: questionProductId("NOSUCHROOMABCDE12345") }), `/results/${A}/talk`, "없는 방이면 기본 채팅방");
 });

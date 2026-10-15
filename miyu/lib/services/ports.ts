@@ -67,7 +67,7 @@ export type PaymentEnv = "test" | "test-docs" | "live";
 export type Acquisition = { source: string | null; medium: string | null; campaign: string | null };
 export type WithdrawDataResult =
   | { ok: true; counts: Record<string, number> }
-  /** cash-balance: 남은 미유캐시가 있다 (다 쓰거나 환불 문의를 마친 뒤에 탈퇴) */
+  /** cash-balance: 결제해 두고 쓰지 않은 질문(장부 잔액)이 남아 있다 (다 쓰거나 환불 문의를 마친 뒤에 탈퇴) */
   | { ok: false; reason: "pending-order" | "report-in-progress" | "cash-balance" | "not-found" };
 
 export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv"> & { acquisition?: Acquisition | null };

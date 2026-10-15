@@ -52,17 +52,27 @@ export function checkApprovalShape(a: ChatApproval, limits: { maxCapKrw: number;
 
 export type UsageRow = { provider: string; promptVersion: string; estCostKrw: number | null; errorCode: string | null };
 
+/** 지금 쓴 값(승인 가드 장부) — 리포트와 채팅이 하나의 승인을 나눠 쓸 때 같은 장부를 넘겨 서로의 호출을 함께 센다 */
+export type ApprovalLedger = {
+  baseline: Spend | null;
+  local: Spend;
+  inFlight: Spend;
+  gate: Promise<unknown>;
+};
+export const createApprovalLedger = (): ApprovalLedger => ({ baseline: null, local: { calls: 0, spentKrw: 0 }, inFlight: { calls: 0, spentKrw: 0 }, gate: Promise.resolve() });
+
 /**
  * 저장된 사용 기록에서 이 가드가 센 호출 수와 쓴 금액을 만든다.
- * - 이 제공사 · 채팅 지시문의 기록만 센다.
+ * - 이 제공사의 기록만 센다. 지시문은 promptPrefix로 거른다(기본 "chat-" = 채팅 질문만, 리포트와 채팅이 하나의 승인을 나눠 쓰면 ""로 모두 센다).
  * - 청구되지 않는 오류(속도 제한 · 인증 · 결제 · 잘못된 요청 · 예산 거절)는 호출 수에도 금액에도 세지 않는다.
  * - 금액을 모르는 기록(시간 초과 등)은 unknownRowKrw(최악 비용)로 센다. 금액을 아는 기록은 부가세 · 여유율(surcharge)을 곱해 센다.
  */
-export function tallyUsage(rows: UsageRow[], model: { provider: string }, s: { surcharge: number; unknownRowKrw: number }): Spend {
+export function tallyUsage(rows: UsageRow[], model: { provider: string }, s: { surcharge: number; unknownRowKrw: number; promptPrefix?: string }): Spend {
+  const prefix = s.promptPrefix ?? "chat-";
   let calls = 0;
   let spent = 0;
   for (const r of rows) {
-    if (r.provider !== model.provider || !r.promptVersion.startsWith("chat-")) continue;
+    if (r.provider !== model.provider || !r.promptVersion.startsWith(prefix)) continue;
     if (r.errorCode && NOT_BILLED_CODES.has(r.errorCode)) continue;
     calls += 1;
     spent += r.estCostKrw === null ? s.unknownRowKrw : r.estCostKrw * s.surcharge;
@@ -96,18 +106,17 @@ export type ApprovedModelOptions = {
   now: () => Date;
   /** 저장된 사용 기록으로 센 지금까지의 호출 수 · 금액 (읽지 못하면 던진다 — 그러면 호출하지 않는다) */
   loadSpend: (sinceIso: string, unknownRowKrw: number) => Promise<Spend>;
+  /** 하나의 승인을 리포트 · 채팅이 나눠 쓸 때 같은 장부를 넘긴다 (안 주면 이 모델만의 장부) */
+  ledger?: ApprovalLedger;
 };
 
 /** 모델 연결을 승인 가드로 감싼다 — 제공사 구현체 · 모의 모델 어느 쪽이든 같은 방식으로 승인 범위를 지킨다 */
 export function withChatApproval(model: TextModel, opts: ApprovedModelOptions): TextModel {
   const { approval, pricing } = opts;
   const settings = { fxKrwPerUsd: pricing.fxKrwPerUsd, surcharge: pricing.surcharge };
-  // 이 프로세스가 직접 센 값 — 기록 저장이 늦어도 같은 호출을 두 번 빠뜨리지 않는다
-  let baseline: Spend | null = null;
-  const local: Spend = { calls: 0, spentKrw: 0 };
-  const inFlight: Spend = { calls: 0, spentKrw: 0 };
-  // 확인 + 예약을 한 번에 하나씩 (동시에 들어온 호출이 같은 잔액을 보고 함께 통과하지 못하게)
-  let gate: Promise<unknown> = Promise.resolve();
+  // 이 프로세스가 직접 센 값 — 기록 저장이 늦어도 같은 호출을 두 번 빠뜨리지 않는다. 확인 + 예약은 한 번에 하나씩(gate) 해서 동시에 들어온 호출이 같은 잔액을 보고 함께 통과하지 못하게 한다.
+  const ledger = opts.ledger ?? createApprovalLedger();
+  const { local, inFlight } = ledger;
 
   async function admit(request: ModelRequest): Promise<{ worst: number }> {
     const est = { inputTokens: estimateInputTokens([request.system, ...request.messages.map((m) => m.content)]), maxOutputTokens: request.maxOutputTokens };
@@ -121,9 +130,9 @@ export function withChatApproval(model: TextModel, opts: ApprovedModelOptions): 
     } catch {
       throw new ChatApprovalError("unreadable");
     }
-    baseline ??= stored;
-    const spent = Math.max(stored.spentKrw, baseline.spentKrw + local.spentKrw);
-    const calls = Math.max(stored.calls, baseline.calls + local.calls);
+    ledger.baseline ??= stored;
+    const spent = Math.max(stored.spentKrw, ledger.baseline.spentKrw + local.spentKrw);
+    const calls = Math.max(stored.calls, ledger.baseline.calls + local.calls);
     if (calls + inFlight.calls + 1 > approval.maxCalls) throw new ChatApprovalError("calls");
     if (spent + inFlight.spentKrw + worst > approval.capKrw) throw new ChatApprovalError("cap");
     inFlight.calls += 1;
@@ -135,8 +144,8 @@ export function withChatApproval(model: TextModel, opts: ApprovedModelOptions): 
     provider: model.provider,
     model: model.model,
     async complete(request: ModelRequest): Promise<ModelResult> {
-      const turn = gate.then(() => admit(request));
-      gate = turn.catch(() => {});
+      const turn = ledger.gate.then(() => admit(request));
+      ledger.gate = turn.catch(() => {});
       const { worst } = await turn;
       let charge = worst;
       let counted = true;

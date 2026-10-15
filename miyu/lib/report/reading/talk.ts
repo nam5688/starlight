@@ -3,7 +3,7 @@
 // 자유 질문 · "내 경우는 달라"에 AI가 답하는 기능은 아직 없다(2단계, 운영자 결정 뒤) — 화면에서 "준비 중"으로 밝힌다.
 // 이 파일은 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
 import { tendencyPhrase } from "../../assessment/dev-rules.ts";
-import { CHAT_ROOMS, REPORT_TIER_NAMES } from "../../config/product.ts";
+import { CHAT_ROOMS, formatKrw, QUESTION_PRICE_KRW, REPORT_TIER_NAMES } from "../../config/product.ts";
 import type { SajuResult } from "../../saju/engine.ts";
 import { periodPlain } from "../../saju/interpret/period-plain.ts";
 import type { MonthCalendar } from "../../saju/interpret/months.ts";
@@ -87,14 +87,16 @@ export type TalkChat = {
   state: "ready" | "pending" | "locked";
   /** 무료 리포트(무료) 회원이다 — 무료 질문 한 번의 글자 수가 QUESTION_MAX.free(500자)로 제한된다 (심층 리포트 회원은 1,000자) */
   free?: boolean;
-  /** 이 방의 무료 질문을 모두 썼다 (state가 ready면 미유캐시로 이어서 묻는 중, locked면 캐시가 모자라거나 캐시를 쓸 수 없다) */
+  /** 이 방의 무료 질문을 모두 썼다 (state가 ready면 유료 질문으로 이어서 묻는 중, locked면 유료 질문을 열 수 없다) */
   used?: boolean;
   /** 이 방에 남은 무료 질문 수 (방마다 정해진다 — CHAT_ROOMS) */
   left?: number;
   /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 아직 없어 질문을 열지 않았다 (locked일 때) */
   noMaterial?: boolean;
-  /** 미유캐시를 쓸 수 있다 (DB 13번 전이면 없음) — 잔액 · 질문 한 번에 드는 캐시 */
+  /** 결제한 질문의 장부를 쓸 수 있다 (DB 13번 전이면 없음) — balance가 per 이상이면 결제한 질문이 남아 있다(결제 없이 묻는다) */
   cash?: { balance: number; per: number };
+  /** 이 방은 질문 한 개당 결제로 이어 갈 수 있다(결제가 연결됐을 때) — 결제한 질문이 없을 때 질문을 보내면 결제 화면으로 이어진다. priceKrw는 질문 한 개의 값 */
+  pay?: { priceKrw: number };
   /** 무료 리포트로는 더 이어 갈 수 없는 방이다 (질문이 없는 방) — 심층 리포트로 이어 준다 */
   deepOnly?: boolean;
 };
@@ -188,21 +190,24 @@ export const TALK_COPY = {
   freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
   freeQuestionNoMaterial: "이 주제는 리포트를 받으면 질문할 수 있어요",
   freeQuestionUsed: "무료 질문을 모두 썼어요",
-  /** 무료 질문을 다 썼고 미유캐시를 쓸 수 있을 때 · 무료 리포트로는 질문이 없는 방 */
-  freeQuestionUsedCash: "무료 질문을 모두 썼어요 · 미유캐시를 충전해 주세요",
+  /** 무료 질문을 다 썼을 때 입력창 안내 — 결제해 둔 질문이 있을 때 · 질문을 보내면 결제로 이어질 때(질문 한 개당 결제) */
+  freeQuestionTicket: "결제해 둔 질문 1개로 물어볼 수 있어요",
+  freeQuestionPay: (priceKrw: number) => `유료 질문 ${formatKrw(priceKrw)} · 적어서 보내면 결제로 이어져요`,
   freeQuestionDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요",
+  /** 유료 질문을 보내 결제 화면으로 넘어가는 동안 입력창에 · 결제를 마치지 못하고 돌아왔을 때 알림 */
+  payMoving: "결제 화면으로 이동하고 있어요",
+  payNotDone: "결제를 마치지 못해서 질문은 보내지 않았어요. 적어 두신 질문은 그대로 두었어요.",
   /**
-   * 무료 질문을 모두 썼을 때 뜨는 안내창 — 운영자 문구(2026-10-15): 무료 질문을 다 썼다는 것과 "유료 질문은 글자 수가 1,000자로 늘어난다"만 알린다.
-   * 버튼은 미유캐시 충전 화면(캐시를 쓸 수 있을 때) 또는 심층 리포트 구매로 이어진다. 세 가지 경우:
-   *  - free-used: 이 방의 무료 질문을 다 썼다  - no-cash: 캐시가 모자라다  - deep: 무료 리포트로는 더 이어 갈 수 없는 방이다
+   * 무료 질문을 모두 썼을 때 뜨는 안내창 — 무료 질문을 다 썼다는 것, 이어 가는 방법(질문 한 개당 결제), 유료 질문은 글자 수 제한이 1,000자로 늘어난다는 것을 알린다(운영자 2026-10-15).
+   * 선불 충전은 없다. 버튼은 입력창으로 돌아가거나(질문 한 개당 결제로 이어 갈 수 있을 때) 심층 리포트 구매로 이어진다. 경우:
+   *  - free-used: 무료 리포트 회원이 이 방의 무료 질문을 다 썼다  - paid-used: 심층 리포트 회원이 다 썼다  - deep: 무료 리포트로는 더 이어 갈 수 없는 방이다
    */
   recharge: {
-    "free-used": { title: "무료 질문을 모두 썼어요", body: `유료 질문은 글자 수 제한이 ${won(QUESTION_MAX.paid)}자로 늘어나요.` },
-    "paid-used": { title: "이 방의 무료 질문을 모두 썼어요", body: "미유캐시를 충전하면 이어서 질문할 수 있어요." },
-    "no-cash": { title: "미유캐시가 부족해요", body: "충전하면 이어서 질문할 수 있어요." },
+    "free-used": { title: "무료 질문을 모두 썼어요", body: `이어서 묻고 싶다면 질문 한 개에 ${formatKrw(QUESTION_PRICE_KRW)}이에요. 유료 질문은 글자 수 제한이 ${won(QUESTION_MAX.paid)}자로 늘어나요.` },
+    "paid-used": { title: "이 방의 무료 질문을 모두 썼어요", body: `더 묻고 싶다면 질문 한 개에 ${formatKrw(QUESTION_PRICE_KRW)}으로 이어 갈 수 있어요. 글자 수 제한은 ${won(QUESTION_MAX.paid)}자예요.` },
     deep: { title: "자세한 이야기는 심층 리포트에서 이어져요", body: `${REPORT_TIER_NAMES.deep}로는 모든 상담방을 열 수 있고, 방마다 무료 질문을 ${CHAT_ROOMS.deepFreeQuestions}번 드려요.` },
     later: "다음에 할게요",
-    cashLabel: "미유캐시 충전하기",
+    payLabel: "질문 이어가기",
     open: "안내 열기 — 무료 질문을 모두 썼어요",
   },
   buttons: { example: "일상 예시", detail: "더 자세히 알려줘", basis: "분석 이유", "calendar-love": "연애운이 강해지는 달은?", "calendar-money": "재물이 눈에 띄는 달은?", concern: "고민 말하기", next: "다음 풀이", menu: "메뉴 열기", menuClose: "메뉴 닫기", fullReport: "전체 리포트 보기", data: "내 분석 자료" },

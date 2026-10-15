@@ -8,7 +8,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ASSESSMENT_MODULES } from "../../lib/assessment/modules/index.ts";
 import { createSupabaseRepository } from "../../lib/integrations/supabase/repository.ts";
 import { EMPTY_BASIC_INFO } from "../../lib/profile/basic-info.ts";
-import { concernProductId, MIYU_CASH } from "../../lib/config/product.ts";
+import { cashProductId, concernProductId, MIYU_CASH } from "../../lib/config/product.ts";
+import { createQuestionNonce, questionProductId, questionQuote, questionRoomOf } from "../../lib/commerce/cash.ts";
+import { createOrderNumber } from "../../lib/commerce/order.ts";
 import { concernInputOf } from "../../lib/personalization/concern.ts";
 import { createAiReportGenerator } from "../../lib/report/ai/generator.ts";
 import { createMockModel } from "../../lib/report/ai/mock-model.ts";
@@ -17,7 +19,6 @@ import { devReportGenerator } from "../../lib/report/generate-dev-report.ts";
 import { manseryeokEngine as sajuEngine } from "../../lib/saju/manseryeok-engine.ts";
 import { submitAssessment } from "../../lib/services/assessment-service.ts";
 import { agreeToTerms, getMemberStatus, setMarketingConsent } from "../../lib/services/member-service.ts";
-import { startCashCharge } from "../../lib/services/cash-service.ts";
 import { confirmPayment, startCheckout } from "../../lib/services/order-service.ts";
 import { reconcileOrder } from "../../lib/services/reconcile-service.ts";
 import { createFakeToss } from "../../lib/services/testing/fake-toss.ts";
@@ -986,7 +987,7 @@ test("채팅 요약 표 · 열이 없어도(14번 적용 전) 대화 · 질문�
   assert.deepEqual(await server.listChatSummaries(U.id, { visibleOnly: false }), []);
 });
 
-test("미유캐시(13번 마이그레이션): 결제 승인과 같은 처리에서 한 번만 충전되고, 본인만 보며, 쓰기는 함수로만, 환불하면 남은 만큼 회수하고, 잔액이 있으면 탈퇴를 막는다", async () => {
+test("결제한 질문 장부(13번 마이그레이션) — 예전 선불 충전 주문 형식: 결제 승인과 같은 처리에서 한 번만 들어가고, 본인만 보며, 쓰기는 함수로만, 환불하면 남은 만큼 회수하고, 잔액이 있으면 탈퇴를 막는다", async () => {
   const U = await makeUser();
   const V = await makeUser();
   const server = createSupabaseRepository(admin);
@@ -994,10 +995,12 @@ test("미유캐시(13번 마이그레이션): 결제 승인과 같은 처리에�
   const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "캐시" }, answers, today: new Date() });
   assert.ok(saved.ok);
   const aid = saved.ok ? saved.assessment.id : "";
+  // 예전에 만든 선불 충전 주문(이미 운영 데이터에 있을 수 있다) — 지금 화면에서는 만들 수 없지만 DB는 같은 형식을 계속 처리한다
   const charge = async (cash: number) => {
-    const started = await startCashCharge({ repo: server, now: () => new Date() }, { userId: U.id, assessmentId: aid, cash });
-    if (started.kind !== "order") throw new Error(started.kind);
-    return started;
+    const bonus = cash >= 100 ? 15 : 0;
+    const inserted = await server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: U.id, assessmentId: aid, productId: cashProductId({ cash, bonus, nonce: `LEG${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}` }), amount: cash * MIYU_CASH.krwPerCash, paymentEnv: "test" });
+    if (!inserted.ok) throw new Error("주문을 만들지 못했습니다");
+    return { order: inserted.value };
   };
   const ledgerOf = async () => (await server.listCashLedger(U.id, 50)).map((l) => [l.kind, l.amount]).sort();
 
@@ -1080,6 +1083,56 @@ test("미유캐시(13번 마이그레이션): 결제 승인과 같은 처리에�
   await admin.from("cash_wallets").select(); // 읽기만 가능
   // 1캐시가 남아 있으면 여전히 막힌다
   assert.deepEqual(await server.withdrawMemberData(U.id), { ok: false, reason: "cash-balance" });
+});
+
+test("유료 질문 결제(질문 한 개당): 승인되면 3단위가 한 번만 들어가고, 질문에 쓰면 0이 되며 되돌리면 다시 남고, 환불하면 회수하며, 남아 있으면 탈퇴를 막는다 — 방 이름은 상품 번호에서 되읽힌다", async () => {
+  const U = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const tag = randomUUID().slice(0, 8);
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "질문결제" }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+  const quote = questionQuote();
+  const order = async () => {
+    const inserted = await server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: U.id, assessmentId: aid, productId: questionProductId(createQuestionNonce("love")), amount: quote.priceKrw, paymentEnv: "test" });
+    if (!inserted.ok) throw new Error("주문을 만들지 못했습니다");
+    return inserted.value;
+  };
+  const first = await order();
+  assert.equal(questionRoomOf(first.productId), "love");
+  assert.equal(first.amount, 300);
+  assert.equal(await server.getCashBalance(U.id), 0, "주문만 만들면 질문이 생기지 않는다");
+  const key = `pk-${randomUUID()}`;
+  const paid = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: first.orderNumber, paymentKey: key, amount: first.amount });
+  assert.equal(paid.kind, "paid");
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "질문 한 개(3단위)");
+  const again = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: first.orderNumber, paymentKey: key, amount: first.amount });
+  assert.equal(again.kind, "paid");
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "같은 승인을 다시 반영해도 한 번만");
+  assert.deepEqual((await server.listCashLedger(U.id, 10)).map((l) => [l.kind, l.amount]), [["charge", 3]]);
+  assert.equal(await server.getReportByOrder(first.id), null, "리포트는 만들어지지 않는다");
+
+  // 질문에 쓰면 0, 답을 받지 못해 되돌리면 다시 남고(같은 결제로 다시 물을 수 있다), 한 번 더 쓰면 0
+  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-1-${tag}` }), 0);
+  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-2-${tag}` }), null, "결제한 질문이 없으면 쓸 수 없다");
+  assert.equal(await server.restoreCashSpend({ userId: U.id, ref: `q-pay-1-${tag}` }), MIYU_CASH.perQuestion);
+  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-3-${tag}` }), 0);
+
+  // 쓰고 난 뒤 환불 — 이미 쓴 질문은 회수하지 못한 몫으로 남는다
+  const refund = await admin.from("orders").update({ status: "refunded" }).eq("id", first.id);
+  assert.equal(refund.error, null);
+  const claw = (await server.listCashLedger(U.id, 10)).find((l) => l.kind === "clawback");
+  assert.equal(Math.abs(claw?.amount ?? 1), 0);
+  assert.equal(claw?.shortfall, 3);
+
+  // 남아 있는 질문이 있으면 탈퇴를 막는다
+  const second = await order();
+  const paid2 = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: second.orderNumber, paymentKey: `pk-${randomUUID()}`, amount: second.amount });
+  assert.equal(paid2.kind, "paid");
+  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion);
+  assert.deepEqual(await server.withdrawMemberData(U.id), { ok: false, reason: "cash-balance" });
+  await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-4-${tag}` });
+  assert.equal(await server.getCashBalance(U.id), 0);
 });
 
 test("미유캐시: 상품 번호 형식이 맞지 않는 주문은 결제 완료 처리를 막지 않고 지갑에도 넣지 않는다 (check-cash.sql이 찾는다)", async () => {

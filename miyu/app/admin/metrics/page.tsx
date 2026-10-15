@@ -130,8 +130,8 @@ function Revenue({ m }: { m: Metrics }) {
         <Row label="이 중 고민 반영 리포트">
           {r.concern.paidCount}건 · {formatKrw(r.concern.netKrw)} (기존 구매자의 추가 구매 — 위 첫 구매 단계 · 채널별 전환에는 넣지 않음)
         </Row>
-        <Row label="미유캐시 충전 (별도)">
-          {r.cash.paidCount}건 · {formatKrw(r.cash.netKrw)} · 환불 {r.cash.refundedCount}건 (리포트 매출 · 한 건당 계산에는 넣지 않음 — 아직 쓰지 않은 선불 금액이라 매출로 잡는 시점은 운영자 · 세무 확인 전)
+        <Row label="유료 질문 결제 (별도)">
+          {r.cash.paidCount}건 · {formatKrw(r.cash.netKrw)} · 환불 {r.cash.refundedCount}건 (리포트 매출 · 한 건당 계산에는 넣지 않음 — 질문 결제의 매출로 잡는 시점 · 환불 기준은 운영자 · 세무 확인 전. 예전 선불 충전 주문이 있으면 함께 센다)
         </Row>
         <Row label="제외한 것">테스트 결제 {r.testPaidCount}건 (매출 아님) · 중복 결제 의심 {r.duplicateSuspects}건 (운영자 확인)</Row>
         <Row label="AI 비용 (실결제 리포트)">{e.pricingConfigured ? krw(e.aiCostKrw) : "토큰 단가 설정 전 — 비용 계산 안 함"}</Row>

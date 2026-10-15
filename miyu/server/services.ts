@@ -7,6 +7,7 @@ import { devReportGenerator } from "@/lib/report/generate-dev-report";
 import type { ReportGenerator } from "@/lib/report/generator";
 import { manseryeokEngine } from "@/lib/saju/manseryeok-engine";
 import { aiConfig, paymentConfig } from "./env";
+import { liveReportGenerator } from "./live-ai";
 import { createAdminSupabase, createServerSupabase } from "./supabase";
 
 // 웹 채널에서 쓰는 구현체 묶음. 다른 채널은 같은 서비스(lib/services)에 다른 구현체를 넘긴다.
@@ -34,6 +35,8 @@ export function paymentGateway() {
 export function reportGenerator(): ReportGenerator {
   const ai = aiConfig();
   if (ai.kind === "mock-local") return createAiReportGenerator({ model: createMockLocalModel({ baseUrl: ai.baseUrl }) });
+  // 실제 Claude — 운영자가 승인 금액 · 호출 수 · 기간을 직접 적었을 때만(없으면 aiConfig가 invalid가 되어 개발용 생성기로 두고 호출하지 않는다)
+  if (ai.kind === "anthropic") return liveReportGenerator(ai);
   return devReportGenerator;
 }
 

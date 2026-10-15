@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, LockIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
-import { MIYU_CASH, REPORT_TIER_NAMES } from "@/lib/config/product";
+import { MIYU_CASH, QUESTION_PRICE_KRW, REPORT_TIER_NAMES } from "@/lib/config/product";
 import { isSimpleRoom, roomSections } from "@/lib/report/chat/quota";
 import { freeQuestionPlaceholder, questionMaxFor, TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
 import {
@@ -28,12 +29,13 @@ import {
   type TalkMood,
   type TalkSay,
 } from "@/lib/report/reading/talk-room";
-import { askMiyuAction, closeTalkRoomAction, resetTalkRoomAction, saveChatSummaryAction, saveTalkRoomAction } from "@/app/results/[id]/talk/actions";
+import { askMiyuAction, closeTalkRoomAction, resetTalkRoomAction, saveChatSummaryAction, saveTalkRoomAction, startQuestionPaymentAction } from "@/app/results/[id]/talk/actions";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
 import { CloseDialog } from "./close-dialog";
 import { MiyuAvatar, TypingDots } from "./miyu-character";
-import { RechargeDialog, type RechargeVariant } from "./recharge-dialog";
+import { savePayPending, takePayPending } from "./pay-pending";
+import { RechargeDialog, type RechargeAction, type RechargeVariant } from "./recharge-dialog";
 
 /** 화면에 보이는 대화 한 줄 — 번호를 붙여 스크롤 · 초점이 어느 줄인지 찾는다 */
 type Item = TalkLine & { id: number };
@@ -60,6 +62,8 @@ type Props = {
    * initial: 이 방에 서버에 저장돼 있던 행동 목록(없으면 빈 목록) · savedKeys: 저장된 대화가 있는 방 이름들. 없으면 이 기기의 브라우저에만 저장한다(예시 화면).
    */
   persist?: { assessmentId: string; initial: unknown[]; savedKeys: string[] };
+  /** 유료 질문 결제를 마치고 돌아온 화면이다(주소의 paid) — 결제 전에 적어 둔 질문이 브라우저에 남아 있으면 이어서 바로 보낸다 */
+  payReturn?: boolean;
 };
 
 /** 넓고 충분히 높은 화면에서는 가운데 채팅 틀로 보이고, 그 반대(모바일)에서는 화면 전체를 쓴다 (globals.css의 chat-frame 조건과 같아야 한다) */
@@ -103,8 +107,9 @@ const writeSave = (scope: string, key: string, actions: RoomAction[]) => {
  * 모두 저장된 리포트의 글(답변 한 번에 말풍선 1~2개)과 고정 문구이며 AI를 부르지 않는다. 풀이를 읽은 뒤에는 내 경험을 말하는 질문과 보조 버튼이 따라온다.
  * 대화는 이 기기에만 이어 보기로 남는다(서버 저장 없음). 자유 질문 · 고민 말하기(AI가 답하는 부분)는 아직 준비 중이라고 밝힌다. 모션을 줄이는 설정이면 말풍선이 한꺼번에 나타난다.
  */
-export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, badge, contextHref, roomHrefs, persist }: Props) {
+export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, badge, contextHref, roomHrefs, persist, payReturn }: Props) {
   const def = ROOMS[room];
+  const router = useRouter();
   const { name } = model;
   const key = roomSaveKey(model, room);
   const noteId = useId();
@@ -121,22 +126,27 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const [draft, setDraft] = useState("");
   /** 이 방에 남은 무료 질문 수 — 답을 받을 때마다 서버가 알려 준다 (처음에는 화면을 만든 값) */
   const [remaining, setRemaining] = useState<number | null>(null);
-  /** 미유캐시 잔액 — 캐시를 쓸 수 없으면(DB 13번 전) null */
+  /** 결제해 둔 질문의 장부 잔액(per 이상이면 결제 없이 묻는다) — 장부를 쓸 수 없으면(DB 13번 전) null */
   const [cashBalance, setCashBalance] = useState<number | null>(model.chat.cash?.balance ?? null);
-  /** 이 화면에서 캐시를 쓴 적이 있는가 — 안내창 문구를 고르는 데 쓴다 */
-  const [cashSpent, setCashSpent] = useState(false);
+  /** 유료 질문을 결제 화면으로 넘기는 중 */
+  const [paying, setPaying] = useState(false);
+  /** 결제를 다녀온 뒤 이어서 보낼 질문 — 저장된 대화를 되살린 다음에 보낸다(되살리기 전에 보내면 이어 붙일 대화가 어긋난다) */
+  const [autoQuestion, setAutoQuestion] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   /** 직접 적어 보낸 뒤에는 초점을 입력창에 둔다 (눌러서 이어 간 뒤에는 답장 버튼 쪽) */
   const wantInput = useRef(false);
   // 자유 질문은 AI가 연결돼 있고, 서버에 저장하는 화면(로그인한 내 결과)에서만 열린다.
-  // 이 방의 무료 질문을 다 쓰면(quotaUsed) 미유캐시가 질문 한 번에 `per`개 이상 남아 있을 때만 이어서 물을 수 있다.
+  // 이 방의 무료 질문을 다 쓰면(quotaUsed) 질문 한 개당 결제로 이어 간다 — 결제해 둔 질문이 있으면(hasTicket) 바로 묻고, 없으면(payMode) 질문을 보낼 때 결제 화면으로 넘어간다.
   const per = model.chat.cash?.per ?? MIYU_CASH.perQuestion;
   const left = remaining ?? model.chat.left ?? null;
   const quotaUsed = Boolean(model.chat.used) || left === 0;
-  const cashReady = quotaUsed && cashBalance !== null && cashBalance >= per;
-  const canAsk = model.chat.state === "ready" && Boolean(persist) && (!quotaUsed || cashReady);
-  const busy = typing || waiting;
-  /** 질문 한 번의 글자 수 한도 — 무료 리포트의 무료 질문은 500자, 그 밖(심층 리포트 · 미유캐시 질문)은 1,000자 */
+  const hasTicket = quotaUsed && cashBalance !== null && cashBalance >= per;
+  const payMode = quotaUsed && !hasTicket && Boolean(model.chat.pay);
+  const canAsk = model.chat.state === "ready" && Boolean(persist) && (!quotaUsed || hasTicket || payMode);
+  /** 미유가 말을 하고 있는 중(입력 중 표시) — 결제 화면으로 넘기는 중(paying)에는 입력창만 잠그고 미유의 "입력 중"은 보이지 않는다 */
+  const miyuBusy = typing || waiting;
+  const busy = miyuBusy || paying;
+  /** 질문 한 번의 글자 수 한도 — 무료 리포트의 무료 질문은 500자, 그 밖(심층 리포트 · 유료 질문)은 1,000자 */
   const questionMax = questionMaxFor(Boolean(model.chat.free) && !quotaUsed);
   /** 무료 질문을 모두 썼을 때 뜨는 안내창 — 마지막 답을 읽을 시간을 준 뒤(답이 다 도착한 다음) 연다 */
   const [rechargeOpen, setRechargeOpen] = useState(false);
@@ -235,12 +245,23 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       // 서버에 저장된 대화가 있으면 그것을 먼저(어느 기기에서나 이어 보기), 없으면 이 기기에 남은 것
       const fromServer = persist && persist.initial.length > 0 ? parseRoomSave({ v: ROOM_SAVE_VERSION, actions: persist.initial }, model, room) : [];
       const restored = fromServer.length > 0 ? fromServer : parseRoomSave(readSave(scope, key), model, room);
-      if (restored.length === 0) return;
-      const state = replayRoom(model, room, restored, { contextHref });
-      setEngine(state);
-      setActions(restored);
-      setLog(state.lines.map((l, i) => ({ ...l, id: i })));
-      stick.current = true;
+      if (restored.length > 0) {
+        const state = replayRoom(model, room, restored, { contextHref });
+        setEngine(state);
+        setActions(restored);
+        setLog(state.lines.map((l, i) => ({ ...l, id: i })));
+        stick.current = true;
+      }
+      // 유료 질문 결제를 다녀온 화면 — 결제 전에 적어 둔 질문이 브라우저에 남아 있으면 한 번만 쓴다. 대화를 되살린 다음에 다룬다(이어 붙일 대화가 같은 상태여야 서버에 저장되는 대화가 어긋나지 않는다):
+      // 결제를 마치고 돌아왔고 결제해 둔 질문이 있으면 이어서 바로 보내고, 아니면 입력창에 되돌려 놓는다
+      const pending = persist ? takePayPending(persist.assessmentId, key) : null;
+      if (pending) {
+        if (payReturn && hasTicket) setAutoQuestion(pending.q);
+        else {
+          setDraft((d) => d || pending.q);
+          setStrip({ tone: "warn", text: TALK_COPY.payNotDone, link: false });
+        }
+      }
     }, 0);
     return () => window.clearTimeout(t);
     // 방이 바뀌면 화면 전체가 새로 만들어진다(경로가 다르다) — 처음 한 번만
@@ -290,10 +311,56 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     deliver(r.added);
   };
 
-  /** 직접 적은 질문 보내기 — 내 말은 바로 보이고, 답은 서버가 저장된 리포트의 글을 근거로 AI에게 받아 온다. 검사를 통과한 답만 대화에 놓고 저장한다 */
+  const say = (texts: string[]): TalkLine[] => texts.map((text, i) => ({ from: "miyu", say: { kind: "text", text }, mood: i === 0 ? "thinking" : "basic" }));
+
+  /** 직접 적은 질문 보내기 — 질문 한 개당 결제로 이어 가는 중이면 결제 화면으로, 아니면 바로 답을 받는다 */
   const send = async (e?: FormEvent) => {
     e?.preventDefault();
     const q = draft.trim();
+    if (!canAsk || !persist || !q || busy) return;
+    if (payMode) await pay(q);
+    else await ask(q);
+  };
+
+  /**
+   * 유료 질문 결제로 넘어가기 — 질문을 받을 수 있는지(마음이 힘든 글 · 글자 수 · 하루 예산 같은 것)는 서버가 결제 전에 먼저 확인한다(받을 수 없는 질문은 결제하지 않는다).
+   * 질문 글은 결제를 다녀오는 동안 이 브라우저에만 남고(pay-pending), 결제가 끝나 돌아오면 자동으로 이어서 보낸다.
+   */
+  const pay = async (q: string) => {
+    if (!persist) return;
+    if (running.current) skip();
+    acted.current = true;
+    wantInput.current = true;
+    stick.current = true;
+    setPaying(true);
+    const topic = engine.asking?.topic ?? engine.current;
+    const r = await startQuestionPaymentAction({ assessmentId: persist.assessmentId, room, roomKey: key, question: q, topicId: topic, intake: engine.intake, followUp: engine.asking !== null }).catch(() => null);
+    if (r?.ok && r.kind === "pay") {
+      savePayPending(persist.assessmentId, key, { q, orderNumber: r.orderNumber });
+      // 화면이 넘어가는 동안 입력창은 "결제 화면으로 이동하고 있어요"로 둔다 (결제 화면에서 뒤로 돌아오면 다시 쓸 수 있게 잠시 뒤 풀어 둔다)
+      router.push(`/checkout/${encodeURIComponent(r.orderNumber)}`);
+      window.setTimeout(() => setPaying(false), 4000);
+      return;
+    }
+    setPaying(false);
+    // 방금 무료 질문이 남았거나 결제해 둔 질문이 있다 — 결제 없이 바로 묻는다
+    if (r?.ok && r.kind === "ask") {
+      await ask(q);
+      return;
+    }
+    if (r?.ok && r.kind === "safety") {
+      // 마음이 힘든 글의 안내 — 결제하지 않고 대화에만 보인다(저장하지 않는다)
+      setDraft("");
+      setLog((l) => [...l, { from: "me", text: q, id: ++seq.current }]);
+      deliver(say(r.paragraphs));
+      return;
+    }
+    // 결제를 시작하지 못했다 — 이유를 알리고 쓴 글은 그대로 둔다
+    deliver(say([r && !r.ok ? r.message : "결제를 시작하지 못했어요. 잠시 뒤에 다시 시도해 주세요."]));
+  };
+
+  /** 질문 보내기 — 내 말은 바로 보이고, 답은 서버가 저장된 리포트의 글을 근거로 AI에게 받아 온다. 검사를 통과한 답만 대화에 놓고 저장한다 */
+  const ask = async (q: string) => {
     if (!canAsk || !persist || !q || busy) return;
     if (running.current) skip();
     acted.current = true;
@@ -308,16 +375,11 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 75_000)),
     ]).catch(() => null);
     setWaiting(false);
-    const say = (texts: string[]): TalkLine[] => texts.map((text, i) => ({ from: "miyu", say: { kind: "text", text }, mood: i === 0 ? "thinking" : "basic" }));
     if (reply?.ok && reply.kind === "answer") {
       setRemaining(reply.remaining);
-      if (reply.cash) {
-        setCashSpent(true);
-        setCashBalance(reply.cash.balance);
-      }
-      // 무료 질문을 방금 다 썼거나 캐시를 쓰고 남은 캐시가 모자라면, 마지막 답이 도착한 뒤 안내창을 연다 (이어서 물을 수 있으면 열지 않는다)
-      const balanceAfter = reply.cash ? reply.cash.balance : cashBalance;
-      if ((reply.cash !== undefined || reply.remaining === 0) && !(balanceAfter !== null && balanceAfter >= per)) setRechargeDue(true);
+      if (reply.cash) setCashBalance(reply.cash.balance);
+      // 무료 질문을 방금 다 썼다면(결제해 둔 질문이 아닌 답으로 0이 됐다면), 마지막 답이 도착한 뒤 안내창을 연다
+      if (reply.cash === undefined && reply.remaining === 0) setRechargeDue(true);
       // 저장하는 질문은 서버가 개인정보를 가린 글이다
       const action: RoomAction = { t: "free", q: reply.question, a: reply.paragraphs, ...(topic ? { topic } : {}) };
       const r = applyAction(model, room, engine, action, ctx);
@@ -334,14 +396,26 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     if (reply?.ok) deliver(say(reply.paragraphs));
     else {
       deliver(say([reply ? reply.message : "답이 늦어지고 있어요. 잠시 뒤에 다시 물어봐 주세요."]));
-      if (reply && !reply.ok && (reply.reason === "limit" || reply.reason === "free-used" || reply.reason === "no-cash")) {
+      if (reply && !reply.ok && (reply.reason === "limit" || reply.reason === "free-used" || reply.reason === "need-payment")) {
         setRemaining(0);
-        if (reply.reason === "no-cash") setCashBalance((b) => (b === null ? b : Math.min(b, per - 1)));
-        setRechargeDue(true);
+        // 결제해 둔 질문이 없었다 — 다음에는 보낼 때 결제로 이어진다
+        if (reply.reason === "need-payment") setCashBalance((b) => (b === null ? b : Math.min(b, per - 1)));
+        else setRechargeDue(true);
       }
-      if (!reply || reply.reason === "failed" || reply.reason === "budget" || reply.reason === "too-long-free") setDraft((d) => d || q);
+      if (!reply || reply.reason === "failed" || reply.reason === "budget" || reply.reason === "too-long-free" || reply.reason === "need-payment") setDraft((d) => d || q);
     }
   };
+
+  // 결제를 다녀온 질문은 저장된 대화를 되살린 다음(위 효과)에 보낸다
+  useEffect(() => {
+    if (autoQuestion === null) return;
+    const t = window.setTimeout(() => {
+      setAutoQuestion(null);
+      void ask(autoQuestion);
+    }, 0);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoQuestion]);
 
   /** 화면의 대화를 새 대화로 되돌린다 (서버에 저장된 대화를 지우는 일은 호출한 쪽이 한다) */
   const resetView = () => {
@@ -498,13 +572,14 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const byTopic = new Map([...model.topics, ...model.codeTopics].map((t) => [t.id, t]));
   const topicsHere = roomTopics(model, room);
   // 자유 질문 입력창의 안내 — 열려 있으면 묻는 말, 아니면 왜 닫혀 있는지 (작동하는 것처럼 보이지 않게)
-  const cashEnabled = model.chat.cash !== undefined;
   const leftText = left !== null ? (left > 1 ? `${left}번` : "한 번") : "";
   const placeholder = canAsk
     ? engine.asking
       ? TALK_COPY.freeQuestionAsking
       : quotaUsed
-        ? `미유캐시 ${per}개로 질문하기 · 지금 ${cashBalance ?? 0}개`
+        ? hasTicket
+          ? TALK_COPY.freeQuestionTicket
+          : TALK_COPY.freeQuestionPay(model.chat.pay?.priceKrw ?? QUESTION_PRICE_KRW)
         : left !== null
           ? model.chat.free
             ? freeQuestionPlaceholder(left)
@@ -513,9 +588,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     : model.chat.deepOnly
       ? TALK_COPY.freeQuestionDeepOnly
       : quotaUsed
-        ? cashEnabled
-          ? TALK_COPY.freeQuestionUsedCash
-          : TALK_COPY.freeQuestionUsed
+        ? TALK_COPY.freeQuestionUsed
         : model.chat.noMaterial
           ? TALK_COPY.freeQuestionNoMaterial
           : model.chat.state === "locked"
@@ -523,26 +596,33 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
             : TALK_COPY.freeQuestion;
   const note = canAsk
     ? quotaUsed
-      ? `${ROOM_COPY.chatAiNote} 질문 한 번에 미유캐시 ${per}개가 쓰이고, 답을 받지 못하면 쓰이지 않아요.`
+      ? hasTicket
+        ? `${ROOM_COPY.chatAiNote} 결제해 둔 질문 한 개가 쓰이고, 답을 받지 못하면 쓰이지 않아요.`
+        : `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatPayNote(model.chat.pay?.priceKrw ?? QUESTION_PRICE_KRW)}`
       : model.chat.free
         ? `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatFreeNote}`
         : ROOM_COPY.chatAiNote
     : model.chat.deepOnly
       ? ROOM_COPY.chatDeepOnly
       : quotaUsed
-        ? cashEnabled
-          ? ROOM_COPY.chatCashLow
+        ? model.chat.cash
+          ? ROOM_COPY.chatPayLow
           : ROOM_COPY.chatFreeUsed
         : model.chat.noMaterial
           ? ROOM_COPY.chatNoMaterial
           : model.chat.state === "locked"
             ? ROOM_COPY.chatLocked
             : TALK_COPY.freeQuestionPending;
-  // 안내창: 어떤 경우인지, 어디로 이어 줄지 — 캐시를 쓸 수 있으면 미유캐시 충전, 무료 리포트의 맛보기라면 심층 리포트 구매
-  const hadCash = (cashBalance ?? 0) > 0 || cashSpent;
-  const rechargeVariant: RechargeVariant = model.chat.deepOnly ? "deep" : hadCash ? "no-cash" : model.chat.free ? "free-used" : "paid-used";
-  const cashHref = persist ? `/cash?a=${persist.assessmentId}` : null;
-  const rechargeAction = rechargeVariant === "deep" ? (model.buy ? { href: model.buy.href, label: model.buy.label } : null) : cashEnabled && cashHref ? { href: cashHref, label: TALK_COPY.recharge.cashLabel } : model.buy && model.chat.free ? { href: model.buy.href, label: model.buy.label } : null;
+  // 안내창: 어떤 경우인지, 어디로 이어 줄지 — 질문 한 개당 결제로 이어 갈 수 있으면 입력창으로 돌아가 질문을 이어 가고, 무료 리포트의 맛보기라면 심층 리포트 구매
+  const payAvailable = Boolean(model.chat.pay);
+  const rechargeVariant: RechargeVariant = model.chat.deepOnly ? "deep" : payAvailable ? (model.chat.free ? "free-used" : "paid-used") : "deep";
+  const rechargeAction: RechargeAction | null =
+    rechargeVariant === "deep" ? (model.buy && (model.chat.deepOnly || model.chat.free) ? { href: model.buy.href, label: model.buy.label } : null) : { label: TALK_COPY.recharge.payLabel, pick: true };
+  /** 안내창에서 "질문 이어가기"를 누르면 — 안내창을 닫고 입력창으로 돌아간다 */
+  const pickPay = () => {
+    setRechargeOpen(false);
+    inputRef.current?.focus();
+  };
   const hasRechargeAction = rechargeAction !== null;
   const canExplain = !canAsk && (model.chat.deepOnly || quotaUsed) && hasRechargeAction;
 
@@ -566,7 +646,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         <Link href={reportHref} aria-label="전체 리포트로 돌아가기" className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
           <ArrowIcon className="size-5 rotate-180" />
         </Link>
-        <MiyuAvatar className="size-11" mood={busy ? "thinking" : lastMood} bob={busy} />
+        <MiyuAvatar className="size-11" mood={miyuBusy ? "thinking" : lastMood} bob={miyuBusy} />
         <div className="min-w-0 flex-1">
           <h1 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[17px] leading-tight font-bold">
             <span>
@@ -588,8 +668,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           </h1>
           {/* 대표 경향 설명은 분석 카드가 위로 올라가도 계속 보인다 — 후보 설명이며 진단이 아니다. 답을 쓰는 동안에는 "입력하고 있어요"가 겹쳐 보인다(높이는 그대로) */}
           <div className="relative">
-            <p className={`line-clamp-2 text-[13px] leading-snug text-ink-3 transition-opacity ${busy ? "opacity-0" : ""}`}>{model.card.tendency ?? def.blurb}</p>
-            {busy && (
+            <p className={`line-clamp-2 text-[13px] leading-snug text-ink-3 transition-opacity ${miyuBusy ? "opacity-0" : ""}`}>{model.card.tendency ?? def.blurb}</p>
+            {miyuBusy && (
               <p aria-hidden="true" className="absolute inset-x-0 top-0 flex items-center gap-2 text-[13px] leading-snug font-semibold text-accent-strong">
                 {TALK_COPY.typing}
                 <TypingDots className="size-1.5" />
@@ -667,7 +747,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
             </div>
           );
         })}
-        {busy && (
+        {miyuBusy && (
           <div className={`motion-safe:animate-miyu-in ${afterMiyuText ? "mt-1.5" : "mt-4"}`}>
             <div className="flex items-start gap-2">
               <div className="w-9 shrink-0">{!afterMiyuText && <MiyuAvatar className="size-9" mood="thinking" bob />}</div>
@@ -685,7 +765,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         {busy ? (
           <div className="flex min-h-11 items-center justify-between gap-3 px-3">
             <p className="flex items-center gap-2 text-[14px] text-ink-3">
-              미유가 답하고 있어요
+              {paying ? TALK_COPY.payMoving : "미유가 답하고 있어요"}
               <TypingDots className="size-1.5" />
             </p>
             {typing && (
@@ -848,7 +928,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           {/* 미유가 답을 쓰는 동안 입력창에도 "입력 중"을 보인다 */}
           {busy && (
             <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center gap-2 px-4 text-[15px] font-medium text-accent-strong">
-              {TALK_COPY.typing}
+              {paying ? TALK_COPY.payMoving : TALK_COPY.typing}
               <TypingDots className="size-1.5" />
             </span>
           )}
@@ -856,7 +936,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         <button
           type="submit"
           disabled={!canAsk || busy || draft.trim().length === 0}
-          aria-label={canAsk ? "보내기" : "보내기 (사용할 수 없어요)"}
+          aria-label={canAsk ? (payMode ? "보내고 결제하기" : "보내기") : "보내기 (사용할 수 없어요)"}
           className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-white transition-opacity hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-accent-soft disabled:text-ink-3 disabled:opacity-70"
         >
           <ArrowIcon className="size-5 -rotate-90" />
@@ -866,7 +946,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         </span>
       </form>
       <CloseDialog open={closeOpen} onStay={() => !closing && setCloseOpen(false)} onClose={finishClose} busy={closing} error={closeError} />
-      <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} variant={rechargeVariant} action={rechargeAction} />
+      <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} variant={rechargeVariant} action={rechargeAction} onPick={pickPay} />
     </div>
   );
 }

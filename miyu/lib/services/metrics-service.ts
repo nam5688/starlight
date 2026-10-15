@@ -41,7 +41,7 @@ export type Metrics = {
     duplicateSuspects: number;
     /** 위 매출 중 "내 고민 반영 리포트"(기존 구매자 추가 구매)가 차지하는 건수 · 순매출 — 첫 구매 단계 · 채널별 전환에는 넣지 않는다 */
     concern: { paidCount: number; netKrw: number };
-    /** 미유캐시 충전 — 위 리포트 매출 · 한 건당 계산에는 넣지 않는다 (충전은 아직 쓰지 않은 선불 금액이라 매출 인식 시점은 운영자 · 세무 확인 전) */
+    /** 유료 질문 결제(예전 선불 충전 주문 포함) — 위 리포트 매출 · 한 건당 계산에는 넣지 않는다 (질문 결제의 매출 인식 시점 · 환불 기준은 운영자 · 세무 확인 전) */
     cash: { paidCount: number; refundedCount: number; netKrw: number };
   };
   economics: {
@@ -91,7 +91,7 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
 
   const isLive = (o: MetricsOrder) => o.paymentEnv === "live";
   const approved = (o: MetricsOrder) => o.status === "paid" || o.status === "refunded";
-  // 미유캐시 충전은 리포트가 아니라서 리포트 매출 · 한 건당 계산에 섞지 않고 따로 센다
+  // 유료 질문 결제는 리포트가 아니라서 리포트 매출 · 한 건당 계산에 섞지 않고 따로 센다
   const liveAll = orders.filter(isLive);
   const liveCash = liveAll.filter((o) => isCashProduct(o.productId));
   const liveOrders = liveAll.filter((o) => !isCashProduct(o.productId));

@@ -59,7 +59,7 @@ async function buy(mem: ReturnType<typeof createMemoryRepository>, assessmentId:
   return { order: paid.order, report };
 }
 
-test("상품 번호: 첫 구매는 지금까지의 번호 그대로, 다시 받기는 :r2 · :r3 — 번째를 읽을 수 있고 고민 반영 · 미유캐시 번호와 섞이지 않는다", () => {
+test("상품 번호: 첫 구매는 지금까지의 번호 그대로, 다시 받기는 :r2 · :r3 — 번째를 읽을 수 있고 고민 반영 · 유료 질문 번호와 섞이지 않는다", () => {
   assert.equal(personalProductId(1), PERSONAL_REPORT.id);
   assert.equal(personalProductId(2), `${PERSONAL_REPORT.id}:r2`);
   assert.equal(parsePersonalSeq(PERSONAL_REPORT.id), 1);

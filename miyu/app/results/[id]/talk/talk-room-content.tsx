@@ -17,11 +17,19 @@ import { now, readRepository } from "@/server/services";
 import { seoulDate } from "@/lib/saju/interpret/day-plain";
 import { ownedState, roomModelFor, viewTier, type OwnedState } from "@/server/talk-model";
 
+const ORDER_NUMBER = /^[A-Za-z0-9_-]{6,64}$/;
+
+/** 주소의 paid(유료 질문 결제를 마치고 돌아왔다는 표시, 주문번호) — 모양이 맞을 때만 쓴다. 이 값은 화면이 질문을 이어서 보낼지 정하는 데만 쓰고 권한 판단에는 쓰지 않는다 */
+export const paidOf = (query: Record<string, string | string[] | undefined>): string | null => {
+  const v = query.paid;
+  return typeof v === "string" && ORDER_NUMBER.test(v) ? v : null;
+};
+
 /**
  * 대화로 풀어보기 — 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖의 경우(무료 분석만 마쳤거나 리포트를 준비 중)는 무료 맛보기로 이야기한다.
  * 어느 쪽이든 새 글을 쓰는 AI를 부르지 않는다. 방마다 새 대화로 시작한다.
  */
-export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }) {
+export async function TalkRoomContent({ id, room, paid = null }: { id: string; room: RoomId; paid?: string | null }) {
   const here = talkRoomPath(id, room);
   if (!isAuthConfigured()) notFound();
   const member = await getMember();
@@ -54,7 +62,7 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
 
   // 구매해 준비된 개인 통합 리포트(읽기 구조)는 저장된 글을 풀이로 쓰고, 그 밖에는 무료 맛보기(잠긴 내용 없음)로 이야기한다
   const tier = viewTier(view);
-  // 방마다 무료 질문 수 · 미유캐시를 센다 — 오늘의 운세 방은 날짜별 방이라 오늘 날짜로 센다
+  // 방마다 무료 질문 수 · 결제해 둔 질문을 센다 — 오늘의 운세 방은 날짜별 방이라 오늘 날짜로 센다
   const roomKey = room === "daily" ? `daily:${seoulDate(now())}` : room;
   const chat = await chatStateFor(tier, member.userId, room, roomKey);
   const { model } = roomModelFor(view, { paid: chat, free: chat }, room);
@@ -63,6 +71,8 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
     const sample = view.report?.content?.source === "sample";
     return (
       <TalkView
+        key={paid ?? "-"}
+        payReturn={paid !== null}
         model={model}
         room={room}
         scope={id}
@@ -83,6 +93,8 @@ export async function TalkRoomContent({ id, room }: { id: string; room: RoomId }
   if (!roomAvailable(model, room)) notFound();
   return (
     <TalkView
+      key={paid ?? "-"}
+      payReturn={paid !== null}
       model={model}
       room={room}
       scope={id}

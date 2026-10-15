@@ -74,3 +74,14 @@ export const CHAT_TEST_LIMITS = { maxCapKrw: 1500, maxCalls: 40, maxDays: 3 } as
 
 /** 채팅 질문에 쓰는 모델 — 후보 A. 가격 · 모델 ID가 어긋나지 않게 이 한 곳에서만 정한다 */
 export const CHAT_AI_MODEL = AI_CANDIDATES[0];
+
+/**
+ * 실제 AI 시험(리포트 생성 + 채팅 질문)의 승인 — 운영자 승인 2026-10-15: **5,000원**. 1단계 비교 승인(3,000원, STAGE1_LEDGER)과 별개다.
+ * 코드가 넘을 수 없는 상한이며, 이 안에서도 운영자가 .env.local에 승인 금액 · 호출 수 · 기간(AI_APPROVED_KRW · CALLS · FROM · THROUGH)을 직접 적어야만 호출한다.
+ * 리포트 한 건은 고쳐 쓰기를 포함해 대략 300원대(8-4 기록 305~333원), 채팅 질문 한 건은 십여 원대(어림)라 호출 수 상한은 금액보다 먼저 닿지 않게 넉넉히 둔다.
+ */
+export const LIVE_TEST_LIMITS = { maxCapKrw: 5000, maxCalls: 60, maxDays: 7 } as const;
+export const LIVE_TEST_APPROVAL = { approvedKrw: 5000, approvedOn: "2026-10-15", scope: "개인 통합 리포트 생성 + 채팅 질문 답변" } as const;
+
+/** 리포트 생성에 쓰는 모델 — 후보 A(채팅과 같은 모델). 가격 · 모델 ID는 이 한 곳에서만 정한다 */
+export const REPORT_AI_MODEL = AI_CANDIDATES[0];

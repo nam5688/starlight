@@ -1,58 +1,52 @@
-// 미유캐시 규칙 — 충전 금액 · 보너스 계산과 질문에 드는 캐시. 채널(웹)과 결제사에 관계없이 같은 규칙을 쓴다.
-// 값(1캐시의 값 · 단위 · 보너스 구간)은 lib/config/product.ts의 MIYU_CASH 한 곳에서만 바꾼다.
+// 유료 질문 규칙 — 무료 질문을 다 쓴 뒤 질문 한 개당 결제하는 값과 주문 번호. 채널(웹)과 결제사에 관계없이 같은 규칙을 쓴다.
+// 값(질문 한 개의 값 · 장부 단위)은 lib/config/product.ts의 MIYU_CASH · QUESTION_PRICE_KRW 한 곳에서만 바꾼다. 충전 · 보너스는 없다(운영자 2026-10-15).
 
-import { cashProductId, MIYU_CASH } from "../config/product.ts";
+import { cashProductId, MIYU_CASH, parseCashProductId, QUESTION_PRICE_KRW } from "../config/product.ts";
 
-export type CashQuote = {
-  /** 충전하는 캐시 (10의 배수) */
-  cash: number;
-  /** 보너스로 더 얹는 캐시 (소수점 버림) */
-  bonus: number;
-  /** 지갑에 들어가는 합계 */
-  total: number;
-  /** 보너스 비율(%) — 보너스가 없으면 0 */
-  bonusPct: number;
+/** 질문 한 개 결제의 견적 — 서버가 주문 금액으로 쓰고, 화면은 같은 값을 보여 준다 */
+export type QuestionQuote = {
   /** 결제 금액 (원) */
   priceKrw: number;
-  /** 합계로 물어볼 수 있는 횟수 (남는 캐시는 다음 충전에 이어서 쓴다) */
-  questions: number;
+  /** 결제하면 장부에 들어오는 단위 (질문 한 번이 그만큼을 쓴다) */
+  units: number;
 };
 
-/** 충전 캐시에 붙는 보너스 — 가장 높은 구간 하나만 적용하고 소수점은 버린다 */
-export function bonusFor(cash: number): { bonus: number; pct: number } {
-  let pct = 0;
-  for (const tier of MIYU_CASH.bonusTiers) if (cash >= tier.minCash && tier.ratePct > pct) pct = tier.ratePct;
-  return { bonus: Math.floor((cash * pct) / 100), pct };
-}
+export const questionQuote = (): QuestionQuote => ({ priceKrw: QUESTION_PRICE_KRW, units: MIYU_CASH.perQuestion });
 
-/** 충전 가능한 개수인가: 정수 · 10의 배수 · 최소 ~ 최대 범위 */
-export function isChargeable(cash: unknown): cash is number {
-  return typeof cash === "number" && Number.isInteger(cash) && cash % MIYU_CASH.unit === 0 && cash >= MIYU_CASH.minCash && cash <= MIYU_CASH.maxCash;
-}
-
-/** 충전 견적 — 충전할 수 없는 개수면 null. 화면 · 주문 생성이 같은 계산을 쓴다 */
-export function quoteCharge(cash: unknown): CashQuote | null {
-  if (!isChargeable(cash)) return null;
-  const { bonus, pct } = bonusFor(cash);
-  const total = cash + bonus;
-  return { cash, bonus, total, bonusPct: pct, priceKrw: cash * MIYU_CASH.krwPerCash, questions: Math.floor(total / MIYU_CASH.perQuestion) };
-}
-
-/** 빠른 선택 견적 목록 */
-export const chargePackages = (): CashQuote[] => MIYU_CASH.packages.map((c) => quoteCharge(c)).filter((q): q is CashQuote => q !== null);
-
-/** 지금 잔액으로 물어볼 수 있는 횟수 */
+/** 지금 장부로 물어볼 수 있는 질문 수 (결제하고 아직 쓰지 않은 질문) */
 export const questionsLeft = (balance: number) => Math.max(0, Math.floor(balance / MIYU_CASH.perQuestion));
 
-/** 질문 한 번을 캐시로 물을 수 있는 잔액인가 */
+/** 결제한 질문이 남아 있는가 — 남아 있으면 새로 결제받지 않고 그 질문으로 묻는다 */
 export const canAffordQuestion = (balance: number) => balance >= MIYU_CASH.perQuestion;
 
-/** 주문을 만들 때 쓰는 상품 번호 — 견적에서 충전 캐시 · 보너스를 정해 번호에 적는다 */
-export const productIdFor = (quote: CashQuote, nonce: string) => cashProductId({ cash: quote.cash, bonus: quote.bonus, nonce });
-
 const NONCE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const RANDOM_LENGTH = 10;
+/** 번호 앞에 붙는 방 이름 — 소문자 영문(상담방 이름 규칙) */
+const ROOM = /^[a-z]{2,20}$/;
 
-/** 주문마다 다른 임의 번호 (영문 · 숫자 10자) */
-export function createCashNonce(random: (bytes: Uint8Array) => Uint8Array = (b) => globalThis.crypto.getRandomValues(b)): string {
-  return Array.from(random(new Uint8Array(10)), (b) => NONCE_ALPHABET[b % NONCE_ALPHABET.length]).join("");
+function randomPart(random: (bytes: Uint8Array) => Uint8Array): string {
+  return Array.from(random(new Uint8Array(RANDOM_LENGTH)), (b) => NONCE_ALPHABET[b % NONCE_ALPHABET.length]).join("");
+}
+
+/**
+ * 질문 결제 주문의 임의 번호 — 방 이름(대문자) + 임의 10자 (영문 · 숫자만, DB 13번이 허용하는 6~32자 안).
+ * 방 이름이 앞에 붙어 있어서 결제가 끝난 뒤 그 방으로 돌아올 수 있고, 주문마다 번호가 달라 같은 검사 결과에서 여러 번 결제해도 된다.
+ */
+export function createQuestionNonce(room: string, random: (bytes: Uint8Array) => Uint8Array = (b) => globalThis.crypto.getRandomValues(b)): string {
+  if (!ROOM.test(room)) throw new Error("상담방 이름이 올바르지 않습니다.");
+  return `${room.toUpperCase()}${randomPart(random)}`;
+}
+
+/** 질문 결제 주문의 상품 번호 */
+export const questionProductId = (nonce: string) => cashProductId({ cash: MIYU_CASH.perQuestion, bonus: 0, nonce });
+
+/**
+ * 상품 번호에서 질문 결제의 상담방 이름을 꺼낸다. 질문 결제 주문이 아니거나(예전 선불 충전 주문 포함) 방 이름이 없으면 null.
+ * 이 값은 돌아갈 화면을 고르는 데만 쓴다(권한 판단에는 쓰지 않는다).
+ */
+export function questionRoomOf(productId: string): string | null {
+  const parsed = parseCashProductId(productId);
+  if (!parsed || parsed.cash !== MIYU_CASH.perQuestion || parsed.bonus !== 0) return null;
+  const room = parsed.nonce.slice(0, parsed.nonce.length - RANDOM_LENGTH).toLowerCase();
+  return ROOM.test(room) ? room : null;
 }

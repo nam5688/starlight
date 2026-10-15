@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ModelCallError, type ModelRequest, type ModelResult, type TextModel } from "../ai/model.ts";
-import { ChatApprovalError, approvalSince, checkApprovalShape, seoulDate, tallyUsage, withChatApproval, type ChatApproval, type Spend, type UsageRow } from "./approval.ts";
+import { ChatApprovalError, approvalSince, checkApprovalShape, createApprovalLedger, seoulDate, tallyUsage, withChatApproval, type ChatApproval, type Spend, type UsageRow } from "./approval.ts";
 
 const PRICING = { price: { inputUsdPerMTok: 2, outputUsdPerMTok: 10 }, fxKrwPerUsd: 1600, surcharge: 1.1 };
 const APPROVAL: ChatApproval = { capKrw: 300, maxCalls: 5, from: "2026-10-15", through: "2026-10-16" };
@@ -155,4 +155,38 @@ test("저장된 사용 기록 집계: 이 제공사 · 채팅 지시문의 기�
   const t = tallyUsage(rows, { provider: "anthropic" }, { surcharge: 1.1, unknownRowKrw: 20 });
   assert.equal(t.calls, 2);
   assert.ok(Math.abs(t.spentKrw - (11 + 20)) < 1e-9);
+});
+
+test("리포트와 채팅이 한 장부를 나눠 쓰면 서로의 호출을 함께 센다 — 호출 수 · 금액 한도는 둘을 합친 값이다", async () => {
+  const ledger = createApprovalLedger();
+  const report = fakeModel(() => ok(1000, 500));
+  const chat = fakeModel(() => ok(1000, 500));
+  const common = { approval: { ...APPROVAL, maxCalls: 2 }, ledger };
+  const gReport = guard(report, common);
+  const gChat = guard(chat, common);
+  await gReport.complete(REQUEST);
+  await gChat.complete(REQUEST);
+  // 호출 수 2회를 리포트 1 + 채팅 1로 모두 썼으므로 어느 쪽도 더 부르지 못한다
+  await assert.rejects(() => gReport.complete(REQUEST), (e) => e instanceof ChatApprovalError && e.reason === "calls");
+  await assert.rejects(() => gChat.complete(REQUEST), (e) => e instanceof ChatApprovalError && e.reason === "calls");
+  assert.equal(report.calls + chat.calls, 2);
+  // 장부를 나누지 않은 경우(각자의 장부)에는 서로의 호출이 보이지 않는다 — 옛 채팅 전용 승인의 동작
+  const separate = guard(fakeModel(() => ok()), { approval: { ...APPROVAL, maxCalls: 1 } });
+  await separate.complete(REQUEST);
+  await assert.rejects(() => separate.complete(REQUEST), (e) => e instanceof ChatApprovalError && e.reason === "calls");
+});
+
+test("공통 승인의 집계는 리포트 · 채팅 지시문의 기록을 모두 센다 (promptPrefix 빈 값), 옛 채팅 승인은 채팅 기록만 센다", () => {
+  const rows: UsageRow[] = [
+    { provider: "anthropic", promptVersion: "reading-v1-prompt-0.6", estCostKrw: 300, errorCode: null },
+    { provider: "anthropic", promptVersion: "chat-v1-prompt-0.4", estCostKrw: 10, errorCode: null },
+    { provider: "anthropic", promptVersion: "reading-v1-prompt-0.6", estCostKrw: null, errorCode: "RATE_LIMITED" },
+    { provider: "mock-local", promptVersion: "reading-v1-prompt-0.6", estCostKrw: 999, errorCode: null },
+  ];
+  const all = tallyUsage(rows, { provider: "anthropic" }, { surcharge: 1, unknownRowKrw: 20, promptPrefix: "" });
+  assert.equal(all.calls, 2);
+  assert.equal(all.spentKrw, 310);
+  const chatOnly = tallyUsage(rows, { provider: "anthropic" }, { surcharge: 1, unknownRowKrw: 20 });
+  assert.equal(chatOnly.calls, 1);
+  assert.equal(chatOnly.spentKrw, 10);
 });

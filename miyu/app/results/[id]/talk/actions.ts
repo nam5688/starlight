@@ -2,13 +2,16 @@
 
 import { buildChatContext } from "@/lib/report/chat/context";
 import { ROOMS, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
-import { ASK_MESSAGES, askFreeQuestion, type AskResult } from "@/lib/services/chat-service";
+import { ASK_MESSAGES, askFreeQuestion, type AskDeps, type AskReason, type AskResult } from "@/lib/services/chat-service";
+import { startQuestionPayment } from "@/lib/services/cash-service";
 import { getResultView } from "@/lib/services/report-service";
 import { closeRoom, saveRoomSummary, SUMMARY_MESSAGES, type SummaryFailure } from "@/lib/services/summary-service";
 import { resetTalkRoom, saveTalkRoom } from "@/lib/services/talk-service";
+import { readAcquisition } from "@/server/acquisition";
+import { saleGateCheck } from "@/server/capacity";
 import { chatAnswerer, chatCapacity } from "@/server/chat";
 import { roomModelFor } from "@/server/talk-model";
-import { chatConfig } from "@/server/env";
+import { chatConfig, paymentConfig, paymentEnvOf } from "@/server/env";
 import { getMember } from "@/server/member";
 import { logError } from "@/server/ops";
 import { now, readRepository, writeRepository } from "@/server/services";
@@ -86,10 +89,33 @@ export async function closeTalkRoomAction(input: SummaryInput & { keep: unknown 
 
 type AskInput = { assessmentId: unknown; room: unknown; roomKey: unknown; question: unknown; topicId?: unknown; intake?: unknown; followUp?: unknown };
 
-const failed = (reason: "not-found" | "failed"): AskResult => ({ ok: false, reason, message: ASK_MESSAGES[reason] });
+const failed = (reason: AskReason): AskResult => ({ ok: false, reason, message: ASK_MESSAGES[reason] });
+
+/** 질문 처리에 필요한 의존성 — 답하기와 질문 결제 시작이 같은 규칙(방 · 자료 · 한도)을 쓰도록 한 곳에서 만든다. 근거는 브라우저가 아니라 서버가 저장된 리포트(또는 무료 맛보기)에서 다시 만든다 */
+function askDeps(userId: string, assessmentId: string, room: RoomId, input: AskInput): AskDeps {
+  const text = (v: unknown) => (typeof v === "string" && v.length <= 40 ? v : null);
+  return {
+    repo: writeRepository(),
+    answerer: chatAnswerer(),
+    now,
+    config: chatConfig(),
+    capacity: chatCapacity(),
+    loadAsk: async () => {
+      const view = await getResultView(await readRepository(), { userId, assessmentId });
+      if (!view) return null;
+      // 구매해 준비된 리포트가 있으면 paid(저장된 풀이 글, 방마다 무료 질문 3번), 없으면 free(무료 맛보기의 보이는 글만, 방마다 정해진 무료 질문 수, 재료 없는 방은 noMaterial로 거절)
+      const { tier, model, noMaterial } = roomModelFor(view, { paid: { state: "ready" }, free: { state: "ready", free: true } }, room);
+      if (!roomAvailable(model, room)) return null;
+      const context = buildChatContext(model, room, { topicId: text(input.topicId), intakeId: text(input.intake), followUp: input.followUp === true });
+      // 방 이름(날짜별 방 포함)은 브라우저가 보낸 값이 아니라 서버가 정한다 — 방마다 무료 질문 수를 우회하지 못하게
+      return { context, referenceDate: model.dayKey, tier, noMaterial, room, roomKey: roomSaveKey(model, room) };
+    },
+  };
+}
 
 /**
- * 자유 질문 — 로그인한 회원이 자기 검사 결과의 방에서만(리포트를 받은 분은 하루 한도, 무료 맛보기는 평생 2번 · 질문은 1,000자까지). 근거는 브라우저가 아니라 서버가 저장된 리포트(또는 무료 맛보기)에서 다시 만든다
+ * 자유 질문 — 로그인한 회원이 자기 검사 결과의 방에서만(방마다 무료 질문 수가 정해져 있고, 다 쓰면 결제해 둔 질문 한 개로 이어 간다. 질문 글자 수는 무료 500자 · 유료 1,000자).
+ * 근거는 브라우저가 아니라 서버가 저장된 리포트(또는 무료 맛보기)에서 다시 만든다
  * (브라우저가 보내는 것은 질문 · 방 · 지금 이야기 중인 풀이 번호 · 고른 답 번호뿐이다). 한도 · 예산 · 소유자 확인은 서비스(chat-service)가 한다.
  */
 export async function askMiyuAction(input: AskInput): Promise<AskResult> {
@@ -97,31 +123,49 @@ export async function askMiyuAction(input: AskInput): Promise<AskResult> {
   if (typeof assessmentId !== "string" || typeof roomKey !== "string" || typeof room !== "string" || !(room in ROOMS)) return failed("not-found");
   const member = await getMember();
   if (!member || member.needsConsent) return failed("not-found");
-  const text = (v: unknown) => (typeof v === "string" && v.length <= 40 ? v : null);
   try {
-    return await askFreeQuestion(
-      {
-        repo: writeRepository(),
-        answerer: chatAnswerer(),
-        now,
-        config: chatConfig(),
-        capacity: chatCapacity(),
-        loadAsk: async () => {
-          const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId });
-          if (!view) return null;
-          // 구매해 준비된 리포트가 있으면 paid(저장된 풀이 글, 하루 한도), 없으면 free(무료 맛보기의 보이는 글만, 평생 무료 질문 한도, 재료 없는 방은 noMaterial로 거절)
-          const { tier, model, noMaterial } = roomModelFor(view, { paid: { state: "ready" }, free: { state: "ready", free: true } }, room as RoomId);
-          if (!roomAvailable(model, room as RoomId)) return null;
-          const context = buildChatContext(model, room as RoomId, { topicId: text(input.topicId), intakeId: text(input.intake), followUp: input.followUp === true });
-          // 방 이름(날짜별 방 포함)은 브라우저가 보낸 값이 아니라 서버가 정한다 — 방마다 무료 질문 수를 우회하지 못하게
-          return { context, referenceDate: model.dayKey, tier, noMaterial, room, roomKey: roomSaveKey(model, room as RoomId) };
-        },
-      },
-      { userId: member.userId, assessmentId, roomKey, question: input.question },
-    );
+    return await askFreeQuestion(askDeps(member.userId, assessmentId, room as RoomId, input), { userId: member.userId, assessmentId, roomKey, question: input.question });
   } catch (e) {
     // 고객에게는 같은 안내만 보인다. 서버 로그에는 가린 오류만 남기고 질문 · 답 내용은 어떤 기록에도 넣지 않는다
     logError("talk.ask", e);
     return failed("failed");
+  }
+}
+
+export type QuestionPayResult =
+  /** 결제 주문을 만들었다 — 결제 화면(/checkout/<주문번호>)으로 보낸다 */
+  | { ok: true; kind: "pay"; orderNumber: string }
+  /** 결제 없이 묻는다 — 무료 질문이 남았거나 결제해 둔 질문이 있다 */
+  | { ok: true; kind: "ask" }
+  /** 마음이 많이 힘든 글 — 풀이로 답하지 않는 고정 안내. 결제하지 않는다 */
+  | { ok: true; kind: "safety"; paragraphs: string[] }
+  | { ok: false; reason: AskReason; message: string };
+
+/**
+ * 유료 질문 결제 시작 — 질문을 받을 수 있는지(무료 질문 수 · 글자 수 · 위기 표현 · 잠긴 방 · 하루 예산)를 답할 때와 같은 규칙으로 먼저 확인한 뒤에만 주문을 만든다.
+ * 질문 글은 이 확인에만 쓰고 서버에 저장하지 않는다(결제를 다녀오는 동안은 브라우저에만 남는다). 금액은 서버가 정하고 브라우저가 보낸 값은 쓰지 않는다.
+ */
+export async function startQuestionPaymentAction(input: AskInput): Promise<QuestionPayResult> {
+  const { assessmentId, room, roomKey } = input;
+  const fail = (reason: AskReason): QuestionPayResult => ({ ok: false, reason, message: ASK_MESSAGES[reason] });
+  if (typeof assessmentId !== "string" || typeof roomKey !== "string" || typeof room !== "string" || !(room in ROOMS)) return fail("not-found");
+  const member = await getMember();
+  if (!member || member.needsConsent) return fail("not-found");
+  const config = paymentConfig();
+  if (!config.ok) return fail("pay-unavailable");
+  try {
+    const r = await startQuestionPayment(
+      { ...askDeps(member.userId, assessmentId, room as RoomId, input), saleGate: saleGateCheck },
+      { userId: member.userId, assessmentId, roomKey, question: input.question, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition() },
+    );
+    if (r.kind === "order") return { ok: true, kind: "pay", orderNumber: r.order.orderNumber };
+    if (r.kind === "ask") return { ok: true, kind: "ask" };
+    if (r.kind === "refused") return r.result.ok ? (r.result.kind === "safety" ? { ok: true, kind: "safety", paragraphs: r.result.paragraphs } : fail("failed")) : { ok: false, reason: r.result.reason, message: r.result.message };
+    if (r.kind === "sales-closed") return fail("pay-closed");
+    if (r.kind === "unavailable") return fail("pay-unavailable");
+    return fail("not-found");
+  } catch (e) {
+    logError("talk.pay", e);
+    return fail("failed");
   }
 }

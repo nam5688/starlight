@@ -2,8 +2,11 @@
 
 export type ReportStatus = "queued" | "generating" | "ready" | "failed";
 
-/** 생성 중 상태가 이 시간보다 오래되면 멈춘 것으로 보고 다시 시도할 수 있다 (AI 생성은 1~2분 걸릴 수 있다) */
-export const REPORT_GENERATING_STALE_MS = 5 * 60 * 1000;
+/**
+ * 생성 중 상태가 이 시간보다 오래되면 멈춘 것으로 보고 다시 시도할 수 있다.
+ * 실제 AI는 한 번 호출에 1~3분, 형식 검사에 걸려 고쳐 쓰면 두 번이라 5분을 넘길 수 있어 10분으로 둔다(2026-10-15, 실제 AI 연결).
+ */
+export const REPORT_GENERATING_STALE_MS = 10 * 60 * 1000;
 
 /** 자동·수동 재시도 상한. 넘으면 운영자가 확인한다 (재처리 또는 환불). */
 export const REPORT_MAX_ATTEMPTS = 5;
@@ -18,6 +21,10 @@ export const REPORT_SLA_MS = 30 * 60_000;
  * 넘기면 실패로 남기고(완성으로 저장하지 않음) 고객은 다시 만들기를 누를 수 있다.
  */
 export const REPORT_GENERATION_TIMEOUT_MS = 4 * 60_000;
+/** 운영자가 AI_GENERATION_TIMEOUT_SECONDS로 늘릴 수 있는 한계 — 멈춤 판단보다 1분 짧게 (그래야 시간 초과가 먼저 실패로 기록된다) */
+export const REPORT_GENERATION_TIMEOUT_MAX_MS = REPORT_GENERATING_STALE_MS - 60_000;
+/** 실제 AI(Anthropic)를 연결했을 때의 기본 생성 시간 한도 — 첫 응답 + 고쳐 쓰기 두 번 호출을 담는다 */
+export const REPORT_GENERATION_TIMEOUT_LIVE_MS = 8 * 60_000;
 /** "다시 만들기"를 이어서 누를 수 있는 최소 간격 (연타 · 반복 호출 비용 방지) */
 export const REPORT_RETRY_COOLDOWN_MS = 60_000;
 /** 한 회원이 하루(24시간)에 저장할 수 있는 검사 결과 수 (무료 생성 남용 방지) */

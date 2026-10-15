@@ -220,9 +220,9 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
 
 export type OrderTrace = {
   order: MyOrderRow & { method: string | null; failureMessage: string | null };
-  /** 결제 승인 후에만 리포트 열람 권한이 생긴다 (미유캐시 충전 주문은 리포트가 아니라 cash를 본다) */
+  /** 결제 승인 후에만 리포트 열람 권한이 생긴다 (유료 질문 주문은 리포트가 아니라 cash를 본다) */
   entitled: boolean;
-  /** 미유캐시 충전 주문이면 — 주문에 적힌 충전량과 지갑에 실제로 들어간 · 회수된 양 (서버가 결제 승인을 확인한 뒤에만 들어간다) */
+  /** 유료 질문(또는 예전 충전) 주문이면 — 주문에 적힌 단위와 장부에 실제로 들어간 · 회수된 양 (서버가 결제 승인을 확인한 뒤에만 들어간다) */
   cash: { cash: number; bonus: number; credited: number; clawedBack: number; shortfall: number } | null;
   generation: Generation;
   events: { at: string; source: string; status: string | null; statusLabel: string | null; method?: string; mId?: string; approvedAt?: string }[];

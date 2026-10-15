@@ -1,7 +1,7 @@
-// 실행: npm test — 자유 질문 처리: 소유자 · 입력 · 힘든 글 · 방마다 무료 질문 수 · 미유캐시 · 예산 · 연결 안 됨 · 사용 기록 · 이어지는 질문의 앞선 대화
+// 실행: npm test — 자유 질문 처리: 소유자 · 입력 · 힘든 글 · 방마다 무료 질문 수 · 유료 질문(질문 한 개당 결제) · 예산 · 연결 안 됨 · 사용 기록 · 이어지는 질문의 앞선 대화
 import assert from "node:assert/strict";
 import test from "node:test";
-import { quoteCharge, productIdFor } from "../commerce/cash.ts";
+import { createQuestionNonce, questionProductId, questionQuote } from "../commerce/cash.ts";
 import { MIYU_CASH } from "../config/product.ts";
 import { ChatAnswerError, type ChatAnswerer } from "../report/chat/answer.ts";
 import { CARE_NOTE, CRISIS_REPLY } from "../report/chat/question.ts";
@@ -48,15 +48,15 @@ async function setup(opts: Opts = {}) {
     loadAsk: async () => (opts.loaded === false ? null : { context: CONTEXT, referenceDate: "2026-10-15", tier: opts.tier ?? "paid", room, roomKey: opts.roomKey ?? room, ...(opts.noMaterial ? { noMaterial: true } : {}) }),
     ...over,
   });
-  /** 미유캐시를 충전한다 — 실제와 같은 길(충전 주문 → 결제 완료)로 지갑에 넣는다 */
-  const topUp = async (userId: string, assessmentId: string, cash: number) => {
-    const quote = quoteCharge(cash)!;
-    const ordered = await mem.repo.insertOrder({ orderNumber: `MEU-TEST-${Math.random().toString(36).slice(2, 12).toUpperCase()}`, userId, assessmentId, productId: productIdFor(quote, `T${Math.random().toString(36).slice(2, 10).toUpperCase()}`), amount: quote.priceKrw, paymentEnv: "test" });
-    assert.ok(ordered.ok);
-    await mem.repo.updateOrder(ordered.value.id, ["pending"], { status: "paid", paymentKey: `pk-${ordered.value.id}`, approvedAt: "2026-10-15T03:00:00Z" });
-    return quote;
+  /** 유료 질문을 결제한다 — 실제와 같은 길(질문 결제 주문 → 결제 완료)로 장부에 넣는다. count번 결제하면 결제해 둔 질문이 count개 쌓인다 */
+  const buy = async (userId: string, assessmentId: string, count = 1, payRoom = "love") => {
+    for (let i = 0; i < count; i++) {
+      const ordered = await mem.repo.insertOrder({ orderNumber: `MEU-TEST-${Math.random().toString(36).slice(2, 12).toUpperCase()}`, userId, assessmentId, productId: questionProductId(createQuestionNonce(payRoom)), amount: questionQuote().priceKrw, paymentEnv: "test" });
+      assert.ok(ordered.ok);
+      await mem.repo.updateOrder(ordered.value.id, ["pending"], { status: "paid", paymentKey: `pk-${ordered.value.id}`, approvedAt: "2026-10-15T03:00:00Z" });
+    }
   };
-  return { mem, repo: mem.repo as MiyuRepository, mine: mine.id, other: other.id, asks, deps, topUp };
+  return { mem, repo: mem.repo as MiyuRepository, mine: mine.id, other: other.id, asks, deps, buy };
 }
 const input = (assessmentId: string, question: unknown = "요즘 연락이 뜸한 사람이 있어요", userId = "u1", roomKey = "love") => ({ userId, assessmentId, roomKey, question });
 const ok = (r: Awaited<ReturnType<typeof askFreeQuestion>>) => r.ok && r.kind === "answer";
@@ -123,37 +123,37 @@ test("AI가 연결되지 않았으면 닫혀 있다 (준비 중)", async () => {
   assert.deepEqual(await askFreeQuestion(deps({ answerer: null }), input(mine)), { ok: false, reason: "closed", message: ASK_MESSAGES.closed });
 });
 
-test("무료 리포트: 연애 방 무료 질문 2번 · 고민해결소 2번 · 오늘의 운세 1번, 다 쓰면 free-used (캐시가 없으면 AI를 부르지 않는다)", async () => {
+test("무료 리포트: 연애 방 무료 질문 2번 · 고민해결소 2번 · 오늘의 운세 1번, 다 쓰면 결제해 둔 질문으로 이어 가고(없으면 need-payment) AI를 부르지 않는다", async () => {
   for (const [room, quota] of [["love", 2], ["concern", 2], ["daily", 1]] as const) {
     const { mine, deps, asks, mem } = await setup({ tier: "free", room });
     for (let i = 0; i < quota; i++) {
       const r = await askFreeQuestion(deps(), input(mine, "질문이에요", "u1", room));
       assert.ok(r.ok && r.kind === "answer" && r.remaining === quota - 1 - i, `${room} ${i + 1}번째`);
     }
-    assert.deepEqual(await askFreeQuestion(deps(), input(mine, "질문이에요", "u1", room)), { ok: false, reason: "free-used", message: ASK_MESSAGES["free-used"] }, room);
+    assert.deepEqual(await askFreeQuestion(deps(), input(mine, "질문이에요", "u1", room)), { ok: false, reason: "need-payment", message: ASK_MESSAGES["need-payment"] }, room);
     assert.equal(asks.length, quota, "다 쓴 뒤에는 AI를 부르지 않는다");
     assert.equal(mem.chatQuestions.length, quota);
   }
 });
 
-test("무료 리포트: 나를 알아보기는 질문이 없고(deep-only), 올해의 흐름 · 결혼 · 진로 · 재무 방은 심층 리포트로만 열린다 (room-locked) — 캐시가 있어도 열리지 않는다", async () => {
+test("무료 리포트: 나를 알아보기는 질문이 없고(deep-only), 올해의 흐름 · 결혼 · 진로 · 재무 방은 심층 리포트로만 열린다 (room-locked) — 결제해 둔 질문이 있어도 열리지 않는다", async () => {
   const main = await setup({ tier: "free", room: "main" });
-  await main.topUp("u1", main.mine, 100);
+  await main.buy("u1", main.mine, 3);
   assert.deepEqual(await askFreeQuestion(main.deps(), input(main.mine, "질문", "u1", "main")), { ok: false, reason: "deep-only", message: ASK_MESSAGES["deep-only"] });
   assert.equal(main.asks.length, 0);
   for (const room of ["year", "marriage", "career", "money"]) {
     const s = await setup({ tier: "free", room });
-    await s.topUp("u1", s.mine, 100);
+    await s.buy("u1", s.mine, 3);
     assert.deepEqual(await askFreeQuestion(s.deps(), input(s.mine, "질문", "u1", room)), { ok: false, reason: "room-locked", message: ASK_MESSAGES["room-locked"] }, room);
     assert.equal(s.asks.length, 0);
-    assert.equal(await s.repo.getCashBalance("u1"), 115, "충전한 캐시(100개 + 보너스 15개)는 쓰이지 않았다");
+    assert.equal(await s.repo.getCashBalance("u1"), 9, "결제해 둔 질문 3개(9단위)는 쓰이지 않았다");
   }
 });
 
 test("심층 리포트: 모든 방이 열리고 방마다 무료 질문 3번 — 한 방에서 다 써도 다른 방은 그대로다", async () => {
   const { mine, deps, asks } = await setup({ tier: "paid", room: "love" });
   for (let i = 0; i < 3; i++) assert.ok(ok(await askFreeQuestion(deps(), input(mine))));
-  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "limit", message: ASK_MESSAGES.limit });
+  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "need-payment", message: ASK_MESSAGES["need-payment"] });
   assert.equal(asks.length, 3);
   // 다른 방(진로)은 자기 몫 3번이 따로 있다
   const career = deps({ loadAsk: async () => ({ context: CONTEXT, referenceDate: "2026-10-15", tier: "paid", room: "career", roomKey: "career" }) });
@@ -176,7 +176,7 @@ test("오늘의 운세는 날짜별 방이라 날짜마다 무료 질문 1번씩
   assert.ok(ok(await askFreeQuestion(next, input(day1.mine, "내일은요", "u1", "daily:2026-10-16"))));
 });
 
-test("글자 수: 무료 리포트의 무료 질문은 500자, 미유캐시 질문 · 심층 리포트는 1,000자 — 넘으면 AI를 부르지 않고 횟수도 · 캐시도 쓰지 않으며, 위기 표현은 길어도 안내가 먼저다", async () => {
+test("글자 수: 무료 리포트의 무료 질문은 500자, 유료 질문 · 심층 리포트는 1,000자 — 넘으면 AI를 부르지 않고 횟수도 · 결제한 질문도 쓰지 않으며, 위기 표현은 길어도 안내가 먼저다", async () => {
   assert.equal(QUESTION_MAX.free, 500);
   assert.equal(QUESTION_MAX.paid, 1000);
   assert.equal(QUESTION_MAX.paid, QUESTION_MAX.free * 2);
@@ -195,48 +195,47 @@ test("글자 수: 무료 리포트의 무료 질문은 500자, 미유캐시 질�
   const tooLong = await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.paid + 1)));
   assert.ok(!tooLong.ok && tooLong.reason === "too-long");
 
-  // 무료 리포트도 무료 질문을 다 쓰고 미유캐시로 묻는 질문은 1,000자까지
+  // 무료 리포트도 무료 질문을 다 쓰고 결제한 질문으로 묻는 질문은 1,000자까지
   const cash = await setup({ tier: "free", room: "daily" });
   assert.ok(ok(await askFreeQuestion(cash.deps(), input(cash.mine, "무료", "u1", "daily"))));
-  await cash.topUp("u1", cash.mine, 30);
+  await cash.buy("u1", cash.mine, 1);
   assert.ok(ok(await askFreeQuestion(cash.deps(), input(cash.mine, "가".repeat(QUESTION_MAX.paid), "u1", "daily"))));
 });
 
-test("미유캐시: 무료 질문을 다 쓴 뒤 캐시가 질문 한 번(3개)만큼 있으면 이어서 묻고, 답을 받으면 3개가 차감되며 횟수에 센다", async () => {
-  const { mine, deps, repo, mem, topUp } = await setup({ tier: "free", room: "love" });
+test("유료 질문: 무료 질문을 다 쓴 뒤 결제해 둔 질문이 있으면 이어서 묻고, 답을 받으면 한 개(3단위)가 차감되며 횟수에 센다", async () => {
+  const { mine, deps, repo, mem, buy } = await setup({ tier: "free", room: "love" });
   for (let i = 0; i < 2; i++) assert.ok(ok(await askFreeQuestion(deps(), input(mine))));
-  const quote = await topUp("u1", mine, 50); // 50개 + 보너스 5개 = 55개
-  assert.equal(await repo.getCashBalance("u1"), quote.total);
-  const r = await askFreeQuestion(deps(), input(mine, "이번엔 캐시로 물어볼게요"));
-  assert.deepEqual(r, { ok: true, kind: "answer", question: "이번엔 캐시로 물어볼게요", paragraphs: ["천천히 해 보면 좋겠어요."], remaining: 0, cash: { balance: 52 } });
-  assert.equal(await repo.getCashBalance("u1"), quote.total - MIYU_CASH.perQuestion);
+  await buy("u1", mine, 2); // 질문 2개 = 6단위
+  assert.equal(await repo.getCashBalance("u1"), 2 * MIYU_CASH.perQuestion);
+  const r = await askFreeQuestion(deps(), input(mine, "이번엔 유료로 물어볼게요"));
+  assert.deepEqual(r, { ok: true, kind: "answer", question: "이번엔 유료로 물어볼게요", paragraphs: ["천천히 해 보면 좋겠어요."], remaining: 0, cash: { balance: MIYU_CASH.perQuestion } });
+  assert.equal(await repo.getCashBalance("u1"), MIYU_CASH.perQuestion);
   assert.equal(mem.chatQuestions.length, 3);
   const spends = mem.ledger.filter((l) => l.kind === "spend");
   assert.equal(spends.length, 1);
   assert.equal(spends[0].amount, -3);
-  assert.ok(!JSON.stringify([mem.ledger, mem.chatQuestions]).includes("캐시로 물어볼게요"), "질문 내용은 기록에 없다");
+  assert.ok(!JSON.stringify([mem.ledger, mem.chatQuestions]).includes("유료로 물어볼게요"), "질문 내용은 기록에 없다");
 });
 
-test("미유캐시: 잔액이 모자라면 아무것도 쓰지 않고 AI도 부르지 않는다 (no-cash), 심층 리포트의 3번을 다 쓴 방에서도 같다", async () => {
-  const { mine, deps, asks, repo, topUp } = await setup({ tier: "paid", room: "love" });
+test("유료 질문: 결제해 둔 질문이 없으면 아무것도 쓰지 않고 AI도 부르지 않는다 (need-payment) — 심층 리포트의 3번을 다 쓴 방에서도 같다", async () => {
+  const { mine, deps, asks, repo, buy } = await setup({ tier: "paid", room: "love" });
   for (let i = 0; i < 3; i++) assert.ok(ok(await askFreeQuestion(deps(), input(mine))));
-  // 지갑이 아예 없다 — "이 방의 무료 질문을 모두 썼어요"
-  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "limit", message: ASK_MESSAGES.limit });
+  // 장부가 비어 있다 — 결제부터 해야 한다
+  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "need-payment", message: ASK_MESSAGES["need-payment"] });
   assert.equal(asks.length, 3);
-  // 10개를 충전하면 3번 물을 수 있고(3 × 3 = 9), 남은 1개로는 더 물을 수 없다
-  await topUp("u1", mine, 10);
-  for (let i = 0; i < 3; i++) assert.ok(ok(await askFreeQuestion(deps(), input(mine))), `캐시 ${i + 1}번째`);
-  assert.equal(await repo.getCashBalance("u1"), 1);
-  // 조금 남았지만 한 번에 모자라면 "미유캐시가 부족해요"
-  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "no-cash", message: ASK_MESSAGES["no-cash"] });
-  assert.equal(asks.length, 6);
-  assert.equal(await repo.getCashBalance("u1"), 1, "모자란 질문은 캐시를 쓰지 않는다");
+  // 두 개를 결제하면 두 번 물을 수 있다
+  await buy("u1", mine, 2);
+  for (let i = 0; i < 2; i++) assert.ok(ok(await askFreeQuestion(deps(), input(mine))), `결제한 질문 ${i + 1}번째`);
+  assert.equal(await repo.getCashBalance("u1"), 0);
+  assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "need-payment", message: ASK_MESSAGES["need-payment"] });
+  assert.equal(asks.length, 5);
+  assert.equal(await repo.getCashBalance("u1"), 0, "결제하지 않은 질문은 아무것도 쓰지 않는다");
 });
 
-test("미유캐시: 답을 받지 못하면(호출 실패 · 검사에 걸림) 차감한 캐시를 되돌리고 횟수에도 세지 않는다 — 어느 쪽도 글은 보이지 않는다", async () => {
-  const { mine, deps, repo, mem, topUp } = await setup({ tier: "free", room: "daily" });
+test("유료 질문: 답을 받지 못하면(호출 실패 · 검사에 걸림) 쓴 질문을 되돌리고 횟수에도 세지 않는다 — 어느 쪽도 글은 보이지 않는다", async () => {
+  const { mine, deps, repo, mem, buy } = await setup({ tier: "free", room: "daily" });
   assert.ok(ok(await askFreeQuestion(deps(), input(mine, "무료", "u1", "daily"))));
-  await topUp("u1", mine, 20);
+  await buy("u1", mine, 2, "daily");
   const before = await repo.getCashBalance("u1");
   const hard = { provider: "t", model: "t", answer: async () => Promise.reject(new ChatAnswerError("호출 실패", "MODEL")) } as ChatAnswerer;
   assert.deepEqual(await askFreeQuestion(deps({ answerer: hard }), input(mine, "질문", "u1", "daily")), { ok: false, reason: "failed", message: ASK_MESSAGES.failed });
@@ -248,7 +247,7 @@ test("미유캐시: 답을 받지 못하면(호출 실패 · 검사에 걸림) �
   assert.equal(mem.chatQuestions.length, 1, "횟수에 세지 않았다");
   assert.equal(mem.ledger.filter((l) => l.kind === "spend").length, 2);
   assert.equal(mem.ledger.filter((l) => l.kind === "spend_restore").length, 2);
-  // 예상하지 못한 오류도 캐시를 되돌린 뒤 그대로 올려 운영 기록에 남게 한다
+  // 예상하지 못한 오류도 되돌린 뒤 그대로 올려 운영 기록에 남게 한다
   const boom = { provider: "t", model: "t", answer: async () => Promise.reject(new Error("boom")) } as ChatAnswerer;
   await assert.rejects(askFreeQuestion(deps({ answerer: boom }), input(mine, "질문", "u1", "daily")), /boom/);
   assert.equal(await repo.getCashBalance("u1"), before);
@@ -265,7 +264,7 @@ test("무료 질문도 답을 받지 못하면 차감하지 않는다 — 호출
   assert.equal((await askFreeQuestion(deps(), input(mine, "질문", "u1", "daily"))).ok, false);
 });
 
-test("DB 변경이 아직 안 된 환경: 12번 전(횟수 표 없음)에는 열지 않고, 13번 전(캐시 표 없음)에는 무료 질문이 끝난 것으로만 안내한다", async () => {
+test("DB 변경이 아직 안 된 환경: 12번 전(횟수 표 없음)에는 열지 않고, 13번 전(결제한 질문 장부 표 없음)에는 무료 질문이 끝난 것으로만 안내한다", async () => {
   const { mine, deps, repo } = await setup({ tier: "free" });
   const missing = Object.assign(Object.create(repo), { countChatQuestionsInRoom: async () => Promise.reject(Object.assign(new Error("x"), { code: "42P01" })) });
   assert.deepEqual(await askFreeQuestion(deps({ repo: missing }), input(mine)), { ok: false, reason: "not-ready", message: ASK_MESSAGES["not-ready"] });
@@ -289,14 +288,14 @@ test("자료가 없으면(분석 결과를 찾지 못하면) 열지 않는다", 
   assert.equal(asks.length, 0);
 });
 
-test("하루 예산에 닿으면 새 질문만 멈춘다 (캐시도 쓰지 않는다)", async () => {
-  const { mine, deps, mem, repo, topUp } = await setup({ budget: 1, tier: "paid", room: "love" });
-  await topUp("u1", mine, 10);
+test("하루 예산에 닿으면 새 질문만 멈춘다 (결제한 질문도 쓰지 않는다)", async () => {
+  const { mine, deps, mem, repo, buy } = await setup({ budget: 1, tier: "paid", room: "love" });
+  await buy("u1", mine, 1);
   assert.ok(ok(await askFreeQuestion(deps(), input(mine))));
   // 첫 질문의 사용 기록(1000 · 300토큰)이 예산(1원)을 넘기게 단가가 정해져 있지 않으므로 비용을 직접 채워 넘긴 상태를 만든다
   await mem.repo.addAiUsage({ reportId: null, provider: "t", model: "t", promptVersion: "t", inputTokens: 1, outputTokens: 1, estCostKrw: 5, latencyMs: 1, outcome: "ok", errorCode: null });
   assert.deepEqual(await askFreeQuestion(deps(), input(mine)), { ok: false, reason: "budget", message: ASK_MESSAGES.budget });
-  assert.equal(await repo.getCashBalance("u1"), 10, "예산 때문에 막힌 질문은 캐시를 쓰지 않는다 (첫 질문은 무료 질문이었다)");
+  assert.equal(await repo.getCashBalance("u1"), MIYU_CASH.perQuestion, "예산 때문에 막힌 질문은 결제한 질문을 쓰지 않는다 (첫 질문은 무료 질문이었다)");
 });
 
 test("이어지는 질문: 이 방에 저장된 앞선 질문과 답이 최근 2개까지 함께 간다", async () => {

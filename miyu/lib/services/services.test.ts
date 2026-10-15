@@ -1,5 +1,6 @@
 // 실행: npm test — 서비스 흐름을 메모리 저장소와 가짜 결제사로 확인한다.
 import assert from "node:assert/strict";
+import { REPORT_GENERATING_STALE_MS } from "../commerce/report.ts";
 import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
 import type { GatewayPayment } from "../commerce/order.ts";
@@ -549,7 +550,7 @@ test("백그라운드 생성: 서버가 멈춰 생성 중으로 남으면 일정
   const abandoned = await claimReport(d, order); // 생성 시작 후 서버가 꺼졌다고 가정 (completeReport 호출 안 함)
   assert.equal(abandoned.claimed, true);
   assert.equal((await claimReport(d, order)).claimed, false, "아직 진행 중으로 본다");
-  now += 6 * 60 * 1000; // 5분 넘게 멈춤
+  now += REPORT_GENERATING_STALE_MS + 60 * 1000; // 멈춤 판단 시간(10분)을 넘게 멈춤
   mem.reports.get(abandoned.report!.id)!.updatedAt = TODAY.toISOString();
   const resumed = await claimReport(d, order);
   assert.equal(resumed.claimed, true, "멈춘 작업을 이어받는다");

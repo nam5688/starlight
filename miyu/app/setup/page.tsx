@@ -168,6 +168,11 @@ async function SetupContent() {
           <span className="font-semibold">리포트 생성기</span>{" "}
           {ai.kind === "none" && <span className="text-ink-2">개발용 규칙 생성기 (AI 연결 전 · 비용 없음)</span>}
           {ai.kind === "mock-local" && <span className="text-accent">로컬 모의 AI — 새 리포트 흐름 검증용 (실제 AI 아님 · 비용 없음)</span>}
+          {ai.kind === "anthropic" && (
+            <span className="text-accent">
+              실제 Claude 연결됨 — 승인 금액 {ai.approval.capKrw.toLocaleString("ko-KR")}원 · 호출 {ai.approval.maxCalls}회 · {ai.approval.from} ~ {ai.approval.through} 안에서만 호출합니다 (유료 · 리포트 생성과 채팅 질문이 합쳐서 셉니다)
+            </span>
+          )}
           {ai.kind === "invalid" && <span className="text-danger">{ai.reason}. 지금은 개발용 규칙 생성기로 만듭니다.</span>}
         </p>
         <p className="mt-2 text-[14px] leading-relaxed">
@@ -176,7 +181,7 @@ async function SetupContent() {
           {chatAi.kind === "mock-local" && <span className="text-accent">로컬 모의 AI (실제 AI 아님 · 비용 없음)</span>}
           {chatAi.kind === "anthropic" && (
             <span className="text-accent">
-              실제 Claude 연결됨 — 승인 금액 {chatAi.approval.capKrw.toLocaleString("ko-KR")}원 · 호출 {chatAi.approval.maxCalls}회 · {chatAi.approval.from} ~ {chatAi.approval.through} 안에서만 호출합니다 (유료)
+              실제 Claude 연결됨 — 승인 금액 {chatAi.approval.capKrw.toLocaleString("ko-KR")}원 · 호출 {chatAi.approval.maxCalls}회 · {chatAi.approval.from} ~ {chatAi.approval.through} 안에서만 호출합니다 (유료{chatAi.shared ? " · 리포트 생성과 합쳐서 셉니다" : ""})
             </span>
           )}
           {chatAi.kind === "invalid" && <span className="text-danger">{chatAi.reason}. 지금은 호출하지 않고 &ldquo;준비 중&rdquo;으로 보입니다.</span>}

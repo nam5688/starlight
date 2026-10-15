@@ -49,7 +49,7 @@ export const REPORT_TIER_NAMES = { simple: "무료 리포트", deep: "심층 리
  * 상담방 등급 — 어떤 방이 무료 리포트(무료)로 열리고 방마다 무료 질문이 몇 번인지 (운영자 2026-10-15). 바꿀 때는 여기서만 바꾼다.
  *  - simple: 무료 리포트로 열리는 방 → 방마다 무료 질문 수. 0이면 질문이 없고 "자세한 이야기는 심층 리포트에서"로 이어 준다. **여기 없는 방(올해의 흐름 · 결혼 · 진로 · 재무)은 심층 리포트로만 열린다.**
  *  - deepFreeQuestions: 심층 리포트를 가진 분이 방마다 쓸 수 있는 무료 질문 수 (모든 방).
- *  - 무료 질문을 다 쓰면 미유캐시(MIYU_CASH)로 이어서 물을 수 있다(단 질문이 없는 방 · 심층 리포트로만 열리는 방을 무료 리포트 회원이 캐시로 여는 것은 아니다).
+ *  - 무료 질문을 다 쓰면 질문 한 개당 결제(MIYU_CASH · QUESTION_PRICE_KRW)로 이어서 물을 수 있다(단 질문이 없는 방 · 심층 리포트로만 열리는 방을 무료 리포트 회원이 결제로 여는 것은 아니다).
  *  - 무료 질문은 방 단위로 센다. 오늘의 운세 방은 날짜별 방이라 하루 1번씩이다(운영자 확인 필요 — 평생 1번으로 줄이려면 daily 방을 날짜 없이 세면 된다).
  */
 export const CHAT_ROOMS = {
@@ -65,39 +65,31 @@ export const CHAT_ROOMS = {
 export const CONCERN_RECORDS = { visible: false } as const;
 
 /**
- * 미유캐시 — 자유 질문을 무료 한도 밖에서 이어 갈 때 쓰는 선불 충전 포인트(운영자 2026-10-15: "1질문당 캐시 3개 · 10개 단위 충전 · 많이 충전하면 보너스").
- * 아래 값은 모두 **제안(가안)** 이다 — 운영자가 확정하기 전에는 "가안"으로 다루고, 바꿀 때는 여기 한 곳에서만 바꾼다(결제 금액은 서버가 이 값으로 계산해 주문에 적고, 브라우저가 보낸 금액은 믿지 않는다).
- *  - 1캐시 = 100원(가안). 질문 한 번에 3캐시 → 한 번에 300원 안팎. 한 번 호출 비용 어림(약 17원)과 결제 수수료 · 운영비를 넘기는 폭을 두고 정한 제안이다.
- *  - 충전은 10캐시 단위(1,000원)이고 한 번에 최대 500캐시(50,000원).
- *  - 보너스: 한 번에 충전한 캐시가 구간 기준 이상이면 비율만큼 더 얹는다(소수점은 버림). 보너스 캐시도 질문에 똑같이 쓰이지만, 결제를 취소하면 함께 회수된다.
- *  - 마감 타이머 · "원래 가격" 같은 표시는 쓰지 않는다. 보너스는 항상 같은 표(아래)로 보인다.
- * 환불 · 유효기간 · 보너스의 환불 여부 같은 정책은 운영자(필요하면 법무) 확인 전이며 화면에는 "정책 확정 전"으로 밝힌다(docs/cash-policy.md).
+ * 유료 질문 — 무료 질문을 다 쓴 뒤 질문 **한 개당** 결제해서 이어 간다(운영자 2026-10-15: "선불 충전 방식 말고 질문 한 개당 결제, 가격은 선불 캐시와 비슷하게").
+ * 충전 · 보너스 · 지갑 화면은 없다. 값은 모두 **제안(가안)** 이며 바꿀 때는 여기 한 곳에서만 바꾼다(결제 금액은 서버가 이 값으로 계산해 주문에 적고, 브라우저가 보낸 금액은 믿지 않는다).
+ *  - 질문 한 개 = 300원(가안, 이전 선불 방식의 "3캐시 × 100원"과 같은 값). 한 번 호출 비용 어림(약 17원)과 결제 수수료 · 운영비를 넘기는 폭을 두고 정한 제안이다.
+ *  - 내부적으로는 DB 13번의 지갑 표를 "결제한 질문을 답이 올 때까지 보관하는 장부"로 쓴다. 결제 한 건 = perQuestion(3) 단위가 들어오고 질문 한 번이 바로 그만큼을 쓴다.
+ *    답을 받지 못하면 되돌려 그 질문권이 남고(같은 결제로 다시 물을 수 있다), 질문권이 남아 있으면 새로 결제받지 않으므로 **보관은 질문 한 개까지**다(미리 쌓는 충전금이 아니다).
+ *  - 마감 타이머 · "원래 가격" 같은 표시는 쓰지 않는다.
+ * 환불 · 유효기간 같은 이용 기준은 운영자(필요하면 법무) 확인 전이며 화면에는 "정책 확정 전"으로 밝힌다(docs/question-payment.md).
  */
 export const MIYU_CASH = {
+  /** 상품 번호 접두 — DB 13번 트리거가 `cash-charge:<들어올 단위>:<보너스>:<번호>` 형식을 읽는다 */
   id: "cash-charge",
-  name: "미유캐시",
+  /** 화면에 보이는 상품 이름 */
+  name: "유료 질문",
   /** 화면에 함께 표시하는 가격 상태 */
   priceNote: "가안",
-  /** 충전은 이 개수의 배수로만 */
-  unit: 10,
-  /** 1캐시의 값 (원) */
+  /** 장부 단위 하나의 값 (원) */
   krwPerCash: 100,
-  /** 질문 한 번에 쓰는 캐시 */
+  /** 질문 한 번에 쓰는 장부 단위 */
   perQuestion: 3,
-  /** 한 번에 충전할 수 있는 범위 (개) */
-  minCash: 10,
-  maxCash: 500,
-  /** 보너스 구간 — 충전 캐시가 minCash 이상이면 ratePct(%)를 더 얹는다 (가장 높은 구간 하나만 적용) */
-  bonusTiers: [
-    { minCash: 50, ratePct: 10 },
-    { minCash: 100, ratePct: 15 },
-    { minCash: 300, ratePct: 20 },
-  ],
-  /** 충전 화면의 빠른 선택 (개) */
-  packages: [10, 30, 50, 100, 300],
-  /** 환불 · 유효기간 · 보너스 환불 여부 같은 이용 기준을 운영자가 확정했는가 — false인 동안 충전 화면은 "아직 정해지지 않았다"고 밝힌다(docs/cash-policy.md). 확정하면 true로 바꾸고 화면 문구를 정책에 맞게 고친다 */
+  /** 환불 · 유효기간 같은 이용 기준을 운영자가 확정했는가 — false인 동안 화면은 "아직 정해지지 않았다"고 밝힌다(docs/question-payment.md). 확정하면 true로 바꾸고 화면 문구를 정책에 맞게 고친다 */
   policyDecided: false,
 } as const;
+
+/** 유료 질문 한 개의 값 (원) — 서버가 주문 금액으로 쓴다 */
+export const QUESTION_PRICE_KRW = MIYU_CASH.perQuestion * MIYU_CASH.krwPerCash;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -115,22 +107,23 @@ export function parseConcernProductId(productId: string): string | null {
 }
 
 /**
- * 미유캐시 충전 주문의 상품 번호 — `cash-charge:<충전 캐시>:<보너스 캐시>:<임의 번호>`.
- * 서버가 주문을 만들 때 금액에서 정한 충전량을 번호에 함께 적는다(결제 승인 때 DB가 이 값을 읽어 지갑에 넣는다 — 승인과 같은 처리 안에서).
- * 임의 번호는 같은 검사 결과에서 충전을 여러 번 해도 주문마다 번호가 달라지게 한다(DB의 "같은 검사 · 상품에 결제 완료 하나" 조건을 피하는 용도가 아니라, 충전은 반복해도 되는 상품이기 때문이다).
+ * 유료 질문 주문의 상품 번호 — `cash-charge:<장부에 들어올 단위>:<보너스>:<번호>`. 질문 결제는 항상 `cash-charge:3:0:<방이름 + 임의 10자>`다.
+ * 서버가 주문을 만들 때 정한 값을 번호에 함께 적는다(결제 승인 때 DB가 이 값을 읽어 장부에 넣는다 — 승인과 같은 처리 안에서).
+ * 번호의 앞부분은 질문한 방의 이름이라 결제가 끝난 뒤 그 방으로 돌아올 수 있다(lib/commerce/cash.ts의 questionRoomOf).
+ * 예전 선불 충전 주문(`cash-charge:50:5:…` 등)도 같은 형식이라 읽을 수 있고, 기록은 그대로 남는다.
  */
 export const cashProductId = (p: { cash: number; bonus: number; nonce: string }) => `${MIYU_CASH.id}:${p.cash}:${p.bonus}:${p.nonce}`;
 
 const CASH_PRODUCT = /^cash-charge:([0-9]{1,6}):([0-9]{1,6}):([A-Za-z0-9]{6,32})$/;
 
-/** 상품 번호에서 충전 캐시 · 보너스 캐시를 꺼낸다. 미유캐시 충전 주문이 아니면 null */
+/** 상품 번호에서 장부 단위 · 보너스를 꺼낸다. 유료 질문(또는 예전 충전) 주문이 아니면 null */
 export function parseCashProductId(productId: string): { cash: number; bonus: number; nonce: string } | null {
   const m = CASH_PRODUCT.exec(productId);
   if (!m) return null;
   return { cash: Number(m[1]), bonus: Number(m[2]), nonce: m[3] };
 }
 
-/** 미유캐시 충전 주문인가 (리포트 주문이 아니다 — 리포트를 만들지 않고 지갑에 캐시를 넣는다) */
+/** 유료 질문(또는 예전 충전) 주문인가 (리포트 주문이 아니다 — 리포트를 만들지 않고 장부에 질문 한 개를 넣는다) */
 export const isCashProduct = (productId: string) => parseCashProductId(productId) !== null;
 
 /**
@@ -158,7 +151,7 @@ export function productNameOf(productId: string): string {
   const seq = parsePersonalSeq(productId);
   if (seq !== null) return seq > 1 ? `${PERSONAL_REPORT.name} (${seq}번째 받기)` : PERSONAL_REPORT.name;
   const cash = parseCashProductId(productId);
-  if (cash) return `${MIYU_CASH.name} ${cash.cash}개 충전`;
+  if (cash) return cash.cash === MIYU_CASH.perQuestion && cash.bonus === 0 ? `${MIYU_CASH.name} 1개` : `미유캐시 ${cash.cash}개 충전 (예전 방식)`;
   return parseConcernProductId(productId) ? CONCERN_REPORT.name : productId;
 }
 
