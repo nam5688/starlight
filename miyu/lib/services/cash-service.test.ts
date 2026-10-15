@@ -65,14 +65,14 @@ async function world(opts: WorldOpts = {}) {
   return { mem, toss, now, assessment, deps, input, spendFree, pay };
 }
 
-test("결제 시작: 무료 질문을 다 쓴 방에서 서버가 금액(300원)을 정해 주문을 만들고, 상품 번호에 방 이름이 앞에 붙는다", async () => {
+test("결제 시작: 무료 질문을 다 쓴 방에서 서버가 금액(550원)을 정해 주문을 만들고, 상품 번호에 방 이름이 앞에 붙는다", async () => {
   const w = await world({ room: "love" });
   await w.spendFree(2);
   const r = await startQuestionPayment(w.deps, { ...w.input(), paymentEnv: "test" });
   assert.equal(r.kind, "order");
   if (r.kind !== "order") return;
   assert.equal(r.order.amount, QUESTION_PRICE_KRW);
-  assert.equal(r.order.amount, 300);
+  assert.equal(r.order.amount, 550);
   assert.equal(r.quote.units, MIYU_CASH.perQuestion);
   const parsed = parseCashProductId(r.order.productId);
   assert.equal(parsed?.cash, 3);
@@ -117,14 +117,16 @@ test("결제 시작: 질문을 받을 수 없으면 결제하지 않는다 — �
   assert.equal(w.mem.orders.size, 0);
 });
 
-test("결제 시작: 무료 리포트의 무료 질문 글자 수는 500자, 유료 질문은 1,000자까지 받는다", async () => {
+test("결제 시작: 무료 리포트의 무료 질문 글자 수는 300자, 결제한 질문은 500자까지 받는다", async () => {
   const w = await world({ tier: "free", room: "love" });
-  // 무료 질문이 남았을 때는 500자 한도 — 500자를 넘으면 거절
-  const tooLongFree = await startQuestionPayment(w.deps, { ...w.input("가".repeat(501)), paymentEnv: "test" });
+  // 무료 질문이 남았을 때는 300자 한도 — 300자를 넘으면 거절
+  const tooLongFree = await startQuestionPayment(w.deps, { ...w.input("가".repeat(301)), paymentEnv: "test" });
   assert.ok(tooLongFree.kind === "refused" && !tooLongFree.result.ok && tooLongFree.result.reason === "too-long-free");
   await w.spendFree(2);
-  const ok1000 = await startQuestionPayment(w.deps, { ...w.input("가".repeat(1000)), paymentEnv: "test" });
-  assert.equal(ok1000.kind, "order", "무료 질문을 다 쓴 뒤의 유료 질문은 1,000자까지");
+  const ok500 = await startQuestionPayment(w.deps, { ...w.input("가".repeat(500)), paymentEnv: "test" });
+  assert.equal(ok500.kind, "order", "무료 질문을 다 쓴 뒤의 결제한 질문은 500자까지");
+  const over500 = await startQuestionPayment(w.deps, { ...w.input("가".repeat(501)), paymentEnv: "test" });
+  assert.ok(over500.kind === "refused" && !over500.result.ok && over500.result.reason === "too-long", "500자를 넘으면 결제하지 않는다");
 });
 
 test("결제 시작: 다시 누르면 이전 질문 결제 대기 주문은 대체되고, 개인 통합 리포트의 대기 주문은 건드리지 않는다", async () => {

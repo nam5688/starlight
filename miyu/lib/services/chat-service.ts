@@ -47,7 +47,7 @@ export type AskReason =
 export const ASK_MESSAGES: Record<AskReason, string> = {
   closed: "자유 질문은 아직 준비 중이에요.",
   limit: "이 방에서 물어볼 수 있는 질문을 모두 썼어요.",
-  "free-used": "무료 질문을 모두 썼어요. 유료 질문은 글자 수 제한이 1,000자로 늘어나요.",
+  "free-used": "무료 질문을 모두 썼어요.",
   "need-payment": `유료 질문은 질문 한 개에 ${formatKrw(QUESTION_PRICE_KRW)}이에요. 결제하면 이어서 질문할 수 있어요.`,
   "pay-unavailable": "유료 질문 결제를 지금은 열 수 없어요. 잠시 뒤에 다시 시도해 주세요.",
   "pay-closed": "지금은 새 결제를 받지 않아요. 잠시 뒤에 다시 시도해 주세요.",
@@ -56,7 +56,7 @@ export const ASK_MESSAGES: Record<AskReason, string> = {
   budget: "지금은 질문이 많아 잠시 쉬고 있어요. 조금 뒤에 다시 물어봐 주세요.",
   empty: "궁금한 것을 한두 문장으로 적어 주세요.",
   "too-long": `질문은 ${QUESTION_MAX.paid.toLocaleString("ko-KR")}자 이하로 적어 주세요.`,
-  "too-long-free": `무료 질문은 ${QUESTION_MAX.free.toLocaleString("ko-KR")}자까지예요. 줄여서 적어 주세요. 유료 질문은 ${QUESTION_MAX.paid.toLocaleString("ko-KR")}자까지 쓸 수 있어요.`,
+  "too-long-free": `무료 질문은 ${QUESTION_MAX.free.toLocaleString("ko-KR")}자까지예요. 줄여서 적어 주세요.`,
   "no-material": "이 방의 무료 풀이에는 아직 이야기 나눌 내용이 없어요.",
   "not-found": "이 대화를 찾지 못했어요. 화면을 새로 열어 주세요.",
   "not-ready": "이야기를 이어 가는 건 아직 준비 중이에요.",
@@ -163,7 +163,7 @@ export async function gateQuestion(deps: AskDeps, input: AskInput): Promise<Ques
   }
   const inQuota = used < policy.freeQuestions;
 
-  // 글자 수 한도: 무료 리포트의 무료 질문은 500자, 그 밖(심층 리포트의 무료 질문 · 유료 질문)은 1,000자 (위기 표현 확인 뒤에 센다 — 힘든 글은 길어도 안내가 먼저다)
+  // 글자 수 한도: 무료 리포트의 무료 질문은 300자, 그 밖(심층 리포트의 질문 · 결제한 질문)은 500자 (위기 표현 확인 뒤에 센다 — 힘든 글은 길어도 안내가 먼저다)
   const max = inQuota && free ? QUESTION_MAX.free : QUESTION_MAX.paid;
   if (q.length > max) return no(fail(max === QUESTION_MAX.free ? "too-long-free" : "too-long"));
 

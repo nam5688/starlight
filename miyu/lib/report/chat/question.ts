@@ -12,7 +12,7 @@ export function cleanQuestion(raw: unknown): CleanQuestion {
     .replace(/\s+/g, " ")
     .trim();
   if (!text) return { ok: false, reason: "empty" };
-  // 가장 넉넉한 한도(리포트를 받은 분의 1,000자)를 넘으면 누구에게도 받지 않는다. 무료 질문의 500자 한도는 어떤 쪽인지 안 뒤에 확인한다(chat-service)
+  // 가장 넉넉한 한도(심층 리포트 회원 · 결제한 질문의 500자)를 넘으면 누구에게도 받지 않는다. 무료 질문의 300자 한도는 어떤 쪽인지 안 뒤에 확인한다(chat-service)
   if (text.length > QUESTION_MAX.paid) return { ok: false, reason: "too-long" };
   const r = redactPersonalInfo(text);
   return { ok: true, text: r.text, redactions: r.count, length: text.length };

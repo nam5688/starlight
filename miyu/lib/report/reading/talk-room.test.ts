@@ -423,14 +423,14 @@ test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이�
   assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
 });
 
-test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 질문 한 개당 300원 · 글자 수 1,000자로 늘어난다는 것만 알리고, 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
+test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 질문을 적어 보내면 질문 한 개씩 결제로 이어진다는 것만 알리고(가격 · 글자 수 문장은 이 창에 없다), 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
   const c = TALK_COPY.recharge;
   assert.equal(c["free-used"].title, "무료 질문을 모두 썼어요");
-  assert.equal(c["free-used"].body, "이어서 묻고 싶다면 질문 한 개에 300원이에요. 유료 질문은 글자 수 제한이 1,000자로 늘어나요.");
-  assert.ok(!/500|두 배|충전|캐시/.test(c["free-used"].body), "무료 한도 · 배수 · 선불 충전 말은 덧붙이지 않는다");
-  assert.equal(c["paid-used"].body, "더 묻고 싶다면 질문 한 개에 300원으로 이어 갈 수 있어요. 글자 수 제한은 1,000자예요.");
-  assert.equal(QUESTION_MAX.paid, 1000);
-  assert.equal(QUESTION_PRICE_KRW, 300);
+  assert.equal(c["free-used"].body, "이어서 묻고 싶다면 질문을 적어 보내 주세요. 질문 한 개씩 결제하는 화면으로 이어져요.");
+  assert.equal(c["paid-used"].body, "더 묻고 싶다면 질문을 적어 보내 주세요. 질문 한 개씩 결제하는 화면으로 이어 갈 수 있어요.");
+  for (const v of [c["free-used"], c["paid-used"]]) assert.ok(!/\d|원|자\b|두 배|충전|캐시/.test(v.body), `안내창에는 가격 · 글자 수 · 선불 충전 말이 없다: ${v.body}`);
+  assert.deepEqual(QUESTION_MAX, { free: 300, paid: 500 });
+  assert.equal(QUESTION_PRICE_KRW, 550);
   assert.equal(c.payLabel, "질문 이어가기");
   const texts: string[] = [...[c["free-used"], c["paid-used"], c.deep].flatMap((v) => [v.title, v.body]), c.later, c.payLabel, c.open];
   for (const text of texts) {
@@ -441,7 +441,7 @@ test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정|충전|캐시/.test(text), `불안 · 압박 · 선불 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }
-  assert.match(ROOM_COPY.chatPayLead(300), /300원/);
-  assert.match(TALK_COPY.freeQuestionPay(300), /300원/);
+  assert.match(ROOM_COPY.chatPayLead(550), /550원/);
+  assert.match(TALK_COPY.freeQuestionPay(550), /550원/);
   assert.ok(ROOM_COPY.chatFreeNote.includes(`${QUESTION_MAX.free}자`), "무료 질문 안내에도 글자 수 한도가 있다");
 });

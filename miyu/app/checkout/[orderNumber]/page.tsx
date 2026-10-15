@@ -79,6 +79,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
         <Row label="상품">{productName}</Row>
         <Row label="결제 금액">
           <span className="font-bold tabular-nums">{formatKrw(order.amount)}</span>
+          {isCash && <span className="ml-1 text-[13px] text-ink-3">(부가세 포함)</span>}
         </Row>
         <Row label="주문번호">
           <span className="tabular-nums">{order.orderNumber}</span>
@@ -106,7 +107,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
       )}
       {isCash && (
         <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
-          무료 질문을 다 쓴 뒤 이어서 묻는 유료 질문 한 개의 결제예요. 결제가 확인되면 방금 적은 질문에 이어서 답하고, 리포트는 새로 만들어지지 않아요. 답을 받지 못하면 같은 결제로 다시 물을 수 있어요. 가격은 가안이에요.
+          <span className="font-semibold text-ink">질문 1개 = {formatKrw(order.amount)}.</span> 무료 질문을 다 쓴 뒤 이어서 묻는 유료 질문 한 개의 결제예요. 결제가 확인되면 방금 적은 질문에 이어서 답하고, 리포트는 새로 만들어지지 않아요. 답을 받지 못하면 같은 결제로 다시 물을 수 있어요. 가격은 가안이에요.
         </p>
       )}
       {isRepeat && (

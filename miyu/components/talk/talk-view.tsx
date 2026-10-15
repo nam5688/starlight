@@ -146,7 +146,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   /** 미유가 말을 하고 있는 중(입력 중 표시) — 결제 화면으로 넘기는 중(paying)에는 입력창만 잠그고 미유의 "입력 중"은 보이지 않는다 */
   const miyuBusy = typing || waiting;
   const busy = miyuBusy || paying;
-  /** 질문 한 번의 글자 수 한도 — 무료 리포트의 무료 질문은 500자, 그 밖(심층 리포트 · 유료 질문)은 1,000자 */
+  /** 질문 한 번의 글자 수 한도 — 무료 리포트의 무료 질문은 300자, 그 밖(심층 리포트 · 결제한 질문)은 500자 */
   const questionMax = questionMaxFor(Boolean(model.chat.free) && !quotaUsed);
   /** 무료 질문을 모두 썼을 때 뜨는 안내창 — 마지막 답을 읽을 시간을 준 뒤(답이 다 도착한 다음) 연다 */
   const [rechargeOpen, setRechargeOpen] = useState(false);

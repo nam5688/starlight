@@ -82,11 +82,11 @@ test("남의 검사 결과 · 잘못된 방 이름은 거절하고 AI를 부르�
   assert.equal(mem.chatQuestions.length, 0);
 });
 
-test("입력: 빈 글 · 1,000자 초과는 거절하고(1,000자까지는 받는다), 연락처는 가려서 AI에 보낸다", async () => {
+test("입력: 빈 글 · 500자 초과는 거절하고(500자까지는 받는다), 연락처는 가려서 AI에 보낸다", async () => {
   const { mine, deps, asks } = await setup();
   assert.equal((await askFreeQuestion(deps(), input(mine, "  "))).ok, false);
   const long = await askFreeQuestion(deps(), input(mine, "가".repeat(QUESTION_MAX.paid + 1)));
-  assert.ok(!long.ok && long.reason === "too-long" && long.message.includes("1,000자"));
+  assert.ok(!long.ok && long.reason === "too-long" && long.message.includes("500자"));
   assert.equal(asks.length, 0);
   await askFreeQuestion(deps(), input(mine, "이 번호 010-1234-5678 로 연락이 왔어요"));
   assert.ok(!asks[0].question.includes("1234-5678"));
@@ -176,13 +176,12 @@ test("오늘의 운세는 날짜별 방이라 날짜마다 무료 질문 1번씩
   assert.ok(ok(await askFreeQuestion(next, input(day1.mine, "내일은요", "u1", "daily:2026-10-16"))));
 });
 
-test("글자 수: 무료 리포트의 무료 질문은 500자, 유료 질문 · 심층 리포트는 1,000자 — 넘으면 AI를 부르지 않고 횟수도 · 결제한 질문도 쓰지 않으며, 위기 표현은 길어도 안내가 먼저다", async () => {
-  assert.equal(QUESTION_MAX.free, 500);
-  assert.equal(QUESTION_MAX.paid, 1000);
-  assert.equal(QUESTION_MAX.paid, QUESTION_MAX.free * 2);
+test("글자 수: 무료 리포트의 무료 질문은 300자, 심층 리포트 · 결제한 질문은 500자 — 넘으면 AI를 부르지 않고 횟수도 · 결제한 질문도 쓰지 않으며, 위기 표현은 길어도 안내가 먼저다", async () => {
+  assert.equal(QUESTION_MAX.free, 300);
+  assert.equal(QUESTION_MAX.paid, 500);
   const free = await setup({ tier: "free", room: "love" });
   const over = await askFreeQuestion(free.deps(), input(free.mine, "가".repeat(QUESTION_MAX.free + 1)));
-  assert.ok(!over.ok && over.reason === "too-long-free" && over.message.includes("500자") && over.message.includes("1,000자"), JSON.stringify(over));
+  assert.ok(!over.ok && over.reason === "too-long-free" && over.message.includes("300자") && !over.message.includes("500자"), JSON.stringify(over));
   assert.equal(free.asks.length, 0);
   assert.equal(free.mem.chatQuestions.length, 0);
   assert.ok(ok(await askFreeQuestion(free.deps(), input(free.mine, "가".repeat(QUESTION_MAX.free)))));
@@ -190,12 +189,17 @@ test("글자 수: 무료 리포트의 무료 질문은 500자, 유료 질문 · 
   assert.deepEqual(longCrisis, { ok: true, kind: "safety", paragraphs: CRISIS_REPLY });
 
   const paid = await setup({ tier: "paid" });
-  assert.ok(ok(await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.free + 1)))), "심층 리포트는 500자를 넘어도 된다");
+  assert.ok(ok(await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.free + 1)))), "심층 리포트는 300자를 넘어도 된다");
   assert.ok(ok(await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.paid)))));
   const tooLong = await askFreeQuestion(paid.deps(), input(paid.mine, "가".repeat(QUESTION_MAX.paid + 1)));
   assert.ok(!tooLong.ok && tooLong.reason === "too-long");
 
-  // 무료 리포트도 무료 질문을 다 쓰고 결제한 질문으로 묻는 질문은 1,000자까지
+  // 무료 리포트도 무료 질문을 다 쓰고 결제한 질문으로 묻는 질문은 500자까지(무료 질문의 300자보다 넉넉하다)
+  const cashFree = await setup({ tier: "free", room: "daily" });
+  assert.ok(ok(await askFreeQuestion(cashFree.deps(), input(cashFree.mine, "무료", "u1", "daily"))));
+  await cashFree.buy("u1", cashFree.mine, 1);
+  const cashTooLong = await askFreeQuestion(cashFree.deps(), input(cashFree.mine, "가".repeat(QUESTION_MAX.paid + 1), "u1", "daily"));
+  assert.ok(!cashTooLong.ok && cashTooLong.reason === "too-long", "결제한 질문도 500자를 넘으면 받지 않는다");
   const cash = await setup({ tier: "free", room: "daily" });
   assert.ok(ok(await askFreeQuestion(cash.deps(), input(cash.mine, "무료", "u1", "daily"))));
   await cash.buy("u1", cash.mine, 1);

@@ -4,11 +4,12 @@ import test from "node:test";
 import { cashProductId, isCashProduct, MIYU_CASH, parseCashProductId, productNameOf, QUESTION_PRICE_KRW } from "../config/product.ts";
 import { canAffordQuestion, createQuestionNonce, questionProductId, questionQuote, questionRoomOf, questionsLeft } from "./cash.ts";
 
-test("운영자 지정값: 선불 충전은 없고 질문 한 개 = 300원(이전 선불 방식의 3캐시 × 100원과 같은 값)", () => {
+test("운영자 지정값: 선불 충전은 없고 질문 한 개 = 550원(부가세 포함, 장부 단위와 값은 따로 정한다)", () => {
   assert.equal(MIYU_CASH.perQuestion, 3);
-  assert.equal(MIYU_CASH.krwPerCash, 100);
-  assert.equal(QUESTION_PRICE_KRW, 300);
-  assert.deepEqual(questionQuote(), { priceKrw: 300, units: 3 });
+  assert.equal(MIYU_CASH.priceKrw, 550);
+  assert.equal(QUESTION_PRICE_KRW, 550);
+  assert.equal("krwPerCash" in MIYU_CASH, false, "가격은 장부 단위에서 계산하지 않는다");
+  assert.deepEqual(questionQuote(), { priceKrw: 550, units: 3 });
   // 충전 · 보너스 · 단위 같은 선불 충전 설정은 남아 있지 않다
   for (const gone of ["unit", "minCash", "maxCash", "bonusTiers", "packages"]) assert.equal(gone in MIYU_CASH, false, gone);
 });

@@ -998,7 +998,7 @@ test("결제한 질문 장부(13번 마이그레이션) — 예전 선불 충전
   // 예전에 만든 선불 충전 주문(이미 운영 데이터에 있을 수 있다) — 지금 화면에서는 만들 수 없지만 DB는 같은 형식을 계속 처리한다
   const charge = async (cash: number) => {
     const bonus = cash >= 100 ? 15 : 0;
-    const inserted = await server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: U.id, assessmentId: aid, productId: cashProductId({ cash, bonus, nonce: `LEG${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}` }), amount: cash * MIYU_CASH.krwPerCash, paymentEnv: "test" });
+    const inserted = await server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: U.id, assessmentId: aid, productId: cashProductId({ cash, bonus, nonce: `LEG${randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}` }), amount: cash * 100, paymentEnv: "test" });
     if (!inserted.ok) throw new Error("주문을 만들지 못했습니다");
     return { order: inserted.value };
   };
