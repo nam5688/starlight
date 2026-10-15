@@ -8,7 +8,7 @@ import { CHAT_LIMITS } from "../report/chat/plan.ts";
 import { CARE_NOTE, CRISIS_REPLY, cleanQuestion, crisisLevel } from "../report/chat/question.ts";
 import { shorten, SUMMARY_LIMITS } from "../report/chat/summary.ts";
 import type { ChatAsk, ChatContext, ChatExchange } from "../report/chat/types.ts";
-import { formatKrw, MIYU_CASH, QUESTION_PRICE_KRW, REPORT_TIER_NAMES } from "../config/product.ts";
+import { formatKrw, MIYU_CASH, QUESTION_PACK_PRICE_KRW, QUESTION_PACK_SIZE, REPORT_TIER_NAMES } from "../config/product.ts";
 import { roomPolicy } from "../report/chat/quota.ts";
 import { QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
@@ -48,7 +48,7 @@ export const ASK_MESSAGES: Record<AskReason, string> = {
   closed: "자유 질문은 아직 준비 중이에요.",
   limit: "이 방에서 물어볼 수 있는 질문을 모두 썼어요.",
   "free-used": "무료 질문을 모두 썼어요.",
-  "need-payment": `유료 질문은 질문 한 개에 ${formatKrw(QUESTION_PRICE_KRW)}이에요. 결제하면 이어서 질문할 수 있어요.`,
+  "need-payment": `유료 질문은 질문 ${QUESTION_PACK_SIZE}개에 ${formatKrw(QUESTION_PACK_PRICE_KRW)}이에요. 결제하면 이어서 질문할 수 있어요.`,
   "pay-unavailable": "유료 질문 결제를 지금은 열 수 없어요. 잠시 뒤에 다시 시도해 주세요.",
   "pay-closed": "지금은 새 결제를 받지 않아요. 잠시 뒤에 다시 시도해 주세요.",
   "room-locked": `이 방은 ${REPORT_TIER_NAMES.deep}로 열려요.`,

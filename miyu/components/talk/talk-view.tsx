@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { BasisList, ComfortPair, LuckTimelineCard, Prose, ReactionStepper } from "@/components/report/reading-parts";
 import { AdjustIcon, ArrowIcon, LockIcon, MenuIcon, StrengthIcon } from "@/components/ui/icons";
-import { MIYU_CASH, QUESTION_PRICE_KRW, REPORT_TIER_NAMES } from "@/lib/config/product";
+import { MIYU_CASH, QUESTION_PACK_PRICE_KRW, REPORT_TIER_NAMES } from "@/lib/config/product";
 import { isSimpleRoom, roomSections } from "@/lib/report/chat/quota";
 import { freeQuestionPlaceholder, questionMaxFor, TALK_COPY, type TalkModel } from "@/lib/report/reading/talk";
 import {
@@ -136,11 +136,13 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   /** 직접 적어 보낸 뒤에는 초점을 입력창에 둔다 (눌러서 이어 간 뒤에는 답장 버튼 쪽) */
   const wantInput = useRef(false);
   // 자유 질문은 AI가 연결돼 있고, 서버에 저장하는 화면(로그인한 내 결과)에서만 열린다.
-  // 이 방의 무료 질문을 다 쓰면(quotaUsed) 질문 한 개당 결제로 이어 간다 — 결제해 둔 질문이 있으면(hasTicket) 바로 묻고, 없으면(payMode) 질문을 보낼 때 결제 화면으로 넘어간다.
+  // 이 방의 무료 질문을 다 쓰면(quotaUsed) 질문 3개 묶음 결제로 이어 간다 — 결제해 둔 질문이 하나라도 남아 있으면(hasTicket) 바로 묻고, 하나도 없으면(payMode) 질문을 보낼 때 결제 화면으로 넘어간다.
   const per = model.chat.cash?.per ?? MIYU_CASH.perQuestion;
   const left = remaining ?? model.chat.left ?? null;
   const quotaUsed = Boolean(model.chat.used) || left === 0;
   const hasTicket = quotaUsed && cashBalance !== null && cashBalance >= per;
+  /** 결제해 두고 아직 쓰지 않은 질문 수 (묶음 하나 = 3개, 묶음에서 쓰고 남은 1~2개도 센다) */
+  const ticketCount = cashBalance !== null ? Math.floor(cashBalance / per) : 0;
   const payMode = quotaUsed && !hasTicket && Boolean(model.chat.pay);
   const canAsk = model.chat.state === "ready" && Boolean(persist) && (!quotaUsed || hasTicket || payMode);
   /** 미유가 말을 하고 있는 중(입력 중 표시) — 결제 화면으로 넘기는 중(paying)에는 입력창만 잠그고 미유의 "입력 중"은 보이지 않는다 */
@@ -313,7 +315,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
 
   const say = (texts: string[]): TalkLine[] => texts.map((text, i) => ({ from: "miyu", say: { kind: "text", text }, mood: i === 0 ? "thinking" : "basic" }));
 
-  /** 직접 적은 질문 보내기 — 질문 한 개당 결제로 이어 가는 중이면 결제 화면으로, 아니면 바로 답을 받는다 */
+  /** 직접 적은 질문 보내기 — 질문 3개 묶음 결제로 이어 가는 중이면 결제 화면으로, 아니면 바로 답을 받는다 */
   const send = async (e?: FormEvent) => {
     e?.preventDefault();
     const q = draft.trim();
@@ -578,8 +580,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       ? TALK_COPY.freeQuestionAsking
       : quotaUsed
         ? hasTicket
-          ? TALK_COPY.freeQuestionTicket
-          : TALK_COPY.freeQuestionPay(model.chat.pay?.priceKrw ?? QUESTION_PRICE_KRW)
+          ? TALK_COPY.freeQuestionTicket(ticketCount)
+          : TALK_COPY.freeQuestionPay(model.chat.pay?.priceKrw ?? QUESTION_PACK_PRICE_KRW)
         : left !== null
           ? model.chat.free
             ? freeQuestionPlaceholder(left)
@@ -597,8 +599,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   const note = canAsk
     ? quotaUsed
       ? hasTicket
-        ? `${ROOM_COPY.chatAiNote} 결제해 둔 질문 한 개가 쓰이고, 답을 받지 못하면 쓰이지 않아요.`
-        : `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatPayNote(model.chat.pay?.priceKrw ?? QUESTION_PRICE_KRW)}`
+        ? `${ROOM_COPY.chatAiNote} 결제해 둔 질문 중 하나가 쓰이고, 답을 받지 못하면 쓰이지 않아요.`
+        : `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatPayNote(model.chat.pay?.priceKrw ?? QUESTION_PACK_PRICE_KRW)}`
       : model.chat.free
         ? `${ROOM_COPY.chatAiNote} ${ROOM_COPY.chatFreeNote}`
         : ROOM_COPY.chatAiNote
@@ -613,7 +615,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           : model.chat.state === "locked"
             ? ROOM_COPY.chatLocked
             : TALK_COPY.freeQuestionPending;
-  // 안내창: 어떤 경우인지, 어디로 이어 줄지 — 질문 한 개당 결제로 이어 갈 수 있으면 입력창으로 돌아가 질문을 이어 가고, 무료 리포트의 맛보기라면 심층 리포트 구매
+  // 안내창: 어떤 경우인지, 어디로 이어 줄지 — 질문 3개 묶음 결제로 이어 갈 수 있으면 입력창으로 돌아가 질문을 이어 가고, 무료 리포트의 맛보기라면 심층 리포트 구매
   const payAvailable = Boolean(model.chat.pay);
   const rechargeVariant: RechargeVariant = model.chat.deepOnly ? "deep" : payAvailable ? (model.chat.free ? "free-used" : "paid-used") : "deep";
   const rechargeAction: RechargeAction | null =

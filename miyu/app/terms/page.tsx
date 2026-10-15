@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/membership/legal-document";
-import { formatKrw, QUESTION_PRICE_KRW } from "@/lib/config/product";
+import { formatKrw, QUESTION_PACK_PRICE_KRW, QUESTION_PACK_SIZE } from "@/lib/config/product";
 
 export const metadata: Metadata = { title: "이용약관 · ME:U 미유", description: "ME:U 미유 이용약관 (초안)", alternates: { canonical: "/terms" } };
 
@@ -33,7 +33,7 @@ export default function TermsPage() {
             "유료 리포트의 가격과 포함 내용은 구매 전에 화면에 표시합니다.",
             "결제는 토스페이먼츠를 통해 진행하며, 결제가 승인된 것을 서버에서 확인한 뒤 리포트를 제공합니다.",
             "구매한 리포트는 저장된 같은 버전으로 다시 볼 수 있습니다. 같은 검사 결과로 새 리포트를 다시 받을 수 있으며, 받을 때마다 결제하고 이전에 받은 리포트는 그대로 남습니다.",
-            `유료 질문: 방마다 정해진 무료 질문을 모두 쓴 뒤에는 질문 한 개마다 결제하고 이어서 물을 수 있습니다. 가격은 질문 한 개에 ${formatKrw(QUESTION_PRICE_KRW)}(부가세 포함, 가안)이며, 결제가 승인된 것을 서버에서 확인한 뒤 질문에 답합니다. 미리 충전해 두는 방식은 없습니다. 답을 받지 못한 질문은 같은 결제로 다시 물을 수 있습니다. 환불 기준은 출시 전 확정합니다.`,
+            `유료 질문: 방마다 정해진 무료 질문을 모두 쓴 뒤에는 질문 ${QUESTION_PACK_SIZE}개를 묶어서 결제하고 이어서 물을 수 있습니다(1개씩 결제하는 방법은 없습니다). 가격은 질문 ${QUESTION_PACK_SIZE}개에 ${formatKrw(QUESTION_PACK_PRICE_KRW)}(부가세 포함, 가안)이며, 결제가 승인된 것을 서버에서 확인한 뒤 질문에 답합니다. 결제한 질문은 질문을 보낼 때마다 하나씩 쓰이고, 쓰지 않은 질문은 계정에 남아 이어서 쓸 수 있습니다. 답을 받지 못한 질문은 쓰이지 않습니다. 남은 질문의 환불 · 유효기간 · 탈퇴 때의 처리는 출시 전 확정합니다.`,
           ],
         },
         {

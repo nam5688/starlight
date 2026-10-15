@@ -1,5 +1,5 @@
 // 방마다 무료 질문 수와 방의 열림 — 무료 리포트(무료) 회원은 네 개 방만 열리고 방마다 무료 질문 수가 다르며,
-// 심층 리포트(개인 통합 리포트) 회원은 모든 방이 열리고 방마다 무료 질문 3번이다. 무료 질문을 다 쓰면 질문 한 개당 결제로 이어 간다.
+// 심층 리포트(개인 통합 리포트) 회원은 모든 방이 열리고 방마다 무료 질문 3번이다. 무료 질문을 다 쓰면 질문 3개 묶음 결제로 이어 간다.
 // 값은 lib/config/product.ts의 CHAT_ROOMS 한 곳에서 정한다. 채널 독립 코드다.
 import { CHAT_ROOMS } from "../../config/product.ts";
 
@@ -10,7 +10,7 @@ export type RoomPolicy = {
   open: boolean;
   /** 방마다 무료 질문 수 (0이면 질문이 없다) */
   freeQuestions: number;
-  /** 무료 질문을 다 쓴 뒤 질문 한 개당 결제로 이어서 물을 수 있는가 */
+  /** 무료 질문을 다 쓴 뒤 질문 3개 묶음 결제로 이어서 물을 수 있는가 */
   cashAllowed: boolean;
   /** 무료 리포트로는 더 이어 갈 수 없고 심층 리포트가 필요한 방 (닫힌 방 · 질문이 없는 방) */
   needsDeep: boolean;
@@ -53,5 +53,5 @@ export function roomQuestionNote(tier: ChatTier, room: string, chatReady: boolea
   if (!chatReady) return "질문 기능은 준비 중이에요";
   if (policy.freeQuestions === 0) return "질문은 없어요 · 자세한 이야기는 심층 리포트에서";
   const unit = room === "daily" ? "하루 무료 질문" : "무료 질문";
-  return tier === "paid" ? `${unit} ${policy.freeQuestions}번 · 더 묻고 싶으면 질문 한 개당 결제` : `${unit} ${policy.freeQuestions}번`;
+  return tier === "paid" ? `${unit} ${policy.freeQuestions}번 · 더 묻고 싶으면 질문 3개 묶음 결제` : `${unit} ${policy.freeQuestions}번`;
 }

@@ -56,6 +56,6 @@ test("방 카드 한 줄: 방마다 무료 질문 수 · 질문 없는 방은 �
   assert.equal(roomQuestionNote("free", "career", true), "심층 리포트로 열려요");
   assert.equal(roomQuestionNote("free", "career", false), "심층 리포트로 열려요", "닫힌 방은 AI 연결과 상관없이 같은 안내");
   assert.equal(roomQuestionNote("free", "love", false), "질문 기능은 준비 중이에요");
-  assert.equal(roomQuestionNote("paid", "career", true), "무료 질문 3번 · 더 묻고 싶으면 질문 한 개당 결제");
-  assert.equal(roomQuestionNote("paid", "daily", true), "하루 무료 질문 3번 · 더 묻고 싶으면 질문 한 개당 결제");
+  assert.equal(roomQuestionNote("paid", "career", true), "무료 질문 3번 · 더 묻고 싶으면 질문 3개 묶음 결제");
+  assert.equal(roomQuestionNote("paid", "daily", true), "하루 무료 질문 3번 · 더 묻고 싶으면 질문 3개 묶음 결제");
 });

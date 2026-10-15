@@ -358,7 +358,7 @@ function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
           <form action={adminCreditQuestionAction}>
             <input type="hidden" name="orderNumber" value={order.orderNumber} />
             <button type="submit" className={buttonPrimary}>
-              결제사 확인 후 질문 1개 넣기
+              결제사 확인 후 질문 넣기
             </button>
           </form>
         )}

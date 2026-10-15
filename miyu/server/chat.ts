@@ -4,7 +4,7 @@ import { createMockLocalModel } from "@/lib/integrations/ai/mock-local";
 import { tallyUsage, withChatApproval } from "@/lib/report/chat/approval";
 import { createChatAnswerer, type ChatAnswerer } from "@/lib/report/chat/answer";
 import { CHAT_LIMITS } from "@/lib/report/chat/plan";
-import { MIYU_CASH, QUESTION_PRICE_KRW } from "@/lib/config/product";
+import { MIYU_CASH, QUESTION_PACK_PRICE_KRW } from "@/lib/config/product";
 import { roomPolicy } from "@/lib/report/chat/quota";
 import type { TalkChat } from "@/lib/report/reading/talk";
 import type { RoomId } from "@/lib/report/reading/talk-room";
@@ -82,10 +82,10 @@ async function cashInfo(userId: string): Promise<{ balance: number; per: number 
 }
 
 /**
- * 이 방의 자유 질문 상태 — 방마다 무료 질문 수(무료 리포트: 연애 2 · 고민 2 · 일일 1 · 나를 알아보기 0, 심층 리포트: 방마다 3)가 다르고, 다 쓰면 질문 한 개당 결제(300원)로 이어 간다.
+ * 이 방의 자유 질문 상태 — 방마다 무료 질문 수(무료 리포트: 연애 2 · 고민 2 · 일일 1 · 나를 알아보기 0, 심층 리포트: 방마다 3)가 다르고, 다 쓰면 질문 3개 묶음 결제(2,500원, 부가세 포함)로 이어 간다.
  * - ready: 지금 물을 수 있다 (left가 있으면 무료 질문, used면 유료 질문 — 결제한 질문이 있으면 바로 묻고 없으면 보낼 때 결제로 이어진다)
  * - locked: 지금은 물을 수 없다 (심층 리포트로만 열리는 방 · 질문이 없는 방 · 무료 질문을 다 썼는데 유료 질문을 열 수 없음)
- * pay: 이 방은 질문 한 개당 결제로 이어 갈 수 있다(장부 표가 있고 결제가 연결된 때). 연결 전에는 "준비 중"으로 밝힌다(작동하는 것처럼 보이지 않게 한다).
+ * pay: 이 방은 질문 3개 묶음 결제로 이어 갈 수 있다(장부 표가 있고 결제가 연결된 때). 연결 전에는 "준비 중"으로 밝힌다(작동하는 것처럼 보이지 않게 한다).
  * 12번 DB 변경 전이라 횟수를 셀 수 없을 때도 준비 중이다.
  */
 export async function chatStateFor(tier: "paid" | "free", userId: string, room: RoomId, roomKey: string): Promise<TalkChat> {
@@ -101,7 +101,7 @@ export async function chatStateFor(tier: "paid" | "free", userId: string, room: 
     return { state: "pending" };
   }
   const cash = policy.cashAllowed ? await cashInfo(userId) : undefined;
-  const pay = cash && paymentConfig().ok ? { priceKrw: QUESTION_PRICE_KRW } : undefined;
+  const pay = cash && paymentConfig().ok ? { priceKrw: QUESTION_PACK_PRICE_KRW } : undefined;
   const left = policy.freeQuestions - used;
   if (left > 0) return { state: "ready", free, left, ...(cash ? { cash } : {}), ...(pay ? { pay } : {}) };
   if (cash && (cash.balance >= cash.per || pay)) return { state: "ready", free, used: true, cash, ...(pay ? { pay } : {}) };

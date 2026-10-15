@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
-import { MIYU_CASH } from "../config/product.ts";
+import { QUESTION_PACK_SIZE, QUESTION_PACK_UNITS } from "../config/product.ts";
 import { createQuestionNonce } from "../commerce/cash.ts";
 import { EMPTY_BASIC_INFO } from "../profile/basic-info.ts";
 import { manseryeokEngine } from "../saju/manseryeok-engine.ts";
@@ -52,7 +52,7 @@ async function world() {
   return { mem, toss, now, assessment, questionOrder, paidWithoutLedger, verify };
 }
 
-test("수동 반영: 결제사 기록으로 결제 완료를 확인한 질문 결제 주문에만 질문 1개가 들어가고, 같은 주문에는 두 번 들어가지 않는다", async () => {
+test("수동 반영: 결제사 기록으로 결제 완료를 확인한 질문 결제 주문에만 질문 3개 묶음(9단위)이 들어가고, 같은 주문에는 두 번 들어가지 않는다", async () => {
   const w = await world();
   const order = w.paidWithoutLedger(await w.questionOrder());
   assert.equal((await getCashView(w.mem.repo, USER)).balance, 0, "시작 상태: 결제는 됐는데 질문이 없다");
@@ -62,15 +62,15 @@ test("수동 반영: 결제사 기록으로 결제 완료를 확인한 질문 �
   const first = await adminCreditQuestionOrder({ repo: w.mem.repo, verify: w.verify }, order);
   assert.deepEqual(first, { kind: "credited" });
   const view = await getCashView(w.mem.repo, USER);
-  assert.equal(view.balance, MIYU_CASH.perQuestion);
-  assert.equal(view.questions, 1);
-  assert.deepEqual(view.ledger.map((l) => [l.kind, l.amount]), [["charge", 3]]);
+  assert.equal(view.balance, QUESTION_PACK_UNITS);
+  assert.equal(view.questions, QUESTION_PACK_SIZE);
+  assert.deepEqual(view.ledger.map((l) => [l.kind, l.amount]), [["charge", QUESTION_PACK_UNITS]]);
   assert.equal((await questionLedgerState(w.mem.repo, order))?.credited, true);
 
   // 버튼을 다시 눌러도 더 들어가지 않는다
   const second = await adminCreditQuestionOrder({ repo: w.mem.repo, verify: w.verify }, order);
   assert.equal(second.kind, "already");
-  assert.equal((await getCashView(w.mem.repo, USER)).balance, MIYU_CASH.perQuestion);
+  assert.equal((await getCashView(w.mem.repo, USER)).balance, QUESTION_PACK_UNITS);
   assert.equal(w.mem.ledger.filter((l) => l.orderId === order.id).length, 1);
 });
 
@@ -122,7 +122,7 @@ test("수동 반영: 결제사는 승인했는데 우리 주문이 대기로 남
   const r = await adminCreditQuestionOrder({ repo: w.mem.repo, verify: w.verify }, order);
   assert.deepEqual(r, { kind: "already", autoCredited: true });
   assert.equal(w.mem.orders.get(order.id)?.status, "paid");
-  assert.equal((await getCashView(w.mem.repo, USER)).balance, MIYU_CASH.perQuestion);
+  assert.equal((await getCashView(w.mem.repo, USER)).balance, QUESTION_PACK_UNITS);
   assert.equal(w.mem.ledger.filter((l) => l.orderId === order.id).length, 1);
 });
 
@@ -152,7 +152,7 @@ test("수동 반영으로 넣은 질문도 결제가 취소되면 회수된다 (
   const w = await world();
   const order = w.paidWithoutLedger(await w.questionOrder());
   assert.equal((await adminCreditQuestionOrder({ repo: w.mem.repo, verify: w.verify }, order)).kind, "credited");
-  assert.equal((await getCashView(w.mem.repo, USER)).balance, 3);
+  assert.equal((await getCashView(w.mem.repo, USER)).balance, QUESTION_PACK_UNITS);
   await w.mem.repo.updateOrder(order.id, ["paid"], { status: "refunded" });
   assert.equal((await getCashView(w.mem.repo, USER)).balance, 0);
 });
@@ -169,7 +169,7 @@ test("주문 조회: 질문 결제 주문에는 질문 장부 상태가 보이�
   const after = await adminLookup(w.mem.repo, order.orderNumber, w.now());
   if (after.kind !== "order") throw new Error(after.kind);
   assert.equal(after.order.question?.credited, true);
-  assert.equal(after.order.question?.questionsLeft, 1);
+  assert.equal(after.order.question?.questionsLeft, QUESTION_PACK_SIZE);
   assert.ok(!JSON.stringify(after).includes("연락이 뜸한"));
 });
 

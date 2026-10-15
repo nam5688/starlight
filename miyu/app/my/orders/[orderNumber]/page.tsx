@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { RecheckPayment } from "@/components/my/recheck-payment";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
-import { formatKrw, MIYU_CASH } from "@/lib/config/product";
+import { cashOrderKind, formatKrw, MIYU_CASH, QUESTION_PACK_SIZE } from "@/lib/config/product";
 import { GENERATION_LABEL, PAYMENT_ENV_LABEL, traceOrder } from "@/lib/services/my-service";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
@@ -70,12 +70,14 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
       {trace.cash ? (
         <section aria-labelledby="o-access">
           <h2 id="o-access" className="text-[18px] font-bold">
-            {trace.cash.cash === MIYU_CASH.perQuestion && trace.cash.bonus === 0 ? "유료 질문 결제" : "미유캐시 충전 (예전 방식)"}
+            {cashOrderKind(trace.cash) === "legacy" ? "미유캐시 충전 (예전 방식)" : `${MIYU_CASH.name} 결제`}
           </h2>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
             {trace.entitled
-              ? trace.cash.cash === MIYU_CASH.perQuestion && trace.cash.bonus === 0
-                ? "서버가 결제 승인을 확인해 질문 한 개를 결제 완료로 기록했습니다. 채팅방에서 질문이 쓰이고, 답을 받지 못하면 같은 결제로 다시 물을 수 있습니다."
+              ? cashOrderKind(trace.cash) !== "legacy"
+                ? cashOrderKind(trace.cash) === "pack"
+                  ? `서버가 결제 승인을 확인해 질문 ${QUESTION_PACK_SIZE}개를 결제 완료로 기록했습니다. 채팅방에서 질문을 보낼 때마다 하나씩 쓰이고, 쓰지 않은 질문은 남아 있다가 이어서 쓸 수 있습니다. 답을 받지 못한 질문은 쓰이지 않습니다.`
+                  : "서버가 결제 승인을 확인해 질문 한 개를 결제 완료로 기록했습니다. 채팅방에서 질문이 쓰이고, 답을 받지 못하면 같은 결제로 다시 물을 수 있습니다."
                 : `서버가 결제 승인을 확인해 지갑에 ${trace.cash.credited}캐시(충전 ${trace.cash.cash}${trace.cash.bonus > 0 ? ` + 보너스 ${trace.cash.bonus}` : ""})가 들어갔습니다.`
               : trace.cash.credited > 0 && trace.cash.clawedBack > 0
                 ? `결제가 취소되어 이 결제로 들어간 ${trace.cash.credited}개 중 ${trace.cash.clawedBack}개를 회수했습니다.${trace.cash.shortfall > 0 ? ` 이미 사용한 ${trace.cash.shortfall}개는 회수하지 못해 운영자가 확인합니다.` : ""}`

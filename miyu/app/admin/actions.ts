@@ -48,9 +48,9 @@ export async function adminRetryReportAction(formData: FormData) {
 const CREDIT_NOTE = (r: AdminCreditResult): string => {
   switch (r.kind) {
     case "credited":
-      return "결제사 기록으로 결제 완료를 확인했고, 질문 1개를 넣었습니다. 고객은 그 방에서 결제 없이 질문할 수 있습니다.";
+      return "결제사 기록으로 결제 완료를 확인했고, 주문에 적힌 만큼(질문 3개 묶음이면 3개)의 질문을 넣었습니다. 고객은 결제 없이 질문할 수 있습니다.";
     case "already":
-      return r.autoCredited ? "결제사 기록을 확인해 결제 완료로 맞췄고, 질문 1개는 그 처리 안에서 자동으로 들어갔습니다 (더 넣지 않았습니다)." : "이미 이 주문의 질문이 들어가 있습니다 (더 넣지 않았습니다).";
+      return r.autoCredited ? "결제사 기록을 확인해 결제 완료로 맞췄고, 질문은 그 처리 안에서 자동으로 들어갔습니다 (더 넣지 않았습니다)." : "이미 이 주문의 질문이 들어가 있습니다 (더 넣지 않았습니다).";
     case "not-question-order":
       return "질문 결제 주문이 아니라 질문을 넣지 않았습니다.";
     case "not-verified":
@@ -61,7 +61,7 @@ const CREDIT_NOTE = (r: AdminCreditResult): string => {
 };
 
 /**
- * 결제는 됐는데 질문이 안 들어갔다는 문의 — 결제사 기록을 먼저 확인하고, 결제 완료로 확인된 질문 결제 주문에만 질문 1개를 넣는다.
+ * 결제는 됐는데 질문이 안 들어갔다는 문의 — 결제사 기록을 먼저 확인하고, 결제 완료로 확인된 질문 결제 주문에만 주문에 적힌 만큼(묶음이면 3개)의 질문을 넣는다.
  * 주문을 손으로 "결제 완료"로 바꾸지 않는다(대조가 결제사 기록으로만 맞춘다). 주문 한 건에는 한 번만 들어간다.
  */
 export async function adminCreditQuestionAction(formData: FormData) {

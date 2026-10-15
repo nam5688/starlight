@@ -1,22 +1,24 @@
-// 유료 질문 규칙 — 무료 질문을 다 쓴 뒤 질문 한 개당 결제하는 값과 주문 번호. 채널(웹)과 결제사에 관계없이 같은 규칙을 쓴다.
-// 값(질문 한 개의 값 · 장부 단위)은 lib/config/product.ts의 MIYU_CASH · QUESTION_PRICE_KRW 한 곳에서만 바꾼다. 충전 · 보너스는 없다(운영자 2026-10-15).
+// 유료 질문 규칙 — 무료 질문을 다 쓴 뒤 질문 3개 묶음(2,500원, 부가세 포함)을 결제하는 값과 주문 번호. 채널(웹)과 결제사에 관계없이 같은 규칙을 쓴다.
+// 값(묶음의 값 · 질문 수 · 장부 단위)은 lib/config/product.ts의 MIYU_CASH · QUESTION_PACK_* 한 곳에서만 바꾼다. 낱개 결제 · 충전 금액 입력 · 보너스는 없다(운영자 2026-10-15).
 
-import { cashProductId, MIYU_CASH, parseCashProductId, QUESTION_PRICE_KRW } from "../config/product.ts";
+import { cashOrderKind, cashProductId, MIYU_CASH, parseCashProductId, QUESTION_PACK_PRICE_KRW, QUESTION_PACK_SIZE, QUESTION_PACK_UNITS } from "../config/product.ts";
 
-/** 질문 한 개 결제의 견적 — 서버가 주문 금액으로 쓰고, 화면은 같은 값을 보여 준다 */
+/** 질문 3개 묶음 결제의 견적 — 서버가 주문 금액으로 쓰고, 화면은 같은 값을 보여 준다 */
 export type QuestionQuote = {
-  /** 결제 금액 (원) */
+  /** 결제 금액 (원, 부가세 포함) */
   priceKrw: number;
-  /** 결제하면 장부에 들어오는 단위 (질문 한 번이 그만큼을 쓴다) */
+  /** 결제하면 생기는 질문 수 (3 — 낱개 결제는 없다) */
+  questions: number;
+  /** 결제하면 장부에 들어오는 단위 (질문 수 × 질문 한 번의 단위) */
   units: number;
 };
 
-export const questionQuote = (): QuestionQuote => ({ priceKrw: QUESTION_PRICE_KRW, units: MIYU_CASH.perQuestion });
+export const questionQuote = (): QuestionQuote => ({ priceKrw: QUESTION_PACK_PRICE_KRW, questions: QUESTION_PACK_SIZE, units: QUESTION_PACK_UNITS });
 
 /** 지금 장부로 물어볼 수 있는 질문 수 (결제하고 아직 쓰지 않은 질문) */
 export const questionsLeft = (balance: number) => Math.max(0, Math.floor(balance / MIYU_CASH.perQuestion));
 
-/** 결제한 질문이 남아 있는가 — 남아 있으면 새로 결제받지 않고 그 질문으로 묻는다 */
+/** 결제한 질문이 남아 있는가 — 하나라도 남아 있으면 새로 결제받지 않고 그 질문으로 묻는다(그래서 쓰지 않은 질문은 최대 2개까지 남는다) */
 export const canAffordQuestion = (balance: number) => balance >= MIYU_CASH.perQuestion;
 
 const NONCE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -37,16 +39,16 @@ export function createQuestionNonce(room: string, random: (bytes: Uint8Array) =>
   return `${room.toUpperCase()}${randomPart(random)}`;
 }
 
-/** 질문 결제 주문의 상품 번호 */
-export const questionProductId = (nonce: string) => cashProductId({ cash: MIYU_CASH.perQuestion, bonus: 0, nonce });
+/** 질문 3개 묶음 결제 주문의 상품 번호 — `cash-charge:9:0:<방이름 + 임의 10자>` */
+export const questionProductId = (nonce: string) => cashProductId({ cash: QUESTION_PACK_UNITS, bonus: 0, nonce });
 
 /**
- * 상품 번호에서 질문 결제의 상담방 이름을 꺼낸다. 질문 결제 주문이 아니거나(예전 선불 충전 주문 포함) 방 이름이 없으면 null.
+ * 상품 번호에서 질문 결제의 상담방 이름을 꺼낸다. 질문 3개 묶음 주문(또는 묶음 전 버전의 낱개 주문)이 아니거나(예전 선불 충전 주문 포함) 방 이름이 없으면 null.
  * 이 값은 돌아갈 화면을 고르는 데만 쓴다(권한 판단에는 쓰지 않는다).
  */
 export function questionRoomOf(productId: string): string | null {
   const parsed = parseCashProductId(productId);
-  if (!parsed || parsed.cash !== MIYU_CASH.perQuestion || parsed.bonus !== 0) return null;
+  if (!parsed || cashOrderKind(parsed) === "legacy") return null;
   const room = parsed.nonce.slice(0, parsed.nonce.length - RANDOM_LENGTH).toLowerCase();
   return ROOM.test(room) ? room : null;
 }

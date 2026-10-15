@@ -180,7 +180,7 @@ select * from (
   union all
   select 15, '20261025000000_admin_credit_question.sql',
          case when wd15.fn then '적용됨' else '아직 안 함' end,
-         '함수 admin_credit_question (결제사 확인 뒤 운영자가 질문 1개를 넣는 함수)'
+         '함수 admin_credit_question (결제사 확인 뒤 운영자가 주문에 적힌 만큼 질문을 넣는 함수)'
   from wd15
 ) r
 order by "번호";

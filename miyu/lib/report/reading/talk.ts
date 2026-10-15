@@ -3,7 +3,7 @@
 // 자유 질문 · "내 경우는 달라"에 AI가 답하는 기능은 아직 없다(2단계, 운영자 결정 뒤) — 화면에서 "준비 중"으로 밝힌다.
 // 이 파일은 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
 import { tendencyPhrase } from "../../assessment/dev-rules.ts";
-import { CHAT_ROOMS, formatKrw, REPORT_TIER_NAMES } from "../../config/product.ts";
+import { CHAT_ROOMS, formatKrw, QUESTION_PACK_SIZE, REPORT_TIER_NAMES } from "../../config/product.ts";
 import type { SajuResult } from "../../saju/engine.ts";
 import { periodPlain } from "../../saju/interpret/period-plain.ts";
 import type { MonthCalendar } from "../../saju/interpret/months.ts";
@@ -93,9 +93,9 @@ export type TalkChat = {
   left?: number;
   /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 아직 없어 질문을 열지 않았다 (locked일 때) */
   noMaterial?: boolean;
-  /** 결제한 질문의 장부를 쓸 수 있다 (DB 13번 전이면 없음) — balance가 per 이상이면 결제한 질문이 남아 있다(결제 없이 묻는다) */
+  /** 결제한 질문의 장부를 쓸 수 있다 (DB 13번 전이면 없음) — balance가 per 이상이면 결제한 질문이 남아 있다(결제 없이 묻는다, 남은 질문 수 = balance ÷ per) */
   cash?: { balance: number; per: number };
-  /** 이 방은 질문 한 개당 결제로 이어 갈 수 있다(결제가 연결됐을 때) — 결제한 질문이 없을 때 질문을 보내면 결제 화면으로 이어진다. priceKrw는 질문 한 개의 값 */
+  /** 이 방은 질문 3개 묶음 결제로 이어 갈 수 있다(결제가 연결됐을 때) — 결제한 질문이 하나도 없을 때 질문을 보내면 결제 화면으로 이어진다. priceKrw는 묶음(질문 3개)의 값 */
   pay?: { priceKrw: number };
   /** 무료 리포트로는 더 이어 갈 수 없는 방이다 (질문이 없는 방) — 심층 리포트로 이어 준다 */
   deepOnly?: boolean;
@@ -139,7 +139,7 @@ export const CARD_DISCLAIMER = "참고용 해석이며 예측이나 진단이 �
 /**
  * 질문 한 번의 글자 수 한도(운영자 2026-10-15: "500자도 너무 많다 — 무료 300자 · 유료 리포트 500자 · 질문 충전한 사람도 500자").
  *  - free: 무료 리포트 회원의 **무료 질문** 300자
- *  - paid: 그 밖 — 심층 리포트 회원의 질문, 그리고 결제한 질문(질문 한 개 550원, 무료 리포트 회원이어도) 500자
+ *  - paid: 그 밖 — 심층 리포트 회원의 질문, 그리고 결제한 질문(질문 3개 묶음 2,500원, 무료 리포트 회원이어도) 500자
  * 입력창 · 서버 확인 · 저장이 같은 값을 쓴다. 저장하는 글은 둘 중 큰 쪽(paid)까지 받는다.
  */
 export const QUESTION_MAX = { free: 300, paid: 500 } as const;
@@ -191,21 +191,21 @@ export const TALK_COPY = {
   freeQuestionLocked: "자유 질문 · 리포트를 받으면 열려요",
   freeQuestionNoMaterial: "이 주제는 리포트를 받으면 질문할 수 있어요",
   freeQuestionUsed: "무료 질문을 모두 썼어요",
-  /** 무료 질문을 다 썼을 때 입력창 안내 — 결제해 둔 질문이 있을 때 · 질문을 보내면 결제로 이어질 때(질문 한 개당 결제) */
-  freeQuestionTicket: "결제해 둔 질문 1개로 물어볼 수 있어요",
-  freeQuestionPay: (priceKrw: number) => `질문 1개 ${formatKrw(priceKrw)} · 적어서 보내면 결제로 이어져요`,
+  /** 무료 질문을 다 썼을 때 입력창 안내 — 결제해 둔 질문이 남아 있을 때(남은 개수) · 질문을 보내면 결제로 이어질 때(질문 3개 묶음 결제, 낱개 없음) */
+  freeQuestionTicket: (left: number) => `결제해 둔 질문 ${left}개가 남아 있어요`,
+  freeQuestionPay: (priceKrw: number) => `질문 ${QUESTION_PACK_SIZE}개 ${formatKrw(priceKrw)} · 적어서 보내면 결제로 이어져요`,
   freeQuestionDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요",
   /** 유료 질문을 보내 결제 화면으로 넘어가는 동안 입력창에 · 결제를 마치지 못하고 돌아왔을 때 알림 */
   payMoving: "결제 화면으로 이동하고 있어요",
   payNotDone: "결제를 마치지 못해서 질문은 보내지 않았어요. 적어 두신 질문은 그대로 두었어요.",
   /**
-   * 무료 질문을 모두 썼을 때 뜨는 안내창 — 무료 질문을 다 썼다는 것과 이어 가는 방법(질문 한 개당 결제)을 알린다(운영자 2026-10-15: 가격 · 글자 수 문장은 이 창에 넣지 않는다 — 가격은 입력창 안내와 결제 화면에 보인다).
-   * 선불 충전은 없다. 버튼은 입력창으로 돌아가거나(질문 한 개당 결제로 이어 갈 수 있을 때) 심층 리포트 구매로 이어진다. 경우:
+   * 무료 질문을 모두 썼을 때 뜨는 안내창 — 무료 질문을 다 썼다는 것과 이어 가는 방법(질문 3개 묶음 결제)을 알린다(운영자 2026-10-15: 가격 · 글자 수 문장은 이 창에 넣지 않는다 — 가격은 입력창 안내와 결제 화면에 보인다).
+   * 충전 금액을 고르는 선불 충전은 없다(낱개 없이 3개 묶음 하나뿐). 버튼은 입력창으로 돌아가거나(묶음 결제로 이어 갈 수 있을 때) 심층 리포트 구매로 이어진다. 경우:
    *  - free-used: 무료 리포트 회원이 이 방의 무료 질문을 다 썼다  - paid-used: 심층 리포트 회원이 다 썼다  - deep: 무료 리포트로는 더 이어 갈 수 없는 방이다
    */
   recharge: {
-    "free-used": { title: "무료 질문을 모두 썼어요", body: "이어서 묻고 싶다면 질문을 적어 보내 주세요. 질문 한 개씩 결제하는 화면으로 이어져요." },
-    "paid-used": { title: "이 방의 무료 질문을 모두 썼어요", body: "더 묻고 싶다면 질문을 적어 보내 주세요. 질문 한 개씩 결제하는 화면으로 이어 갈 수 있어요." },
+    "free-used": { title: "무료 질문을 모두 썼어요", body: `이어서 묻고 싶다면 질문을 적어 보내 주세요. 질문 ${QUESTION_PACK_SIZE}개를 묶어서 결제하는 화면으로 이어져요.` },
+    "paid-used": { title: "이 방의 무료 질문을 모두 썼어요", body: `더 묻고 싶다면 질문을 적어 보내 주세요. 질문 ${QUESTION_PACK_SIZE}개를 묶어서 결제하는 화면으로 이어 갈 수 있어요.` },
     deep: { title: "자세한 이야기는 심층 리포트에서 이어져요", body: `${REPORT_TIER_NAMES.deep}로는 모든 상담방을 열 수 있고, 방마다 무료 질문을 ${CHAT_ROOMS.deepFreeQuestions}번 드려요.` },
     later: "다음에 할게요",
     payLabel: "질문 이어가기",

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { QUESTION_PRICE_KRW } from "../../config/product.ts";
+import { QUESTION_PACK_PRICE_KRW } from "../../config/product.ts";
 import { SAMPLE_CHART } from "../../samples/sample-report.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
 import { dayReading } from "../../saju/interpret/day-plain.ts";
@@ -423,25 +423,28 @@ test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이�
   assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
 });
 
-test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 질문을 적어 보내면 질문 한 개씩 결제로 이어진다는 것만 알리고(가격 · 글자 수 문장은 이 창에 없다), 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
+test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 질문을 적어 보내면 질문 3개를 묶어서 결제하는 화면으로 이어진다는 것만 알리고(가격 · 글자 수 문장은 이 창에 없다), 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
   const c = TALK_COPY.recharge;
   assert.equal(c["free-used"].title, "무료 질문을 모두 썼어요");
-  assert.equal(c["free-used"].body, "이어서 묻고 싶다면 질문을 적어 보내 주세요. 질문 한 개씩 결제하는 화면으로 이어져요.");
-  assert.equal(c["paid-used"].body, "더 묻고 싶다면 질문을 적어 보내 주세요. 질문 한 개씩 결제하는 화면으로 이어 갈 수 있어요.");
-  for (const v of [c["free-used"], c["paid-used"]]) assert.ok(!/\d|원|자\b|두 배|충전|캐시/.test(v.body), `안내창에는 가격 · 글자 수 · 선불 충전 말이 없다: ${v.body}`);
+  assert.equal(c["free-used"].body, "이어서 묻고 싶다면 질문을 적어 보내 주세요. 질문 3개를 묶어서 결제하는 화면으로 이어져요.");
+  assert.equal(c["paid-used"].body, "더 묻고 싶다면 질문을 적어 보내 주세요. 질문 3개를 묶어서 결제하는 화면으로 이어 갈 수 있어요.");
+  for (const v of [c["free-used"], c["paid-used"]]) assert.ok(!/\d+원|\d+자|두 배|충전|캐시/.test(v.body), `안내창에는 가격 · 글자 수 · 선불 충전 말이 없다(질문 개수만 알린다): ${v.body}`);
   assert.deepEqual(QUESTION_MAX, { free: 300, paid: 500 });
-  assert.equal(QUESTION_PRICE_KRW, 550);
+  assert.equal(QUESTION_PACK_PRICE_KRW, 2500);
   assert.equal(c.payLabel, "질문 이어가기");
   const texts: string[] = [...[c["free-used"], c["paid-used"], c.deep].flatMap((v) => [v.title, v.body]), c.later, c.payLabel, c.open];
   for (const text of texts) {
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정|충전|캐시/.test(text), `불안 · 압박 · 선불 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }
-  for (const text of [ROOM_COPY.chatTicketLead, ROOM_COPY.chatPayLead(QUESTION_PRICE_KRW), ROOM_COPY.chatPayLow, ROOM_COPY.chatPayNote(QUESTION_PRICE_KRW), TALK_COPY.freeQuestionTicket, TALK_COPY.freeQuestionPay(QUESTION_PRICE_KRW), TALK_COPY.payMoving, TALK_COPY.payNotDone]) {
+  for (const text of [ROOM_COPY.chatTicketLead(2), ROOM_COPY.chatPayLead(QUESTION_PACK_PRICE_KRW), ROOM_COPY.chatPayLow, ROOM_COPY.chatPayNote(QUESTION_PACK_PRICE_KRW), TALK_COPY.freeQuestionTicket(2), TALK_COPY.freeQuestionPay(QUESTION_PACK_PRICE_KRW), TALK_COPY.payMoving, TALK_COPY.payNotDone]) {
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정|충전|캐시/.test(text), `불안 · 압박 · 선불 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }
-  assert.match(ROOM_COPY.chatPayLead(550), /550원/);
-  assert.match(TALK_COPY.freeQuestionPay(550), /550원/);
+  assert.match(ROOM_COPY.chatPayLead(2500), /질문 3개에 2,500원/);
+  assert.match(ROOM_COPY.chatPayNote(2500), /질문 3개에 2,500원/);
+  assert.equal(TALK_COPY.freeQuestionPay(2500), "질문 3개 2,500원 · 적어서 보내면 결제로 이어져요");
+  assert.equal(TALK_COPY.freeQuestionTicket(2), "결제해 둔 질문 2개가 남아 있어요");
+  assert.match(ROOM_COPY.chatTicketLead(1), /결제해 둔 질문이 1개 남아 있어요/);
   assert.ok(ROOM_COPY.chatFreeNote.includes(`${QUESTION_MAX.free}자`), "무료 질문 안내에도 글자 수 한도가 있다");
 });

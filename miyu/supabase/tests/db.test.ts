@@ -8,7 +8,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ASSESSMENT_MODULES } from "../../lib/assessment/modules/index.ts";
 import { createSupabaseRepository } from "../../lib/integrations/supabase/repository.ts";
 import { EMPTY_BASIC_INFO } from "../../lib/profile/basic-info.ts";
-import { cashProductId, concernProductId, MIYU_CASH } from "../../lib/config/product.ts";
+import { cashProductId, concernProductId, MIYU_CASH, QUESTION_PACK_UNITS } from "../../lib/config/product.ts";
 import { createQuestionNonce, questionProductId, questionQuote, questionRoomOf } from "../../lib/commerce/cash.ts";
 import { createOrderNumber } from "../../lib/commerce/order.ts";
 import { concernInputOf } from "../../lib/personalization/concern.ts";
@@ -1100,38 +1100,40 @@ test("유료 질문 결제(질문 한 개당): 승인되면 3단위가 한 번�
   };
   const first = await order();
   assert.equal(questionRoomOf(first.productId), "love");
-  assert.equal(first.amount, 300);
+  assert.equal(first.amount, 2500, "질문 3개 묶음 하나의 값");
   assert.equal(await server.getCashBalance(U.id), 0, "주문만 만들면 질문이 생기지 않는다");
   const key = `pk-${randomUUID()}`;
   const paid = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: first.orderNumber, paymentKey: key, amount: first.amount });
   assert.equal(paid.kind, "paid");
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "질문 한 개(3단위)");
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS, "질문 3개(9단위)");
   const again = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: first.orderNumber, paymentKey: key, amount: first.amount });
   assert.equal(again.kind, "paid");
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "같은 승인을 다시 반영해도 한 번만");
-  assert.deepEqual((await server.listCashLedger(U.id, 10)).map((l) => [l.kind, l.amount]), [["charge", 3]]);
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS, "같은 승인을 다시 반영해도 한 번만");
+  assert.deepEqual((await server.listCashLedger(U.id, 10)).map((l) => [l.kind, l.amount]), [["charge", 9]]);
   assert.equal(await server.getReportByOrder(first.id), null, "리포트는 만들어지지 않는다");
 
-  // 질문에 쓰면 0, 답을 받지 못해 되돌리면 다시 남고(같은 결제로 다시 물을 수 있다), 한 번 더 쓰면 0
-  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-1-${tag}` }), 0);
-  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-2-${tag}` }), null, "결제한 질문이 없으면 쓸 수 없다");
-  assert.equal(await server.restoreCashSpend({ userId: U.id, ref: `q-pay-1-${tag}` }), MIYU_CASH.perQuestion);
+  // 묶음의 질문을 하나씩 쓴다: 6 → 3 → 0, 다 쓰면 더 쓸 수 없고, 답을 받지 못해 되돌리면 다시 남으며(같은 결제로 다시 물을 수 있다), 한 번 더 쓰면 0
+  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-1-${tag}` }), 6);
+  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-2-${tag}` }), 3);
   assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-3-${tag}` }), 0);
+  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-x-${tag}` }), null, "결제한 질문이 없으면 쓸 수 없다");
+  assert.equal(await server.restoreCashSpend({ userId: U.id, ref: `q-pay-1-${tag}` }), MIYU_CASH.perQuestion);
+  assert.equal(await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-y-${tag}` }), 0);
 
   // 쓰고 난 뒤 환불 — 이미 쓴 질문은 회수하지 못한 몫으로 남는다
   const refund = await admin.from("orders").update({ status: "refunded" }).eq("id", first.id);
   assert.equal(refund.error, null);
   const claw = (await server.listCashLedger(U.id, 10)).find((l) => l.kind === "clawback");
   assert.equal(Math.abs(claw?.amount ?? 1), 0);
-  assert.equal(claw?.shortfall, 3);
+  assert.equal(claw?.shortfall, QUESTION_PACK_UNITS, "묶음의 질문 3개를 모두 쓴 뒤 환불하면 회수할 것이 없고 9단위가 모자란 몫으로 남는다");
 
   // 남아 있는 질문이 있으면 탈퇴를 막는다
   const second = await order();
   const paid2 = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: second.orderNumber, paymentKey: `pk-${randomUUID()}`, amount: second.amount });
   assert.equal(paid2.kind, "paid");
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion);
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS);
   assert.deepEqual(await server.withdrawMemberData(U.id), { ok: false, reason: "cash-balance" });
-  await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-4-${tag}` });
+  for (let i = 0; i < 3; i++) await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion, ref: `q-pay-4-${i}-${tag}` });
   assert.equal(await server.getCashBalance(U.id), 0);
 });
 
@@ -1189,10 +1191,10 @@ test("운영자 수동 질문 반영(15번 마이그레이션): 결제 완료인
   await paidWithoutTrigger(missed.id);
   assert.equal(await server.getCashBalance(U.id), 0, "시작 상태: 결제 완료인데 질문이 없다");
   assert.equal(await server.adminCreditQuestion(missed.id), "credited");
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion);
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS);
   assert.equal(await server.adminCreditQuestion(missed.id), "already");
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "다시 눌러도 더 들어가지 않는다");
-  assert.deepEqual((await server.listCashLedger(U.id, 10)).map((l) => [l.kind, l.amount, l.orderId === missed.id]), [["charge", 3, true]]);
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS, "다시 눌러도 더 들어가지 않는다");
+  assert.deepEqual((await server.listCashLedger(U.id, 10)).map((l) => [l.kind, l.amount, l.orderId === missed.id]), [["charge", QUESTION_PACK_UNITS, true]]);
   assert.equal((await server.getOrderById(missed.id))?.status, "paid");
 
   // 같은 주문에 동시에 여러 번 눌러도 한 번만
@@ -1201,12 +1203,12 @@ test("운영자 수동 질문 반영(15번 마이그레이션): 결제 완료인
   const results = await Promise.all(Array.from({ length: 6 }, () => server.adminCreditQuestion(racing.id)));
   assert.equal(results.filter((r) => r === "credited").length, 1, JSON.stringify(results));
   assert.equal(results.filter((r) => r === "already").length, 5);
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion * 2);
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS * 2);
 
   // 이 함수로 넣은 질문도 결제가 취소되면 회수된다
   const refund = await admin.from("orders").update({ status: "refunded" }).eq("id", racing.id);
   assert.equal(refund.error, null);
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion);
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS);
   assert.equal(await server.adminCreditQuestion(racing.id), "not-paid", "환불된 주문에는 넣지 않는다");
 
   // 브라우저(로그인 회원 · 비로그인)는 이 함수를 부를 수 없다
@@ -1216,14 +1218,14 @@ test("운영자 수동 질문 반영(15번 마이그레이션): 결제 완료인
   assert.ok(byUser.error, "로그인 회원은 부를 수 없다");
   const byAnon = await anon.rpc("admin_credit_question", { p_order_id: own.id });
   assert.ok(byAnon.error, "비로그인은 부를 수 없다");
-  assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "브라우저 호출로는 아무것도 들어가지 않는다");
+  assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS, "브라우저 호출로는 아무것도 들어가지 않는다");
 
   // 15번 변경 전(함수 없음) — 이유를 알려 주는 오류(코드 42P01)
   psql("alter function public.admin_credit_question(uuid) rename to admin_credit_question_hidden; notify pgrst, 'reload schema'");
   await sleep(800);
   try {
     await assert.rejects(server.adminCreditQuestion(own.id), (e: unknown) => (e as { code?: string }).code === "42P01");
-    assert.equal(await server.getCashBalance(U.id), MIYU_CASH.perQuestion, "함수가 없어도 장부 조회는 그대로다");
+    assert.equal(await server.getCashBalance(U.id), QUESTION_PACK_UNITS, "함수가 없어도 장부 조회는 그대로다");
   } finally {
     psql("alter function public.admin_credit_question_hidden(uuid) rename to admin_credit_question; notify pgrst, 'reload schema'");
     await sleep(800);
@@ -1231,5 +1233,5 @@ test("운영자 수동 질문 반영(15번 마이그레이션): 결제 완료인
   assert.equal(await server.adminCreditQuestion(own.id), "credited", "함수를 되돌린 뒤에는 다시 동작한다");
 
   // 정리: 남은 질문을 써서 탈퇴를 막지 않게 한다
-  await server.spendCash({ userId: U.id, amount: MIYU_CASH.perQuestion * 2, ref: `q-manual-${randomUUID().slice(0, 8)}` });
+  await server.spendCash({ userId: U.id, amount: QUESTION_PACK_UNITS * 2, ref: `q-manual-${randomUUID().slice(0, 8)}` });
 });

@@ -3,7 +3,7 @@
 // 이 파일은 AI를 부르지 않는다. 자유 질문의 답은 서버가 만들어 오고(자유 질문 행동 "free"), 이 파일은 그 글을 대화에 놓고 되살리기만 한다.
 // 눌러 준 답(연애 상태 등)은 풀이를 바꾸지 않는다. 풀이를 어떻게 읽을지 알려 주는 한 줄에만 쓴다.
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
-import { CHAT_SUMMARY_POLICY, formatKrw } from "../../config/product.ts";
+import { CHAT_SUMMARY_POLICY, formatKrw, QUESTION_PACK_SIZE } from "../../config/product.ts";
 import { answerBubbles, extraBubbles, freeLeftText, nextTopic, QUESTION_MAX, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
 
 /** 미유의 표정 — 운영자가 보낸 캐릭터 시트의 표정 시트 6가지와 액션 포즈 3가지 (그림은 components/talk/miyu-moods.ts) */
@@ -87,12 +87,12 @@ export const ROOM_COPY = {
   chatLocked: "이야기를 이어 가는 건 리포트를 받은 분께 열려 있어요.",
   /** 무료 리포트로는 질문이 없는 방(나를 알아보기) — 심층 리포트로 이어 준다 */
   chatDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요.",
-  /** 무료 질문을 모두 쓴 뒤 유료 질문(질문 한 개당 결제)으로 이어 가는 중 — 결제한 질문이 남아 있을 때 · 질문을 보낼 때 결제로 이어질 때 · 유료 질문을 지금 열 수 없을 때 */
-  chatTicketLead: "무료 질문은 모두 썼어요. 결제해 둔 질문이 하나 있어요. 아래 입력창에 적어 보내면 바로 이어서 답해요.",
-  chatPayLead: (priceKrw: number) => `무료 질문은 모두 썼어요. 더 묻고 싶다면 질문 한 개에 ${formatKrw(priceKrw)}이에요. 질문을 적어 보내면 결제로 이어지고, 결제가 끝나면 바로 답해요.`,
+  /** 무료 질문을 모두 쓴 뒤 유료 질문(질문 3개 묶음 결제)으로 이어 가는 중 — 결제한 질문이 남아 있을 때(남은 개수) · 질문을 보낼 때 결제로 이어질 때 · 유료 질문을 지금 열 수 없을 때 */
+  chatTicketLead: (left: number) => `무료 질문은 모두 썼어요. 결제해 둔 질문이 ${left}개 남아 있어요. 아래 입력창에 적어 보내면 바로 이어서 답해요.`,
+  chatPayLead: (priceKrw: number) => `무료 질문은 모두 썼어요. 더 묻고 싶다면 질문 ${QUESTION_PACK_SIZE}개에 ${formatKrw(priceKrw)}이에요. 질문을 적어 보내면 결제로 이어지고, 결제가 끝나면 바로 답해요. 지금 보낸 질문에 하나가 먼저 쓰이고, 나머지는 이어서 쓸 수 있어요.`,
   chatPayLow: "무료 질문을 모두 썼어요. 유료 질문은 지금 열 수 없어요. 잠시 뒤에 다시 와 주세요.",
   /** 입력창 설명(보조기기용) — 결제 화면으로 이어지는 것과 답을 받지 못하면 같은 결제로 다시 물을 수 있다는 것 */
-  chatPayNote: (priceKrw: number) => `질문 한 개에 ${formatKrw(priceKrw)}이에요. 보내면 결제 화면으로 이어지고, 결제가 끝나면 바로 답해요. 답을 받지 못하면 같은 결제로 다시 물을 수 있어요.`,
+  chatPayNote: (priceKrw: number) => `질문 ${QUESTION_PACK_SIZE}개에 ${formatKrw(priceKrw)}이에요(1개씩 결제하는 방법은 없어요). 보내면 결제 화면으로 이어지고, 결제가 끝나면 바로 답해요. 쓰지 않은 질문은 남아 있다가 이어서 쓸 수 있고, 답을 받지 못하면 그 질문은 쓰이지 않아요.`,
   /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 아직 없을 때 — 무료 질문을 열지 않는다(재료가 있는 방에서만 연다) */
   chatNoMaterial: "이 방의 무료 풀이에는 아직 이야기 나눌 내용이 없어서 무료 질문은 열리지 않았어요. 리포트를 받으면 이어서 물어볼 수 있어요.",
   /** 무료 맛보기에서 로그인한 분께 열어 주는 무료 질문(기본 2번) — 열려 있을 때 · 이미 썼을 때 */
@@ -432,7 +432,7 @@ function chatLead(model: TalkModel, ctx: RoomContext): TalkLine[] {
   const c = model.chat.state;
   const ch = model.chat;
   if (c === "ready") {
-    if (ch.used && ch.cash && ch.cash.balance >= ch.cash.per) return [miyu(text(ROOM_COPY.chatTicketLead), "basic")];
+    if (ch.used && ch.cash && ch.cash.balance >= ch.cash.per) return [miyu(text(ROOM_COPY.chatTicketLead(Math.floor(ch.cash.balance / ch.cash.per))), "basic")];
     if (ch.used && ch.pay) return [miyu(text(ROOM_COPY.chatPayLead(ch.pay.priceKrw)), "basic")];
     if (ch.left !== undefined) return [miyu(text(`이 방에서 무료 질문을 ${freeLeftText(ch.left)} 더 할 수 있어요. 아래 입력창에 편하게 적어 주세요.`), "basic")];
     return [miyu(text(ROOM_COPY.chatReady), "basic")];

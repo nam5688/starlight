@@ -79,7 +79,7 @@ export function TalkEntry({ id, rooms, sample = false, remembered = null, tastin
             ))}
           </ul>
           <p className="mt-2.5 text-[13px] leading-[1.65] text-ink-3">
-            {REPORT_TIER_NAMES.deep}를 받으면 모든 상담방이 열리고, 방마다 무료 질문을 드려요. 더 묻고 싶을 땐 질문 한 개당 결제로 이어 갈 수 있어요.
+            {REPORT_TIER_NAMES.deep}를 받으면 모든 상담방이 열리고, 방마다 무료 질문을 드려요. 더 묻고 싶을 땐 질문 3개 묶음 결제로 이어 갈 수 있어요.
           </p>
           {buyHref && (
             <Link href={buyHref} className="mt-3 inline-flex min-h-11 items-center justify-center rounded-full bg-accent px-5 text-[15px] font-semibold text-white hover:bg-accent-strong">

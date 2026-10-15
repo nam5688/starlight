@@ -1,6 +1,6 @@
-// 유료 질문 — 질문 한 개당 결제 주문 시작과 결제한 질문 조회. 결제는 개인 통합 리포트와 같은 흐름(주문 → 토스 결제 → 서버 승인 확인)을 그대로 쓰고,
-// 결제 승인이 확인되면 DB(orders_cash_change 트리거)가 같은 처리 안에서 장부에 질문 한 개를 넣는다. 서비스는 장부에 직접 쓰지 않는다.
-// 금액은 서버가 정하고(lib/commerce/cash.ts) 브라우저가 보낸 값은 믿지 않는다. 충전 · 보너스 · 지갑 화면은 없다(운영자 2026-10-15).
+// 유료 질문 — 질문 3개 묶음(2,500원) 결제 주문 시작과 결제한 질문 조회. 결제는 개인 통합 리포트와 같은 흐름(주문 → 토스 결제 → 서버 승인 확인)을 그대로 쓰고,
+// 결제 승인이 확인되면 DB(orders_cash_change 트리거)가 같은 처리 안에서 장부에 질문 3개(9단위)를 넣는다. 서비스는 장부에 직접 쓰지 않는다.
+// 금액은 서버가 정하고(lib/commerce/cash.ts) 브라우저가 보낸 값은 믿지 않는다. 낱개 결제 · 충전 금액 입력 · 보너스 · 지갑 화면은 없다(운영자 2026-10-15).
 
 import { createOrderNumber } from "../commerce/order.ts";
 import { canAffordQuestion, createQuestionNonce, questionProductId, questionQuote, questionsLeft, type QuestionQuote } from "../commerce/cash.ts";
@@ -11,7 +11,7 @@ import type { SaleGateCheck } from "./order-service.ts";
 import type { Acquisition, CashLedgerRecord, MiyuRepository, OrderRecord, PaymentEnv } from "./ports.ts";
 
 export type StartQuestionPaymentResult =
-  /** 결제 없이 물을 수 있다 — 이 방의 무료 질문이 남았거나 이미 결제한 질문이 있다 (바로 질문을 보낸다) */
+  /** 결제 없이 물을 수 있다 — 이 방의 무료 질문이 남았거나 이미 결제한 질문이 남아 있다 (바로 질문을 보낸다) */
   | { kind: "ask" }
   /** 결제 주문을 만들었다 — 결제 화면으로 보낸다 */
   | { kind: "order"; order: OrderRecord; quote: QuestionQuote }
@@ -25,7 +25,7 @@ export type StartQuestionPaymentResult =
 
 /**
  * 질문 결제 시작. **질문을 받을 수 있는지(무료 질문 수 · 글자 수 · 위기 표현 · 잠긴 방 · 하루 예산)를 답할 때와 같은 규칙으로 먼저 확인한 뒤에만** 주문을 만든다 —
- * 마음이 많이 힘든 글은 결제 없이 안내로 끝나고, 무료 질문이 남았거나 결제한 질문이 이미 있으면 새로 결제받지 않는다(보관은 질문 한 개까지).
+ * 마음이 많이 힘든 글은 결제 없이 안내로 끝나고, 무료 질문이 남았거나 결제한 질문이 하나라도 남아 있으면 새로 결제받지 않는다(그래서 쓰지 않은 질문은 최대 2개까지 남는다).
  * 질문 글은 확인에만 쓰고 저장하지 않는다(결제를 다녀오는 동안은 브라우저에만 남는다).
  * 주문은 본인의 검사 결과 하나에 붙고(주문 표가 검사 결과 번호를 요구한다), 이 결과에 남아 있던 질문 결제 대기 주문은 새 결제 요청으로 대체한다(결제창을 닫고 다시 누른 경우).
  */
@@ -47,7 +47,7 @@ export async function startQuestionPayment(
   } catch {
     return { kind: "unavailable" };
   }
-  // 결제한 질문이 이미 남아 있으면(답을 받지 못했거나 결제 뒤 돌아오지 못했을 때) 새로 결제받지 않고 그 질문으로 묻는다
+  // 결제한 질문이 하나라도 남아 있으면(묶음에서 아직 쓰지 않았거나, 답을 받지 못했거나, 결제 뒤 돌아오지 못했을 때) 새로 결제받지 않고 그 질문으로 묻는다
   if (canAffordQuestion(balance)) return { kind: "ask" };
 
   if (deps.saleGate) {
@@ -84,7 +84,7 @@ export async function startQuestionPayment(
 }
 
 export const CASH_KIND_LABEL: Record<CashLedgerRecord["kind"], string> = {
-  charge: "질문 결제",
+  charge: "질문 결제 (묶음)",
   bonus: "보너스 (예전 방식)",
   spend: "질문에 사용",
   spend_restore: "질문 복구 (답을 받지 못함)",
@@ -104,7 +104,7 @@ export async function walletReady(repo: MiyuRepository, userId: string): Promise
 export type CashView = {
   /** 장부를 쓸 수 있는가 (false면 유료 질문이 닫힌다) */
   ready: boolean;
-  /** 장부 단위 잔액 (결제한 질문이 없으면 0) */
+  /** 장부 단위 잔액 (결제한 질문이 없으면 0, 묶음 하나는 9단위) */
   balance: number;
   /** 결제하고 아직 쓰지 않은 질문 수 */
   questions: number;

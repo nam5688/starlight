@@ -49,7 +49,7 @@ export const REPORT_TIER_NAMES = { simple: "무료 리포트", deep: "심층 리
  * 상담방 등급 — 어떤 방이 무료 리포트(무료)로 열리고 방마다 무료 질문이 몇 번인지 (운영자 2026-10-15). 바꿀 때는 여기서만 바꾼다.
  *  - simple: 무료 리포트로 열리는 방 → 방마다 무료 질문 수. 0이면 질문이 없고 "자세한 이야기는 심층 리포트에서"로 이어 준다. **여기 없는 방(올해의 흐름 · 결혼 · 진로 · 재무)은 심층 리포트로만 열린다.**
  *  - deepFreeQuestions: 심층 리포트를 가진 분이 방마다 쓸 수 있는 무료 질문 수 (모든 방).
- *  - 무료 질문을 다 쓰면 질문 한 개당 결제(MIYU_CASH · QUESTION_PRICE_KRW)로 이어서 물을 수 있다(단 질문이 없는 방 · 심층 리포트로만 열리는 방을 무료 리포트 회원이 결제로 여는 것은 아니다).
+ *  - 무료 질문을 다 쓰면 질문 3개 묶음 결제(MIYU_CASH · QUESTION_PACK_PRICE_KRW)로 이어서 물을 수 있다(단 질문이 없는 방 · 심층 리포트로만 열리는 방을 무료 리포트 회원이 결제로 여는 것은 아니다).
  *  - 무료 질문은 방 단위로 센다. 오늘의 운세 방은 날짜별 방이라 하루 1번씩이다(운영자 확인 필요 — 평생 1번으로 줄이려면 daily 방을 날짜 없이 세면 된다).
  */
 export const CHAT_ROOMS = {
@@ -65,14 +65,16 @@ export const CHAT_ROOMS = {
 export const CONCERN_RECORDS = { visible: false } as const;
 
 /**
- * 유료 질문 — 무료 질문을 다 쓴 뒤 질문 **한 개당** 결제해서 이어 간다(운영자 2026-10-15: "선불 충전 방식 말고 질문 한 개당 결제, 가격은 선불 캐시와 비슷하게").
- * 충전 · 보너스 · 지갑 화면은 없다. 값은 모두 **제안(가안)** 이며 바꿀 때는 여기 한 곳에서만 바꾼다(결제 금액은 서버가 이 값으로 계산해 주문에 적고, 브라우저가 보낸 금액은 믿지 않는다).
- *  - 질문 한 개 = 550원(부가세 포함, 가안 — 운영자 2026-10-15: 300원에서 올림. 공급가 500원 + 부가세 50원). 한 번 호출 비용 어림(약 17원 · 실제 비용은 첫 시험에서 처음 잰다)과 결제 수수료 · 운영비를 넘기는 폭을 두고 정한 제안이다.
+ * 유료 질문 — 무료 질문을 다 쓴 뒤 **질문 3개 묶음(2,500원, 부가세 포함)** 을 결제해서 이어 간다(운영자 2026-10-15: "3개 2,500원이 고정이고 앞으로 1개씩 안 하고 무조건 3개씩").
+ * 낱개(1개) 결제는 없다. 선불 충전 금액 입력 · 보너스 · 지갑 화면도 없다(고정 묶음 하나뿐). 값은 모두 **제안(가안)** 이며 바꿀 때는 여기 한 곳에서만 바꾼다
+ * (결제 금액은 서버가 이 값으로 계산해 주문에 적고, 브라우저가 보낸 금액은 믿지 않는다).
+ *  - 묶음 하나 = 질문 3개 = 2,500원(부가세 포함, 가안 — 공급가 약 2,273원 + 부가세 약 227원). 질문 1개로 나누면 약 833원이다.
  *    장부 단위(perQuestion)와 값(priceKrw)은 따로 정한다 — 가격을 바꿔도 장부 단위 · DB 13번 트리거는 그대로다.
- *  - 내부적으로는 DB 13번의 지갑 표를 "결제한 질문을 답이 올 때까지 보관하는 장부"로 쓴다. 결제 한 건 = perQuestion(3) 단위가 들어오고 질문 한 번이 바로 그만큼을 쓴다.
- *    답을 받지 못하면 되돌려 그 질문권이 남고(같은 결제로 다시 물을 수 있다), 질문권이 남아 있으면 새로 결제받지 않으므로 **보관은 질문 한 개까지**다(미리 쌓는 충전금이 아니다).
+ *  - 내부적으로는 DB 13번의 지갑 표를 "결제한 질문을 쓸 때까지 보관하는 장부"로 쓴다. 결제 한 건 = perQuestion × questionsPerPack(9) 단위가 들어오고 질문 한 번이 perQuestion(3) 단위를 쓴다.
+ *    답을 받지 못하면 되돌려 그 질문이 남고(같은 결제로 다시 물을 수 있다), 결제한 질문이 하나라도 남아 있으면 새로 결제받지 않는다 — 그래서 **쓰지 않은 질문은 최대 2개**까지 남는다.
+ *    **남은 질문이 있다는 점에서 선불 결제와 닮았다.** 선불 결제수단 · 상품권에 해당하는지, 미사용분의 환불 · 청약철회 · 유효기간 · 탈퇴 처리는 판단하지 않았고 법적 검토가 필요하다(docs/question-payment.md의 결정 항목).
  *  - 마감 타이머 · "원래 가격" 같은 표시는 쓰지 않는다.
- * 환불 · 유효기간 같은 이용 기준은 운영자(필요하면 법무) 확인 전이며 화면에는 "정책 확정 전"으로 밝힌다(docs/question-payment.md).
+ * 환불 · 유효기간 같은 이용 기준은 운영자(필요하면 법무) 확인 전이며 화면에는 "정책 확정 전"으로 밝힌다.
  */
 export const MIYU_CASH = {
   /** 상품 번호 접두 — DB 13번 트리거가 `cash-charge:<들어올 단위>:<보너스>:<번호>` 형식을 읽는다 */
@@ -81,16 +83,22 @@ export const MIYU_CASH = {
   name: "유료 질문",
   /** 화면에 함께 표시하는 가격 상태 */
   priceNote: "가안",
-  /** 질문 한 개의 값 (원, 부가세 포함) — 서버가 주문 금액으로 쓴다. 이미 만든 주문은 만들 때의 금액 그대로다 */
-  priceKrw: 550,
+  /** 묶음 하나(질문 3개)의 값 (원, 부가세 포함) — 서버가 주문 금액으로 쓴다. 이미 만든 주문은 만들 때의 금액 그대로다 */
+  priceKrw: 2500,
+  /** 한 번 결제로 생기는 질문 수 — 고정이다(낱개 결제는 없다) */
+  questionsPerPack: 3,
   /** 질문 한 번에 쓰는 장부 단위 */
   perQuestion: 3,
   /** 환불 · 유효기간 같은 이용 기준을 운영자가 확정했는가 — false인 동안 화면은 "아직 정해지지 않았다"고 밝힌다(docs/question-payment.md). 확정하면 true로 바꾸고 화면 문구를 정책에 맞게 고친다 */
   policyDecided: false,
 } as const;
 
-/** 유료 질문 한 개의 값 (원) — 서버가 주문 금액으로 쓴다 */
-export const QUESTION_PRICE_KRW = MIYU_CASH.priceKrw;
+/** 질문 묶음 하나의 값 (원, 부가세 포함) — 서버가 주문 금액으로 쓴다 */
+export const QUESTION_PACK_PRICE_KRW = MIYU_CASH.priceKrw;
+/** 묶음 하나로 생기는 질문 수 (3) */
+export const QUESTION_PACK_SIZE = MIYU_CASH.questionsPerPack;
+/** 묶음 하나가 장부에 넣는 단위 (질문 수 × 질문 한 번의 단위 = 9) — 상품 번호에 적힌다 */
+export const QUESTION_PACK_UNITS = MIYU_CASH.questionsPerPack * MIYU_CASH.perQuestion;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -108,7 +116,8 @@ export function parseConcernProductId(productId: string): string | null {
 }
 
 /**
- * 유료 질문 주문의 상품 번호 — `cash-charge:<장부에 들어올 단위>:<보너스>:<번호>`. 질문 결제는 항상 `cash-charge:3:0:<방이름 + 임의 10자>`다.
+ * 유료 질문 주문의 상품 번호 — `cash-charge:<장부에 들어올 단위>:<보너스>:<번호>`. 질문 묶음 결제는 항상 `cash-charge:9:0:<방이름 + 임의 10자>`다(질문 3개 = 9단위).
+ * 낱개(1개, 3단위) 결제는 묶음 전 버전이 만든 주문(`cash-charge:3:0:…`)에만 있고 기록은 그대로 남는다.
  * 서버가 주문을 만들 때 정한 값을 번호에 함께 적는다(결제 승인 때 DB가 이 값을 읽어 장부에 넣는다 — 승인과 같은 처리 안에서).
  * 번호의 앞부분은 질문한 방의 이름이라 결제가 끝난 뒤 그 방으로 돌아올 수 있다(lib/commerce/cash.ts의 questionRoomOf).
  * 예전 선불 충전 주문(`cash-charge:50:5:…` 등)도 같은 형식이라 읽을 수 있고, 기록은 그대로 남는다.
@@ -122,6 +131,17 @@ export function parseCashProductId(productId: string): { cash: number; bonus: nu
   const m = CASH_PRODUCT.exec(productId);
   if (!m) return null;
   return { cash: Number(m[1]), bonus: Number(m[2]), nonce: m[3] };
+}
+
+/**
+ * 질문 결제 주문의 종류 — pack: 지금의 질문 3개 묶음(9단위) · single: 묶음 전 버전의 질문 1개 결제(3단위, 기록만 남아 있다) · legacy: 그보다 앞선 선불 충전(보너스 포함).
+ * 장부에 들어간 단위는 어느 종류든 DB 트리거가 상품 번호에서 읽는다.
+ */
+export function cashOrderKind(p: { cash: number; bonus: number }): "pack" | "single" | "legacy" {
+  if (p.bonus !== 0) return "legacy";
+  if (p.cash === QUESTION_PACK_UNITS) return "pack";
+  if (p.cash === MIYU_CASH.perQuestion) return "single";
+  return "legacy";
 }
 
 /** 유료 질문(또는 예전 충전) 주문인가 (리포트 주문이 아니다 — 리포트를 만들지 않고 장부에 질문 한 개를 넣는다) */
@@ -152,7 +172,10 @@ export function productNameOf(productId: string): string {
   const seq = parsePersonalSeq(productId);
   if (seq !== null) return seq > 1 ? `${PERSONAL_REPORT.name} (${seq}번째 받기)` : PERSONAL_REPORT.name;
   const cash = parseCashProductId(productId);
-  if (cash) return cash.cash === MIYU_CASH.perQuestion && cash.bonus === 0 ? `${MIYU_CASH.name} 1개` : `미유캐시 ${cash.cash}개 충전 (예전 방식)`;
+  if (cash) {
+    const kind = cashOrderKind(cash);
+    return kind === "pack" ? `${MIYU_CASH.name} ${QUESTION_PACK_SIZE}개` : kind === "single" ? `${MIYU_CASH.name} 1개` : `미유캐시 ${cash.cash}개 충전 (예전 방식)`;
+  }
   return parseConcernProductId(productId) ? CONCERN_REPORT.name : productId;
 }
 
