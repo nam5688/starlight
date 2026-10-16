@@ -200,6 +200,18 @@ test("형식 검사: 해요체로 쓴 사건 예언 · 단정 · 진단 · 나�
   assert.ok(!errorsOf((d) => (d.blocks[0].summary = "{name} 님은 새로운 일 앞에서 위험은 없는지 먼저 살펴보는 편이에요. 익숙한 방식이 편한 사람이에요.")).some((e) => /이름을 쓰지 않습니다/.test(e)), "다른 글에서는 가끔 이름을 불러도 된다");
 });
 
+test("형식 검사: 응답이나 자료가 없다는 말을 본문에 쓰지 않는다(0.9) — 응답이 없는 주제도 사주 근거로 풀이를 끝까지 쓴다", () => {
+  for (const bad of ["이 부분은 응답이 없어요.", "관련 자료가 없어서 말하기 어려워요.", "아직 응답이 부족해요.", "자료는 없습니다."]) {
+    assert.ok(errorsOf((d) => (d.blocks[0].watch = `${bad} 적어 보면 도움이 될 수 있어요.`)).some((e) => /응답이나 자료가 없다는 말/.test(e)), `통과하면 안 되는 문장: ${bad}`);
+  }
+  // 일상 문장은 막지 않는다 — "자료를 찾아 두면" · "응답이 빨라요" 같은 말
+  for (const okText of ["자료를 찾아 두면 마음이 놓일 수 있어요.", "연락에 응답이 빠른 편일 수 있어요."]) {
+    assert.deepEqual(errorsOf((d) => (d.blocks[0].watch = `${okText} 적어 보면 도움이 될 수 있어요.`)).filter((e) => /응답이나 자료가 없다는 말/.test(e)), [], okText);
+  }
+  // 서윤 예시는 이 규칙을 통과한다
+  assert.deepEqual(errorsOf(() => {}).filter((e) => /응답이나 자료가 없다는 말/.test(e)), []);
+});
+
 test("형식 검사: 알려 준 고민이 없는데 focus · '알려 주신'을 쓰면 막고, 있는데 빠지거나 말해 준 내용임을 밝히지 않으면 막는다", () => {
   assert.ok(errorsOf((d) => (d.focus = [{ text: "알려 주신 고민을 반영하면 결정 앞에서 기준을 먼저 정하는 것이 도움이 될 수 있습니다. ".repeat(2), evidence: ["saju.daymaster"] }])).some((e) => /알려 주신 고민이 없는데 focus/.test(e)));
   assert.ok(errorsOf((d) => (d.blocks[0].watch = "알려 주신 내용처럼 한 가지로 정하기보다 상황마다 적어 보면 좋습니다. 다시 살펴봅니다.")).some((e) => /알려 주신/.test(e)));
@@ -420,8 +432,11 @@ test("소단락 반복 · 내용 검사: 소단락 글도 같은 문장 반복 �
   assert.ok(result.metrics.units >= 5 + 3 + 6, `의미 단위 ${result.metrics.units}`);
 });
 
-test("소단락: AI 지시문 0.8은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
-  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.8");
+test("소단락: AI 지시문 0.9는 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
+  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.9");
+  // 0.9 — 응답 근거가 없는 주제는 "없다"고 쓰지 않고 사주 근거로 완결한다
+  assert.match(READING_SYSTEM_PROMPT, /사주 근거만으로 풀이를 끝까지 쓴다/);
+  assert.doesNotMatch(READING_SYSTEM_PROMPT, /응답이 없는 영역은 없다고 쓰고/);
   assert.match(READING_SYSTEM_PROMPT, /풀이의 방향/);
   assert.match(READING_SYSTEM_PROMPT, /응답을 그대로 읽어 주지 않는다/);
   assert.match(READING_SYSTEM_PROMPT, /~했던 때가 있었을 거예요/);
