@@ -75,7 +75,7 @@ export function ChatExample() {
         ))}
       </ul>
       <Link href="/analyze" className="mt-4 flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white hover:bg-accent-strong">
-        무료 분석 해보기
+        무료로 내 분석 확인하기
         <ArrowIcon className="size-4" />
       </Link>
     </div>
