@@ -75,7 +75,7 @@ test("채팅은 공통 승인(AI_APPROVED_*)을 적었다면 그것을 쓰고, �
   // 공통 승인을 적다 말았다면 옛 값이 있어도 몰래 넘어가지 않는다
   const partial = resolveChatAi(reader({ ...chat, AI_APPROVED_KRW: "5000", AI_CHAT_APPROVED_KRW: "600", AI_CHAT_APPROVED_CALLS: "14", AI_CHAT_APPROVED_FROM: "2026-10-14", AI_CHAT_APPROVED_THROUGH: "2026-10-15" }), null);
   assert.equal(partial.kind, "invalid");
-  // 공통 승인을 하나도 안 적었다면 옛 채팅 전용 승인(상한 1,500원)
+  // 공통 승인을 하나도 안 적었다면 옛 채팅 전용 승인(상한 900원)
   const legacy = resolveChatAi(reader({ ...chat, AI_CHAT_APPROVED_KRW: "600", AI_CHAT_APPROVED_CALLS: "14", AI_CHAT_APPROVED_FROM: "2026-10-14", AI_CHAT_APPROVED_THROUGH: "2026-10-15" }), null);
   assert.ok(legacy.kind === "anthropic" && legacy.shared === false && legacy.approval.capKrw === 600);
 });

@@ -37,7 +37,15 @@ export function plainPeriodLabel(label: string): string {
 
 const isString = (v: unknown): v is string => typeof v === "string";
 const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
-const countSentences = (t: string) => t.split(/(?<=[.!?])\s+/).filter(Boolean).length;
+/**
+ * 문장 수 — 따옴표로 묶은 말 안의 마침표는 문장을 나누지 않는다(2026-10-16, 실제 AI 글의 `이렇게 말해 보세요. "저는 천천히 알아가는 게 편해요. 중간중간 속도를 맞춰 봐요."`가
+ * 안내 한 문장 + 건넬 말 한 덩어리인데 세 문장으로 세어져 두 번 모두 걸렸다). 짝이 맞지 않는 따옴표는 그대로 센다.
+ */
+export const countSentences = (t: string) =>
+  t
+    .replace(/"[^"\n]*"|“[^”\n]*”|‘[^’\n]*’/g, (q) => q.replace(/[.!?]/g, "·"))
+    .split(/(?<=[.!?])\s+/)
+    .filter(Boolean).length;
 
 /** 화면에 그대로 보이는 글을 위치와 함께 모은다 (근거 ID · 시기 ref처럼 보이지 않는 값은 제외) */
 export function visibleTexts(d: ReadingDraftV1): { where: string; text: string }[] {

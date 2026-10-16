@@ -47,14 +47,33 @@ export const ALL_TERMS: Term[] = [...EXPLAIN_TERMS, ...STRUCTURE_TERMS, ...STREN
 const PAREN_EXPLAIN = /^\s?\(([^)]{2,60})\)/;
 const sentencesOf = (t: string) => t.match(/[^.!?。\n]+[.!?。]?/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
 
-function explainedHere(name: string, sentence: string, after: string): boolean {
+/**
+ * 용어 앞에 풀이가 먼저 오는 꼴 — 처음 쓸 때의 풀이로 본다(2026-10-16, 실제 AI의 첫 글이 모든 용어를 이 순서로 풀었는데 "용어(풀이)" 순서만 알아봐서 전부 걸렸다).
+ *   · 괄호 안에 용어만 있고 앞에 한글 풀이가 네 글자 이상: "태어난 달의 기운(월령)" · "배우자 자리(일지)" (한자만 · 짧은 말은 풀이가 아니다)
+ *   · 풀이 + "인 / 이라는 / 라는 / 이라고 부르는" + 용어: "나 자신을 나타내는 글자인 일간" (앞 풀이가 다섯 글자 이상)
+ * "도움을 덜 받는 실령"처럼 용어 앞의 꾸미는 말만 있는 꼴은 알아보지 않는다 — 풀이인지 단순한 수식인지 낱말만으로 가를 수 없어서, 괄호로 풀어 달라고 요청한다.
+ */
+function explainedBefore(before: string, after: string): boolean {
+  if (before.endsWith("(") && /^\s?\)/.test(after)) {
+    return before.slice(0, -1).slice(-24).replace(/[^가-힣]/g, "").length >= 4;
+  }
+  const m = /([가-힣 ]{5,40})(?:인|이라는|라는|이라고 부르는|라고 부르는|이라고 하는|라고 하는)\s?$/.exec(before);
+  return Boolean(m && m[1].replace(/[^가-힣]/g, "").length >= 5);
+}
+
+function explainedHere(name: string, sentence: string, after: string, before = ""): boolean {
   const paren = PAREN_EXPLAIN.exec(after);
   if (paren && paren[1].replace(/[^가-힣]/g, "").length >= 4) return true; // 한글 풀이가 네 글자 이상(한자만 있는 괄호는 풀이가 아니다)
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (new RegExp(`${escaped}(?:이란|란|이라는|라는|이라고 (?:해요|부르|불러|하는)|라고 (?:해요|부르|불러|하는)|이라 (?:부르|불러)|라 (?:부르|불러))`).test(sentence)) return true;
   if (new RegExp(`${escaped}(?:은|는|이|가)\\s*[^.!?]{0,40}(?:뜻해요|뜻이에요|말해요|가리켜요|의미해요|말이에요|을 말|를 말|를 뜻|을 뜻)`).test(sentence)) return true;
-  return false;
+  return explainedBefore(before, after);
 }
+
+/** 오류 문구에 붙이는 문장 일부 — 어디를 고쳐야 하는지 모델이 알 수 있게(필드 이름만으로는 이미 풀었다고 믿는 곳을 고치지 못한다) */
+const snippetAround = (sentence: string, index: number, len: number) => `"…${sentence.slice(Math.max(0, index - 14), index + len + 16).trim()}…"`;
+const unexplainedMessage = (where: string, name: string, snippet: string) =>
+  `${where}: 설명 없는 사주 용어(${name}) — ${snippet} 처음 쓸 때 바로 뒤에 "${name}(쉬운 풀이)"나 앞에 풀이를 쓰고 "쉬운 풀이(${name})"처럼 괄호로 용어를 적거나 쉬운 말로 바꿔 주세요.`;
 
 /** 근거 사실(fact)이 가리키는 방향과 반대되는 용어인가 — 있으면 이유를 돌려준다 (월령 · 강약만. 다른 판정의 방향은 사람이 읽는 평가로 본다) */
 function directionConflict(name: string, byId: Map<string, Evidence>): string | null {
@@ -77,6 +96,7 @@ export function checkTermUse(texts: { where: string; text: string }[], evidence:
   const byId = new Map(evidence.map((e) => [e.id, e]));
   const evidenceText = evidence.map((e) => `${e.fact} ${e.cue}`).join("\n");
   const explained = new Set<string>();
+  const flagged = new Set<string>(); // 처음 쓴 곳에서 이미 지적한 용어 — 풀이는 처음 쓰는 곳에 붙이면 되므로 뒤에서 되풀이해 지적하지 않는다
 
   for (const { where, text } of texts) {
     for (const sentence of sentencesOf(text)) {
@@ -110,9 +130,12 @@ export function checkTermUse(texts: { where: string; text: string }[], evidence:
             continue;
           }
           // 설명 없는 용어
-          if (!explained.has(t.name)) {
-            if (explainedHere(t.name, sentence, after)) explained.add(t.name);
-            else errors.push(`${where}: 설명 없는 사주 용어(${t.name}) — 처음 쓸 때 "${t.name}(쉬운 풀이)"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.`);
+          if (!explained.has(t.name) && !flagged.has(t.name)) {
+            if (explainedHere(t.name, sentence, after, sentence.slice(0, m.index))) explained.add(t.name);
+            else {
+              flagged.add(t.name);
+              errors.push(unexplainedMessage(where, t.name, snippetAround(sentence, m.index, m[0].length)));
+            }
           }
         }
       }
@@ -150,8 +173,8 @@ export function chatTermIssues(text: string, o: { question: string; allowTerms: 
         }
         const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 64);
         if (!explained.has(t.name)) {
-          if (explainedHere(t.name, sentence, after)) explained.add(t.name);
-          else errors.push(`설명 없는 사주 용어(${t.name}) — 처음 쓸 때 "${t.name}(쉬운 풀이)"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.`);
+          if (explainedHere(t.name, sentence, after, sentence.slice(0, m.index))) explained.add(t.name);
+          else errors.push(unexplainedMessage("답변", t.name, snippetAround(sentence, m.index, m[0].length)).replace(/^답변: /, ""));
         }
         // 이 사람의 것으로 말해도 되는 판정인가 — 풀이 글에 그 낱말이 없으면 일반 설명으로만
         if (t.cls !== "explain" && !known.includes(m[0]) && PERSONAL_CUE.test(sentence) && !GENERAL_CUE.test(sentence)) {

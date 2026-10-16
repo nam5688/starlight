@@ -2,7 +2,7 @@
 //  - AI_CHAT_PROVIDER 비움 → 리포트용 가짜 AI(AI_PROVIDER=mock-local)가 있으면 그것, 아니면 연결 없음("준비 중")
 //  - AI_CHAT_PROVIDER=anthropic → 실제 호출. 아래가 모두 있어야 한다(하나라도 없거나 상한을 넘으면 호출하지 않는다):
 //      ANTHROPIC_API_KEY · 승인 금액 · 호출 수 · 기간 — **공통 승인(AI_APPROVED_KRW · CALLS · FROM · THROUGH, 리포트 생성과 한 장부로 센다, 상한 5,000원)을 적었다면 그것을 쓰고**,
-//      하나도 적지 않았을 때만 채팅 전용 옛 값(AI_CHAT_APPROVED_KRW · CALLS · FROM · THROUGH, 상한 1,500원 · 승인 기간 3일)을 읽는다.
+//      하나도 적지 않았을 때만 채팅 전용 옛 값(AI_CHAT_APPROVED_KRW · CALLS · FROM · THROUGH, 상한 900원(남은 1단계 승인 금액 안) · 승인 기간 3일)을 읽는다.
 //    선택: AI_CHAT_FX_KRW_PER_USD(환율 가정, 기본 1,600) · AI_CHAT_BASE_URL(로컬 시험 서버 http://127.0.0.1:포트 — 실제 Anthropic 주소를 바꿀 수 없게 로컬 주소만 받는다)
 //  모델 · 가격은 lib/config/ai-candidates.ts의 한 곳에서 정한다. 이 파일은 키 값을 어디에도 돌려주지 않는다(설정 객체 안에서만 호출 코드로 간다).
 import { CHAT_AI_MODEL, CHAT_TEST_LIMITS } from "../../config/ai-candidates.ts";

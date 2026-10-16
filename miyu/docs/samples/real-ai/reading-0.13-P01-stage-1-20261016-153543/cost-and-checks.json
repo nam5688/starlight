@@ -1,0 +1,75 @@
+{
+  "stage": "stage-1",
+  "variant": "reading-v1",
+  "spentKrw": 497.42,
+  "alreadySpentKrw": 1600,
+  "remainingCapAtStartKrw": 1400,
+  "stoppedByBudget": false,
+  "estimateRatio": 0.7287779910428663,
+  "crossPersonOverlap": {
+    "A": null
+  },
+  "runs": [
+    {
+      "persona": "P01",
+      "candidate": "A",
+      "blind": "X",
+      "status": "failed",
+      "firstPassValid": false,
+      "calls": 2,
+      "inputTokens": 65978,
+      "outputTokens": 15067,
+      "costKrw": 497.42176000000006,
+      "latencyMs": 90382,
+      "errorCode": "FAILED",
+      "errorMessage": "리포트 형식 검사 실패: blocks.love(가까운 관계).sections[1].tryIt: 3문장 (2문장 이하로 묶어 주세요) / blocks.tendency.summary: 설명 없는 사주 용어(일간) — 처음 쓸 때 \"일간(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요. / blocks.tendency.details[0]: 설명 없는 사주 용어(원국) — 처음 쓸 때 \"원국(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+      "depth": null,
+      "attempts": [
+        {
+          "round": 0,
+          "errors": [
+            "blocks.love(가까운 관계).sections[1].tryIt: 3문장 (2문장 이하로 묶어 주세요)",
+            "flow.periods: 5개 (1~4개)",
+            "flow.scenarios[1].then: 확률이 아닌 가능성으로 써 주세요 (\"~할 수 있어요\").",
+            "blocks.tendency.summary: 설명 없는 사주 용어(일간) — 처음 쓸 때 \"일간(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.tendency.details[0]: 설명 없는 사주 용어(원국) — 처음 쓸 때 \"원국(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.values.details[0]: 설명 없는 사주 용어(관성) — 처음 쓸 때 \"관성(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.values.details[0]: 설명 없는 사주 용어(일간) — 처음 쓸 때 \"일간(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.values.details[0]: 설명 없는 사주 용어(실령) — 처음 쓸 때 \"실령(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.values.details[0]: 한 문장에 사주 용어가 4개(관성 · 일간 · 월령 · 실령) — 용어를 나열하지 말고 한 문장에 2개까지만, 풀이 속에서 쓰세요.",
+            "blocks.values.details[0]: 설명 없는 사주 용어(지지) — 처음 쓸 때 \"지지(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.love.sections[0].body: 설명 없는 사주 용어(비견) — 처음 쓸 때 \"비견(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.love.sections[1].body: 설명 없는 사주 용어(관성) — 처음 쓸 때 \"관성(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[0].body: 설명 없는 사주 용어(식상) — 처음 쓸 때 \"식상(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[0].body: 설명 없는 사주 용어(원국) — 처음 쓸 때 \"원국(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[0].body: 설명 없는 사주 용어(대운) — 처음 쓸 때 \"대운(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[1].body: 설명 없는 사주 용어(대운) — 처음 쓸 때 \"대운(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "flow.summary: 설명 없는 사주 용어(대운) — 처음 쓸 때 \"대운(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "flow.cardText: 설명 없는 사주 용어(대운) — 처음 쓸 때 \"대운(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요."
+          ]
+        },
+        {
+          "round": 1,
+          "errors": [
+            "blocks.love(가까운 관계).sections[1].tryIt: 3문장 (2문장 이하로 묶어 주세요)",
+            "blocks.tendency.summary: 설명 없는 사주 용어(일간) — 처음 쓸 때 \"일간(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.tendency.details[0]: 설명 없는 사주 용어(원국) — 처음 쓸 때 \"원국(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.values.details[0]: 설명 없는 사주 용어(월령) — 처음 쓸 때 \"월령(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.values.details[0]: 설명 없는 사주 용어(실령) — 처음 쓸 때 \"실령(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.values.details[0]: 설명 없는 사주 용어(지지) — 처음 쓸 때 \"지지(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.love.sections[0].body: 설명 없는 사주 용어(비견) — 처음 쓸 때 \"비견(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.love.sections[0].body: 설명 없는 사주 용어(일지) — 처음 쓸 때 \"일지(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.love.sections[1].body: 설명 없는 사주 용어(관성) — 처음 쓸 때 \"관성(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[0].body: 설명 없는 사주 용어(식상) — 처음 쓸 때 \"식상(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[0].body: 설명 없는 사주 용어(원국) — 처음 쓸 때 \"원국(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[0].body: 설명 없는 사주 용어(대운) — 처음 쓸 때 \"대운(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "flow.summary: 설명 없는 사주 용어(대운) — 처음 쓸 때 \"대운(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "flow.cardText: 설명 없는 사주 용어(대운) — 처음 쓸 때 \"대운(쉬운 풀이)\"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.",
+            "blocks.work-money.sections[0].body: 쓰지 않는 표현 (운을 바꾼다는 보장 · 행운의 숫자 · 날짜)"
+          ]
+        }
+      ],
+      "hasReport": false
+    }
+  ]
+}
