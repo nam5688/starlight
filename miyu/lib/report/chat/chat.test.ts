@@ -184,7 +184,10 @@ test("지시문과 입력: 이름 · 생년월일이 없고, 근거 안에서만
   for (const must of ["memory", "이어질 때만", "새 근거가 아니다", "단정하지 않는다"]) assert.ok(CHAT_SYSTEM_PROMPT.includes(must), `memory 지시: ${must}`);
   // 사주에서 읽은 점 → 응답에서 읽은 반응 → 만나는 장면 순서로 잇고, 사주와 응답이 다르면 차이를 설명하며, 문구를 베끼지 않는다 (무료 맛보기 profile)
   for (const must of ["profile", "saju는 사주에서 읽은 문구", "response는 사용자의 응답이 뒷받침한 문구", "사주에서는 ~로 읽혀요", "하나로 맞추지 않는다", "그대로 베끼지 말고", "물 기운이 많은 구성"]) assert.ok(CHAT_SYSTEM_PROMPT.includes(must), `profile 지시: ${must}`);
-  assert.equal(CHAT_PROMPT_VERSION, "chat-v1-prompt-0.5");
+  assert.equal(CHAT_PROMPT_VERSION, "chat-v1-prompt-0.6");
+  // 0.6 — 고민 상담의 흐름(사주 해석 → 상황의 뜻 → 구체적 추천, 단계 이름을 드러내지 않기) · 이유 있는 추천 · 용어를 물으면 구분해서 답하기 · 가벼운 보완 아이템
+  for (const must of ["[답의 흐름 — 사주 해석 → 지금 상황이 뜻하는 것 → 구체적인 추천]", "단계를 이름 붙여 나열하지 않는다", "목차 · 소제목", "추천은 이유와 함께 말한다", "중대한 선택을 확정해 주는 말", "이 주식을 사세요", "사용자가 용어를 물으면", "아직 이 분의", "이 분의 것으로 정해 주지 않는다", "색 · 공간 · 습관", "구매한 리포트 방(taste false)에서는 풀이에 필요하면 용어를 쓸 수 있고"]) assert.ok(CHAT_SYSTEM_PROMPT.includes(must), `0.6 지시: ${must}`);
+  assert.ok(!CHAT_SYSTEM_PROMPT.includes("기준과 스스로 확인할 질문까지만 쓴다"), "방향 제시를 기준 · 질문까지로 제한한 줄은 없앴다");
   assert.ok(buildChatRepairMessage(["가", "나"]).includes("- 가") && buildChatRepairMessage(["가"]).includes("처음부터 다시"));
 });
 

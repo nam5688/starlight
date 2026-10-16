@@ -104,3 +104,45 @@ export function checkTermUse(texts: { where: string; text: string }[], evidence:
   }
   return errors;
 }
+
+// ───────────── 채팅 답의 용어 검사 ─────────────
+// 채팅 답은 근거 ID 없이 저장된 풀이 글(known)을 근거로 한다. 규칙은 같은 방향이다 — 사용자가 용어를 물었거나(question) 구매한 리포트 방이면(allowTerms) 용어를 설명과 함께 쓸 수 있고,
+// 무료 맛보기 방에서 묻지 않은 용어는 쉬운 말로 바꾼다. 이 사람의 것으로 말해도 되는 판정(월령 · 통근 · 강약 · 조후 · 격국 …)은 풀이 글(known)에 이미 그 낱말이 있을 때만이고,
+// 풀이 글에 없는 것은 "무엇인지"를 일반 설명으로만 말하고 이 사람의 것처럼 쓰지 않는다("미유는 아직 계산하지 않아요"라고 밝히는 문장은 괜찮다).
+
+/** 이 사람을 가리키는 말 — 이런 문장에서 판정 용어를 단정하면 개인 판정으로 읽는다 */
+const PERSONAL_CUE = /(?:이 분|이분|이 사람|당신|님|내가|나는|내 |나의|제 )/;
+/** 일반 개념을 설명하거나 "아직 계산하지 않았다 · 알 수 없다"고 밝히는 말 */
+const GENERAL_CUE = /(?:보통|일반적으로|라고 (?:해요|부르|불러)|이란|란 |라는 (?:말|뜻|개념)|뜻|개념|계산하지|계산되지|아직|읽을 수 없|알 수 없|확인하지 못|정하지|판정하지|말하기 어려|없어요|없는|못 해요|못했|않아요|않았어요)/;
+
+export function chatTermIssues(text: string, o: { question: string; allowTerms: boolean; known?: string }): string[] {
+  const errors: string[] = [];
+  const known = o.known ?? "";
+  const explained = new Set<string>();
+  for (const sentence of sentencesOf(text)) {
+    const distinct = new Set<string>();
+    for (const t of ALL_TERMS) {
+      const re = new RegExp(t.re.source, "g");
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(sentence))) {
+        distinct.add(t.name);
+        const asked = new RegExp(t.re.source).test(o.question);
+        if (!asked && !o.allowTerms) {
+          errors.push(`사주 용어(${t.name})는 쓰지 않고 쉬운 말로 풀어 써 주세요(사용자가 물은 용어만 설명할 수 있어요).`);
+          continue;
+        }
+        const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 64);
+        if (!explained.has(t.name)) {
+          if (explainedHere(t.name, sentence, after)) explained.add(t.name);
+          else errors.push(`설명 없는 사주 용어(${t.name}) — 처음 쓸 때 "${t.name}(쉬운 풀이)"처럼 바로 풀어 쓰거나 쉬운 말로 바꿔 주세요.`);
+        }
+        // 이 사람의 것으로 말해도 되는 판정인가 — 풀이 글에 그 낱말이 없으면 일반 설명으로만
+        if (t.cls !== "explain" && !known.includes(m[0]) && PERSONAL_CUE.test(sentence) && !GENERAL_CUE.test(sentence)) {
+          errors.push(`근거 없는 판정(${t.name}) — 풀이 글에 없는 ${t.name}을(를) 이 분의 것처럼 쓰지 않습니다. 무엇인지 일반 설명만 하고, 미유가 아직 계산하지 않았다면 그렇게 밝혀 주세요.`);
+        }
+      }
+    }
+    if (distinct.size > TERM_LIMITS.perSentenceMax) errors.push(`한 문장에 사주 용어가 ${distinct.size}개(${[...distinct].join(" · ")}) — 용어를 나열하지 말고 한 문장에 ${TERM_LIMITS.perSentenceMax}개까지만 쓰세요.`);
+  }
+  return [...new Set(errors)];
+}

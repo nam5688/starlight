@@ -6,7 +6,7 @@ import { ModelCallError, type ModelMessage, type TextModel } from "../ai/model.t
 import { CHAT_LIMITS as L } from "./plan.ts";
 import { buildChatRepairMessage, buildChatUserMessage, CHAT_PROMPT_VERSION, CHAT_SYSTEM_PROMPT } from "./prompt.ts";
 import type { ChatAnswer, ChatAsk } from "./types.ts";
-import { validateChatAnswer } from "./validate.ts";
+import { chatKnownText, validateChatAnswer } from "./validate.ts";
 
 export class ChatAnswerError extends Error {
   readonly code: "INVALID" | "MODEL";
@@ -60,7 +60,8 @@ export function createChatAnswerer(opts: ChatAnswererOptions): ChatAnswerer {
           if (e instanceof ModelCallError) throw round > 0 ? new ChatAnswerError("답이 검사를 통과하지 못했어요.", "INVALID", lastErrors) : new ChatAnswerError("AI 호출에 실패했어요.", "MODEL");
           throw e;
         }
-        const check = validateChatAnswer(call.result.text);
+        // 용어는 사용자가 물었거나 구매한 리포트 방이면 설명과 함께 쓸 수 있고, 이 방의 풀이 글에 있는 판정만 이 사람의 것으로 말할 수 있다
+        const check = validateChatAnswer(call.result.text, { question: ask.question, allowTerms: !ask.context.taste, known: chatKnownText(ask.context) });
         if (check.ok) {
           caller.recordResult(ctx, spec, call, "ok");
           return { paragraphs: check.paragraphs };
