@@ -22,7 +22,10 @@ test("근거에서 용어를 고른다: 기본 용어 먼저, 실제로 나온 �
   const terms = glossaryFor(evidence).map((g) => g.term);
   assert.deepEqual(terms.slice(0, BASE_TERMS.length), BASE_TERMS);
   for (const t of ["정인", "상관", "인성", "식상", "편재", "충", "육합", "공망", "대운", "세운", "일지", "관성"]) assert.ok(terms.includes(t), t);
-  assert.ok(!terms.includes("편관") && !terms.includes("정관"), "원국 · 시기 근거에 없는 십신은 넣지 않는다");
+  // 십신 용어는 근거 문장에 실제로 나온 것만 — 지장간 근거에 나온 십신(예: 진의 계 = 편관)은 들어가고 어디에도 없는 십신은 넣지 않는다
+  for (const g of ["비견", "겁재", "식신", "상관", "편재", "정재", "편관", "정관", "편인", "정인"]) assert.equal(terms.includes(g), evidence.some((e) => e.fact.includes(g)), g);
+  assert.ok(!terms.includes("정관"), "서윤의 근거에는 정관이 없다");
+  for (const g of ["지장간", "월령", "실령", "통근", "투간", "강약"]) assert.ok(terms.includes(g), `구조 근거의 용어 ${g}`);
   assert.equal(new Set(terms).size, terms.length);
 });
 

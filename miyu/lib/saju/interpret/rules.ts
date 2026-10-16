@@ -15,11 +15,10 @@ export const SAJU_RULE_VERSION = "saju-rules-0.1-draft";
 
 type Stem = Parameters<typeof getTenGod>[0];
 type Branch = Parameters<typeof getBranchTenGod>[1];
-export type Group = "비겁" | "식상" | "재성" | "관성" | "인성";
-
-export const GROUP_OF: Record<string, Group> = {
-  비견: "비겁", 겁재: "비겁", 식신: "식상", 상관: "식상", 편재: "재성", 정재: "재성", 편관: "관성", 정관: "관성", 편인: "인성", 정인: "인성",
-};
+// Group · GROUP_OF는 structure.ts에서 정의한다(structure.ts가 rules.ts를 가져오지 않게 — 순환 방지). 다른 파일은 여전히 rules.ts에서 가져다 쓴다.
+import { GROUP_OF, structureEvidence, type Group } from "./structure.ts";
+export { GROUP_OF };
+export type { Group };
 
 const DAY_MASTER_CUE: Record<string, string> = {
   갑: "큰 나무에 비유합니다 — 곧게 뻗으려는 성장 욕구와 자기 방향이 분명한 편으로 봅니다.",
@@ -363,6 +362,9 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
       uncertain: true,
     });
   }
+
+  // 7-2. 원국의 구조 — 여덟 글자와 자리 · 지장간 · 월령 · 통근 · 투간 · 강약 후보 · 조후 후보 (structure.ts, 규칙은 전문가 검토 전 초안)
+  out.push(...structureEvidence(saju, uncertainPillars));
 
   // 8. 대운 (성별이 있을 때)
   const refYm = ym(input.reference);

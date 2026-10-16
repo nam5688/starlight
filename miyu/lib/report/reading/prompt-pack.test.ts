@@ -17,7 +17,10 @@ import { validateReadingDraft } from "./validate.ts";
 const FROZEN_011 = readFileSync(new URL("../../../docs/samples/prompts/reading-v1-prompt-0.11.txt", import.meta.url), "utf8");
 const draft = () => structuredClone(sampleReadingAsDraft());
 /** 엔진이 계산해 주지 않는 학파 의존 판단(강약 · 월령 · 조후 · 격국 · 용신 계열 · 지장간 · 신살) */
-const SCHOOL_DEPENDENT = /격국|조후|월령|지장간|신살|희신|기신|용신|신강|신약|(?:도화|역마|화개|양인|괴강|백호|홍염|귀문)살/;
+// 아직 엔진이 계산하지 않는 판단(개인의 격국 · 용신 · 희신 · 기신 · 신살) — 근거 목록에 나오면 안 된다
+const SCHOOL_DEPENDENT = /격국|신살|희신|기신|용신|(?:도화|역마|화개|양인|괴강|백호|홍염|귀문)살/;
+// 구조 분석(2026-10-16)으로 엔진이 계산하게 된 재료 — 근거 ID가 saju.structure.* 인 것에서만 나온다
+const STRUCTURE_TERMS = /월령|지장간|조후|통근|투간|강약/;
 const adviceWhy = (s: string) => ADVICE_RULES.filter((r) => r.re.test(s)).map((r) => r.why);
 
 test("지시문 0.12는 0.11의 줄을 하나도 지우지 않고 더하기만 했다(버전이 0.12일 때만 확인 — 다음 버전부터는 이 시험이 요구하지 않는다)", () => {
@@ -134,7 +137,7 @@ test("AI에게는 원국(간지)이 아니라 근거 목록이 간다 — 이름
   assert.match(dm.cue, /봅니다/);
 });
 
-test("엔진이 근거로 주는 사주 자료에는 강약 · 월령 · 조후 · 격국 · 용신 · 지장간 · 신살이 없다(지시문이 \"목록에 있을 때만\"이라고 한 것과 같은 상태) — 엔진에 더하려면 지시문 · 쉬운 말 검사 · 전문가 검토 상태를 함께 바꾼다", () => {
+test("엔진이 근거로 주는 사주 자료: 격국 · 용신 · 희신 · 기신 · 신살은 계산하지 않아 없고, 월령 · 지장간 · 통근 · 투간 · 강약 · 조후는 구조 분석 근거(saju.structure.*)에만 있다", () => {
   const charts = [
     calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" }),
     calculateSaju({ year: 1996, month: 3, day: 29, calendar: "solar", isLeapMonth: false, birthTime: null, gender: "female" }),
@@ -144,8 +147,13 @@ test("엔진이 근거로 주는 사주 자료에는 강약 · 월령 · 조후 
     assert.equal(c.status, "ok");
     if (c.status !== "ok") continue;
     const ev = [...sajuEvidence(c, { reference: { year: 2026, month: 10 }, gender: c.gender ?? null }), ...surveyEvidence(sampleReport, "INFJ")];
-    // "(지장간 제외)"는 지장간을 계산하지 않았다는 표시이지 지장간을 읽은 것이 아니다
-    for (const e of ev) assert.equal(SCHOOL_DEPENDENT.test(`${e.id} ${e.fact} ${e.cue}`.replaceAll("(지장간 제외)", "")), false, `${e.id}: 근거에 학파 의존 용어가 들어 있다`);
+    assert.ok(ev.some((e) => e.id === "saju.structure.hidden"), "지장간 근거가 만들어진다");
+    // "(지장간 제외)"는 지장간을 오행 개수에 넣지 않았다는 표시이지 지장간을 읽은 것이 아니다
+    for (const e of ev) {
+      const text = `${e.id} ${e.fact} ${e.cue}`.replaceAll("(지장간 제외)", "");
+      assert.equal(SCHOOL_DEPENDENT.test(text), false, `${e.id}: 아직 계산하지 않는 판단이 근거에 들어 있다`);
+      if (!e.id.startsWith("saju.structure.")) assert.equal(STRUCTURE_TERMS.test(text), false, `${e.id}: 구조 분석 용어가 구조 근거 밖에 있다`);
+    }
   }
 });
 

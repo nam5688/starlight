@@ -44,6 +44,39 @@ const saju = (m: Omit<RuleMeta, "kind" | "calculation" | "source" | "review" | "
   ...m,
 });
 
+/**
+ * 원국 구조 규칙(structure.ts, 2026-10-16 운영자 요청: 지장간 · 월령 · 강약 · 조후부터 해석 재료를 보강). 두 층으로 구분한다.
+ *  · 기본 자료(조회): 지장간 표 — 위키백과 "지장간"의 12지지 표와 대조해 확인했다. 그 외 학파별 변형은 문서에서 확인하지 못했다.
+ *  · 구조 분석(규칙): 월령 득실 · 통근 · 투간 · 강약 후보 · 조후 후보 — 전통 해석을 단순화한 초안이며 원전과 대조하지 못했고 전문가 검토 전이다.
+ * 격국 · 용신 · 희신 · 기신 · 신살은 이 단계에서 만들지 않았다.
+ */
+const STRUCTURE_EXCEPTIONS = [
+  "출생 시각을 모르면 시주 없이 계산한다(글자 수 · 자리 수가 줄어든다)",
+  "월주가 절기 경계에 걸려 달라질 수 있으면(uncertain) 월지에 기대는 근거는 해석의 근거로 쓰지 않는다",
+  "격국 · 용신 · 희신 · 기신 · 신살을 정하는 데 쓰지 않는다 — 이 단계의 결과는 그 판단의 재료일 뿐이다",
+  "점수 · 퍼센트로 환산하지 않고, 어떤 요소 때문에 그렇게 읽었는지를 근거 문장에 남긴다",
+];
+const structure = (m: { id: string; title: string; match: RegExp; calculation: string; interpretation: string; source: string; conditions: string[]; exceptions?: string[] }): RuleMeta => ({
+  kind: "saju",
+  review: "unreviewed",
+  version: "0.1",
+  ...m,
+  // 이 규칙들의 계산은 표 조회와 개수 세기라 만세력 엔진의 십신 · 절기 계산과 달리 외부 엔진과의 교차 검증 대상이 아니다 — 저장소의 단위 테스트(structure.test.ts)로 확인한다
+  calculation: m.calculation + " 이 계산은 외부 엔진과의 교차 검증 대상이 아니라 이 저장소의 단위 테스트(structure.test.ts)로 확인한다.",
+  exceptions: [...(m.exceptions ?? []), ...STRUCTURE_EXCEPTIONS],
+});
+const SRC_STRUCTURE = "전통 명리(자평 계열)의 일반적인 서술을 단순화한 초안. 원전(자평진전 · 연해자평 등)과 대조하지 못했고 학파별 세부 기준 차이는 확인하지 못했다. 검색으로는 판정 기준을 문헌 수준으로 확인하지 못했다(2026-10-16). 해석 규칙의 문헌 근거는 확인하지 못했다.";
+function structureRules(): RuleMeta[] {
+  return [
+    structure({ id: "structure-chart", title: "원국 여덟 글자와 자리(년 · 월 · 일 · 시, 천간 · 지지, 일간 기준 십신)", match: /^saju\.structure\.chart$/, calculation: "만세력 엔진이 계산한 네 기둥의 천간 · 지지와 일간 기준 십신(교차 검증 범위는 docs/saju-engine.md). 이 근거는 그 값을 한 줄에 모은 것이다.", interpretation: "같은 십신이라도 어느 기둥의 천간인지 지지인지에 따라 읽는 방식이 달라진다고 보고, 년주는 바깥 환경과 바탕 · 월주는 사회와 일의 자리 · 일주는 나와 가까운 관계 · 시주는 앞으로의 방향으로 읽는다.", source: "기둥별 자리의 의미는 전통 해석의 일반적인 서술이다(초안). 십신 계산은 만세력 라이브러리의 표를 쓴다. 해석 규칙의 문헌 근거는 확인하지 못했다.", conditions: ["항상 만든다(시각을 모르면 여섯 글자)"] }),
+    structure({ id: "structure-hidden", title: "지장간(지지 속 숨은 글자)과 일간 기준 십신", match: /^saju\.structure\.hidden$/, calculation: "12지지별 지장간 표(여기 · 중기 · 정기) 조회 + 일간 기준 십신 계산. 표는 위키백과 '지장간'(ko.wikipedia.org/wiki/지장간)과 대조해 같음을 확인했다(2026-10-16).", interpretation: "겉으로 드러나지 않고 지지 안에 숨은 기운으로 보고, 정기를 그 지지의 중심 기운으로, 여기 · 중기를 보조로 읽는다.", source: "지장간 표: 위키백과 '지장간' 표와 같음(확인됨, 날짜 일수는 쓰지 않음). 해석 문장은 전통 해석의 일반적 서술(초안). 학파별 변형 표기는 문서에서 확인하지 못했다. 해석 규칙의 문헌 근거는 확인하지 못했다.", conditions: ["항상 만든다"] }),
+    structure({ id: "structure-month", title: "월령(태어난 달의 기운)과 득령 · 실령", match: /^saju\.structure\.month$/, calculation: "월지의 정기 지장간이 일간 기준 어느 십신 그룹인지 계산(월지의 계절은 인묘진 봄 · 사오미 여름 · 신유술 가을 · 해자축 겨울).", interpretation: "월지 정기가 비겁 · 인성이면 득령(태어난 계절의 도움), 식상 · 재성 · 관성이면 실령으로 읽는다. 득령 여부만으로 강약을 정하지 않는다.", source: SRC_STRUCTURE, conditions: ["월지 정기의 십신 그룹이 정해질 때(항상)"], exceptions: ["월령을 얻었다고 해서 좋다 · 실령이라고 해서 나쁘다는 뜻이 아니다"] }),
+    structure({ id: "structure-roots", title: "일간의 뿌리(통근)와 월지 지장간의 투간", match: /^saju\.structure\.roots$/, calculation: "일간과 같은 오행의 지장간이 어느 지지에 있는지(정기 · 중기 · 여기) 조회, 월지 지장간 글자가 천간(일간 포함)에 같은 글자로 있는지 비교.", interpretation: "정기에 뿌리가 있으면 단단한 뿌리, 중기 · 여기에만 있으면 약한 뿌리로 읽고, 월지 지장간이 천간에 드러났으면 숨은 기운이 겉으로 쓰이는 정도로 읽는다.", source: SRC_STRUCTURE, conditions: ["항상 만든다(뿌리가 없으면 없다고 적는다)"], exceptions: ["투간은 월지 지장간만 본다(다른 지지의 투간은 보지 않는다)", "같은 글자만 투간으로 센다(같은 오행의 다른 글자는 세지 않는다)"] }),
+    structure({ id: "structure-strength", title: "일간 강약 후보(요소 기록)", match: /^saju\.structure\.strength$/, calculation: "세 요소의 방향을 기록한다 — ① 월령(득령 = 받는 쪽, 실령 = 덜 받는 쪽) ② 뿌리(정기에 뿌리 = 받는 쪽, 아니면 덜 받는 쪽) ③ 세력(천간 3곳 · 지지 4곳을 정기 십신으로 센 돕는 자리(비겁 · 인성)와 덜어내는 자리(식상 · 재성 · 관성)의 수 비교 — 세는 자리가 7곳(시각을 모르면 5곳)이라 같은 수는 나오지 않는다).", interpretation: "두 요소 이상이 같은 쪽이고 반대쪽 요소가 하나도 없을 때만 그 쪽을 후보로, 아니면 갈림으로 두며 갈림이면 강약을 단정하지 않는다. 점수 환산이나 임의의 기준 점수는 쓰지 않는다.", source: SRC_STRUCTURE + " 세 요소를 고른 것과 합치는 방식(두 요소 이상이 같은 쪽 · 반대쪽 없음)은 개발 중 정한 단순화이며 학파의 표준 기준이 아니다.", conditions: ["항상 만든다(갈림이면 weak, 한쪽이면 moderate)"], exceptions: ["세력을 센 때 지장간의 중기 · 여기는 세지 않는다(정기만)", "후보로 필요한 기운(용신)이나 격국을 정하지 않는다"] }),
+    structure({ id: "structure-johu", title: "조후(계절의 한열) 후보", match: /^saju\.structure\.johu$/, calculation: "월지의 계절이 겨울(해 · 자 · 축)이면 화(불), 여름(사 · 오 · 미)이면 수(물) 기운이 원국 글자에 몇 개 있는지(지장간 포함 수도 따로) 센다. 봄 · 가을은 만들지 않는다.", interpretation: "계절이 추우면 따뜻하게 하는 화, 더우면 식히는 수를 반긴다고 보는 가장 큰 원칙만 쓴다.", source: SRC_STRUCTURE + " 일간 · 달마다 달라지는 세부 표(궁통보감 계열)는 적용하지 않았다.", conditions: ["월지가 겨울 또는 여름일 때만(해 · 자 · 축 · 사 · 오 · 미)", "필요한 기운이 원국 글자에 없으면 moderate, 있으면 weak"], exceptions: ["필요한 기운이 있다 · 없다만으로 좋고 나쁨을 정하지 않는다", "봄 · 가을과 진 · 술 달은 한열이 치우치지 않는다고 보아 만들지 않는다"] }),
+  ];
+}
+
 export const RULE_META: RuleMeta[] = [
   saju({ id: "daymaster", title: "일간의 비유(십간 물상)", match: /^saju\.daymaster$/, interpretation: "일간 10종을 큰 나무 · 촛불 · 바위 같은 자연물에 비유해 성향의 방향을 한 줄로 읽는다.", conditions: ["일간(태어난 날의 천간) 10종 각각에 한 문장"], exceptions: ["일주는 날짜로 정해지지만 자시 관법(야자시 · 조자시)에 따라 달라질 수 있어, 그 경우 saju.uncertain.jasi-school로 알린다"] }),
   saju({ id: "element-many", title: "오행이 두드러짐", match: /^saju\.element\.[목화토금수]\.many$/, interpretation: "한 오행이 원국 글자 중 3개 이상이면 그 기운(목 성장 · 화 표현 · 토 안정 · 금 기준 · 수 생각)이 두드러진다고 읽는다.", conditions: ["원국 글자(지장간 제외)에서 같은 오행 3개 이상 — 4개 이상이면 strong, 3개면 moderate"], exceptions: [...COMMON_EXCEPTIONS, "지장간 속 오행은 세지 않는다(학파마다 기준이 달라 엔진 결과로 단정하지 않음)"] }),
@@ -63,6 +96,7 @@ export const RULE_META: RuleMeta[] = [
   saju({ id: "daeun-relation", title: "대운 지지와 원국의 관계", match: /^saju\.daeun\.(current|next)\.(year|month|day|hour)\.(천간합|육합|반합|충|형)$/, interpretation: "대운 지지가 원국 기둥과 맺는 합 · 충 · 형으로 해당 영역의 주제가 두드러지는 시기를 읽는다.", conditions: ["대운 지지와 원국 지지의 관계가 있을 때 — 항상 weak"] }),
   saju({ id: "seun", title: "세운(해마다의 흐름)", match: /^saju\.seun\.\d{4}$/, interpretation: "기준 연도부터 3년의 세운 천간 · 지지가 어느 십신 그룹인지로 그해의 주제를 읽는다.", conditions: ["기준 날짜의 연도부터 3년"], exceptions: [...COMMON_EXCEPTIONS, "세운은 날짜만으로 정해져 같은 해를 다시 열어도 바뀌지 않는다", "시기 해석은 실제 사건을 알려 주지 않는다"] }),
   saju({ id: "seun-relation", title: "세운 지지와 원국의 관계", match: /^saju\.seun\.\d{4}\.(year|month|day|hour)\.(천간합|육합|반합|충|형)$/, interpretation: "세운 지지가 원국 기둥과 맺는 합 · 충 · 형으로 그해에 해당 영역의 주제가 두드러지는 지점을 읽는다.", conditions: ["세운 지지와 원국 지지의 관계가 있을 때 — 항상 weak"] }),
+  ...structureRules(),
   {
     id: "survey-direction", title: "응답 경향(개발용 문항)", match: /^survey\.(novelty|caution|sensitivity|persistence|anxiety|avoidance)\.(high|low)$/, kind: "survey",
     calculation: "개발용 예시 문항(status: dev-example) 응답을 0~100으로 환산한 값. 백분위 · 정확도가 아니다.",
