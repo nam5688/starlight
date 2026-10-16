@@ -81,10 +81,24 @@ export function createFakeToss(now: () => Date = () => new Date()) {
     authorize: (paymentKey: string, orderId: string, amount: number) => authorized.set(paymentKey, { orderId, amount }),
     /** 우리 서버가 모르는 사이에 결제사에서 승인됨 */
     approveBehindOurBack: (paymentKey: string, orderId: string, amount: number) => approve(paymentKey, orderId, amount),
-    /** 결제사에서 취소(환불) */
-    cancel: (paymentKey: string) => {
+    /**
+     * 결제사에서 취소(환불). amount를 주면 그 금액만 부분 취소(PARTIAL_CANCELED, 누적 · 남은 금액 갱신), 없으면 남은 금액 전부를 취소한다(CANCELED).
+     * 실제 토스처럼 남은 금액보다 큰 금액은 거절한다(false를 돌려준다).
+     */
+    cancel: (paymentKey: string, amount?: number): boolean => {
       const p = byKey.get(paymentKey);
-      if (p) byKey.set(paymentKey, { ...p, status: "CANCELED", balanceAmount: 0 });
+      if (!p) return false;
+      const left = p.balanceAmount;
+      const cut = amount ?? left;
+      if (!Number.isInteger(cut) || cut <= 0 || cut > left) return false;
+      const balanceAmount = left - cut;
+      byKey.set(paymentKey, {
+        ...p,
+        status: balanceAmount === 0 ? "CANCELED" : "PARTIAL_CANCELED",
+        balanceAmount,
+        canceledAmount: p.totalAmount - balanceAmount,
+      });
+      return true;
     },
     setStatus: (paymentKey: string, status: GatewayPayment["status"]) => {
       const p = byKey.get(paymentKey);

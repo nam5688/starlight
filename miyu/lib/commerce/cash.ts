@@ -52,3 +52,42 @@ export function questionRoomOf(productId: string): string | null {
   const room = parsed.nonce.slice(0, parsed.nonce.length - RANDOM_LENGTH).toLowerCase();
   return ROOM.test(room) ? room : null;
 }
+
+// ───────────── 묶음(주문)별 환불 계산 — 누적 방식 (운영자 2026-10-15: 올림을 매번 하면 834 × 3 = 2,502원이 된다) ─────────────
+// 환불액은 "누적 환불 질문 수 k"에 대해 올림(결제액 × k ÷ 묶음 질문 수)으로 정하고, 이번에 취소할 금액은 그 값에서 이미 환불한 누적액을 뺀 차이다.
+// 그래서 1개씩 세 번 나눠 환불해도 834 + 833 + 833 = 2,500원이고, 한 번에 환불해도 같은 값이다. 토스의 누적 취소액이 결제액을 넘을 수 없다.
+// DB의 question_refund_total(supabase/migrations/20261026000000_question_packs.sql)과 같은 식이며 db.test.ts가 둘을 비교한다.
+
+/** 누적 환불 질문 수 k → 누적 환불액(원). 정수 올림 */
+export const refundTotalFor = (priceKrw: number, questions: number, k: number): number => Math.floor((priceKrw * k + questions - 1) / questions);
+
+/** 묶음 하나의 누적 환불액 표 — [k=1의 누적액, k=2의 누적액, …, 결제액] */
+export const refundSchedule = (priceKrw: number, questions: number): number[] => Array.from({ length: questions }, (_, i) => refundTotalFor(priceKrw, questions, i + 1));
+
+/** 토스의 누적 취소액이 몇 번째 누적 환불 질문 수에 해당하는가 — 표에 없는 금액이면 null (질문 수에 맞지 않는 취소) */
+export function refundQuestionsFor(priceKrw: number, questions: number, canceledTotal: number): number | null {
+  const i = refundSchedule(priceKrw, questions).indexOf(canceledTotal);
+  return i < 0 ? null : i + 1;
+}
+
+/** 묶음 장부 한 줄 — DB question_packs와 같다 */
+export type QuestionPackState = { questions: number; priceKrw: number; used: number; refundedQuestions: number; refundedKrw: number };
+
+/** 이 묶음에서 아직 쓸 수 있는 질문 수 (환불로 정산한 질문과 쓴 질문을 뺀다) */
+export const packRemaining = (p: Pick<QuestionPackState, "questions" | "used" | "refundedQuestions">): number => Math.max(0, p.questions - p.used - p.refundedQuestions);
+
+/** 질문을 이미 썼는데 그 질문까지 환불해 버린 수 (회수하지 못한 몫, 동시에 쓴 경우 포함) */
+export const packShortfall = (p: Pick<QuestionPackState, "questions" | "used" | "refundedQuestions">): number => Math.max(0, p.used + p.refundedQuestions - p.questions);
+
+/**
+ * 지금 남은 질문을 더 환불한다면 토스에서 이번에 취소할 금액 — 질문 1개 · 2개 · …(남은 만큼). cancelNow가 토스의 "취소 금액"에 넣을 값이고 cumulative가 그 뒤 누적 취소액이다.
+ * 결제 승인이 확인된 주문의 묶음에만 쓴다(환불 가능 금액 안내용 — 환불을 실행하지는 않는다).
+ */
+export function nextRefundSteps(p: QuestionPackState): { questions: number; cancelNow: number; cumulative: number }[] {
+  const left = packRemaining(p);
+  return Array.from({ length: left }, (_, i) => {
+    const k = p.refundedQuestions + i + 1;
+    const cumulative = refundTotalFor(p.priceKrw, p.questions, k);
+    return { questions: i + 1, cancelNow: cumulative - p.refundedKrw, cumulative };
+  });
+}

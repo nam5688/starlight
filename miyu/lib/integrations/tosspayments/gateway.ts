@@ -92,6 +92,22 @@ const STATUSES: readonly GatewayPaymentStatus[] = [
   "EXPIRED",
 ];
 
+/**
+ * 지금까지 취소된 누적 금액 — 결제사 cancels 배열 중 완료(cancelStatus DONE 또는 값 없음)된 것의 cancelAmount 합.
+ * 남은 취소 가능 금액(balanceAmount)으로 센 값(총액 − 잔액)과 다르면 **작은 쪽**을 쓴다(질문을 더 적게 회수하는 쪽 — 확인이 필요하면 운영자가 본다).
+ */
+function canceledTotal(json: Record<string, unknown>, totalAmount: number, balanceAmount: number): number {
+  const fromBalance = Math.max(0, totalAmount - balanceAmount);
+  if (!Array.isArray(json.cancels) || json.cancels.length === 0) return fromBalance;
+  let sum = 0;
+  for (const c of json.cancels as Record<string, unknown>[]) {
+    if (!c || typeof c.cancelAmount !== "number") continue;
+    if (c.cancelStatus !== undefined && c.cancelStatus !== null && c.cancelStatus !== "DONE") continue;
+    sum += c.cancelAmount;
+  }
+  return Math.min(sum, fromBalance);
+}
+
 /** 필요한 값만 꺼낸다 (카드 번호 등 결제수단 상세는 저장하지 않는다) */
 export function toGatewayPayment(json: Record<string, unknown>): GatewayPayment | null {
   const status = json.status as GatewayPaymentStatus;
@@ -103,12 +119,14 @@ export function toGatewayPayment(json: Record<string, unknown>): GatewayPayment 
   ) {
     return null;
   }
+  const balanceAmount = typeof json.balanceAmount === "number" ? json.balanceAmount : json.totalAmount;
   return {
     paymentKey: json.paymentKey,
     orderId: json.orderId,
     status,
     totalAmount: json.totalAmount,
-    balanceAmount: typeof json.balanceAmount === "number" ? json.balanceAmount : json.totalAmount,
+    balanceAmount,
+    canceledAmount: canceledTotal(json, json.totalAmount, balanceAmount),
     method: typeof json.method === "string" ? json.method : null,
     approvedAt: typeof json.approvedAt === "string" ? json.approvedAt : null,
     mId: typeof json.mId === "string" ? json.mId : null,

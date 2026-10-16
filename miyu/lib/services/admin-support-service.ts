@@ -4,7 +4,7 @@
 // - 질문 · 대화 · 고민 · 응답 내용은 다루지 않는다. 리포트 본문은 운영자가 문의에 답하려고 열 때만 읽고(화면은 따로, 열람 기록을 남긴다) 이 목록 · 장부 확인에는 없다.
 
 import { isCashProduct } from "../config/product.ts";
-import { questionsLeft } from "../commerce/cash.ts";
+import { nextRefundSteps, packRemaining, packShortfall, questionsLeft } from "../commerce/cash.ts";
 import { isValidOrderNumber } from "../commerce/order.ts";
 import { isReadingReport, type AnyReportContent } from "../report/generator.ts";
 import { renderReadingMarkdown } from "../report/reading/render-text.ts";
@@ -28,6 +28,19 @@ export type QuestionLedgerState = {
   creditedAt: string | null;
   /** 이 회원이 지금 쓸 수 있는 결제한 질문 수 */
   questionsLeft: number;
+  /**
+   * 이 주문(묶음)의 장부 — DB 16번 이후에 결제된 묶음만(없으면 null). 사용 · 환불 수량, 누적 환불액,
+   * nextRefunds는 남은 질문을 환불할 때 토스 관리자의 "취소 금액"에 **이번에** 넣을 값(누적표 − 이미 환불한 누적액 — 합이 결제액을 넘지 않는다).
+   */
+  pack: {
+    questions: number;
+    used: number;
+    refundedQuestions: number;
+    refundedKrw: number;
+    remaining: number;
+    shortfall: number;
+    nextRefunds: { questions: number; cancelNow: number; cumulative: number }[];
+  } | null;
 };
 
 /** 질문 결제 주문 하나가 장부에 반영됐는지 본다. 질문 결제 주문이 아니면 null */
@@ -36,9 +49,27 @@ export async function questionLedgerState(repo: MiyuRepository, order: OrderReco
   try {
     const [balance, rows] = await Promise.all([repo.getCashBalance(order.userId), repo.listCashLedger(order.userId, 200)]);
     const row = rows.find((r) => r.orderId === order.id && (r.kind === "charge" || r.kind === "bonus"));
-    return { ready: true, credited: Boolean(row), creditedAt: row?.createdAt ?? null, questionsLeft: questionsLeft(balance) };
+    let pack: QuestionLedgerState["pack"] = null;
+    try {
+      const p = await repo.getQuestionPack(order.id);
+      if (p) {
+        pack = {
+          questions: p.questions,
+          used: p.used,
+          refundedQuestions: p.refundedQuestions,
+          refundedKrw: p.refundedKrw,
+          remaining: packRemaining(p),
+          shortfall: packShortfall(p),
+          // 이미 결제가 취소된(환불됨) 주문은 더 환불할 수 없다
+          nextRefunds: order.status === "paid" ? nextRefundSteps(p) : [],
+        };
+      }
+    } catch {
+      // 16번 DB 변경 전에는 묶음 장부가 없다
+    }
+    return { ready: true, credited: Boolean(row), creditedAt: row?.createdAt ?? null, questionsLeft: questionsLeft(balance), pack };
   } catch {
-    return { ready: false, credited: false, creditedAt: null, questionsLeft: 0 };
+    return { ready: false, credited: false, creditedAt: null, questionsLeft: 0, pack: null };
   }
 }
 

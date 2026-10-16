@@ -9,7 +9,7 @@ import { ASSESSMENT_MODULES } from "../../lib/assessment/modules/index.ts";
 import { createSupabaseRepository } from "../../lib/integrations/supabase/repository.ts";
 import { EMPTY_BASIC_INFO } from "../../lib/profile/basic-info.ts";
 import { cashProductId, concernProductId, MIYU_CASH, QUESTION_PACK_UNITS } from "../../lib/config/product.ts";
-import { createQuestionNonce, questionProductId, questionQuote, questionRoomOf } from "../../lib/commerce/cash.ts";
+import { createQuestionNonce, questionProductId, questionQuote, questionRoomOf, refundSchedule, refundTotalFor } from "../../lib/commerce/cash.ts";
 import { createOrderNumber } from "../../lib/commerce/order.ts";
 import { concernInputOf } from "../../lib/personalization/concern.ts";
 import { createAiReportGenerator } from "../../lib/report/ai/generator.ts";
@@ -849,7 +849,8 @@ test("대화 저장(12번 마이그레이션): 서버가 저장하고 본인만 
   const cheat = await U.client.from("chat_questions").delete().eq("user_id", U.id).select();
   assert.ok(cheat.error || (cheat.data ?? []).length === 0, "횟수를 지워 한도를 피할 수 없다");
   const cols = execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-tAc", "select string_agg(column_name, ',' order by ordinal_position) from information_schema.columns where table_name='chat_questions'"], { encoding: "utf8" }).trim();
-  assert.equal(cols, "id,user_id,assessment_id,room_key,created_at", "질문 내용을 담는 열이 없다");
+  // state · reserved_until은 16번의 무료 질문 자리 예약용이다 — 질문 · 답 내용을 담는 열은 여전히 없다
+  assert.equal(cols, "id,user_id,assessment_id,room_key,created_at,state,reserved_until", "질문 내용을 담는 열이 없다");
 
   // 6) 탈퇴: 대화와 질문 횟수가 함께 지워진다
   const gone = await server.withdrawMemberData(U.id);
@@ -1123,7 +1124,8 @@ test("유료 질문 결제(질문 한 개당): 승인되면 3단위가 한 번�
   // 쓰고 난 뒤 환불 — 이미 쓴 질문은 회수하지 못한 몫으로 남는다
   const refund = await admin.from("orders").update({ status: "refunded" }).eq("id", first.id);
   assert.equal(refund.error, null);
-  const claw = (await server.listCashLedger(U.id, 10)).find((l) => l.kind === "clawback");
+  // 묶음 장부가 있는 주문(16번 이후)의 전액 취소는 묶음별 환불 회수(refund_claw)로 남는다
+  const claw = (await server.listCashLedger(U.id, 10)).find((l) => l.kind === "refund_claw");
   assert.equal(Math.abs(claw?.amount ?? 1), 0);
   assert.equal(claw?.shortfall, QUESTION_PACK_UNITS, "묶음의 질문 3개를 모두 쓴 뒤 환불하면 회수할 것이 없고 9단위가 모자란 몫으로 남는다");
 
@@ -1184,13 +1186,13 @@ test("실제 DB 동시성(질문 3개 묶음): 같은 승인이 6번 동시에 �
   assert.equal(await server.getCashBalance(U.id), per * 2, "질문 2개 남음");
   const refund = await admin.from("orders").update({ status: "refunded" }).eq("id", order.id);
   assert.equal(refund.error, null);
-  const claw = (await server.listCashLedger(U.id, 50)).find((l) => l.kind === "clawback");
+  const claw = (await server.listCashLedger(U.id, 50)).find((l) => l.kind === "refund_claw");
   assert.equal(claw?.amount, -per * 2, "남은 질문 2개(6단위)를 회수");
   assert.equal(claw?.shortfall, per, "이미 쓴 질문 1개(3단위)는 회수하지 못한 몫");
   assert.equal(await server.getCashBalance(U.id), 0);
   // 같은 환불 상태를 다시 써도(결제사 대조 · 웹훅이 겹쳐도) 한 번만 회수한다
   await admin.from("orders").update({ status: "refunded" }).eq("id", order.id);
-  assert.equal((await server.listCashLedger(U.id, 50)).filter((l) => l.kind === "clawback").length, 1);
+  assert.equal((await server.listCashLedger(U.id, 50)).filter((l) => l.kind === "refund_claw").length, 1);
 });
 
 test("미유캐시: 상품 번호 형식이 맞지 않는 주문은 결제 완료 처리를 막지 않고 지갑에도 넣지 않는다 (check-cash.sql이 찾는다)", async () => {
@@ -1290,4 +1292,337 @@ test("운영자 수동 질문 반영(15번 마이그레이션): 결제 완료인
 
   // 정리: 남은 질문을 써서 탈퇴를 막지 않게 한다
   await server.spendCash({ userId: U.id, amount: QUESTION_PACK_UNITS * 2, ref: `q-manual-${randomUUID().slice(0, 8)}` });
+});
+
+// ───────────── 16번 마이그레이션: 묶음 장부 · 부분 환불 · 환불 중 동시 사용 · 무료 질문 예약 ─────────────
+
+const psqlRun = (q: string) => execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-q", "-tA", "-c", q], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+
+/** 질문 묶음 시험용 세계 — 회원 한 명 · 검사 결과 하나 · 묶음(질문 3개 · 2,500원)을 결제해 장부에 넣는 도우미 */
+async function packWorld(nickname: string) {
+  const U = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+  const per = MIYU_CASH.perQuestion;
+  const buy = async () => {
+    const inserted = await server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: U.id, assessmentId: aid, productId: questionProductId(createQuestionNonce("love")), amount: questionQuote().priceKrw, paymentEnv: "test" });
+    assert.ok(inserted.ok);
+    const order = inserted.ok ? inserted.value : null!;
+    const paid = await confirmPayment({ repo: server, gateway }, { userId: U.id, orderNumber: order.orderNumber, paymentKey: `pk-${randomUUID()}`, amount: order.amount });
+    assert.equal(paid.kind, "paid");
+    return order;
+  };
+  const balance = () => server.getCashBalance(U.id);
+  const ledger = () => server.listCashLedger(U.id, 500);
+  /** 장부의 모든 줄을 더한 값은 언제나 지갑 잔액과 같아야 한다 (어느 순서로 동시에 와도) */
+  const consistent = async (why: string) => {
+    const sum = (await ledger()).reduce((s, l) => s + l.amount, 0);
+    assert.equal(sum, await balance(), `${why}: 내역 합계와 지갑 잔액이 다르다`);
+    assert.ok((await balance()) >= 0 && (await balance()) % per === 0, `${why}: 잔액이 음수이거나 질문 단위가 아니다`);
+  };
+  return { U, server, aid, per, buy, balance, ledger, consistent };
+}
+
+test("묶음 장부(16번): 누적 환불표가 TS · DB 두 곳에서 같고, 승인되면 묶음 한 줄이 만들어지며, 누적 환불액이 결제액을 넘는 값은 DB가 거부한다", async () => {
+  // 장부 단위와 환불 계산식이 TS와 DB에서 같다
+  const units = await admin.rpc("question_units");
+  assert.equal(units.data, MIYU_CASH.perQuestion, "DB의 질문 단위(question_units)와 MIYU_CASH.perQuestion이 같다 — 하나를 바꾸면 새 마이그레이션이 필요하다");
+  for (const [price, q] of [[2500, 3], [2499, 3], [2501, 3], [9900, 5], [1000, 7], [12345, 4]] as const) {
+    for (let k = 1; k <= q; k++) {
+      const db = await admin.rpc("question_refund_total", { p_price: price, p_questions: q, p_k: k });
+      assert.equal(db.data, refundTotalFor(price, q, k), `${price}원 · ${q}개 · k=${k}`);
+    }
+  }
+  assert.deepEqual(refundSchedule(2500, 3), [834, 1667, 2500]);
+
+  const w = await packWorld("묶음장부");
+  const order = await w.buy();
+  const pack = await w.server.getQuestionPack(order.id);
+  assert.deepEqual(pack && { questions: pack.questions, priceKrw: pack.priceKrw, used: pack.used, refundedQuestions: pack.refundedQuestions, refundedKrw: pack.refundedKrw }, { questions: 3, priceKrw: 2500, used: 0, refundedQuestions: 0, refundedKrw: 0 });
+  assert.equal(await w.balance(), 9);
+  // 결제액을 넘는 누적 환불액 · 쓴 수가 산 수를 넘는 값은 표 자체가 거부한다
+  assert.throws(() => psqlRun(`update public.question_packs set refunded_krw = 2501 where order_id = '${order.id}'`), /check/i);
+  assert.throws(() => psqlRun(`update public.question_packs set used = 4 where order_id = '${order.id}'`), /check/i);
+  // 본인만 보고, 브라우저로는 쓸 수 없다
+  const mine = await w.U.client.from("question_packs").select("order_id, questions").eq("order_id", order.id);
+  assert.equal(mine.data?.length, 1);
+  const others = await B.client.from("question_packs").select("order_id").eq("order_id", order.id);
+  assert.equal(others.data?.length ?? 0, 0, "다른 회원은 볼 수 없다");
+  const write = await w.U.client.from("question_packs").update({ refunded_krw: 0, used: 0 }).eq("order_id", order.id).select();
+  assert.ok(write.error || (write.data ?? []).length === 0, "브라우저는 묶음 장부를 고칠 수 없다");
+  const call = await w.U.client.rpc("apply_cash_refund", { p_order_id: order.id, p_canceled_total: 834 });
+  assert.ok(call.error, "브라우저는 환불 반영 함수를 부를 수 없다");
+  const anonCall = await anon.rpc("reserve_chat_question", { p_user_id: w.U.id, p_assessment_id: w.aid, p_room_key: "love", p_max: 3 });
+  assert.ok(anonCall.error, "비로그인도 예약 함수를 부를 수 없다");
+  assert.equal(await w.balance(), 9, "거부된 호출은 아무것도 바꾸지 않았다");
+});
+
+test("부분 환불(16번): 1개씩 세 번 나눠 환불해도 총 환불액은 정확히 2,500원이고(834 → 1,667 → 2,500), 같은 금액을 다시 반영해도 한 번만 회수하며, 질문 수에 맞지 않는 금액은 아무것도 바꾸지 않는다", async () => {
+  const w = await packWorld("부분환불");
+  const order = await w.buy();
+
+  // 질문 수에 맞지 않거나 범위를 벗어난 금액 — 장부를 바꾸지 않고 맞는 금액을 알려 준다
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 1000 }), { status: "amount-mismatch", allowed: [834, 1667, 2500], refundedKrw: 0 });
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 3000 }), { status: "invalid-amount", allowed: [834, 1667, 2500] });
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 0 }), { status: "invalid-amount", allowed: [834, 1667, 2500] });
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: -834 }), { status: "invalid-amount", allowed: [834, 1667, 2500] });
+  assert.equal(await w.balance(), 9);
+  assert.equal((await w.server.getQuestionPack(order.id))?.refundedKrw, 0);
+
+  // 1개 환불
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 834 }), { status: "applied", questions: 1, refundedKrw: 834, clawed: 1, shortfall: 0 });
+  assert.equal(await w.balance(), 6);
+  // 같은 누적액을 다시 반영 — 웹훅 중복 · 결제 대조가 겹쳐도 한 번만
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 834 }), { status: "already", questions: 1, refundedKrw: 834 });
+  assert.equal(await w.balance(), 6);
+  // 2번째 · 3번째 (이번에 취소한 금액은 833 · 833이고 토스의 누적 취소액은 1,667 · 2,500)
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 1667 }), { status: "applied", questions: 2, refundedKrw: 1667, clawed: 1, shortfall: 0 });
+  assert.equal(await w.balance(), 3);
+  // 알림이 늦게 와서 이전 누적액이 다시 도착해도 이미 반영된 것으로 본다 (되돌리지 않는다)
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 834 }), { status: "already", questions: 2, refundedKrw: 1667 });
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 2500 }), { status: "applied", questions: 3, refundedKrw: 2500, clawed: 1, shortfall: 0 });
+  assert.equal(await w.balance(), 0);
+
+  const pack = await w.server.getQuestionPack(order.id);
+  assert.deepEqual(pack && { used: pack.used, rq: pack.refundedQuestions, krw: pack.refundedKrw }, { used: 0, rq: 3, krw: 2500 }, "총 환불액이 결제액과 정확히 같다 (834 × 3 = 2,502가 아니다)");
+  const claws = (await w.ledger()).filter((l) => l.kind === "refund_claw");
+  assert.equal(claws.length, 3);
+  assert.equal(claws.reduce((s, l) => s + l.amount, 0), -9, "질문 3개(9단위)를 회수");
+  assert.ok(claws.every((l) => l.shortfall === 0));
+  await w.consistent("세 번 나눠 환불");
+  assert.equal((await w.server.getOrderById(order.id))?.status, "paid", "부분 환불은 주문 상태를 바꾸지 않는다");
+  assert.equal(await w.server.spendCash({ userId: w.U.id, amount: w.per, ref: `q-after-refund-${randomUUID().slice(0, 8)}` }), null, "환불한 질문은 쓸 수 없다");
+});
+
+test("부분 환불 뒤 전액 취소(주문이 환불됨으로 바뀜): 아직 회수하지 않은 질문만 회수하고, 환불 내역이 두 번 쌓이지 않는다 — 한 번에 환불해도 나눠 환불해도 결과가 같다", async () => {
+  const a = await packWorld("나눠환불");
+  const first = await a.buy();
+  await a.server.applyCashRefund({ orderId: first.id, canceledTotal: 834 });
+  assert.equal(await a.balance(), 6);
+  assert.equal((await admin.from("orders").update({ status: "refunded" }).eq("id", first.id)).error, null);
+  assert.equal(await a.balance(), 0, "남은 2개를 회수");
+  const pa = await a.server.getQuestionPack(first.id);
+  assert.deepEqual(pa && { rq: pa.refundedQuestions, krw: pa.refundedKrw }, { rq: 3, krw: 2500 });
+  assert.equal((await a.ledger()).filter((l) => l.kind === "refund_claw").reduce((s, l) => s + l.amount, 0), -9);
+  await admin.from("orders").update({ status: "refunded" }).eq("id", first.id); // 같은 상태를 다시 써도
+  assert.equal((await a.ledger()).filter((l) => l.kind === "refund_claw").length, 2, "환불 반영이 한 번 더 쌓이지 않는다");
+
+  const b = await packWorld("한번에환불");
+  const second = await b.buy();
+  assert.equal((await admin.from("orders").update({ status: "refunded" }).eq("id", second.id)).error, null);
+  assert.equal(await b.balance(), 0);
+  const pb = await b.server.getQuestionPack(second.id);
+  assert.deepEqual(pb && { rq: pb.refundedQuestions, krw: pb.refundedKrw }, { rq: 3, krw: 2500 }, "나눠 환불한 것과 같은 최종 상태");
+  await a.consistent("나눠 환불");
+  await b.consistent("한 번에 환불");
+});
+
+test("환불과 사용이 겹칠 때(16번): 이미 쓴 질문까지 환불하면 회수하지 못한 몫으로 남고, 답을 받지 못해 되돌린 질문은 환불에 포함됐는지에 따라 돌아오거나 돌아오지 않는다", async () => {
+  const w = await packWorld("환불사용");
+  const order = await w.buy();
+  const tag = randomUUID().slice(0, 8);
+  assert.equal(await w.server.spendCash({ userId: w.U.id, amount: w.per, ref: `q-a-${tag}` }), 6);
+  assert.equal(await w.server.spendCash({ userId: w.U.id, amount: w.per, ref: `q-b-${tag}` }), 3); // 2개 사용, 남은 질문 1개
+  const r = await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 1667 }); // 2개 환불
+  assert.deepEqual(r, { status: "applied", questions: 2, refundedKrw: 1667, clawed: 1, shortfall: 1 }, "남은 1개만 회수하고 이미 쓴 1개는 회수하지 못한 몫");
+  assert.equal(await w.balance(), 0);
+  assert.equal((await w.ledger()).find((l) => l.kind === "refund_claw")?.shortfall, w.per);
+  await w.consistent("쓴 질문까지 환불");
+
+  // 답을 받지 못해 질문 하나를 되돌린다 → 이 묶음은 이미 (쓴 2 + 환불 2)로 산 질문 3개를 넘겨 정산돼 있어(모자란 몫 1) 되돌린 질문이 지갑에 다시 들어오지 않는다
+  assert.equal(await w.server.restoreCashSpend({ userId: w.U.id, ref: `q-a-${tag}` }), 0, "환불이 이미 질문 2개를 정산했으므로 돌아오지 않는다");
+  const pack = (await w.server.getQuestionPack(order.id))!;
+  assert.deepEqual({ used: pack.used, rq: pack.refundedQuestions }, { used: 1, rq: 2 });
+  assert.equal(await w.balance(), 0);
+  await w.consistent("되돌림");
+
+  // 같은 묶음을 전부 환불한다 — 남은 질문이 없으니 회수할 것은 없고, 쓴 질문(1개)이 환불에 포함돼 모자란 몫 1이 남는다. 이후 되돌려도 돌아오지 않는다
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 2500 }), { status: "applied", questions: 3, refundedKrw: 2500, clawed: 0, shortfall: 1 });
+  assert.equal(await w.balance(), 0);
+  assert.equal(await w.server.restoreCashSpend({ userId: w.U.id, ref: `q-b-${tag}` }), 0, "이미 환불받은 질문은 지갑에 다시 넣지 않는다");
+  assert.equal(await w.balance(), 0);
+  await w.consistent("전부 환불 뒤 되돌림");
+  // 같은 되돌림을 다시 해도 아무 일도 없다
+  assert.equal(await w.server.restoreCashSpend({ userId: w.U.id, ref: `q-b-${tag}` }), null);
+
+  // 답을 기다리는 질문 1개가 있을 때 2개를 환불하면(남은 질문 2개 회수) 그 질문이 답을 받지 못해 되돌려지는 경우에는 1개가 돌아온다 — 환불 2 + 남은 1 = 3
+  const x = await packWorld("환불중실패");
+  const o2 = await x.buy();
+  const tag2 = randomUUID().slice(0, 8);
+  assert.equal(await x.server.spendCash({ userId: x.U.id, amount: x.per, ref: `q-w-${tag2}` }), 6); // 답을 기다리는 중
+  assert.deepEqual(await x.server.applyCashRefund({ orderId: o2.id, canceledTotal: 1667 }), { status: "applied", questions: 2, refundedKrw: 1667, clawed: 2, shortfall: 0 });
+  assert.equal(await x.balance(), 0);
+  assert.equal(await x.server.restoreCashSpend({ userId: x.U.id, ref: `q-w-${tag2}` }), x.per, "답을 받지 못한 질문 1개는 돌아온다");
+  const p2 = (await x.server.getQuestionPack(o2.id))!;
+  assert.equal(p2.used + p2.refundedQuestions + (await x.balance()) / x.per, 3);
+  await x.consistent("환불 중 실패");
+});
+
+test("묶음이 둘일 때(16번): 한 묶음을 환불해도 다른 묶음의 질문은 회수되지 않고, 질문은 먼저 산 묶음부터 쓰인다", async () => {
+  const w = await packWorld("묶음둘");
+  const tag = randomUUID().slice(0, 8);
+  const a = await w.buy();
+  for (let i = 0; i < 3; i++) assert.notEqual(await w.server.spendCash({ userId: w.U.id, amount: w.per, ref: `q-a${i}-${tag}` }), null);
+  const b = await w.buy();
+  assert.equal(await w.balance(), 9);
+  // 묶음 A의 질문은 모두 썼고 묶음 B는 새 묶음이다 — A를 전액 환불해도 B의 질문은 그대로여야 한다 (예전 지갑 합계 방식이면 9단위가 회수됐다)
+  assert.equal((await admin.from("orders").update({ status: "refunded" }).eq("id", a.id)).error, null);
+  assert.equal(await w.balance(), 9, "묶음 B의 질문 3개는 그대로");
+  const packA = (await w.server.getQuestionPack(a.id))!;
+  const packB = (await w.server.getQuestionPack(b.id))!;
+  assert.deepEqual({ used: packA.used, rq: packA.refundedQuestions }, { used: 3, rq: 3 });
+  assert.deepEqual({ used: packB.used, rq: packB.refundedQuestions }, { used: 0, rq: 0 });
+  assert.equal((await w.ledger()).find((l) => l.kind === "refund_claw")?.shortfall, 9, "묶음 A는 이미 다 써서 회수할 질문이 없고 환불받은 3개는 모자란 몫으로 남는다");
+  assert.notEqual(await w.server.spendCash({ userId: w.U.id, amount: w.per, ref: `q-b0-${tag}` }), null);
+  assert.equal((await w.server.getQuestionPack(b.id))?.used, 1, "새 질문은 남은 질문이 있는 묶음 B에서 쓰인다");
+  await w.consistent("묶음 둘");
+});
+
+test("묶음 장부가 없는 예전 주문(16번 전에 결제): 전액 취소는 예전 방식(지갑 잔액 한도 안에서 회수)으로 동작하고, 부분 환불 함수는 no_pack으로 거절한다", async () => {
+  const w = await packWorld("예전주문");
+  const order = await w.buy();
+  psqlRun(`delete from public.question_packs where order_id = '${order.id}'`); // 16번 전에 결제돼 묶음 장부가 없는 주문을 흉내 낸다
+  assert.deepEqual(await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 834 }), { status: "no-pack" });
+  assert.equal(await w.balance(), 9, "묶음 장부가 없으면 부분 환불은 아무것도 바꾸지 않는다(운영자 확인)");
+  assert.equal((await admin.from("orders").update({ status: "refunded" }).eq("id", order.id)).error, null);
+  const claw = (await w.ledger()).find((l) => l.kind === "clawback");
+  assert.equal(claw?.amount, -9, "예전 방식으로 지갑에서 회수");
+  assert.equal(await w.balance(), 0);
+});
+
+test("실제 DB 동시성(16번): 같은 환불을 6번 동시에 반영해도 한 번만 회수하고, 환불과 질문 사용이 동시에 와도 어느 순서든 장부가 맞아떨어지며(음수 없음 · 내역 합계 = 잔액 · 쓴 + 환불 + 남은 − 모자란 몫 = 3)", async () => {
+  // 같은 누적 환불액 6번 동시
+  const w = await packWorld("환불동시");
+  const order = await w.buy();
+  const same = await Promise.all(Array.from({ length: 6 }, () => w.server.applyCashRefund({ orderId: order.id, canceledTotal: 834 })));
+  assert.equal(same.filter((r) => r.status === "applied").length, 1, JSON.stringify(same));
+  assert.equal(same.filter((r) => r.status === "already").length, 5);
+  assert.equal(await w.balance(), 6);
+  // 서로 다른 누적액(834 · 1,667 · 2,500)이 순서가 뒤바뀌어 동시에 와도 마지막 상태는 같다
+  const mixed = await Promise.all([2500, 834, 1667, 2500, 1667].map((canceledTotal) => w.server.applyCashRefund({ orderId: order.id, canceledTotal })));
+  assert.ok(mixed.every((r) => r.status === "applied" || r.status === "already"), JSON.stringify(mixed));
+  const pack = (await w.server.getQuestionPack(order.id))!;
+  assert.deepEqual({ rq: pack.refundedQuestions, krw: pack.refundedKrw }, { rq: 3, krw: 2500 });
+  assert.equal(await w.balance(), 0);
+  await w.consistent("같은 환불 동시");
+
+  // 환불과 질문 사용이 동시에 — 서로 다른 시작 순서로 여러 번 시험한다
+  for (let round = 0; round < 8; round++) {
+    const x = await packWorld(`환불사용동시${round}`);
+    const o = await x.buy();
+    const tag = randomUUID().slice(0, 8);
+    assert.notEqual(await x.server.spendCash({ userId: x.U.id, amount: x.per, ref: `q-0-${tag}` }), null); // 1개는 이미 사용
+    const jobs: (() => Promise<unknown>)[] = [
+      () => x.server.applyCashRefund({ orderId: o.id, canceledTotal: round % 2 === 0 ? 1667 : 2500 }), // 2개 또는 3개 환불
+      () => x.server.spendCash({ userId: x.U.id, amount: x.per, ref: `q-1-${tag}` }),
+      () => x.server.spendCash({ userId: x.U.id, amount: x.per, ref: `q-2-${tag}` }),
+    ];
+    const order = round % 3 === 0 ? [0, 1, 2] : round % 3 === 1 ? [1, 2, 0] : [2, 0, 1];
+    await Promise.all(order.map((i) => jobs[i]()));
+    const bal = await x.balance();
+    const pk = (await x.server.getQuestionPack(o.id))!;
+    const shortfallQ = (await x.ledger()).filter((l) => l.kind === "refund_claw").reduce((s, l) => s + l.shortfall, 0) / x.per;
+    assert.ok(bal >= 0, `라운드 ${round}: 잔액이 음수가 되지 않는다`);
+    assert.equal(pk.used + pk.refundedQuestions + bal / x.per - shortfallQ, 3, `라운드 ${round}: 쓴 ${pk.used} + 환불 ${pk.refundedQuestions} + 남은 ${bal / x.per} − 모자란 몫 ${shortfallQ} = 3`);
+    await x.consistent(`라운드 ${round}`);
+    // 환불 뒤 남은 질문은 환불받지 않은 질문뿐이다
+    assert.ok(bal / x.per <= 3 - pk.refundedQuestions, `라운드 ${round}: 환불받은 질문이 남아 있다`);
+  }
+});
+
+test("운영자 수동 반영(15번 함수)도 묶음 장부를 함께 만든다 — 트리거가 일을 못 한 주문에 한 번만, 묶음 한 줄", async () => {
+  const w = await packWorld("수동묶음");
+  const inserted = await w.server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: w.U.id, assessmentId: w.aid, productId: questionProductId(createQuestionNonce("love")), amount: questionQuote().priceKrw, paymentEnv: "test" });
+  assert.ok(inserted.ok);
+  const order = inserted.ok ? inserted.value : null!;
+  psqlRun("alter table public.orders disable trigger orders_cash_change");
+  try {
+    assert.equal((await admin.from("orders").update({ status: "paid", approved_at: new Date().toISOString() }).eq("id", order.id)).error, null);
+  } finally {
+    psqlRun("alter table public.orders enable trigger orders_cash_change");
+  }
+  assert.equal(await w.server.getQuestionPack(order.id), null, "트리거가 일을 못 해 묶음 장부가 없다");
+  assert.equal(await w.server.adminCreditQuestion(order.id), "credited");
+  const pack = await w.server.getQuestionPack(order.id);
+  assert.deepEqual(pack && { q: pack.questions, price: pack.priceKrw }, { q: 3, price: 2500 });
+  assert.equal(await w.server.adminCreditQuestion(order.id), "already");
+  assert.equal(psqlRun(`select count(*) from public.question_packs where order_id = '${order.id}'`), "1");
+  // 반영한 묶음도 부분 환불을 받는다
+  assert.equal((await w.server.applyCashRefund({ orderId: order.id, canceledTotal: 834 })).status, "applied");
+  assert.equal(await w.balance(), 6);
+});
+
+test("무료 질문 예약(16번): 같은 회원 · 같은 방에 동시에 8개가 와도 정확히 한도만큼만 예약되고(여러 서버 흉내), 풀면 다시 열리며, 오래된 예약은 세지 않고, 확정하면 센다", async () => {
+  const U = await makeUser();
+  const V = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "예약시험" }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+  const savedV = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: V.id, channel: "web", info: { ...info, nickname: "예약시험2" }, answers, today: new Date() });
+  assert.ok(savedV.ok);
+  const vid = savedV.ok ? savedV.assessment.id : "";
+  const room = "love";
+
+  // 동시에 8개 — 한도 3개만 예약된다
+  const raced = await Promise.all(Array.from({ length: 8 }, () => server.reserveChatQuestion({ userId: U.id, assessmentId: aid, roomKey: room, max: 3 })));
+  const got = raced.filter((r) => r !== null);
+  assert.equal(got.length, 3, `동시에 8번 요청해도 3개만: ${JSON.stringify(raced)}`);
+  assert.ok(got.every((r) => typeof r!.id === "number"));
+  assert.equal(await server.countChatQuestionsInRoom(U.id, room), 3, "예약도 자리를 차지한 것으로 센다");
+  assert.equal(await server.reserveChatQuestion({ userId: U.id, assessmentId: aid, roomKey: room, max: 3 }), null);
+
+  // 다른 방 · 다른 회원은 따로다
+  assert.ok(await server.reserveChatQuestion({ userId: U.id, assessmentId: aid, roomKey: "worry", max: 1 }));
+  assert.ok(await server.reserveChatQuestion({ userId: V.id, assessmentId: vid, roomKey: room, max: 1 }));
+
+  // 풀면 다시 열린다 — 남의 예약은 풀 수 없다
+  await server.releaseChatQuestion(got[0]!, { userId: V.id });
+  assert.equal(await server.countChatQuestionsInRoom(U.id, room), 3, "다른 회원이 풀려고 해도 풀리지 않는다");
+  await server.releaseChatQuestion(got[0]!, { userId: U.id });
+  assert.equal(await server.countChatQuestionsInRoom(U.id, room), 2);
+  const again = await server.reserveChatQuestion({ userId: U.id, assessmentId: aid, roomKey: room, max: 3 });
+  assert.ok(again);
+
+  // 확정하면 계속 센다(같은 확정을 두 번 해도 한 번)
+  await server.confirmChatQuestion(got[1]!, { userId: U.id, assessmentId: aid, roomKey: room });
+  await server.confirmChatQuestion(got[1]!, { userId: U.id, assessmentId: aid, roomKey: room });
+  assert.equal(psqlRun(`select count(*) from public.chat_questions where user_id = '${U.id}' and room_key = '${room}' and state = 'done'`), "1");
+  assert.equal(await server.countChatQuestionsInRoom(U.id, room), 3);
+
+  // 오래된 예약(서버가 죽어 남은 것)은 세지 않고 다음 예약 때 정리된다 — 영원히 잠기지 않는다
+  psqlRun(`update public.chat_questions set reserved_until = now() - interval '1 minute' where user_id = '${U.id}' and room_key = '${room}' and state = 'reserved'`);
+  assert.equal(await server.countChatQuestionsInRoom(U.id, room), 1, "확정된 1개만 센다");
+  assert.ok(await server.reserveChatQuestion({ userId: U.id, assessmentId: aid, roomKey: room, max: 3 }));
+  assert.equal(psqlRun(`select count(*) from public.chat_questions where user_id = '${U.id}' and room_key = '${room}' and state = 'reserved' and reserved_until <= now()`), "0", "만료된 예약은 지워졌다");
+
+  // 만료돼 지워진 예약이라도 답을 받은 질문은 센다
+  const ghost = { id: 999999999 };
+  await server.confirmChatQuestion(ghost, { userId: U.id, assessmentId: aid, roomKey: room });
+  assert.equal(psqlRun(`select count(*) from public.chat_questions where user_id = '${U.id}' and room_key = '${room}' and state = 'done'`), "2");
+
+  // 질문 내용을 담는 열이 없고, 브라우저는 읽지도 풀지도 못한다
+  const seen = await U.client.from("chat_questions").select();
+  assert.ok(seen.error || (seen.data ?? []).length === 0);
+  const call = await U.client.rpc("release_chat_question", { p_id: got[2]!.id, p_user_id: U.id });
+  assert.ok(call.error, "브라우저는 예약 함수를 부를 수 없다");
+});
+
+test("16번을 적용하기 전 환경(함수 · 열 없음)에서도 앱이 멈추지 않는다 — 예약은 예전 방식({ id: null })으로, 부분 환불은 unavailable로 알려 준다", async () => {
+  const w = await packWorld("예전환경");
+  const order = await w.buy();
+  // 저장소가 보는 DB를 흉내 낸다: 함수가 없다는 응답(PGRST202)을 돌려주는 클라이언트
+  const missing = { code: "PGRST202", message: "Could not find the function public.reserve_chat_question in the schema cache" };
+  const fakeAdmin = new Proxy(admin, {
+    get(target, prop, receiver) {
+      if (prop === "rpc") return async (name: string) => (["reserve_chat_question", "apply_cash_refund", "count_chat_questions_in_room"].includes(name) ? { data: null, error: missing } : { data: null, error: { code: "x", message: "unexpected" } });
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as SupabaseClient;
+  const old = createSupabaseRepository(fakeAdmin);
+  assert.deepEqual(await old.reserveChatQuestion({ userId: w.U.id, assessmentId: w.aid, roomKey: "love", max: 2 }), { id: null });
+  assert.deepEqual(await old.applyCashRefund({ orderId: order.id, canceledTotal: 834 }), { status: "unavailable" });
+  assert.equal(await old.countChatQuestionsInRoom(w.U.id, "love"), 0, "함수가 없으면 예전 방식으로 센다");
 });

@@ -2,13 +2,16 @@
 // 운영 코드에서 쓰지 않는다.
 
 import { canTransition } from "../../commerce/order.ts";
-import { parseCashProductId } from "../../config/product.ts";
+import { MIYU_CASH, parseCashProductId } from "../../config/product.ts";
+import { packRemaining, refundSchedule } from "../../commerce/cash.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
 import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AiUsageRecord,
   CashLedgerRecord,
+  CashRefundResult,
+  QuestionPackRecord,
   FeedbackRecord,
   FunnelEventRecord,
   OpsEventRecord,
@@ -36,17 +39,47 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const concernRecords = new Map<string, ConcernRecord>();
   const talkRooms = new Map<string, TalkRoomRecord>();
   const chatQuestions: { userId: string; assessmentId: string; roomKey: string; createdAt: string }[] = [];
+  // 무료 질문 자리 예약(답을 기다리는 중) — 10분 안에만 센다
+  const chatReservations: { id: number; userId: string; assessmentId: string; roomKey: string; until: number }[] = [];
+  let reservationSeq = 0;
+  const liveReservations = (userId: string, roomKey: string) => chatReservations.filter((r) => r.userId === userId && r.roomKey === roomKey && r.until > now().getTime()).length;
   const chatSummaries: ChatSummaryRecord[] = [];
   // 미유캐시 — DB의 지갑 · 내역 · 트리거(충전 · 회수) · 함수(차감 · 되돌림)를 흉내 낸다
   const wallets = new Map<string, number>();
-  const ledger: (CashLedgerRecord & { userId: string; ref: string | null })[] = [];
+  const ledger: (CashLedgerRecord & { userId: string; ref: string | null; packOrderId: string | null })[] = [];
   let ledgerSeq = 0;
-  const addLedger = (row: { userId: string; kind: CashLedgerRecord["kind"]; amount: number; orderId?: string | null; ref?: string | null; shortfall?: number }): boolean => {
-    // 같은 주문의 같은 종류 · 같은 참조번호의 같은 종류는 한 번만 (DB 고유 조건)
-    if (row.orderId && ledger.some((l) => l.orderId === row.orderId && l.kind === row.kind)) return false;
+  const addLedger = (row: { userId: string; kind: CashLedgerRecord["kind"]; amount: number; orderId?: string | null; ref?: string | null; shortfall?: number; packOrderId?: string | null }): boolean => {
+    // 같은 주문의 같은 종류 · 같은 참조번호의 같은 종류는 한 번만 (DB 고유 조건 — 묶음 환불(refund_claw)은 한 주문에 여러 번이라 주문 기준에서 빠진다)
+    if (row.orderId && row.kind !== "refund_claw" && ledger.some((l) => l.orderId === row.orderId && l.kind === row.kind)) return false;
     if (row.ref && ledger.some((l) => l.ref === row.ref && l.kind === row.kind)) return false;
-    ledger.push({ id: ++ledgerSeq, userId: row.userId, kind: row.kind, amount: row.amount, orderId: row.orderId ?? null, ref: row.ref ?? null, shortfall: row.shortfall ?? 0, createdAt: new Date(now().getTime() + ledgerSeq).toISOString() });
+    ledger.push({ id: ++ledgerSeq, userId: row.userId, kind: row.kind, amount: row.amount, orderId: row.orderId ?? null, ref: row.ref ?? null, shortfall: row.shortfall ?? 0, packOrderId: row.packOrderId ?? null, createdAt: new Date(now().getTime() + ledgerSeq).toISOString() });
     return true;
+  };
+  // 질문 묶음(주문)별 장부 — DB question_packs · ensure_question_pack · apply_cash_refund와 같은 규칙
+  const packs = new Map<string, QuestionPackRecord>();
+  const ensurePack = (order: OrderRecord) => {
+    const cash = parseCashProductId(order.productId);
+    if (!cash || cash.bonus !== 0 || cash.cash <= 0 || cash.cash % MIYU_CASH.perQuestion !== 0 || order.amount <= 0 || packs.has(order.id)) return;
+    packs.set(order.id, { orderId: order.id, userId: order.userId, questions: cash.cash / MIYU_CASH.perQuestion, priceKrw: order.amount, used: 0, refundedQuestions: 0, refundedKrw: 0, purchasedAt: order.approvedAt ?? now().toISOString() });
+  };
+  const applyRefund = (orderId: string, canceledTotal: number): CashRefundResult => {
+    const pack = packs.get(orderId);
+    if (!pack) return { status: "no-pack" };
+    const allowed = refundSchedule(pack.priceKrw, pack.questions);
+    if (!Number.isInteger(canceledTotal) || canceledTotal <= 0 || canceledTotal > pack.priceKrw) return { status: "invalid-amount", allowed };
+    const idx = allowed.indexOf(canceledTotal);
+    if (idx < 0) return { status: "amount-mismatch", allowed, refundedKrw: pack.refundedKrw };
+    const k = idx + 1;
+    if (k <= pack.refundedQuestions) return { status: "already", questions: pack.refundedQuestions, refundedKrw: pack.refundedKrw };
+    const delta = k - pack.refundedQuestions;
+    const remaining = packRemaining(pack);
+    const balance = wallets.get(pack.userId) ?? 0;
+    const take = Math.min(delta, remaining, Math.floor(balance / MIYU_CASH.perQuestion));
+    pack.refundedQuestions = k;
+    pack.refundedKrw = canceledTotal;
+    addLedger({ userId: pack.userId, kind: "refund_claw", amount: -(take * MIYU_CASH.perQuestion), orderId, ref: `refund:${orderId}:${k}`, shortfall: (delta - take) * MIYU_CASH.perQuestion });
+    if (take > 0) wallets.set(pack.userId, balance - take * MIYU_CASH.perQuestion);
+    return { status: "applied", questions: k, refundedKrw: canceledTotal, clawed: take, shortfall: delta - take };
   };
   /** 주문 상태가 바뀔 때의 충전 · 회수 — DB 트리거(orders_cash_change)와 같은 규칙 */
   const onOrderChange = (before: OrderRecord, after: OrderRecord) => {
@@ -54,9 +87,17 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     if (!cash || before.status === after.status) return;
     if (after.status === "paid") {
       if (!wallets.has(after.userId)) wallets.set(after.userId, 0);
-      if (cash.cash > 0 && addLedger({ userId: after.userId, kind: "charge", amount: cash.cash, orderId: after.id })) wallets.set(after.userId, wallets.get(after.userId)! + cash.cash);
+      if (cash.cash > 0 && addLedger({ userId: after.userId, kind: "charge", amount: cash.cash, orderId: after.id })) {
+        wallets.set(after.userId, wallets.get(after.userId)! + cash.cash);
+        ensurePack(after);
+      }
       if (cash.bonus > 0 && addLedger({ userId: after.userId, kind: "bonus", amount: cash.bonus, orderId: after.id })) wallets.set(after.userId, wallets.get(after.userId)! + cash.bonus);
     } else if (after.status === "refunded" && before.status === "paid") {
+      if (packs.has(after.id)) {
+        // 묶음 장부가 있는 주문: 전액 취소 = 결제액 전체를 누적 환불로 반영 (이 묶음의 남은 질문만 회수)
+        applyRefund(after.id, after.amount);
+        return;
+      }
       const credited = ledger.filter((l) => l.orderId === after.id && (l.kind === "charge" || l.kind === "bonus")).reduce((s, l) => s + l.amount, 0);
       if (credited > 0) {
         const take = Math.min(wallets.get(after.userId) ?? 0, credited);
@@ -440,7 +481,29 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       return chatQuestions.filter((q) => q.userId === userId && q.createdAt >= since).length;
     },
     async countChatQuestionsInRoom(userId, roomKey) {
-      return chatQuestions.filter((q) => q.userId === userId && q.roomKey === roomKey).length;
+      return chatQuestions.filter((q) => q.userId === userId && q.roomKey === roomKey).length + liveReservations(userId, roomKey);
+    },
+    async reserveChatQuestion({ userId, assessmentId, roomKey, max }) {
+      // DB reserve_chat_question과 같은 규칙 — 확인과 예약이 한 번에(await 없이) 일어나 동시에 와도 한도를 넘지 않는다
+      const nowMs = now().getTime();
+      for (let i = chatReservations.length - 1; i >= 0; i--) if (chatReservations[i].userId === userId && chatReservations[i].until <= nowMs) chatReservations.splice(i, 1);
+      const used = chatQuestions.filter((q) => q.userId === userId && q.roomKey === roomKey).length + liveReservations(userId, roomKey);
+      if (used >= max) return null;
+      const id = ++reservationSeq;
+      chatReservations.push({ id, userId, assessmentId, roomKey, until: nowMs + 10 * 60_000 });
+      return { id };
+    },
+    async confirmChatQuestion(reservation, input) {
+      if (reservation.id !== null) {
+        const i = chatReservations.findIndex((r) => r.id === reservation.id);
+        if (i >= 0) chatReservations.splice(i, 1);
+      }
+      chatQuestions.push({ ...input, createdAt: iso() });
+    },
+    async releaseChatQuestion(reservation, input) {
+      if (reservation.id === null) return;
+      const i = chatReservations.findIndex((r) => r.id === reservation.id && r.userId === input.userId);
+      if (i >= 0) chatReservations.splice(i, 1);
     },
     async getCashBalance(userId) {
       return wallets.get(userId) ?? 0;
@@ -458,16 +521,43 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const balance = wallets.get(userId);
       if (balance === undefined || balance < amount) return null;
       wallets.set(userId, balance - amount);
-      addLedger({ userId, kind: "spend", amount: -amount, ref });
+      // 질문 한 개를 쓰는 것이면 가장 먼저 산 묶음 중 남은 질문이 있는 묶음에서 쓴다 (DB spend_cash와 같다)
+      let packOrderId: string | null = null;
+      if (amount === MIYU_CASH.perQuestion) {
+        const pack = [...packs.values()]
+          .filter((p) => p.userId === userId && packRemaining(p) > 0)
+          .sort((a, b) => (a.purchasedAt < b.purchasedAt ? -1 : a.purchasedAt > b.purchasedAt ? 1 : a.orderId < b.orderId ? -1 : 1))[0];
+        if (pack) {
+          pack.used += 1;
+          packOrderId = pack.orderId;
+        }
+      }
+      addLedger({ userId, kind: "spend", amount: -amount, ref, packOrderId });
       return balance - amount;
     },
     async restoreCashSpend({ userId, ref }) {
       const spent = ledger.find((l) => l.userId === userId && l.ref === ref && l.kind === "spend");
       if (!spent) return null;
-      if (!addLedger({ userId, kind: "spend_restore", amount: -spent.amount, ref })) return null;
-      const next = (wallets.get(userId) ?? 0) - spent.amount;
+      let add = -spent.amount;
+      const pack = spent.packOrderId ? packs.get(spent.packOrderId) : undefined;
+      if (pack) {
+        // 그 사이 이 묶음이 환불로 정산됐다면 되돌린 질문은 이미 환불에 포함된 것이라 지갑에 다시 넣지 않는다
+        const before = packRemaining(pack);
+        const after = packRemaining({ ...pack, used: Math.max(pack.used - 1, 0) });
+        add = (after - before) * -spent.amount;
+      }
+      if (!addLedger({ userId, kind: "spend_restore", amount: add, ref, packOrderId: spent.packOrderId })) return null;
+      if (pack) pack.used = Math.max(pack.used - 1, 0);
+      const next = (wallets.get(userId) ?? 0) + add;
       wallets.set(userId, next);
       return next;
+    },
+    async getQuestionPack(orderId) {
+      const p = packs.get(orderId);
+      return p ? { ...p } : null;
+    },
+    async applyCashRefund({ orderId, canceledTotal }) {
+      return applyRefund(orderId, canceledTotal);
     },
     async adminCreditQuestion(orderId) {
       // DB 함수 admin_credit_question과 같은 규칙: 주문 상태는 바꾸지 않고, 결제 완료인 질문 결제 주문에 빠진 충전만 한 번 넣는다
@@ -480,6 +570,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       let credited = false;
       if (cash.cash > 0 && addLedger({ userId: order.userId, kind: "charge", amount: cash.cash, orderId: order.id })) {
         wallets.set(order.userId, wallets.get(order.userId)! + cash.cash);
+        ensurePack(order);
         credited = true;
       }
       if (cash.bonus > 0 && addLedger({ userId: order.userId, kind: "bonus", amount: cash.bonus, orderId: order.id })) {
@@ -526,5 +617,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger };
+  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
 }

@@ -60,11 +60,18 @@ export type GatewayPayment = {
   approvedAt: string | null;
   /** 결제를 처리한 상점 ID */
   mId: string | null;
+  /** 지금까지 취소된 누적 금액(원) — 결제사의 cancels 중 완료된 것의 합. 없으면 totalAmount − balanceAmount로 본다 */
+  canceledAmount?: number;
 };
+
+/** 결제사 기록에서 지금까지 취소된 누적 금액 (부분 취소 반영에 쓴다) */
+export const canceledAmountOf = (payment: Pick<GatewayPayment, "totalAmount" | "balanceAmount" | "canceledAmount">): number =>
+  payment.canceledAmount ?? Math.max(0, payment.totalAmount - payment.balanceAmount);
 
 /**
  * 결제사 상태 → 맞춰야 할 주문 상태. null이면 주문 상태를 바꾸지 않는다.
- * 부분 취소는 단일 상품이라 정상 흐름에서 생기지 않으므로 기록만 남기고 운영자가 확인한다.
+ * 부분 취소(PARTIAL_CANCELED)는 여기서 상태를 바꾸지 않는다 — 질문 3개 묶음 주문은 order-service의 applyPayment가 누적 취소액을 묶음 장부에 반영하고,
+ * 그 밖의 주문(개인 통합 리포트 등)은 기록만 남기고 운영자가 확인한다.
  */
 export function orderStatusFor(payment: GatewayPayment): OrderStatus | null {
   switch (payment.status) {

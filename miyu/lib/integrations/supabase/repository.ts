@@ -10,11 +10,14 @@ import type { PersonalContext } from "../../personalization/context.ts";
 import type {
   AssessmentRecord,
   CashLedgerRecord,
+  CashRefundResult,
+  ChatReservation,
   FunnelEventName,
   InsertResult,
   MiyuRepository,
   OpsEventRecord,
   OrderRecord,
+  QuestionPackRecord,
   ReportRecord,
   ReportStatusRecord,
   TalkRoomRecord,
@@ -24,6 +27,9 @@ import type {
 type Row = Record<string, unknown>;
 
 const UNIQUE_VIOLATION = "23505";
+/** 함수가 아직 없음 (PostgREST · Postgres) — DB 변경 전에는 예전 방식으로 동작하게 한다 */
+const MISSING_FUNCTION = new Set(["PGRST202", "42883"]);
+const isMissingFunction = (error: { code?: string | null } | null | undefined) => Boolean(error?.code && MISSING_FUNCTION.has(error.code));
 /** 테이블이 아직 없음 (PostgREST · Postgres) — 선택 기능은 꺼진 것으로 보고 기존 화면은 그대로 동작하게 한다 */
 const MISSING_TABLE = new Set(["PGRST205", "42P01"]);
 export const isMissingTableError = (error: { code?: string | null } | null | undefined) => Boolean(error?.code && MISSING_TABLE.has(error.code));
@@ -856,9 +862,36 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       return count ?? 0;
     },
     async countChatQuestionsInRoom(userId, roomKey) {
+      // DB 변경 16번 이후: 확정된 질문 + 10분 안의 예약만 센다 (함수가 없으면 예전처럼 줄 수를 센다)
+      const viaFn = await db.rpc("count_chat_questions_in_room", { p_user_id: userId, p_room_key: roomKey });
+      if (!viaFn.error) return Number(viaFn.data ?? 0);
+      if (!isMissingFunction(viaFn.error) && !isMissingTableError(viaFn.error)) fail("방별 질문 횟수 조회", viaFn.error);
       const { count, error } = await db.from("chat_questions").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("room_key", roomKey);
       if (error) fail("방별 질문 횟수 조회", error);
       return count ?? 0;
+    },
+    async reserveChatQuestion({ userId, assessmentId, roomKey, max }): Promise<ChatReservation | null> {
+      const { data, error } = await db.rpc("reserve_chat_question", { p_user_id: userId, p_assessment_id: assessmentId, p_room_key: roomKey, p_max: max });
+      if (error) {
+        // 16번 전: 예전 방식(답을 받은 뒤에 센다) — 한도 확인은 호출한 쪽의 줄 수 확인에 맡긴다
+        if (isMissingFunction(error)) return { id: null };
+        fail("무료 질문 자리 예약", error);
+      }
+      return data === null || data === undefined ? null : { id: Number(data) };
+    },
+    async confirmChatQuestion(reservation, input) {
+      if (reservation.id === null) {
+        const { error, status } = await db.from("chat_questions").insert({ user_id: input.userId, assessment_id: input.assessmentId, room_key: input.roomKey });
+        if (error) fail("자유 질문 횟수 기록", status === 404 && !error.code ? { code: "42P01", message: "chat_questions 테이블이 없습니다" } : error);
+        return;
+      }
+      const { error } = await db.rpc("confirm_chat_question", { p_id: reservation.id, p_user_id: input.userId, p_assessment_id: input.assessmentId, p_room_key: input.roomKey });
+      if (error) fail("자유 질문 횟수 확정", error);
+    },
+    async releaseChatQuestion(reservation, input) {
+      if (reservation.id === null) return;
+      const { error } = await db.rpc("release_chat_question", { p_id: reservation.id, p_user_id: input.userId });
+      if (error) fail("무료 질문 자리 풀기", error);
     },
 
     // 미유캐시 — 표 · 함수가 없으면(DB 변경 13번 전) 코드 42P01로 통일해 던진다 (호출한 쪽이 "캐시 준비 중"으로 다룬다)
@@ -881,6 +914,51 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       const { data, error } = await db.rpc("restore_cash_spend", { p_user_id: userId, p_ref: ref });
       if (error) fail("미유캐시 되돌림", ["PGRST202", "42883"].includes(error.code ?? "") || isMissingTableError(error) ? { code: "42P01", message: "restore_cash_spend 함수가 없습니다 (DB 변경 13번 필요)" } : error);
       return data === null || data === undefined ? null : Number(data);
+    },
+    async getQuestionPack(orderId): Promise<QuestionPackRecord | null> {
+      const { data, error } = await db
+        .from("question_packs")
+        .select("order_id, user_id, questions, price_krw, used, refunded_questions, refunded_krw, purchased_at")
+        .eq("order_id", orderId)
+        .maybeSingle();
+      if (error) {
+        if (isMissingTableError(error)) return null; // 16번 전
+        fail("질문 묶음 장부 조회", error);
+      }
+      if (!data) return null;
+      const r = data as Row;
+      return {
+        orderId: r.order_id as string,
+        userId: r.user_id as string,
+        questions: Number(r.questions),
+        priceKrw: Number(r.price_krw),
+        used: Number(r.used),
+        refundedQuestions: Number(r.refunded_questions),
+        refundedKrw: Number(r.refunded_krw),
+        purchasedAt: r.purchased_at as string,
+      };
+    },
+    async applyCashRefund({ orderId, canceledTotal }): Promise<CashRefundResult> {
+      const { data, error } = await db.rpc("apply_cash_refund", { p_order_id: orderId, p_canceled_total: canceledTotal });
+      if (error) {
+        if (isMissingFunction(error) || isMissingTableError(error)) return { status: "unavailable" };
+        fail("질문 묶음 환불 반영", error);
+      }
+      const r = (data ?? {}) as { status?: string; questions?: number; refunded_krw?: number; clawed?: number; shortfall?: number; allowed?: number[] };
+      switch (r.status) {
+        case "applied":
+          return { status: "applied", questions: Number(r.questions), refundedKrw: Number(r.refunded_krw), clawed: Number(r.clawed), shortfall: Number(r.shortfall) };
+        case "already":
+          return { status: "already", questions: Number(r.questions), refundedKrw: Number(r.refunded_krw) };
+        case "no_pack":
+          return { status: "no-pack" };
+        case "invalid_amount":
+          return { status: "invalid-amount", allowed: (r.allowed ?? []).map(Number) };
+        case "amount_mismatch":
+          return { status: "amount-mismatch", allowed: (r.allowed ?? []).map(Number), refundedKrw: Number(r.refunded_krw ?? 0) };
+        default:
+          throw new Error("질문 묶음 환불 반영: 알 수 없는 결과");
+      }
     },
     async adminCreditQuestion(orderId) {
       const { data, error } = await db.rpc("admin_credit_question", { p_order_id: orderId });

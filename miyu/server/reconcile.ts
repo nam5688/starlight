@@ -4,7 +4,7 @@ import { newErrorId } from "@/lib/ops/redact";
 import type { OrderRecord } from "@/lib/services/ports";
 import { reconcileBatch, reconcileOrder, type ReconcileOptions, type ReconcileOutcome, type ReconcileSummary } from "@/lib/services/reconcile-service";
 import { paymentConfig } from "./env";
-import { alert, logError, notifyOrderEvent, recordOps } from "./ops";
+import { alert, logError, notifyOrderEvent, notifyPartialRefund, recordOps } from "./ops";
 import { queueAndScheduleReport, runReportInline } from "./report-jobs";
 import { now, paymentGateway, writeRepository } from "./services";
 
@@ -38,6 +38,11 @@ async function report(outcome: ReconcileOutcome): Promise<void> {
     case "paid":
       await recordOps({ kind: "reconcile.paid", severity: "warn", orderNumber: o.orderNumber, message: "결제사 승인 기록을 확인해 주문을 결제 완료로 맞췄습니다 (리포트 준비 시작)" });
       if (outcome.transitioned !== false) await notifyOrderEvent("paid", o);
+      if (outcome.refund) await notifyPartialRefund(o, outcome.refund);
+      return;
+    case "partial-refund":
+      await recordOps({ kind: "reconcile.partial_refund", severity: "warn", orderNumber: o.orderNumber, message: `결제사의 부분 취소를 확인해 질문 묶음에 반영했습니다 (누적 ${outcome.refund.refundedKrw}원 · 질문 ${outcome.refund.questions}개 환불)` });
+      await notifyPartialRefund(o, outcome.refund);
       return;
     case "refunded":
       await recordOps({ kind: "reconcile.refunded", severity: "warn", orderNumber: o.orderNumber, message: "결제사에서 취소된 결제를 확인해 주문을 환불됨으로 맞췄습니다 (열람 권한 회수)" });
@@ -50,7 +55,7 @@ async function report(outcome: ReconcileOutcome): Promise<void> {
       const errorId = newErrorId();
       await alert({
         kind: "reconcile.anomaly",
-        severity: outcome.code === "DUPLICATE_PAYMENT" || outcome.code === "PAID_BUT_NOT_AT_GATEWAY" ? "error" : "warn",
+        severity: outcome.code === "DUPLICATE_PAYMENT" || outcome.code === "PAID_BUT_NOT_AT_GATEWAY" || outcome.code.startsWith("PARTIAL_REFUND_") ? "error" : "warn",
         title: `결제 기록 불일치 — 확인 필요 (${outcome.code})`,
         orderNumber: o.orderNumber,
         errorId,
@@ -74,7 +79,7 @@ async function report(outcome: ReconcileOutcome): Promise<void> {
 
 /** 모든 대기 주문 · 최근 결제 완료 주문을 대조한다 (정기 실행 · 관리자 버튼) */
 export async function reconcileAllNow(options: ReconcileOptions = {}, mode: ReportMode = "schedule"): Promise<ReconcileSummary> {
-  if (!paymentConfig().ok) return { checked: 0, outcomes: [], counts: { paid: 0, refunded: 0, closed: 0, waiting: 0, ok: 0, anomaly: 0, error: 0 } };
+  if (!paymentConfig().ok) return { checked: 0, outcomes: [], counts: { paid: 0, "partial-refund": 0, refunded: 0, closed: 0, waiting: 0, ok: 0, anomaly: 0, error: 0 } };
   const summary = await reconcileBatch(deps(mode), options);
   for (const outcome of summary.outcomes) await report(outcome);
   return summary;

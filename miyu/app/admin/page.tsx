@@ -329,6 +329,21 @@ function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
           <>
             <Row label="질문 장부">{!question.ready ? "장부를 읽지 못했습니다 (DB 변경 13번 전)" : question.credited ? `이 주문의 질문이 들어감 (${time(question.creditedAt)})` : order.status === "paid" ? "결제 완료인데 장부에 질문이 없음 — 아래 버튼으로 결제사 확인 뒤 넣을 수 있습니다" : "아직 결제 완료가 아니라 들어가지 않음"}</Row>
             <Row label="이 회원이 쓸 수 있는 결제한 질문">{question.ready ? `${question.questionsLeft}개` : "-"}</Row>
+            {question.pack ? (
+              <>
+                <Row label="이 묶음의 사용 · 환불">
+                  질문 {question.pack.questions}개 중 사용 {question.pack.used}개 · 환불 {question.pack.refundedQuestions}개 (누적 {formatKrw(question.pack.refundedKrw)}) · 남은 질문 {question.pack.remaining}개
+                  {question.pack.shortfall > 0 ? ` · 환불받은 질문 중 ${question.pack.shortfall}개는 이미 쓴 질문이라 회수하지 못함` : ""}
+                </Row>
+                {question.pack.nextRefunds.length > 0 && (
+                  <Row label="환불 금액 안내 (토스 관리자의 취소 금액)">
+                    {question.pack.nextRefunds.map((s) => `질문 ${s.questions}개 환불 → ${formatKrw(s.cancelNow)}`).join(" · ")} (취소 후 누적 환불액이 결제액 {formatKrw(order.amount)}을 넘지 않도록 정한 금액입니다. 이 금액이 아니면 질문이 회수되지 않고 이 화면에 확인 필요로 남습니다.)
+                  </Row>
+                )}
+              </>
+            ) : (
+              order.status === "paid" && question.credited && <Row label="이 묶음의 사용 · 환불">묶음 장부가 없는 주문입니다 (DB 변경 16번 전에 결제됨) — 부분 환불은 질문에 자동 반영되지 않습니다. 환불이 필요하면 운영 매뉴얼을 보세요.</Row>
+            )}
           </>
         ) : (
           <Row label="리포트">{report ? `${reportLabel(report)} · 시도 ${report.attempts}/${report.maxAttempts}${report.lastError ? ` · ${report.lastError}` : ""}` : order.status === "paid" ? "리포트 기록 없음" : "-"}</Row>

@@ -11,10 +11,12 @@
 // - 결제사에 해당 주문의 결제가 아예 없고 충분한 시간이 지난 경우에만 "미완료"로 정리한다.
 // - 같은 대조를 여러 번 해도 결과가 같다 (중복 반영 · 중복 리포트 없음).
 // - 실제 환불은 하지 않는다. 결제사에서 이미 취소된 것을 주문에 맞출 뿐이다.
+// - 질문 3개 묶음의 **부분 취소**는 결제사의 누적 취소액을 묶음 장부에 반영해 남은 질문을 회수한다(웹훅을 놓쳤거나 늦게 와도 이 대조가 맞춘다).
 
 import type { GatewayPayment } from "../commerce/order.ts";
-import { applyPayment } from "./order-service.ts";
-import type { MiyuRepository, OrderRecord, PaymentGateway } from "./ports.ts";
+import { isCashProduct } from "../config/product.ts";
+import { applyPayment, refundAttention } from "./order-service.ts";
+import type { CashRefundResult, MiyuRepository, OrderRecord, PaymentGateway } from "./ports.ts";
 
 export const RECONCILE_DEFAULTS = {
   /** 결제 진행 중일 수 있으니 주문이 이 시간 지난 뒤부터 확인한다 */
@@ -29,8 +31,10 @@ export const RECONCILE_DEFAULTS = {
 export type ReconcileOptions = Partial<typeof RECONCILE_DEFAULTS>;
 
 export type ReconcileOutcome =
-  /** 결제사는 승인했는데 우리 주문이 대기였음 → 결제 완료로 맞춤 (리포트 준비 필요) */
-  | { kind: "paid"; order: OrderRecord; transitioned?: boolean }
+  /** 결제사는 승인했는데 우리 주문이 대기였음 → 결제 완료로 맞춤 (리포트 준비 필요). refund: 그 결제가 이미 일부 취소돼 있어 묶음 장부에 함께 반영한 경우 */
+  | { kind: "paid"; order: OrderRecord; transitioned?: boolean; refund?: Extract<CashRefundResult, { status: "applied" }> }
+  /** 결제사의 부분 취소(질문 묶음 일부 환불)를 묶음 장부에 반영함 → 남은 질문 회수 (주문은 결제 완료 그대로) */
+  | { kind: "partial-refund"; order: OrderRecord; refund: Extract<CashRefundResult, { status: "applied" }> }
   /** 결제사에서 취소됨 → 주문을 환불됨으로 맞춤 (열람 권한 회수) */
   | { kind: "refunded"; order: OrderRecord }
   /** 결제가 끝나지 않은 채 정리됨 */
@@ -104,7 +108,9 @@ export async function reconcileOrder(deps: Deps, order: OrderRecord, options: Re
       } catch {
         // 리포트 준비는 결과 화면의 상태 확인이 이어받는다
       }
-      return { kind: "paid", order: applied.order, transitioned: applied.transitioned };
+      const att = applied.refund ? refundAttention(applied.refund) : null;
+      if (att) return { kind: "anomaly", order: applied.order, ...att };
+      return { kind: "paid", order: applied.order, transitioned: applied.transitioned, ...(applied.refund?.status === "applied" ? { refund: applied.refund } : {}) };
     }
     if (applied.kind === "updated") {
       return applied.order.status === "refunded" ? { kind: "refunded", order: applied.order } : { kind: "closed", order: applied.order, reason: payment.status };
@@ -128,6 +134,16 @@ export async function reconcileOrder(deps: Deps, order: OrderRecord, options: Re
       return { kind: "anomaly", order, code: "PAYMENT_MISMATCH", message: "결제사 기록의 주문번호 또는 금액이 주문과 다릅니다." };
     }
     if (payment.status === "DONE") return { kind: "ok", order };
+    if (payment.status === "PARTIAL_CANCELED" && isCashProduct(order.productId)) {
+      // 질문 묶음의 부분 취소 — 결제사의 누적 취소액을 묶음 장부에 반영한다(이미 반영했다면 "already"라 ok)
+      const applied = await applyPayment(repo, order, payment, "reconcile");
+      if (applied.kind === "paid" && applied.refund) {
+        const att = refundAttention(applied.refund);
+        if (att) return { kind: "anomaly", order: applied.order, ...att };
+        return applied.refund.status === "applied" ? { kind: "partial-refund", order: applied.order, refund: applied.refund } : { kind: "ok", order: applied.order };
+      }
+      return { kind: "anomaly", order: applied.order, code: "REFUND_NOT_APPLIED", message: "결제사에서 일부 취소됐지만 묶음 장부에 반영하지 못했습니다." };
+    }
     if (payment.status === "CANCELED") {
       const applied = await applyPayment(repo, order, payment, "reconcile");
       if (applied.kind === "updated" && applied.order.status === "refunded") return { kind: "refunded", order: applied.order };
@@ -163,7 +179,7 @@ export async function reconcileBatch(deps: Deps, options: ReconcileOptions = {})
       outcomes.push({ kind: "error", order, code: "RECONCILE_EXCEPTION" });
     }
   }
-  const counts = { paid: 0, refunded: 0, closed: 0, waiting: 0, ok: 0, anomaly: 0, error: 0 } satisfies Record<ReconcileOutcome["kind"], number>;
+  const counts = { paid: 0, "partial-refund": 0, refunded: 0, closed: 0, waiting: 0, ok: 0, anomaly: 0, error: 0 } satisfies Record<ReconcileOutcome["kind"], number>;
   for (const r of outcomes) counts[r.kind]++;
   return { checked: orders.length, outcomes, counts };
 }

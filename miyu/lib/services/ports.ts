@@ -167,9 +167,29 @@ export type NewPersonalContext = PersonalContextInput & Pick<PersonalContext, "a
 /** 목록용 — 적은 내용은 담지 않는다 */
 export type PersonalContextSummary = Pick<PersonalContext, "assessmentId" | "topic" | "updatedAt">;
 
-/** 미유캐시 거래 내역 — charge 충전 · bonus 보너스 · spend 질문에 사용 · spend_restore 사용 되돌림 · clawback 결제 취소로 회수. 질문 내용은 담지 않는다 */
-export type CashLedgerKind = "charge" | "bonus" | "spend" | "spend_restore" | "clawback";
+/** 미유캐시 거래 내역 — charge 충전 · bonus 보너스 · spend 질문에 사용 · spend_restore 사용 되돌림 · clawback 결제 취소로 회수(예전 방식) · refund_claw 묶음 환불로 회수(부분 · 전액). 질문 내용은 담지 않는다 */
+export type CashLedgerKind = "charge" | "bonus" | "spend" | "spend_restore" | "clawback" | "refund_claw";
 export type CashLedgerRecord = { id: number; kind: CashLedgerKind; amount: number; orderId: string | null; shortfall: number; createdAt: string };
+
+/** 질문 3개 묶음(주문) 하나의 장부 — 산 질문 수 · 쓴 수 · 환불한 수 · 누적 환불액(원). DB 변경 16번 이후 결제한 주문에만 있다 */
+export type QuestionPackRecord = { orderId: string; userId: string; questions: number; priceKrw: number; used: number; refundedQuestions: number; refundedKrw: number; purchasedAt: string };
+
+/**
+ * 결제사의 누적 취소액을 묶음 장부에 반영한 결과.
+ * applied: 이번에 반영함(clawed: 지갑에서 회수한 질문 수, shortfall: 이미 써서 회수하지 못한 질문 수) · already: 이미 반영된 금액(같은 알림 · 대조를 다시 받음)
+ * no-pack: 묶음 장부가 없는 주문(DB 16번 전에 결제) · invalid-amount: 0 이하이거나 결제액보다 큼 · amount-mismatch: 질문 수에 맞지 않는 취소 금액(장부는 바꾸지 않음, allowed: 맞는 누적 취소액들)
+ * unavailable: DB에 16번 변경이 없음
+ */
+export type CashRefundResult =
+  | { status: "applied"; questions: number; refundedKrw: number; clawed: number; shortfall: number }
+  | { status: "already"; questions: number; refundedKrw: number }
+  | { status: "no-pack" }
+  | { status: "invalid-amount"; allowed: number[] }
+  | { status: "amount-mismatch"; allowed: number[]; refundedKrw: number }
+  | { status: "unavailable" };
+
+/** 무료 질문 자리 예약 — id가 null이면 DB 변경 16번 전의 예전 방식(답을 받은 뒤에 한 번에 센다) */
+export type ChatReservation = { id: number | null };
 
 /** 대화(상담방) 저장 — 회원 · 검사 결과 · 방마다 한 줄. 눌렀던 행동 목록과 자유 질문 · 답만 담고 리포트 글은 담지 않는다 */
 export type TalkRoomRecord = { assessmentId: string; roomKey: string; userId: string; actions: unknown[]; updatedAt: string; /** 행동 목록에서 어디까지 요약했는가 — 다음 저장은 여기부터 요약한다 */ savedUpto: number };
@@ -273,6 +293,13 @@ export interface MiyuRepository {
   countChatQuestionsSince(userId: string, since: string): Promise<number>;
   /** 이 방(roomKey)에서 이 회원이 지금까지 한 질문 수 — 방마다 무료 질문 수를 세는 데 쓴다. 테이블이 없으면 오류(코드 42P01) */
   countChatQuestionsInRoom(userId: string, roomKey: string): Promise<number>;
+  /**
+   * 무료 질문 자리를 DB에서 한 번에 확인하고 예약한다(DB 변경 16번 — 여러 서버가 동시에 와도 같은 회원 · 같은 방은 한 줄로). max개가 이미 차 있으면 null.
+   * 16번 전에는 { id: null }(예전 방식 — 답을 받은 뒤 confirm에서 센다). 예약은 10분 안에만 세고, 답을 받으면 confirmChatQuestion, 받지 못하면 releaseChatQuestion.
+   */
+  reserveChatQuestion(input: { userId: string; assessmentId: string; roomKey: string; max: number }): Promise<ChatReservation | null>;
+  confirmChatQuestion(reservation: ChatReservation, input: { userId: string; assessmentId: string; roomKey: string }): Promise<void>;
+  releaseChatQuestion(reservation: ChatReservation, input: { userId: string }): Promise<void>;
 
   /**
    * 미유캐시 — 서버만 쓴다(충전은 결제 완료 처리 안에서 DB가 한다). 테이블 · 함수가 없으면(DB 변경 13번 전) 오류(코드 42P01)를 던진다.
@@ -290,6 +317,13 @@ export interface MiyuRepository {
    * 함수가 없으면(15번 전) 오류(코드 42P01)를 던진다.
    */
   adminCreditQuestion(orderId: string): Promise<"credited" | "already" | "not-paid" | "not-cash" | "not-found">;
+  /** 질문 묶음 장부(DB 변경 16번 이후 주문). 없는 주문 · 16번 전이면 null */
+  getQuestionPack(orderId: string): Promise<QuestionPackRecord | null>;
+  /**
+   * 결제사의 **누적** 취소액(원)을 묶음 장부에 반영해 남은 질문을 회수한다. 같은 금액을 여러 번 반영해도 한 번만, 환불과 질문 사용이 동시에 와도 질문이 마이너스가 되지 않는다.
+   * 전액 취소(주문이 환불됨으로 바뀜)는 DB 트리거가 같은 함수로 처리한다. DB에 16번이 없으면 { status: "unavailable" }.
+   */
+  applyCashRefund(input: { orderId: string; canceledTotal: number }): Promise<CashRefundResult>;
 
   /** 서버 전용 (브라우저 권한으로는 읽을 수 없다) — 주문 소유자를 확인한 뒤에만 쓴다 */
   listPaymentEvents(orderId: string): Promise<PaymentEventRecord[]>;

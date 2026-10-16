@@ -21,3 +21,28 @@ export const BUSINESS_FIELDS: readonly { label: string; value: string }[] = [
   { label: "통신판매신고번호", value: BUSINESS_INFO.mailOrderNumber },
   { label: "개인정보관리책임자", value: BUSINESS_INFO.privacyOfficer },
 ];
+
+/**
+ * 고객 문의 채널 — **운영자(박슬기)가 정해 알려 준 값만** 적는다(2026-10-16): 카카오톡 채널 "미유톡"의 상담톡(CS 전용). 이메일 · 전화는 정해지지 않아 비워 둔다 — 지어내서 채우지 않는다.
+ * 사이트 하단 · 약관 9조 · 유료 질문 환불 안내에 그대로 보인다. 응대 시간은 운영자가 알려 주기 전까지 적지 않는다.
+ * 문의 채널이 비어 있으면 실결제 질문 판매를 열지 않는다(환불을 요청할 곳이 없으면 판매하지 않는다 — lib/config/product.ts의 questionPackSalesOpen).
+ */
+export const SUPPORT_CONTACT: { email: string | null; channelName: string | null; channelUrl: string | null; hours: string | null } = {
+  email: null,
+  channelName: "미유톡 (카카오톡 채널 · CS 전용 상담톡)",
+  channelUrl: "http://pf.kakao.com/_xjxnqmX/chat",
+  hours: null,
+};
+
+/** 문의 채널이 정해졌는가 — 이메일이나 채널(링크) 중 하나라도 있어야 한다 */
+export const hasSupportContact = (c: typeof SUPPORT_CONTACT = SUPPORT_CONTACT): boolean => Boolean(c.email?.trim() || (c.channelName?.trim() && c.channelUrl?.trim()));
+
+/** 화면에 보이는 한 줄 — 정해지지 않았으면 null (호출한 쪽이 "정하는 중" 문구를 보인다) */
+export function supportContactLine(c: typeof SUPPORT_CONTACT = SUPPORT_CONTACT): string | null {
+  if (!hasSupportContact(c)) return null;
+  const parts = [c.email?.trim() ? `이메일 ${c.email.trim()}` : null, c.channelName?.trim() && c.channelUrl?.trim() ? `${c.channelName.trim()} ${c.channelUrl.trim()}` : null, c.hours?.trim() ? `응대 시간 ${c.hours.trim()}` : null];
+  return parts.filter(Boolean).join(" · ");
+}
+
+/** 문의 채널이 아직 없을 때 보이는 문구 */
+export const SUPPORT_CONTACT_PENDING = "고객 문의 채널은 운영자가 정하는 중입니다. 정해지면 이 자리와 사이트 하단에 적습니다.";

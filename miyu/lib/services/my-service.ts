@@ -1,6 +1,7 @@
 // MY 화면 자료 — 리포트별 이용 권한 · 생성 상태와 결제내역을 따로 보여준다.
 // 결제 상태(orders)와 리포트 생성 상태(reports)는 섞지 않는다: 결제했지만 생성에 실패한 고객에게 다시 구매하라고 하지 않는다.
 
+import { packRemaining } from "../commerce/cash.ts";
 import type { OrderStatus } from "../commerce/order.ts";
 import { isPersonalProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
@@ -223,7 +224,15 @@ export type OrderTrace = {
   /** 결제 승인 후에만 리포트 열람 권한이 생긴다 (유료 질문 주문은 리포트가 아니라 cash를 본다) */
   entitled: boolean;
   /** 유료 질문(또는 예전 충전) 주문이면 — 주문에 적힌 단위와 장부에 실제로 들어간 · 회수된 양 (서버가 결제 승인을 확인한 뒤에만 들어간다) */
-  cash: { cash: number; bonus: number; credited: number; clawedBack: number; shortfall: number } | null;
+  cash: {
+    cash: number;
+    bonus: number;
+    credited: number;
+    clawedBack: number;
+    shortfall: number;
+    /** 묶음(주문)별 장부 — DB 16번 이후에 결제된 질문 묶음만. 사용 · 환불 수량과 누적 환불액 (부분 환불을 반영한 값) */
+    pack: { questions: number; used: number; refundedQuestions: number; refundedKrw: number; remaining: number } | null;
+  } | null;
   generation: Generation;
   events: { at: string; source: string; status: string | null; statusLabel: string | null; method?: string; mId?: string; approvedAt?: string }[];
 };
@@ -246,6 +255,11 @@ export const EVENT_STATUS_LABEL: Record<string, string> = {
   ABANDONED: "결제사에 결제 기록이 없어 미완료로 정리",
   IN_PROGRESS: "결제사에서 진행 중",
   PAID_BUT_NOT_AT_GATEWAY: "결제 완료로 기록됐지만 결제사에서 찾지 못함 (운영자 확인)",
+  PARTIAL_REFUND_APPLIED: "부분 환불을 질문 묶음에 반영함 (남은 질문 회수)",
+  PARTIAL_REFUND_MISMATCH: "취소 금액이 질문 개수에 맞지 않아 질문을 회수하지 않음 (운영자 확인)",
+  PARTIAL_REFUND_INVALID: "취소 금액이 결제액 범위를 벗어나 반영하지 않음 (운영자 확인)",
+  PARTIAL_REFUND_NO_PACK: "묶음 장부가 없는 예전 주문이라 부분 환불을 반영하지 못함 (운영자 확인)",
+  PARTIAL_REFUND_NEEDS_DB16: "DB 변경 16번 전이라 부분 환불을 반영하지 못함 (운영자 확인)",
 };
 
 export const SOURCE_LABEL: Record<PaymentEventRecord["source"], string> = {
@@ -309,6 +323,14 @@ async function cashTraceOf(repo: MiyuRepository, userId: string, order: OrderRec
     // 13번 DB 변경 전에는 지갑 내역이 없다
   }
   const credited = rows.filter((r) => r.kind === "charge" || r.kind === "bonus").reduce((n, r) => n + r.amount, 0);
-  const clawback = rows.filter((r) => r.kind === "clawback");
-  return { cash: parsed.cash, bonus: parsed.bonus, credited, clawedBack: -clawback.reduce((n, r) => n + r.amount, 0), shortfall: clawback.reduce((n, r) => n + r.shortfall, 0) };
+  // 전액 취소(예전 방식 clawback) · 묶음별 환불(refund_claw)을 함께 센다
+  const clawback = rows.filter((r) => r.kind === "clawback" || r.kind === "refund_claw");
+  let pack: NonNullable<OrderTrace["cash"]>["pack"] = null;
+  try {
+    const p = await repo.getQuestionPack(order.id);
+    if (p) pack = { questions: p.questions, used: p.used, refundedQuestions: p.refundedQuestions, refundedKrw: p.refundedKrw, remaining: packRemaining(p) };
+  } catch {
+    // 16번 DB 변경 전에는 묶음 장부가 없다
+  }
+  return { cash: parsed.cash, bonus: parsed.bonus, credited, clawedBack: -clawback.reduce((n, r) => n + r.amount, 0), shortfall: clawback.reduce((n, r) => n + r.shortfall, 0), pack };
 }

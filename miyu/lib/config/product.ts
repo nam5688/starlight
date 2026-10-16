@@ -93,6 +93,12 @@ export const MIYU_CASH = {
   policyDecided: false,
 } as const;
 
+/**
+ * 실결제로 질문 묶음을 팔아도 되는가 — 이용 기준(환불 · 유효기간 · 탈퇴 · 서비스 종료)을 운영자가 확정했고(MIYU_CASH.policyDecided) 고객 문의 채널이 정해졌을 때만 true.
+ * 테스트 결제는 이 값과 상관없이 열려 있다. 둘 중 하나라도 없으면 실결제 모드의 질문 결제는 "준비 중"으로 막힌다(결제 시작도 하지 않는다 — 돈이 빠지지 않는다).
+ */
+export const questionPackSalesOpen = (policyDecided: boolean, hasContact: boolean): boolean => policyDecided && hasContact;
+
 /** 질문 묶음 하나의 값 (원, 부가세 포함) — 서버가 주문 금액으로 쓴다 */
 export const QUESTION_PACK_PRICE_KRW = MIYU_CASH.priceKrw;
 /** 묶음 하나로 생기는 질문 수 (3) */

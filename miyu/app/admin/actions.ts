@@ -79,7 +79,7 @@ export async function adminRunAllAction() {
   const summary = await reconcileAllNow();
   const reports = await sweepReports();
   await recordOps({ kind: "admin.run_all", message: `운영자가 전체 점검 실행: 주문 ${summary.checked}건, 실패 리포트 ${reports.failed}건, 지연 ${reports.delayed}건` });
-  redirect(`/admin?note=${encodeURIComponent(`점검 완료: 주문 ${summary.checked}건 확인 (반영 ${summary.counts.paid + summary.counts.refunded + summary.counts.closed}, 확인 필요 ${summary.counts.anomaly}, 조회 실패 ${summary.counts.error})`)}`);
+  redirect(`/admin?note=${encodeURIComponent(`점검 완료: 주문 ${summary.checked}건 확인 (반영 ${summary.counts.paid + summary.counts["partial-refund"] + summary.counts.refunded + summary.counts.closed}, 확인 필요 ${summary.counts.anomaly}, 조회 실패 ${summary.counts.error})`)}`);
 }
 
 /**

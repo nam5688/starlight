@@ -163,6 +163,7 @@ export async function startQuestionPaymentAction(input: AskInput): Promise<Quest
     if (r.kind === "refused") return r.result.ok ? (r.result.kind === "safety" ? { ok: true, kind: "safety", paragraphs: r.result.paragraphs } : fail("failed")) : { ok: false, reason: r.result.reason, message: r.result.message };
     if (r.kind === "sales-closed") return fail("pay-closed");
     if (r.kind === "unavailable") return fail("pay-unavailable");
+    if (r.kind === "policy-pending") return fail("pay-policy");
     return fail("not-found");
   } catch (e) {
     logError("talk.pay", e);

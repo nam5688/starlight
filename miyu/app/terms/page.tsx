@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalDocument } from "@/components/membership/legal-document";
+import { BUSINESS_FIELDS, SUPPORT_CONTACT_PENDING, supportContactLine } from "@/lib/config/business";
 import { formatKrw, QUESTION_PACK_PRICE_KRW, QUESTION_PACK_SIZE } from "@/lib/config/product";
 
 export const metadata: Metadata = { title: "이용약관 · ME:U 미유", description: "ME:U 미유 이용약관 (초안)", alternates: { canonical: "/terms" } };
@@ -55,7 +56,10 @@ export default function TermsPage() {
           title: "8. 탈퇴",
           body: ["회원은 언제든 탈퇴를 요청할 수 있습니다. 관련 법령에 따라 보관해야 하는 거래 기록은 정해진 기간 동안 보관합니다."],
         },
-        { title: "9. 운영자 정보", body: ["[사업자명 · 대표자 · 사업자등록번호 · 통신판매업 신고번호 · 연락처 — 출시 전 기재]"] },
+        {
+          title: "9. 운영자 정보",
+          body: [BUSINESS_FIELDS.map((f) => `${f.label} ${f.value}`).join(" · "), supportContactLine() ? `고객 문의: ${supportContactLine()}` : SUPPORT_CONTACT_PENDING],
+        },
       ]}
     />
   );

@@ -1,6 +1,7 @@
 import { syncPayment } from "@/lib/services/order-service";
 import { paymentConfig } from "@/server/env";
-import { notifyOrderEvent } from "@/server/ops";
+import { newErrorId } from "@/lib/ops/redact";
+import { alert, notifyOrderEvent, notifyPartialRefund } from "@/server/ops";
 import { queueAndScheduleReport } from "@/server/report-jobs";
 import { paymentGateway, writeRepository } from "@/server/services";
 
@@ -35,6 +36,19 @@ export async function POST(request: Request) {
       await queueAndScheduleReport(result.order);
     }
     if (result.kind === "updated" && (result.to === "paid" || result.to === "refunded")) await notifyOrderEvent(result.to, result.order);
+    if (result.kind === "updated" && result.to === "partial-refunded" && result.refund) await notifyPartialRefund(result.order, result.refund);
+    if (result.kind === "attention") {
+      // 부분 취소를 질문 묶음에 반영하지 못했다 — 같은 알림을 다시 받아도 결과가 같으므로 200으로 받고(재전송 불필요) 운영자에게 알린다
+      await alert({
+        kind: "reconcile.anomaly",
+        severity: "error",
+        title: `결제 기록 불일치 — 확인 필요 (${result.code})`,
+        orderNumber: result.order.orderNumber,
+        errorId: newErrorId(),
+        dedupeKey: `anomaly:${result.order.orderNumber}:${result.code}`,
+        lines: [result.message, "환불은 토스페이먼츠 관리자에서 직접 실행합니다 (미유는 환불을 실행하지 않습니다)"],
+      });
+    }
     return Response.json({ ok: true, result: result.kind });
   } catch {
     return new Response("retry", { status: 500 });

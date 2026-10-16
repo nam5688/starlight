@@ -567,6 +567,15 @@ wd13 as (
 wd15 as (
   select exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'admin_credit_question') as fn
 ),
+-- 16번: 질문 묶음 장부 · 부분 환불 반영 함수 · 무료 질문 예약 함수와 열
+wd16 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'question_packs') as packs,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'apply_cash_refund') as refund_fn,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'reserve_chat_question') as reserve_fn,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'chat_questions' and column_name = 'reserved_until') as reserved_col,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'cash_ledger' and column_name = 'pack_order_id') as pack_col
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -680,5 +689,11 @@ select * from (
          case when wd15.fn then '적용됨' else '아직 안 함' end,
          '함수 admin_credit_question (결제사 확인 뒤 운영자가 주문에 적힌 만큼 질문을 넣는 함수)'
   from wd15
+  union all
+  select 16, '20261026000000_question_packs.sql',
+         case when wd16.packs and wd16.refund_fn and wd16.reserve_fn and wd16.reserved_col and wd16.pack_col then '적용됨'
+              when wd16.packs or wd16.refund_fn or wd16.reserve_fn or wd16.reserved_col or wd16.pack_col then '일부만' else '아직 안 함' end,
+         '표 question_packs (묶음별 사용 · 환불 장부) / 함수 apply_cash_refund (부분 환불 반영) · reserve_chat_question (무료 질문 한도를 DB에서 보장) / 열 chat_questions.reserved_until: ' || wd16.reserved_col::text
+  from wd16
 ) r
 order by "번호";

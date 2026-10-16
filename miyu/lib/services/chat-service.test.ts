@@ -10,7 +10,7 @@ import { SAMPLE_CHART } from "../samples/sample-report.ts";
 import { sampleReadingReport } from "../samples/sample-reading-report.ts";
 import { buildTalkModel, QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
-import { ASK_MESSAGES, askFreeQuestion, recentExchanges, type AskDeps } from "./chat-service.ts";
+import { ASK_MESSAGES, askFreeQuestion, askFreeQuestionUnqueued, recentExchanges, type AskDeps } from "./chat-service.ts";
 import { NO_LIMITS } from "./capacity-service.ts";
 import type { AssessmentRecord, MiyuRepository } from "./ports.ts";
 import { closeRoom } from "./summary-service.ts";
@@ -400,4 +400,85 @@ test("다른 회원의 질문은 서로 기다리지 않고, 한 질문의 실�
   assert.ok(ok(b));
   const c = await askFreeQuestion(deps(), input(other, "다른 사람의 질문이에요", "u2"));
   assert.ok(ok(c));
+});
+
+// ───────────── 여러 서버에서 동시에 온 요청 — 무료 질문 한도는 DB 예약(16번)이 지킨다 ─────────────
+// 한 서버 안의 줄 세우기(inRoomQueue)를 거치지 않는 askFreeQuestionUnqueued로 서버가 여러 대인 상황을 흉내 낸다.
+
+test("서버 여러 대 · 무료 질문이 하나 남았을 때 동시에 5개가 와도 정확히 한 개만 무료로 답한다 (줄 세우기 없이도 DB 예약이 막는다)", async () => {
+  const { mem, repo, mine, deps } = await setup({ answer: async () => (await slow(), ["천천히 해 보면 좋겠어요."]) });
+  for (let i = 0; i < 2; i++) await repo.addChatQuestion({ userId: "u1", assessmentId: mine, roomKey: "love" }); // 3번 중 2번 씀
+  const results = await Promise.all([1, 2, 3, 4, 5].map((n) => askFreeQuestionUnqueued(deps(), input(mine, `${n}번째 질문이에요`))));
+  assert.equal(results.filter(ok).length, 1, JSON.stringify(results.map((r) => (r.ok ? r.kind : r.reason))));
+  assert.equal(results.filter((r) => !r.ok && r.reason === "need-payment").length, 4, "나머지는 결제가 필요하다고 안내한다");
+  assert.equal(mem.chatQuestions.length, 3, "무료 질문 3번을 넘겨 세지 않는다");
+  assert.equal(mem.chatReservations.length, 0, "답을 받은 예약은 확정돼 남지 않는다");
+});
+
+test("서버 여러 대 · 무료 질문 자리를 놓친 요청은 결제해 둔 질문이 있으면 그 질문으로 이어 답하고, 결제해 둔 질문 3개를 넘겨 쓰지 않는다", async () => {
+  const { mem, repo, mine, deps, buy } = await setup({ answer: async () => (await slow(), ["천천히 해 보면 좋겠어요."]) });
+  for (let i = 0; i < 2; i++) await repo.addChatQuestion({ userId: "u1", assessmentId: mine, roomKey: "love" });
+  await buy("u1", mine);
+  const results = await Promise.all([1, 2, 3, 4, 5, 6].map((n) => askFreeQuestionUnqueued(deps(), input(mine, `${n}번째 질문이에요`))));
+  assert.equal(results.filter(ok).length, 4, "무료 1개 + 결제해 둔 질문 3개");
+  assert.equal(results.filter((r) => !r.ok && r.reason === "need-payment").length, 2);
+  assert.equal(await repo.getCashBalance("u1"), 0);
+  assert.equal(mem.ledger.filter((l) => l.kind === "spend").length, 3);
+});
+
+test("무료 질문 예약은 답을 받지 못하면 풀린다: 호출이 실패해도 무료 질문이 줄지 않고 같은 질문을 다시 보낼 수 있다", async () => {
+  let fail = true;
+  const { mem, repo, mine, deps } = await setup({
+    answer: async () => {
+      if (fail) throw new ChatAnswerError("호출 실패", "MODEL");
+      return ["천천히 해 보면 좋겠어요."];
+    },
+  });
+  for (let i = 0; i < 2; i++) await repo.addChatQuestion({ userId: "u1", assessmentId: mine, roomKey: "love" });
+  const first = await askFreeQuestionUnqueued(deps(), input(mine));
+  assert.equal(first.ok === false && first.reason, "failed");
+  assert.equal(mem.chatReservations.length, 0, "실패한 예약은 풀렸다");
+  assert.equal(mem.chatQuestions.length, 2);
+  fail = false;
+  assert.ok(ok(await askFreeQuestionUnqueued(deps(), input(mine))), "마지막 무료 질문이 그대로 남아 있었다");
+  assert.equal(mem.chatQuestions.length, 3);
+});
+
+test("오래된 예약은 세지 않는다: 답을 기다리다 서버가 죽어 예약이 남았어도 10분이 지나면 무료 질문이 다시 열린다 (영원히 잠기지 않는다)", async () => {
+  let t = new Date("2026-10-15T03:00:00Z").getTime();
+  const mem = createMemoryRepository(() => new Date(t));
+  const base = { channel: "web", nickname: "서윤", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 11, birthDay: 7, birthTime: "08:40", knownMbti: null, answers: {}, contentVersion: "t", source: "sample", summary: {}, saju: { status: "not-connected" } } as unknown as Omit<AssessmentRecord, "id" | "createdAt" | "userId">;
+  const a = await mem.repo.insertAssessment({ ...base, userId: "u1" });
+  const r1 = await mem.repo.reserveChatQuestion({ userId: "u1", assessmentId: a.id, roomKey: "love", max: 1 });
+  assert.ok(r1 && r1.id !== null);
+  assert.equal(await mem.repo.reserveChatQuestion({ userId: "u1", assessmentId: a.id, roomKey: "love", max: 1 }), null, "예약이 살아 있는 동안은 자리가 없다");
+  assert.equal(await mem.repo.countChatQuestionsInRoom("u1", "love"), 1, "예약도 자리를 차지한 것으로 센다");
+  t += 11 * 60_000;
+  assert.equal(await mem.repo.countChatQuestionsInRoom("u1", "love"), 0, "10분이 지난 예약은 세지 않는다");
+  assert.ok(await mem.repo.reserveChatQuestion({ userId: "u1", assessmentId: a.id, roomKey: "love", max: 1 }));
+});
+
+test("무료 질문 예약은 회원 · 방마다 따로다: 다른 방 · 다른 회원의 예약이 내 무료 질문을 막지 않는다", async () => {
+  const mem = createMemoryRepository(() => new Date("2026-10-15T03:00:00Z"));
+  const { repo } = mem;
+  const base = { channel: "web", nickname: "서윤", calendar: "solar", isLeapMonth: false, birthYear: 1994, birthMonth: 11, birthDay: 7, birthTime: "08:40", knownMbti: null, answers: {}, contentVersion: "t", source: "sample", summary: {}, saju: { status: "not-connected" } } as unknown as Omit<AssessmentRecord, "id" | "createdAt" | "userId">;
+  const a = await repo.insertAssessment({ ...base, userId: "u1" });
+  const b = await repo.insertAssessment({ ...base, userId: "u2" });
+  assert.ok(await repo.reserveChatQuestion({ userId: "u1", assessmentId: a.id, roomKey: "love", max: 1 }));
+  assert.ok(await repo.reserveChatQuestion({ userId: "u1", assessmentId: a.id, roomKey: "worry", max: 1 }), "다른 방");
+  assert.ok(await repo.reserveChatQuestion({ userId: "u2", assessmentId: b.id, roomKey: "love", max: 1 }), "다른 회원");
+  assert.equal(await repo.reserveChatQuestion({ userId: "u1", assessmentId: a.id, roomKey: "love", max: 1 }), null);
+});
+
+test("16번 DB 변경 전(예약 함수 없음): 예전 방식으로 답하고 답을 받은 뒤에 센다 — 무료 질문이 끊기지 않는다", async () => {
+  const { mem, repo, mine, deps } = await setup();
+  const legacy: MiyuRepository = {
+    ...repo,
+    reserveChatQuestion: async () => ({ id: null }),
+    confirmChatQuestion: async (_r, rec) => repo.addChatQuestion(rec),
+    releaseChatQuestion: async () => {},
+  };
+  const r = await askFreeQuestionUnqueued(deps({ repo: legacy }), input(mine));
+  assert.ok(ok(r));
+  assert.equal(mem.chatQuestions.length, 1);
 });

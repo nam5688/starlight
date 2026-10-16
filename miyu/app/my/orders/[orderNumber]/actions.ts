@@ -7,7 +7,7 @@ import { readRepository } from "@/server/services";
 
 export type RecheckResult =
   /** 맞춘 결과 — kind에 따라 안내 문구가 다르다. 주문 화면은 새로고침해 최신 상태를 보여준다 */
-  | { ok: true; kind: "paid" | "refunded" | "closed" | "waiting" | "ok" | "anomaly" | "error"; message: string }
+  | { ok: true; kind: "paid" | "partial-refund" | "refunded" | "closed" | "waiting" | "ok" | "anomaly" | "error"; message: string }
   | { ok: false; message: string };
 
 // 같은 주문을 연타해도 결제사 조회가 한꺼번에 몰리지 않게 한다 (서버 한 대 기준 · 보조 장치)
@@ -16,6 +16,7 @@ const lastCheck = new Map<string, number>();
 
 const MESSAGE: Record<string, string> = {
   paid: "결제사에서 승인된 기록을 확인해 주문에 반영했습니다. 리포트를 준비하고 있습니다. 다시 결제하지 않아도 됩니다.",
+  "partial-refund": "결제사에서 일부 환불된 기록을 확인해 남은 질문에 반영했습니다. 환불받은 개수만큼 질문이 줄어듭니다.",
   refunded: "결제사에서 취소(환불)된 결제로 확인되어 주문을 환불 상태로 맞췄습니다.",
   closed: "결제사에 승인된 결제가 없어 이 주문을 미완료로 정리했습니다. 청구된 금액은 없습니다.",
   waiting: "결제사에서 아직 결과가 나오지 않았습니다. 잠시 뒤 다시 확인하세요. 승인되었다면 자동으로 반영되니 다시 결제하지 마세요.",

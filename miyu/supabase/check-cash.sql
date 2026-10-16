@@ -6,6 +6,7 @@
 --
 -- 구분 1: 전체 합계 — 충전 · 보너스 · 사용 · 되돌림 · 회수 개수와 건수
 -- 구분 2: 이상 징후 — "지갑 잔액 ≠ 내역의 합계"인 회원 · 결제 완료인데 충전 내역이 없는 캐시 주문 · 결제 취소로 회수하지 못한 캐시가 남은 건
+--         · (16번 이후) 묶음 장부와 내역이 맞지 않는 묶음 · 환불됨인데 환불 반영(회수 내역)이 없는 묶음 · 이미 쓴 질문까지 환불된 묶음
 --         (아무 줄도 없으면 이상 없음. 줄이 있으면 번호를 그대로 알려 주세요 — 직접 고치지 마세요.
 --          "결제 완료인데 충전 내역이 없음"은 관리자 화면(/admin)에서 그 주문을 찾아 [결제사 확인 후 질문 넣기]로 처리한다 — 결제사 기록을 다시 확인한 뒤에만 넣고, 주문마다 한 번만 들어간다)
 
@@ -49,5 +50,39 @@ select * from (
   from public.cash_ledger g
   join public.orders o on o.id = g.order_id
   where g.kind = 'clawback' and g.shortfall > 0
+
+  union all
+
+  -- 16번 이후: 묶음 한 줄의 누적 환불액 · 쓴 수 · 환불 수가 내역과 맞는지 (읽기만 — 16번 전에는 question_packs 표가 없어 이 조회는 오류가 난다. 그때는 아래 구분 2의 위쪽 줄만 보면 된다)
+  select '2 이상 징후',
+         '묶음 장부와 내역이 다름 · 주문 ' || o.order_number
+           || ' (쓴 ' || p.used || ' / 내역의 사용 ' || coalesce(u.spent, 0)
+           || ', 환불 질문 ' || p.refunded_questions || ' / 내역의 환불 회수 ' || coalesce(r.clawed, 0) || ' + 모자란 몫 ' || coalesce(r.short, 0) || ')',
+         1::bigint, 0::bigint
+  from public.question_packs p
+  join public.orders o on o.id = p.order_id
+  left join (select pack_order_id, count(*) filter (where kind = 'spend') - count(*) filter (where kind = 'spend_restore' and amount > 0) as spent
+             from public.cash_ledger where pack_order_id is not null group by pack_order_id) u on u.pack_order_id = p.order_id
+  left join (select order_id, (-sum(amount) / 3) as clawed, (sum(shortfall) / 3) as short
+             from public.cash_ledger where kind = 'refund_claw' group by order_id) r on r.order_id = p.order_id
+  where p.refunded_questions <> coalesce(r.clawed, 0) + coalesce(r.short, 0)
+
+  union all
+
+  select '2 이상 징후',
+         '결제사에서 환불됐는데 묶음 환불 반영이 없음 · 주문 ' || o.order_number,
+         1::bigint, 0::bigint
+  from public.question_packs p
+  join public.orders o on o.id = p.order_id
+  where o.status = 'refunded' and p.refunded_krw < p.price_krw
+
+  union all
+
+  select '2 이상 징후',
+         '환불을 받은 질문 중 이미 쓴 질문이 있음(운영자 확인) · 주문 ' || o.order_number || ' (' || (p.used + p.refunded_questions - p.questions) || '개)',
+         1::bigint, (p.used + p.refunded_questions - p.questions)::bigint
+  from public.question_packs p
+  join public.orders o on o.id = p.order_id
+  where p.used + p.refunded_questions > p.questions
 ) t
 order by "구분", "항목";

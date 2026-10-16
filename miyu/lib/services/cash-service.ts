@@ -4,7 +4,8 @@
 
 import { createOrderNumber } from "../commerce/order.ts";
 import { canAffordQuestion, createQuestionNonce, questionProductId, questionQuote, questionsLeft, type QuestionQuote } from "../commerce/cash.ts";
-import { isCashProduct } from "../config/product.ts";
+import { hasSupportContact } from "../config/business.ts";
+import { isCashProduct, MIYU_CASH, questionPackSalesOpen } from "../config/product.ts";
 import type { GateReason } from "./capacity-service.ts";
 import { gateQuestion, type AskDeps, type AskInput, type AskResult } from "./chat-service.ts";
 import type { SaleGateCheck } from "./order-service.ts";
@@ -21,6 +22,8 @@ export type StartQuestionPaymentResult =
   | { kind: "sales-closed"; reason: GateReason | null }
   /** 장부를 쓸 수 없는 DB(13번 변경 전) — 결제가 승인돼도 질문을 넣을 수 없으므로 주문을 만들지 않는다 */
   | { kind: "unavailable" }
+  /** 실결제 모드인데 이용 기준(환불 · 유효기간 · 탈퇴 · 서비스 종료)이 확정되지 않았거나 고객 문의 채널이 없다 — 주문을 만들지 않는다(돈이 빠지지 않는다). 테스트 결제는 막지 않는다 */
+  | { kind: "policy-pending" }
   | { kind: "not-found" };
 
 /**
@@ -30,7 +33,7 @@ export type StartQuestionPaymentResult =
  * 주문은 본인의 검사 결과 하나에 붙고(주문 표가 검사 결과 번호를 요구한다), 이 결과에 남아 있던 질문 결제 대기 주문은 새 결제 요청으로 대체한다(결제창을 닫고 다시 누른 경우).
  */
 export async function startQuestionPayment(
-  deps: AskDeps & { newOrderNumber?: (now: Date) => string; nonce?: (room: string) => string; saleGate?: SaleGateCheck },
+  deps: AskDeps & { newOrderNumber?: (now: Date) => string; nonce?: (room: string) => string; saleGate?: SaleGateCheck; /** 테스트용: 실결제 판매를 열어도 되는지(기본은 이용 기준 확정 + 문의 채널이 있을 때만) */ liveSalesOpen?: boolean },
   input: AskInput & { paymentEnv?: PaymentEnv; acquisition?: Acquisition | null },
 ): Promise<StartQuestionPaymentResult> {
   const { repo } = deps;
@@ -49,6 +52,9 @@ export async function startQuestionPayment(
   }
   // 결제한 질문이 하나라도 남아 있으면(묶음에서 아직 쓰지 않았거나, 답을 받지 못했거나, 결제 뒤 돌아오지 못했을 때) 새로 결제받지 않고 그 질문으로 묻는다
   if (canAffordQuestion(balance)) return { kind: "ask" };
+
+  // 실결제인데 이용 기준이 확정되지 않았거나 환불을 요청할 문의 채널이 없으면 결제를 시작하지 않는다 (테스트 결제는 그대로 열려 있다)
+  if (input.paymentEnv === "live" && !(deps.liveSalesOpen ?? questionPackSalesOpen(MIYU_CASH.policyDecided, hasSupportContact()))) return { kind: "policy-pending" };
 
   if (deps.saleGate) {
     try {
@@ -104,6 +110,7 @@ export const CASH_KIND_LABEL: Record<CashLedgerRecord["kind"], string> = {
   spend: "질문에 사용",
   spend_restore: "질문 복구 (답을 받지 못함)",
   clawback: "결제 취소로 회수",
+  refund_claw: "환불로 남은 질문 회수",
 };
 
 /** 장부를 쓸 수 있는가 — 표가 없으면(DB 변경 13번 전) false */

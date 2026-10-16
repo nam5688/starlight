@@ -75,6 +75,26 @@ export async function notifyOrderEvent(kind: "paid" | "refunded", order: OrderRe
   );
 }
 
+/**
+ * 질문 묶음의 부분 환불을 장부에 반영했을 때 알린다 — 서버가 결제사의 누적 취소액을 확인해 실제로 반영한 순간에만, 주문번호 + 누적 취소액 기준으로 한 번.
+ * 주문번호 · 금액 · 질문 수만 담는다(고객 이름 · 대화는 없다).
+ */
+export async function notifyPartialRefund(order: OrderRecord, refund: { questions: number; refundedKrw: number; clawed: number; shortfall: number }): Promise<void> {
+  await alert({
+    kind: "payment.partial_refunded",
+    severity: refund.shortfall > 0 ? "warn" : "info",
+    title: `부분 환불 반영 · 질문 묶음 누적 ${won(refund.refundedKrw)} (질문 ${refund.questions}개 환불)`,
+    orderNumber: order.orderNumber,
+    dedupeKey: `payment.partial_refunded:${order.orderNumber}:${refund.refundedKrw}`,
+    dedupeMs: ALERT_ONCE_MS,
+    lines: [
+      `결제 환경 ${order.paymentEnv === "live" ? "실결제" : "테스트"}`,
+      `남은 질문에서 ${refund.clawed}개를 회수했습니다`,
+      ...(refund.shortfall > 0 ? [`환불받은 질문 중 ${refund.shortfall}개는 이미 쓴 질문이었습니다 — 운영자가 확인해 주세요`] : []),
+    ],
+  });
+}
+
 export type NotificationTestResult =
   | { configured: false }
   | { configured: true; sent: number; failed: { reason: string; help: string } | null };

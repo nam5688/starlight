@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BUSINESS_FIELDS, BUSINESS_INFO } from "@/lib/config/business";
+import { BUSINESS_FIELDS, BUSINESS_INFO, hasSupportContact, SUPPORT_CONTACT } from "@/lib/config/business";
 
 export function SiteFooter() {
   return (
@@ -32,6 +32,18 @@ export function SiteFooter() {
               </span>
             ))}
           </p>
+          {hasSupportContact() && (
+            <p>
+              고객 문의:{" "}
+              {SUPPORT_CONTACT.email && <span className="mr-2">{SUPPORT_CONTACT.email}</span>}
+              {SUPPORT_CONTACT.channelName && SUPPORT_CONTACT.channelUrl && (
+                <a href={SUPPORT_CONTACT.channelUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-ink">
+                  {SUPPORT_CONTACT.channelName}
+                </a>
+              )}
+              {SUPPORT_CONTACT.hours && <span className="ml-2">응대 시간 {SUPPORT_CONTACT.hours}</span>}
+            </p>
+          )}
         </div>
       </div>
     </footer>

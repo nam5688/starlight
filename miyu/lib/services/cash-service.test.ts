@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
-import { MIYU_CASH, QUESTION_PACK_PRICE_KRW, QUESTION_PACK_SIZE, QUESTION_PACK_UNITS, isCashProduct, parseCashProductId } from "../config/product.ts";
+import { hasSupportContact, SUPPORT_CONTACT, SUPPORT_CONTACT_PENDING, supportContactLine } from "../config/business.ts";
+import { MIYU_CASH, QUESTION_PACK_PRICE_KRW, QUESTION_PACK_SIZE, QUESTION_PACK_UNITS, isCashProduct, parseCashProductId, questionPackSalesOpen } from "../config/product.ts";
 import { createQuestionNonce, questionRoomOf } from "../commerce/cash.ts";
 import { EMPTY_BASIC_INFO } from "../profile/basic-info.ts";
 import { CRISIS_REPLY } from "../report/chat/question.ts";
@@ -40,8 +41,9 @@ async function world(opts: WorldOpts = {}) {
   const roomKey = room === "daily" ? "daily:2026-10-15" : room;
   const tier = opts.tier ?? "free";
   const answerer = { provider: "t", model: "t", answer: async () => ({ paragraphs: ["답이에요."] }) };
-  const deps: AskDeps & { nonce: (room: string) => string; saleGate?: Parameters<typeof startQuestionPayment>[0]["saleGate"] } = {
+  const deps: AskDeps & { nonce: (room: string) => string; saleGate?: Parameters<typeof startQuestionPayment>[0]["saleGate"]; liveSalesOpen?: boolean } = {
     repo: mem.repo,
+    liveSalesOpen: true, // 이 파일의 시험은 실결제 모드의 매출 계산도 본다 — 판매를 막는 규칙은 아래 별도 시험에서 확인한다
     answerer,
     now,
     config: { extraQuestions: 0 },
@@ -246,14 +248,15 @@ test("결제가 취소(환불)되면 넣어 준 질문을 회수하고, 이미 �
   // 안 쓴 채 환불 — 9단위(질문 3개)를 모두 회수한다
   await w.mem.repo.updateOrder(paid.order.id, ["paid"], { status: "refunded" });
   assert.equal((await getCashView(w.mem.repo, USER)).balance, 0);
-  assert.equal(w.mem.ledger.find((l) => l.kind === "clawback")?.shortfall, 0);
+  // 묶음 장부가 있는 주문(DB 16번 이후)의 전액 취소는 "묶음 환불 회수(refund_claw)"로 남는다
+  assert.equal(w.mem.ledger.find((l) => l.kind === "refund_claw")?.shortfall, 0);
 
   // 묶음에서 하나를 쓰고 환불 — 남은 질문 2개(6단위)만 회수하고, 이미 쓴 하나(3단위)는 회수하지 못한 몫으로 남는다 (음수가 되지 않는다)
   const second = await w.pay();
   await w.mem.repo.spendCash({ userId: USER, amount: MIYU_CASH.perQuestion, ref: "ask-used-1" });
   await w.mem.repo.updateOrder(second.order.id, ["paid"], { status: "refunded" });
   assert.equal((await getCashView(w.mem.repo, USER)).balance, 0);
-  const claws = w.mem.ledger.filter((l) => l.kind === "clawback");
+  const claws = w.mem.ledger.filter((l) => l.kind === "refund_claw");
   assert.equal(claws.length, 2);
   assert.equal(Math.abs(claws[1].amount), 6, "쓰지 않은 질문 2개를 회수한다");
   assert.equal(claws[1].shortfall, 3, "이미 쓴 질문은 회수하지 못한 몫으로 기록 — 운영자가 확인한다");
@@ -320,4 +323,42 @@ test("결제 뒤 되돌아오는 길: 묶음을 결제한 방에서 질문하면
   // 3개를 다 쓰고 나면 새로 결제해야 한다
   const again = await askFreeQuestion(w.deps, w.input("또 물어볼게요"));
   assert.deepEqual(again, { ok: false, reason: "need-payment", message: ASK_MESSAGES["need-payment"] });
+});
+
+test("실결제 모드에서 이용 기준(환불 · 유효기간)이 확정되지 않았거나 고객 문의 채널이 없으면 질문 결제를 시작하지 않고 주문도 만들지 않는다 — 테스트 결제는 그대로 열려 있다", async () => {
+  const w = await world({ room: "love" });
+  await w.spendFree(2);
+  const live = { ...w.input(), paymentEnv: "live" as const };
+  // 기본값(정책 미확정 · 문의 채널 없음)이면 막힌다 — 코드에 정해진 값 그대로
+  const blocked = await startQuestionPayment({ ...w.deps, liveSalesOpen: undefined }, live);
+  assert.equal(blocked.kind, "policy-pending");
+  assert.equal(w.mem.orders.size, 0, "주문을 만들지 않았다 (돈이 빠지지 않는다)");
+  // 정책이 확정돼도 문의 채널이 없으면 막힌다
+  assert.equal(questionPackSalesOpen(true, false), false);
+  assert.equal(questionPackSalesOpen(false, true), false);
+  assert.equal(questionPackSalesOpen(true, true), true);
+  // 테스트 결제는 막지 않는다
+  const test = await startQuestionPayment({ ...w.deps, liveSalesOpen: undefined }, { ...w.input(), paymentEnv: "test" });
+  assert.equal(test.kind, "order");
+  // 판매를 열면(운영자 확정 + 문의 채널 입력 뒤) 실결제 주문이 만들어진다
+  const open = await startQuestionPayment({ ...w.deps, liveSalesOpen: true }, live);
+  assert.equal(open.kind, "order");
+});
+
+test("고객 문의 채널: 운영자가 알려 준 카카오 채널 '미유톡'만 들어 있고(이메일 · 응대 시간은 지어내지 않고 비워 둔다), 이메일이나 채널(이름 + 링크) 중 하나가 있어야 정해진 것으로 본다", () => {
+  assert.equal(SUPPORT_CONTACT.channelUrl, "http://pf.kakao.com/_xjxnqmX/chat", "운영자가 알려 준 주소 그대로");
+  assert.match(SUPPORT_CONTACT.channelName ?? "", /미유톡/);
+  assert.equal(SUPPORT_CONTACT.email, null, "이메일은 정해지지 않았다");
+  assert.equal(SUPPORT_CONTACT.hours, null, "응대 시간은 운영자가 알려 주기 전까지 적지 않는다");
+  assert.equal(hasSupportContact(), true);
+  assert.match(supportContactLine() ?? "", /미유톡/);
+  assert.equal(hasSupportContact({ email: " ", channelName: null, channelUrl: null, hours: null }), false);
+  assert.equal(hasSupportContact({ email: null, channelName: "카카오 채널", channelUrl: null, hours: null }), false, "이름만 있고 링크가 없으면 정해진 것이 아니다");
+  assert.equal(hasSupportContact({ email: "help@example.test", channelName: null, channelUrl: null, hours: null }), true);
+  assert.equal(supportContactLine({ email: "help@example.test", channelName: "채널", channelUrl: "https://example.test/c", hours: "평일 10~18시" }), "이메일 help@example.test · 채널 https://example.test/c · 응대 시간 평일 10~18시");
+  assert.equal(supportContactLine({ email: null, channelName: null, channelUrl: null, hours: null }), null);
+  assert.ok(SUPPORT_CONTACT_PENDING.includes("정하는 중"));
+  // 문의 채널이 있어도 이용 기준이 확정되기 전에는 실결제 판매가 열리지 않는다
+  assert.equal(MIYU_CASH.policyDecided, false);
+  assert.equal(questionPackSalesOpen(MIYU_CASH.policyDecided, hasSupportContact()), false);
 });

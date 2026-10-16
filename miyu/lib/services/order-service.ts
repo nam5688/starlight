@@ -2,15 +2,16 @@
 // 결제사 승인 확인이 끝난 뒤에만 구매 권한(paid)을 준다.
 
 import {
+  canceledAmountOf,
   createOrderNumber,
   orderStatusFor,
   USER_CANCEL_CODES,
   type GatewayPayment,
   type OrderStatus,
 } from "../commerce/order.ts";
-import { isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
+import { isCashProduct, isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
 import { salesClosedMessage, type GateReason, type SaleGate } from "./capacity-service.ts";
-import type { Acquisition, MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
+import type { Acquisition, CashRefundResult, MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
 import { nextPersonalSeq, paidPersonalOrders } from "./purchases.ts";
 
 /** 새 구매를 받아도 되는지 확인하는 함수 (용량 · 예산). 확인 자체가 실패하면 판매를 막지 않는다 */
@@ -195,9 +196,11 @@ export async function markCheckoutFailed(
 }
 
 export type SyncResult =
-  /** to: 이번 알림 처리로 주문이 바뀐 상태 */
-  | { kind: "updated"; order: OrderRecord; to?: "paid" | "refunded" | "failed" }
+  /** to: 이번 알림 처리로 주문이 바뀐 상태 (partial-refunded: 주문은 결제 완료 그대로, 부분 취소를 묶음 장부에 반영함 — refund에 회수한 질문 수 · 누적 환불액) */
+  | { kind: "updated"; order: OrderRecord; to?: "paid" | "refunded" | "failed" | "partial-refunded"; refund?: Extract<CashRefundResult, { status: "applied" }> }
   | { kind: "unchanged"; order: OrderRecord }
+  /** 부분 취소를 장부에 반영하지 못했다 — 질문 수에 맞지 않는 취소 금액 · 묶음 장부가 없는 예전 주문 · DB 16번 전. 운영자가 확인해야 한다(재전송으로 풀리지 않는다) */
+  | { kind: "attention"; order: OrderRecord; code: string; message: string }
   | { kind: "ignored"; reason: string };
 
 /**
@@ -218,6 +221,11 @@ export async function syncPayment(
   if (!order) return { kind: "ignored", reason: "UNKNOWN_ORDER" };
 
   const applied = await applyPayment(deps.repo, order, result.payment, "webhook");
+  if (applied.kind === "paid" && applied.refund) {
+    const att = refundAttention(applied.refund);
+    if (att) return { kind: "attention", order: applied.order, ...att };
+    if (applied.refund.status === "applied") return { kind: "updated", order: applied.order, to: "partial-refunded", refund: applied.refund };
+  }
   if (applied.kind === "paid") return applied.transitioned ? { kind: "updated", order: applied.order, to: "paid" } : { kind: "unchanged", order: applied.order };
   if (applied.kind === "updated") return { kind: "updated", order: applied.order, to: applied.to };
   return { kind: "unchanged", order: applied.order };
@@ -233,13 +241,54 @@ async function recordPaymentEvent(repo: MiyuRepository, event: Parameters<MiyuRe
 }
 
 export type ApplyResult =
-  /** transitioned: 이 호출이 주문을 결제 완료로 바꿨다 (이미 결제 완료였거나 동시에 다른 요청이 먼저 바꾼 경우는 false) */
-  | { kind: "paid"; order: OrderRecord; transitioned?: boolean }
+  /** transitioned: 이 호출이 주문을 결제 완료로 바꿨다 (이미 결제 완료였거나 동시에 다른 요청이 먼저 바꾼 경우는 false). refund: 부분 취소를 묶음 장부에 반영한 결과(질문 묶음 주문만) */
+  | { kind: "paid"; order: OrderRecord; transitioned?: boolean; refund?: CashRefundResult }
   | { kind: "updated"; order: OrderRecord; to: "refunded" | "failed" }
   | { kind: "unchanged"; order: OrderRecord; code: string; message: string };
 
+/** 부분 취소를 장부에 반영하지 못했을 때 운영자에게 알릴 이유 (반영했거나 이미 반영돼 있으면 null) */
+export function refundAttention(refund: CashRefundResult): { code: string; message: string } | null {
+  const won = (list: number[]) => list.map((n) => `${n.toLocaleString("ko-KR")}원`).join(" · ");
+  switch (refund.status) {
+    case "applied":
+    case "already":
+      return null;
+    case "amount-mismatch":
+      return { code: "PARTIAL_REFUND_MISMATCH", message: `결제사에서 취소된 누적 금액이 질문 개수에 맞지 않아 질문을 회수하지 않았습니다. 맞는 누적 취소 금액은 ${won(refund.allowed)}입니다 (이미 취소된 금액은 되돌릴 수 없으니 남은 질문을 어떻게 할지 운영자가 판단해 주세요).` };
+    case "invalid-amount":
+      return { code: "PARTIAL_REFUND_INVALID", message: "결제사의 취소 금액이 결제액 범위를 벗어나 반영하지 않았습니다." };
+    case "no-pack":
+      return { code: "PARTIAL_REFUND_NO_PACK", message: "이 주문은 묶음 장부가 없는 예전 주문이라 부분 취소를 질문에 반영하지 못했습니다. 남은 질문은 운영자가 직접 판단해 주세요." };
+    case "unavailable":
+      return { code: "PARTIAL_REFUND_NEEDS_DB16", message: "DB 변경 16번이 없어 부분 취소를 질문에 반영하지 못했습니다. 16번을 적용한 뒤 결제 재확인을 눌러 주세요." };
+  }
+}
+
 /** 결제사 기록을 주문에 반영한다. 같은 내용을 여러 번 반영해도 결과가 같다. */
 export async function applyPayment(
+  repo: MiyuRepository,
+  order: OrderRecord,
+  payment: GatewayPayment,
+  source: PaymentEventSource,
+): Promise<ApplyResult> {
+  const result = await applyPaymentStatus(repo, order, payment, source);
+  // 질문 3개 묶음 주문의 부분 취소: 결제 완료로 맞춘 뒤(이미 결제 완료면 그대로) 결제사의 누적 취소액을 묶음 장부에 반영해 남은 질문을 회수한다.
+  // 알림이 순서가 바뀌어 오거나 중복으로 와도 결제사를 다시 조회한 누적 값으로 반영하므로 결과가 같다(이미 반영한 금액은 "already").
+  if (payment.status !== "PARTIAL_CANCELED" || !isCashProduct(order.productId) || result.kind !== "paid") return result;
+  const canceledTotal = canceledAmountOf(payment);
+  const refund = await repo.applyCashRefund({ orderId: result.order.id, canceledTotal });
+  if (refund.status !== "already") {
+    await recordPaymentEvent(repo, {
+      orderId: order.id,
+      source,
+      status: refund.status === "applied" ? "PARTIAL_REFUND_APPLIED" : (refundAttention(refund)?.code ?? "PARTIAL_REFUND_UNHANDLED"),
+      detail: { canceledTotal, ...(refund.status === "applied" ? { questions: refund.questions, refundedKrw: refund.refundedKrw, clawed: refund.clawed, shortfall: refund.shortfall } : {}) },
+    });
+  }
+  return { ...result, refund };
+}
+
+async function applyPaymentStatus(
   repo: MiyuRepository,
   order: OrderRecord,
   payment: GatewayPayment,
@@ -253,7 +302,8 @@ export async function applyPayment(
   }
   await recordPaymentEvent(repo, { orderId: order.id, source, status: payment.status, detail });
 
-  const target = orderStatusFor(payment);
+  // 질문 묶음 주문의 부분 취소는 "결제는 됐고 일부가 환불된" 상태라 결제 완료로 본다(그 위에 환불을 반영하는 것은 applyPayment)
+  const target = payment.status === "PARTIAL_CANCELED" && isCashProduct(order.productId) ? "paid" : orderStatusFor(payment);
   if (target === "paid") {
     // 이미 다른 결제키로 결제 완료된 주문에 또 다른 승인이 들어오면 같은 결제로 보지 않고 운영자 확인(환불) 대상으로 올린다
     const duplicate = async (): Promise<ApplyResult> => {
