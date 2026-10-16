@@ -1,0 +1,76 @@
+// 실행: npm test — 사주 용어 사용 검사(terms.ts, 2026-10-16): "용어 0건"이 아니라 설명 없는 용어 · 근거 없는 판정 · 용어 나열을 본다.
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { Evidence } from "../evidence.ts";
+import { JARGON } from "./plan.ts";
+import { ALL_TERMS, checkTermUse } from "./terms.ts";
+
+const ev = (id: string, strength: Evidence["strength"] = "moderate", uncertain = false): Evidence => ({ id, source: "saju", topics: ["personality"], strength, fact: `${id} 사실`, cue: `${id} 해석`, ...(uncertain ? { uncertain: true } : {}) });
+const STRUCTURE = [ev("saju.structure.chart"), ev("saju.structure.hidden"), ev("saju.structure.month"), ev("saju.structure.roots"), ev("saju.structure.strength"), ev("saju.structure.johu")];
+const run = (texts: string[], evidence: Evidence[] = STRUCTURE) => checkTermUse(texts.map((text, i) => ({ where: `t${i}`, text })), evidence);
+
+test("용어 목록과 strict 낱말 모음(JARGON)은 같은 낱말을 다룬다 — 한쪽에만 있는 용어가 생기지 않는다", () => {
+  for (const t of ALL_TERMS) {
+    assert.ok(JARGON.test(t.name), `${t.name}: JARGON에 없다`);
+    // 일지 · 지지 · 세운은 뒤따르는 글자에 따라 일상어와 구분하므로 여러 꼴로 써 본다
+    assert.ok(["이 중요해요.", " 중요해요.", "은 중요해요.", "(이)에요."].some((tail) => run([`${t.name}${tail}`]).length > 0), `${t.name}: 설명 없이 써도 걸리지 않는다`);
+  }
+  // 반대로 JARGON이 잡는 낱말이 목록에서 빠지지 않았다
+  for (const w of "비겁 식상 관성 인성 재성 정관 편관 비견 겁재 식신 편재 정재 정인 일간 천간 원국 오행 대운 십신 용신 격국 조후 월령 지장간 신살 희신 기신 신강".split(" ")) {
+    assert.ok(JARGON.test(w) ? ALL_TERMS.some((t) => t.re.test(w)) : true, `${w}: 목록에 없다`);
+  }
+});
+
+test("설명이 붙는 방식: 괄호 풀이 · 이란 · 이라고 부르는 · 뜻해요가 인정되고, 한자만 · 너무 짧은 괄호는 설명이 아니다", () => {
+  assert.deepEqual(run(["일간(나 자신을 나타내는 글자)이 정화예요."]), []);
+  assert.deepEqual(run(["일간이란 나 자신을 나타내는 글자예요."]), []);
+  assert.deepEqual(run(["나 자신을 나타내는 글자를 일간이라고 불러요."]), []);
+  assert.deepEqual(run(["대운은 10년마다 바뀌는 시기를 말해요."]), []);
+  assert.ok(run(["일간(日干)이 정화예요."]).length > 0);
+  assert.ok(run(["일간(나)이 정화예요."]).length > 0, "네 글자 미만의 괄호는 풀이로 보지 않는다");
+});
+
+test("한 번 풀어 준 용어는 뒤에서 다시 풀지 않아도 되고, 풀기 전에 먼저 나온 용어는 막힌다(읽는 순서대로)", () => {
+  assert.deepEqual(run(["일간(나 자신을 나타내는 글자)이 정화예요.", "일간이 정화라서 오래 가는 집중이 있어요."]), []);
+  const errs = run(["일간이 정화예요.", "일간(나 자신을 나타내는 글자)이 정화라서 오래 가요."]);
+  assert.equal(errs.length, 1);
+  assert.match(errs[0], /^t0: 설명 없는 사주 용어\(일간\)/);
+  // 용어마다 따로 풀어야 한다 — 일간을 풀었다고 천간이 풀린 것이 아니다
+  assert.ok(run(["일간(나 자신을 나타내는 글자)이 정화예요.", "천간이 같은 글자예요."]).some((e) => /설명 없는 사주 용어\(천간\)/.test(e)));
+});
+
+test("한 문장에 서로 다른 용어는 둘까지다 — 같은 용어를 두 번 쓰는 것은 나열이 아니다", () => {
+  assert.deepEqual(run(["비겁(나와 같은 기운)과 인성(나를 돕는 기운)이 같이 있어요."]), []);
+  assert.ok(run(["비겁(나와 같은 기운)과 인성(나를 돕는 기운)과 식상(표현하는 기운)이 같이 있어요."]).some((e) => /한 문장에 사주 용어가 3개/.test(e)));
+  assert.deepEqual(run(["일간(나 자신을 나타내는 글자)은 정화예요. 일간은 오래 가는 집중을 말해요. 일간 하나만 봐도 알 수 있어요."]), []);
+});
+
+test("근거 없는 판정: 구조 근거가 없거나 달라질 수 있거나 강약이 갈림이면 구조 용어 · 신강 · 신약을 이 사람의 것으로 쓸 수 없다", () => {
+  assert.ok(run(["월령(태어난 달의 기운)이 약해요."], []).some((e) => /근거 목록에 없는 판정\(월령\)/.test(e)));
+  assert.deepEqual(run(["월령(태어난 달의 기운)이 약해요."]), []);
+  assert.ok(run(["월령(태어난 달의 기운)이 약해요."], [ev("saju.structure.month", "moderate", true)]).some((e) => /근거 목록에 없는 판정\(월령\)/.test(e)));
+  // 득령 · 실령은 월령 근거를 따른다, 통근 · 투간은 roots, 지장간은 hidden, 조후는 johu
+  assert.ok(run(["실령(태어난 달의 도움을 못 받는 것)이에요."], [ev("saju.structure.roots")]).length > 0);
+  assert.ok(run(["통근(뿌리가 닿은 정도)이 약해요."], [ev("saju.structure.month")]).length > 0);
+  assert.ok(run(["조후(계절의 한열)가 맞지 않아요."], STRUCTURE.filter((e) => e.id !== "saju.structure.johu")).length > 0);
+  // 강약: 갈림(weak)이면 신강 · 신약을 쓰지 못하고 한쪽으로 모였으면 설명과 함께 쓸 수 있다
+  const weakStrength = STRUCTURE.map((e) => (e.id === "saju.structure.strength" ? { ...e, strength: "weak" as const } : e));
+  assert.ok(run(["신약(내 힘을 덜 받는 쪽)이에요."], weakStrength).some((e) => /근거 없는 판정\(신약\)/.test(e)));
+  assert.deepEqual(run(["신약(내 힘을 덜 받는 쪽)이에요."]), []);
+  assert.deepEqual(run(["신약 개발 회사에서 일하는 사람처럼 꼼꼼해요."], []), [], "일상어는 걸리지 않는다");
+});
+
+test("개인 격국 · 용신 · 희신 · 기신 · 신살은 근거 목록에 그 낱말이 없으면 설명이 있어도 쓸 수 없다", () => {
+  for (const [text, name] of [["격국(사주의 큰 틀)이 좋아요.", "격국"], ["용신(필요한 기운)은 물이에요.", "용신"], ["희신(도와주는 기운)이 들어와요.", "희신"], ["기신(방해하는 기운)이 와요.", "기신"], ["신살(특별한 기운)이 있어요.", "신살"], ["도화살(사람을 끄는 기운)이 있어요.", "도화살"]] as const) {
+    assert.ok(run([text]).some((e) => e.includes(`근거 목록에 없는 판정(${name})`)), text);
+  }
+  // 근거 목록의 글에 실제로 그 낱말이 있으면 막지 않는다(엔진이 계산하게 된 뒤의 경로)
+  const withYongsin: Evidence[] = [...STRUCTURE, { ...ev("saju.yongsin"), fact: "용신 후보 수", cue: "용신으로 읽는 기운" }];
+  assert.deepEqual(run(["용신(필요한 기운)은 물이에요."], withYongsin).filter((e) => /근거 목록에 없는 판정/.test(e)), []);
+});
+
+test("용어가 없는 글은 아무 오류도 내지 않는다", () => {
+  assert.deepEqual(run(["새 일을 맡을 때는 기준부터 세우는 편이라 시작이 조금 느려 보일 수 있어요. 한번 붙으면 오래 가요."]), []);
+  assert.deepEqual(run(["상관없이 편안하게 쉬어요. 편인데도 꾸준해요. 주는 편인데 받는 데는 서툴러요."], []), []);
+  assert.deepEqual(run(["통근 시간이 길어서 아침이 빠듯해요. 통근하는 길에 생각을 정리해요."], []), [], "출퇴근을 뜻하는 통근은 걸리지 않는다");
+});

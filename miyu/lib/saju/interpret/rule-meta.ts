@@ -111,7 +111,7 @@ export const RULE_META: RuleMeta[] = [
   },
   {
     id: "self-mbti", title: "본인이 입력한 MBTI", match: /^self\.mbti$/, kind: "self",
-    calculation: "본인이 입력한 4글자(검사 점수가 아님).", interpretation: "본인이 알고 있는 자기 인식 참고값으로만 쓴다. 성격 판정이나 사주 해석의 근거로 쓰지 않는다.",
+    calculation: "본인이 입력한 4글자(검사 점수가 아님).", interpretation: "본인이 알고 있는 자기 인식 참고값이다. 선호가 어떤 장면에서 드러날 수 있는지 구체화하는 데 쓰고 행동의 원인으로 단정하지 않으며 사주 · 응답과 다를 때 덮어쓰지 않는다.",
     source: "사용자 입력.", conditions: ["MBTI를 입력한 경우 — 항상 weak"], exceptions: ["자체 응답으로 MBTI를 환산하지 않는다", "공식 MBTI 검사 결과가 아니다"], review: "unreviewed", version: "0.1",
   },
 ];

@@ -1,5 +1,5 @@
 // 응답 근거 v0 — 지금의 개발용 문항 점수에서 행동 근거를 만든다 (새 상황형 문항으로 바뀌면 교체).
-// 점수는 응답 환산값이며 사주 근거와 합산하지 않는다. 본인이 입력한 MBTI는 자기 인식 참고값으로만 쓴다.
+// 점수는 응답 환산값이며 사주 근거와 합산하지 않는다. 본인이 입력한 MBTI는 자기 인식 참고값이며, 선호가 드러나는 장면을 구체화하는 데만 쓴다(행동을 정하는 값으로 쓰지 않는다).
 
 import type { Evidence, Topic } from "./evidence.ts";
 import type { FreeSummary, ScoreRow } from "./types.ts";
@@ -50,7 +50,7 @@ export function surveyEvidence(summary: FreeSummary, knownMbti: string | null): 
       topics: ["personality"],
       strength: "weak",
       fact: `본인이 알고 있는 MBTI ${knownMbti}`,
-      cue: "본인이 알고 있는 자기 인식 참고값으로만 씁니다. 성격 판정이나 사주 해석의 근거로 쓰지 않습니다.",
+      cue: "본인이 알고 있는 자기 인식 참고값입니다. 선호가 어떤 장면에서 어떻게 드러날 수 있는지 구체화하는 데 쓰고, 행동의 원인으로 단정하거나 사주 · 응답과 다를 때 덮어쓰지 않습니다(MBTI는 선호의 참고이지 행동을 정하는 값이 아닙니다).",
     });
   }
   return out;

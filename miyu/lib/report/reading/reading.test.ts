@@ -157,9 +157,9 @@ const errorsOf = (mutate: (d: ReadingDraftV1) => void, opts: { hasContext?: bool
   return r.ok ? [] : r.errors;
 };
 
-test("형식 검사: 본문의 사주 용어 · 점수 · 퍼센트 · 원인 단정 · 나이를 막는다", () => {
-  assert.ok(errorsOf((d) => (d.blocks[0].summary = "원국에서 인성이 많아 신중한 편입니다. 익숙한 방식을 선호합니다.")).some((e) => /사주 전문 용어/.test(e)));
-  assert.ok(errorsOf((d) => (d.blocks[0].watch = "지금 대운은 성과가 주제인 시기로 읽습니다. 이 흐름을 살펴보세요.")).some((e) => /사주 전문 용어\(대운\)/.test(e)));
+test("형식 검사: 설명 없는 사주 용어 · 점수 · 퍼센트 · 원인 단정 · 나이를 막는다", () => {
+  assert.ok(errorsOf((d) => (d.blocks[0].summary = "원국에서 인성이 많아 신중한 편입니다. 익숙한 방식을 선호합니다.")).some((e) => /설명 없는 사주 용어/.test(e)));
+  assert.ok(errorsOf((d) => (d.blocks[0].watch = "지금 대운은 성과가 주제인 시기로 읽습니다. 이 흐름을 살펴보세요.")).some((e) => /설명 없는 사주 용어\(대운\)/.test(e)));
   assert.ok(errorsOf((d) => (d.blocks[1].traits![0].shines = "신중함 71점으로 완성도가 중요한 일에서 강점이 될 수 있습니다.")).some((e) => /점수/.test(e)));
   assert.ok(errorsOf((d) => (d.blocks[3].watch = "상대가 일부러 거리를 두는 것이 아니라 바쁘기 때문입니다. 직접 확인해 보세요.")).some((e) => /원인을 하나로 좁혀/.test(e)));
   assert.ok(errorsOf((d) => (d.blocks[4].example = "서른 살 즈음 새 프로젝트를 맡으면 처음에는 자료를 읽느라 조용할 수 있습니다. 구조가 잡히면 빨라질 수 있습니다. 32살에도 같을 수 있습니다.")).some((e) => /나이|3문장/.test(e)));
@@ -401,7 +401,7 @@ test("소단락 검사: 개수 · 글자 수 · 문장 수 · 겹치는 제목 �
   assert.match(errorsOf((d) => (love(d).sections![2].tryIt = "적어 보세요")).join("\n"), /sections\[2\]\.tryIt: 길이/);
   assert.match(errorsOf((d) => (love(d).sections![1].title = love(d).sections![0].title)).join("\n"), /소단락 제목이 겹칩니다/);
   assert.match(errorsOf((d) => (love(d).sections![0].title = love(d).headline)).join("\n"), /소단락 제목이 주제 제목과 같습니다/);
-  assert.match(errorsOf((d) => (love(d).sections![0].body = `${love(d).sections![0].body} 일간이 정화라서 그렇게 보여요.`)).join("\n"), /sections\[0\]\.body: 사주 전문 용어/);
+  assert.match(errorsOf((d) => (love(d).sections![0].body = `${love(d).sections![0].body} 일간이 정화라서 그렇게 보여요.`)).join("\n"), /sections\[0\]\.body: 설명 없는 사주 용어/);
   assert.match(errorsOf((d) => (love(d).sections![0].tryIt = "마음이 움직인 순간을 80점 만점으로 적어 보세요.")).join("\n"), /sections\[0\]\.tryIt: 점수/);
   // 소단락이 없는 주제에 소단락을 쓰면 막는다
   assert.match(errorsOf((d) => (d.blocks.find((b) => b.id === "tendency")!.sections = love(d).sections)).join("\n"), /tendency.*소단락을 쓰지 않습니다/);
@@ -432,8 +432,8 @@ test("소단락 반복 · 내용 검사: 소단락 글도 같은 문장 반복 �
   assert.ok(result.metrics.units >= 5 + 3 + 6, `의미 단위 ${result.metrics.units}`);
 });
 
-test("소단락: AI 지시문 0.12는 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고(0.11 이하 규칙은 그대로), 사용자 메시지에 소단락 질문을 싣는다", () => {
-  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.12");
+test("소단락: AI 지시문 0.13은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고(0.11 이하 규칙 가운데 서비스 동작은 그대로), 사용자 메시지에 소단락 질문을 싣는다", () => {
+  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.13");
   // 0.11 — 제목은 본문 뒤 결론으로 · 답을 나열하지 않기 · 두 가능성을 늘어놓고 끝내지 않기
   assert.match(READING_SYSTEM_PROMPT, /제목은 풀이의 결론이다/);
   assert.match(READING_SYSTEM_PROMPT, /본문을 다 쓴 뒤에 마지막으로 쓴다/);

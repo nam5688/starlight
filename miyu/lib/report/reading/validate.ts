@@ -3,7 +3,8 @@
 // 한계: 낱말 · 길이 · 표지를 세는 검사다. 좋은 글임을 보증하지 않는다 (가려 읽는 평가가 따로 있다).
 import type { Evidence } from "../evidence.ts";
 import { FORBIDDEN, CONTEXT_ATTRIBUTION, overlap, sentences } from "../v2/validate.ts";
-import { ADVICE_RULES, AGE_TEXT, ANSWER_ECHO, BLOCK_PLAN, CAUSE_NARROWING, HEDGE_REPEAT, JARGON, NO_DATA_TEXT, RAW_THEME_TEXT, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
+import { ADVICE_RULES, AGE_TEXT, ANSWER_ECHO, BLOCK_PLAN, CAUSE_NARROWING, HEDGE_REPEAT, NO_DATA_TEXT, RAW_THEME_TEXT, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
+import { checkTermUse } from "./terms.ts";
 import type { ReadingDraftV1 } from "./types.ts";
 
 export type ReadingValidation = { ok: true; draft: ReadingDraftV1 } | { ok: false; errors: string[] };
@@ -287,8 +288,9 @@ export function validateReadingDraft(
 
   // 쉬운 말 · 금지 표현 · 해 · 반복 (화면에 보이는 모든 글)
   const texts = visibleTexts(d as ReadingDraftV1);
+  // 사주 용어는 설명과 함께 쓸 수 있고, 근거 목록에 없는 판정은 쓰지 않는다(terms.ts — 읽는 순서대로 처음 쓸 때 풀이가 붙었는지 본다)
+  errors.push(...checkTermUse(texts, evidence));
   for (const { where, text: t } of texts) {
-    if (JARGON.test(t)) errors.push(`${where}: 사주 전문 용어(${JARGON.exec(t)![0]})는 본문에 쓰지 않습니다 — 쉬운 말로 풀어 쓰고 용어는 근거로만 남깁니다.`);
     if (RAW_THEME_TEXT.test(t)) errors.push(`${where}: 해석 키워드 나열("${RAW_THEME_TEXT.exec(t)![0]}")을 그대로 옮기지 않습니다 — 쉬운 제목 → 생활에서 뜻하는 것 → 예시로 풀어 쓰세요(예: 배운 것을 일에 써 보는 것, 내 의견을 말하는 것).`);
     if (SCORE_TEXT.test(t)) errors.push(`${where}: 점수 · 퍼센트 · 확률 표현은 본문에 쓰지 않습니다.`);
     if (CAUSE_NARROWING.test(t)) errors.push(`${where}: 원인을 하나로 좁혀 말하지 않습니다 ("~때문이에요" 대신 "~일 수 있어요").`);
