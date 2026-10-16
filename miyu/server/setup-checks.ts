@@ -66,6 +66,7 @@ export const OPTIONAL_TABLES: Record<string, string> = {
   talk_rooms: "대화를 서버에 저장해 다른 기기에서도 이어 보려면 SQL Editor에서 12번 파일(20261022000000_talk_rooms.sql)을 실행합니다.",
   chat_summaries: "채팅 요약 저장(저장하기 · 대화 종료 · 저장한 채팅 요약 보기)을 쓰려면 SQL Editor에서 14번 파일(20261024000000_chat_summaries.sql)을 실행합니다.",
   taste_reports: "맛보기 리포트(무료 · 한 계정당 1번 · AI가 사주와 응답을 엮어 쓰는 글)를 받으려면 SQL Editor에서 17번 파일(20261027000000_taste_reports.sql)을 실행합니다.",
+  invites: "친구 초대 링크와 초대 가격(5,900원)을 쓰려면 SQL Editor에서 18번 파일(20261028000000_invites.sql)을 실행합니다.",
   cash_wallets: "유료 질문(질문 3개 묶음 결제 · 결제한 질문을 쓸 때까지 보관하는 장부)을 쓰려면 SQL Editor에서 13번 파일(20261023000000_miyu_cash.sql)을 실행합니다.",
   ops_events: "운영 기록 · 알림 · 결제 재확인 기록을 남기려면 SQL Editor에서 6번 파일(20261016000000_ops_events.sql)을 실행합니다.",
 };

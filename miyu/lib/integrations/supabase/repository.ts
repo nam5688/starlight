@@ -4,6 +4,7 @@
 // - 서버 비밀키 클라이언트: 쓰기용. 서비스가 소유자를 직접 확인한 뒤에만 쓴다
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { InviteDiscountCheck, InviteDiscountReason } from "../../commerce/invite.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
 import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
@@ -16,6 +17,7 @@ import type {
   TasteReservation,
   FunnelEventName,
   InsertResult,
+  InviteRecord,
   MiyuRepository,
   OpsEventRecord,
   OrderRecord,
@@ -71,6 +73,11 @@ function toChatSummary(r: Row): ChatSummaryRecord {
 }
 
 /** 14번 DB 변경 전 — 표(chat_summaries)나 열(talk_rooms.saved_upto)이 없다. 호출한 쪽이 "준비 중"으로 다루도록 코드 42P01로 통일한다 */
+/** 18번 DB 변경 전 — 초대 표 · 함수가 없다. 호출한 쪽이 "준비 중"으로 다루도록 코드 42P01로 통일한다 */
+function inviteNotReady(what: string, error: { message: string; code?: string }, status?: number): { message: string; code?: string } {
+  const missing = isMissingTableError(error) || isMissingFunction(error) || (status === 404 && !error.code);
+  return missing ? { code: "42P01", message: `${what}가 없습니다 (DB 변경 18번 필요)` } : error;
+}
 function summaryNotReady(what: string, error: { message: string; code?: string }, status?: number): { message: string; code?: string } {
   const missing = isMissingTableError(error) || ["42703", "PGRST204", "PGRST205"].includes(error.code ?? "") || (status === 404 && !error.code);
   return missing ? { code: "42P01", message: `${what}가 없습니다 (DB 변경 14번 필요)` } : error;
@@ -92,6 +99,25 @@ function toTaste(r: Row): TasteReportRecord {
     generatorVersion: (r.generator_version as string | null) ?? null,
     createdAt: r.created_at as string,
   };
+}
+
+function toInvite(r: Row): InviteRecord {
+  return {
+    id: r.id as string,
+    token: r.token as string,
+    inviterUserId: r.inviter_user_id as string,
+    assessmentId: r.assessment_id as string,
+    inviterTier: r.inviter_tier === "free" ? "free" : "deep",
+    createdAt: r.created_at as string,
+  };
+}
+
+function toInviteCheck(data: unknown): InviteDiscountCheck {
+  const r = (data ?? {}) as Row;
+  if (r.ok === true) return { ok: true, remaining: Number(r.remaining ?? 0) };
+  const reason = String(r.reason ?? "");
+  const known: InviteDiscountReason[] = ["invalid", "not-deep", "self", "inviter-not-paid", "already-used", "not-first", "cap", "order-mismatch"];
+  return { ok: false, reason: (known as string[]).includes(reason) ? (reason as InviteDiscountReason) : "invalid" };
 }
 
 function toAssessment(r: Row): AssessmentRecord {
@@ -969,6 +995,55 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     async releaseTasteReport({ userId, assessmentId }) {
       const { error } = await db.rpc("release_taste_report", { p_user_id: userId, p_assessment_id: assessmentId });
       if (error) fail("맛보기 리포트 자리 풀기", tasteNotReady("release_taste_report 함수", error));
+    },
+
+    // 초대 링크 · 초대 할인 — 표 · 함수가 없으면(DB 변경 18번 전) 코드 42P01로 통일해 던진다
+    async createInvite({ userId, assessmentId, token, tier }) {
+      const found = await db.from("invites").select().eq("assessment_id", assessmentId).maybeSingle();
+      if (found.error) fail("초대 링크 조회", inviteNotReady("invites 테이블", found.error, found.status));
+      if (found.data) {
+        if ((found.data as Row).inviter_user_id !== userId) fail("초대 링크 만들기", { message: "다른 회원의 결과입니다" });
+        return toInvite(found.data as Row);
+      }
+      const { data, error, status } = await db.from("invites").insert({ token, inviter_user_id: userId, assessment_id: assessmentId, inviter_tier: tier }).select().single();
+      if (error) {
+        // 동시에 두 번 눌러 다른 요청이 먼저 만들었다면 그 링크를 쓴다
+        if (error.code === "23505") {
+          const again = await db.from("invites").select().eq("assessment_id", assessmentId).maybeSingle();
+          if (again.data && (again.data as Row).inviter_user_id === userId) return toInvite(again.data as Row);
+        }
+        fail("초대 링크 만들기", inviteNotReady("invites 테이블", error, status));
+      }
+      return toInvite(data as Row);
+    },
+    async getInviteByAssessment(userId, assessmentId) {
+      const { data, error, status } = await db.from("invites").select().eq("assessment_id", assessmentId).eq("inviter_user_id", userId).maybeSingle();
+      if (error) fail("초대 링크 조회", inviteNotReady("invites 테이블", error, status));
+      return data ? toInvite(data as Row) : null;
+    },
+    async getInviteByToken(token) {
+      const { data, error, status } = await db.from("invites").select().eq("token", token).maybeSingle();
+      if (error) fail("초대 링크 조회", inviteNotReady("invites 테이블", error, status));
+      return data ? toInvite(data as Row) : null;
+    },
+    async inviteDiscountStatus({ token, inviteeUserId, cap }) {
+      const { data, error } = await db.rpc("invite_discount_status", { p_token: token, p_invitee: inviteeUserId, p_cap: cap });
+      if (error) fail("초대 할인 확인", inviteNotReady("invite_discount_status 함수", error));
+      return toInviteCheck(data);
+    },
+    async claimInviteDiscount({ token, inviteeUserId, orderId, cap }) {
+      const { data, error } = await db.rpc("claim_invite_discount", { p_token: token, p_invitee: inviteeUserId, p_order: orderId, p_cap: cap });
+      if (error) fail("초대 할인 확정", inviteNotReady("claim_invite_discount 함수", error));
+      return toInviteCheck(data);
+    },
+    async countInviteDiscountsUsed(inviterUserId) {
+      const { data, error, status } = await db.from("invite_discounts").select("order_id, orders!inner(status, created_at)").eq("inviter_user_id", inviterUserId);
+      if (error) fail("초대 할인 수 조회", inviteNotReady("invite_discounts 테이블", error, status));
+      const hourAgo = Date.now() - 3600_000;
+      return ((data ?? []) as unknown as { orders: { status: string; created_at: string } | { status: string; created_at: string }[] }[]).filter((r) => {
+        const o = Array.isArray(r.orders) ? r.orders[0] : r.orders;
+        return o && (o.status === "paid" || (o.status === "pending" && new Date(o.created_at).getTime() > hourAgo));
+      }).length;
     },
 
     // 미유캐시 — 표 · 함수가 없으면(DB 변경 13번 전) 코드 42P01로 통일해 던진다 (호출한 쪽이 "캐시 준비 중"으로 다룬다)

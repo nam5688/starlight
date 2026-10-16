@@ -2,8 +2,9 @@
 // 운영 코드에서 쓰지 않는다.
 
 import { canTransition } from "../../commerce/order.ts";
-import { MIYU_CASH, parseCashProductId } from "../../config/product.ts";
+import { isPersonalProduct, MIYU_CASH, PERSONAL_REPORT, parseCashProductId } from "../../config/product.ts";
 import { packRemaining, refundSchedule } from "../../commerce/cash.ts";
+import type { InviteDiscountCheck } from "../../commerce/invite.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
 import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
@@ -17,6 +18,7 @@ import type {
   OpsEventRecord,
   PaymentEventSource,
   AssessmentRecord,
+  InviteRecord,
   MiyuRepository,
   OrderRecord,
   ProfileRecord,
@@ -45,6 +47,33 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   type TasteRow = { userId: string; assessmentId: string; status: "pending" | "ready"; content: unknown | null; generator: string | null; generatorVersion: string | null; createdAt: string; until: number | null };
   const tasteReports = new Map<string, TasteRow>();
   const tasteRecord = (r: TasteRow) => ({ userId: r.userId, assessmentId: r.assessmentId, status: r.status, content: r.content, generator: r.generator, generatorVersion: r.generatorVersion, createdAt: r.createdAt });
+  // 초대 링크(결과마다 하나) · 초대 할인 기록(초대받은 회원 한 명당 한 줄) — DB 18번의 표 · 함수를 흉내 낸다
+  const invites = new Map<string, InviteRecord>();
+  const discounts = new Map<string, { inviteeUserId: string; inviteId: string | null; inviterUserId: string; orderId: string }>();
+  const hasPaidPersonal = (userId: string) => [...orders.values()].some((o) => o.userId === userId && o.status === "paid" && isPersonalProduct(o.productId));
+  const hasConsumedPersonal = (userId: string) => [...orders.values()].some((o) => o.userId === userId && (o.status === "paid" || o.status === "refunded") && isPersonalProduct(o.productId));
+  const liveDiscountCount = (inviterUserId: string, exceptInvitee: string) =>
+    [...discounts.values()].filter((d) => {
+      if (d.inviterUserId !== inviterUserId || d.inviteeUserId === exceptInvitee) return false;
+      const o = orders.get(d.orderId);
+      return Boolean(o && (o.status === "paid" || (o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)));
+    }).length;
+  /** 링크 · 초대한 사람 · 이 사람의 구매 상태 확인 — DB의 invite_discount_status와 같은 순서 */
+  const inviteChecks = (token: string, invitee: string, cap: number): { inv: InviteRecord } | InviteDiscountCheck => {
+    const inv = [...invites.values()].find((i) => i.token === token);
+    if (!inv) return { ok: false, reason: "invalid" };
+    if (inv.inviterTier !== "deep") return { ok: false, reason: "not-deep" };
+    if (inv.inviterUserId === invitee) return { ok: false, reason: "self" };
+    if (!hasPaidPersonal(inv.inviterUserId)) return { ok: false, reason: "inviter-not-paid" };
+    const own = discounts.get(invitee);
+    if (own) {
+      const status = orders.get(own.orderId)?.status;
+      if (status === "paid" || status === "refunded") return { ok: false, reason: "already-used" };
+    } else if (hasConsumedPersonal(invitee)) return { ok: false, reason: "not-first" };
+    const used = liveDiscountCount(inv.inviterUserId, invitee);
+    if (used >= cap) return { ok: false, reason: "cap" };
+    return { inv };
+  };
   let reservationSeq = 0;
   const liveReservations = (userId: string, roomKey: string) => chatReservations.filter((r) => r.userId === userId && r.roomKey === roomKey && r.until > now().getTime()).length;
   const chatSummaries: ChatSummaryRecord[] = [];
@@ -139,7 +168,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       if ([...orders.values()].some((o) => mine(o) && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)) return { ok: false, reason: "pending-order" };
       if ([...reports.values()].some((r) => r.userId === userId && (r.status === "queued" || r.status === "generating"))) return { ok: false, reason: "report-in-progress" };
       if ((wallets.get(userId) ?? 0) > 0) return { ok: false, reason: "cash-balance" };
-      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0, chat_summaries: 0, taste_reports: 0 };
+      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0, chat_summaries: 0, taste_reports: 0, invites: 0 };
       for (const [k, f] of [...feedback]) {
         if (f.userId !== userId) continue;
         feedback.delete(k);
@@ -171,6 +200,11 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         counts.chat_summaries++;
       }
       if (tasteReports.delete(userId)) counts.taste_reports++;
+      for (const [k, v] of [...invites]) {
+        if (v.inviterUserId !== userId) continue;
+        invites.delete(k);
+        counts.invites++;
+      }
       for (const [k, r] of [...reports]) {
         if (r.userId !== userId) continue;
         reports.delete(k);
@@ -540,6 +574,57 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async releaseTasteReport({ userId, assessmentId }) {
       const r = tasteReports.get(userId);
       if (r && r.assessmentId === assessmentId && r.status === "pending") tasteReports.delete(userId);
+    },
+    // 초대 링크 · 초대 할인
+    async createInvite({ userId, assessmentId, token, tier }) {
+      const mine = assessments.get(assessmentId);
+      if (!mine || mine.userId !== userId) throw new Error("invite owner mismatch");
+      const found = invites.get(assessmentId);
+      if (found) return found;
+      const record: InviteRecord = { id: id(), token, inviterUserId: userId, assessmentId, inviterTier: tier, createdAt: iso() };
+      invites.set(assessmentId, record);
+      return record;
+    },
+    async getInviteByAssessment(userId, assessmentId) {
+      const found = invites.get(assessmentId);
+      return found && found.inviterUserId === userId ? found : null;
+    },
+    async getInviteByToken(token) {
+      return [...invites.values()].find((i) => i.token === token) ?? null;
+    },
+    async inviteDiscountStatus({ token, inviteeUserId, cap }) {
+      const checked = inviteChecks(token, inviteeUserId, cap);
+      if ("inv" in checked) return { ok: true, remaining: cap - liveDiscountCount(checked.inv.inviterUserId, inviteeUserId) };
+      return checked;
+    },
+    async claimInviteDiscount({ token, inviteeUserId, orderId, cap }) {
+      const inv = [...invites.values()].find((i) => i.token === token);
+      if (!inv) return { ok: false, reason: "invalid" };
+      const order = orders.get(orderId);
+      if (inv.inviterTier === "deep" && inv.inviterUserId !== inviteeUserId && (!order || order.userId !== inviteeUserId || order.status !== "pending" || order.productId !== PERSONAL_REPORT.id)) {
+        return { ok: false, reason: "order-mismatch" };
+      }
+      // 초대한 사람의 결제 대기 1시간 지난 할인 주문은 취소한다(확인 전에 정리 — DB와 같다)
+      const checkedFirst = inviteChecks(token, inviteeUserId, Number.MAX_SAFE_INTEGER);
+      if ("inv" in checkedFirst) {
+        for (const d of discounts.values()) {
+          if (d.inviterUserId !== inv.inviterUserId || d.inviteeUserId === inviteeUserId) continue;
+          const o = orders.get(d.orderId);
+          if (o && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() >= 3600_000) orders.set(o.id, { ...o, status: "canceled", failureCode: "DISCOUNT_STALE", updatedAt: iso() });
+        }
+      }
+      const checked = inviteChecks(token, inviteeUserId, cap);
+      if (!("inv" in checked)) return checked;
+      const own = discounts.get(inviteeUserId);
+      if (own && own.orderId !== orderId) {
+        const old = orders.get(own.orderId);
+        if (old && old.status === "pending") orders.set(old.id, { ...old, status: "canceled", failureCode: "DISCOUNT_REPLACED", updatedAt: iso() });
+      }
+      discounts.set(inviteeUserId, { inviteeUserId, inviteId: inv.id, inviterUserId: inv.inviterUserId, orderId });
+      return { ok: true, remaining: cap - liveDiscountCount(inv.inviterUserId, inviteeUserId) - 1 };
+    },
+    async countInviteDiscountsUsed(inviterUserId) {
+      return liveDiscountCount(inviterUserId, "");
     },
     async getCashBalance(userId) {
       return wallets.get(userId) ?? 0;

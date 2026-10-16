@@ -14,6 +14,9 @@ import { EMPTY_BASIC_INFO } from "../../lib/profile/basic-info.ts";
 import { cashProductId, concernProductId, MIYU_CASH, QUESTION_PACK_UNITS } from "../../lib/config/product.ts";
 import { createQuestionNonce, questionProductId, questionQuote, questionRoomOf, refundSchedule, refundTotalFor } from "../../lib/commerce/cash.ts";
 import { createOrderNumber } from "../../lib/commerce/order.ts";
+import { createInviteToken } from "../../lib/commerce/invite.ts";
+import { INVITE_DISCOUNT } from "../../lib/config/product.ts";
+import { createInviteLink, getInviteView, quoteInviteDiscount } from "../../lib/services/invite-service.ts";
 import { concernInputOf } from "../../lib/personalization/concern.ts";
 import { createAiReportGenerator } from "../../lib/report/ai/generator.ts";
 import { createMockModel } from "../../lib/report/ai/mock-model.ts";
@@ -1867,4 +1870,167 @@ test("17번을 적용하기 전 환경(표 · 함수 없음)에서도 앱이 멈
   const result = await requestTasteReport({ repo: old, writer, now: () => new Date(), loadInput: async () => ({ ok: true, input }) }, { userId: U.id, assessmentId: aid });
   assert.ok(!result.ok && result.reason === "not-ready");
   assert.deepEqual(await tasteStateFor(old, U.id, aid), { kind: "unavailable" });
+});
+
+// ─── 초대 링크 · 초대 할인(18번) ───
+async function inviteWorld() {
+  const server = createSupabaseRepository(admin);
+  const person = async (nickname: string) => {
+    const U = await makeUser();
+    const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname }, answers, today: new Date() });
+    assert.ok(saved.ok);
+    return { U, aid: saved.ok ? saved.assessment.id : "" };
+  };
+  /** 심층 리포트를 결제까지 마친 사람 */
+  const payer = async (nickname: string, inviteToken?: string) => {
+    const p = await person(nickname);
+    const started = await startCheckout({ repo: server, now: () => new Date() }, { userId: p.U.id, assessmentId: p.aid, inviteToken });
+    assert.equal(started.kind, "order");
+    if (started.kind !== "order") throw new Error("order");
+    const paid = await confirmPayment({ repo: server, gateway }, { userId: p.U.id, orderNumber: started.order.orderNumber, paymentKey: `pk-${randomUUID()}`, amount: started.order.amount });
+    assert.equal(paid.kind, "paid");
+    return { ...p, order: started.order, discounted: started.discounted === true };
+  };
+  const link = async (p: { U: { id: string }; aid: string }) => {
+    const r = await createInviteLink(server, { userId: p.U.id, assessmentId: p.aid });
+    assert.ok(r.ok && r.view.token);
+    return r.ok ? r.view.token! : "";
+  };
+  return { server, person, payer, link };
+}
+
+test("초대 할인(18번): 링크는 구매한 사람만 · 결과마다 하나, 첫 구매만 5,900원(결제까지 승인), 정가는 그대로이며, 브라우저는 읽기만(본인 링크) 하고 함수는 부를 수 없다", async () => {
+  const w = await inviteWorld();
+  const free = await w.person("무료만");
+  assert.deepEqual(await createInviteLink(w.server, { userId: free.U.id, assessmentId: free.aid }), { ok: false, reason: "not-paid" });
+  const inviter = await w.payer("초대자");
+  assert.equal(inviter.order.amount, 9900, "초대 링크 없이는 정가");
+  const token = await w.link(inviter);
+  assert.equal(await w.link(inviter), token, "두 번 눌러도 같은 링크");
+  assert.equal(psqlRun(`select count(*) from public.invites where inviter_user_id = '${inviter.U.id}'`), "1");
+
+  const friend = await w.payer("초대받은친구", token);
+  assert.equal(friend.discounted, true);
+  assert.equal(friend.order.amount, INVITE_DISCOUNT.priceKrw);
+  assert.equal(psqlRun(`select amount from public.orders where id = '${friend.order.id}'`), "5900");
+  assert.equal(psqlRun(`select status from public.orders where id = '${friend.order.id}'`), "paid");
+  assert.equal(await w.server.countInviteDiscountsUsed(inviter.U.id), 1);
+  const view = await getInviteView(w.server, { userId: inviter.U.id, assessmentId: inviter.aid });
+  assert.ok(view.kind === "available" && view.used === 1 && view.cap === 3);
+
+  // 같은 친구가 다른 결과로 다시 와도 정가(첫 구매 1회)
+  const second = await w.server.insertAssessment({ userId: friend.U.id, channel: "web", nickname: "친구2", calendar: "solar", isLeapMonth: false, birthYear: 1990, birthMonth: 1, birthDay: 15, birthTime: null, knownMbti: null, answers, contentVersion: "t", source: "dev-scoring", summary: {}, saju: { status: "not-connected" } } as never);
+  assert.deepEqual(await quoteInviteDiscount(w.server, { token, userId: friend.U.id }), { kind: "none", reason: "already-used" });
+  const again = await startCheckout({ repo: w.server, now: () => new Date() }, { userId: friend.U.id, assessmentId: second.id, inviteToken: token });
+  assert.ok(again.kind === "order" && !again.discounted && again.order.amount === 9900);
+
+  // 접근 정책: 초대한 사람만 자기 링크를 읽고, 다른 회원 · 비로그인은 읽지 못하며, 쓰기 · 함수 호출은 서버만
+  const mine = await inviter.U.client.from("invites").select("token").eq("assessment_id", inviter.aid);
+  assert.equal(mine.data?.length, 1);
+  const others = await friend.U.client.from("invites").select("token");
+  assert.equal(others.data?.length ?? 0, 0, "다른 회원은 남의 링크를 읽지 못한다");
+  assert.ok((await anon.from("invites").select("token")).error || ((await anon.from("invites").select("token")).data ?? []).length === 0);
+  const write = await inviter.U.client.from("invites").insert({ token: createInviteToken(), inviter_user_id: inviter.U.id, assessment_id: free.aid, inviter_tier: "deep" });
+  assert.ok(write.error, "브라우저는 링크를 직접 만들 수 없다");
+  const seen = await friend.U.client.from("invite_discounts").select();
+  assert.ok(seen.error || (seen.data ?? []).length === 0, "할인 기록은 브라우저가 읽지 못한다");
+  for (const [fn, args] of [
+    ["invite_discount_status", { p_token: token, p_invitee: friend.U.id, p_cap: 3 }],
+    ["claim_invite_discount", { p_token: token, p_invitee: friend.U.id, p_order: friend.order.id, p_cap: 3 }],
+  ] as const) {
+    assert.ok((await friend.U.client.rpc(fn, args)).error, `${fn}: 로그인 회원도 부를 수 없다`);
+    assert.ok((await anon.rpc(fn, args)).error, `${fn}: 비로그인도 부를 수 없다`);
+  }
+  // 다른 사람의 결과에는 링크를 붙일 수 없다(DB 트리거)
+  assert.throws(() => psqlRun(`insert into public.invites (token, inviter_user_id, assessment_id, inviter_tier) values ('${createInviteToken()}', '${friend.U.id}', '${inviter.aid}', 'deep')`), /owner mismatch/);
+  // 토큰 모양 검사
+  assert.throws(() => psqlRun(`insert into public.invites (token, inviter_user_id, assessment_id, inviter_tier) values ('short', '${free.U.id}', '${free.aid}', 'deep')`), /check/i);
+});
+
+test("초대 할인 한도(18번): 같은 링크로 동시에 8명이 시작해도 정확히 3명만 5,900원이고 나머지는 정가 주문이 남는다 (여러 서버 흉내)", async () => {
+  const w = await inviteWorld();
+  const inviter = await w.payer("초대자2");
+  const token = await w.link(inviter);
+  const people = await Promise.all(Array.from({ length: 8 }, (_, i) => w.person(`동시${i}`)));
+  const results = await Promise.all(people.map((p) => startCheckout({ repo: w.server, now: () => new Date() }, { userId: p.U.id, assessmentId: p.aid, inviteToken: token })));
+  const orders = results.map((r) => (r.kind === "order" ? r : null));
+  assert.ok(orders.every(Boolean));
+  const discounted = orders.filter((r) => r!.discounted);
+  assert.equal(discounted.length, 3, `할인 ${discounted.length}명: ${JSON.stringify(orders.map((r) => r!.order.amount))}`);
+  assert.ok(discounted.every((r) => r!.order.amount === 5900));
+  assert.ok(orders.filter((r) => !r!.discounted).every((r) => r!.order.amount === 9900));
+  assert.equal(psqlRun(`select count(*) from public.invite_discounts where inviter_user_id = '${inviter.U.id}'`), "3");
+  // 취소된 할인 주문(확정하지 못한 쪽)이 5,900원 그대로 결제되지 못한다: 5,900원 대기 주문은 확정된 3개뿐
+  assert.equal(psqlRun(`select count(*) from public.orders o join public.assessments a on a.id = o.assessment_id where o.user_id = a.user_id and o.amount = 5900 and o.status = 'pending' and o.user_id in (${people.map((p) => `'${p.U.id}'`).join(",")})`), "3");
+  assert.equal(await w.server.countInviteDiscountsUsed(inviter.U.id), 3);
+});
+
+test("초대 할인(18번): 본인 링크 · 이미 정가로 산 사람 · 초대한 사람의 환불 · 오래된 대기 주문 정리 · 환불로 돌아온 자리", async () => {
+  const w = await inviteWorld();
+  const inviter = await w.payer("초대자3");
+  const token = await w.link(inviter);
+  // 본인 링크
+  assert.deepEqual(await quoteInviteDiscount(w.server, { token, userId: inviter.U.id }), { kind: "none", reason: "self" });
+  // 이미 정가로 산 사람
+  const old = await w.payer("정가구매");
+  assert.deepEqual(await quoteInviteDiscount(w.server, { token, userId: old.U.id }), { kind: "none", reason: "not-first" });
+  // 한도 3명(대기)
+  const three = await Promise.all([w.person("a"), w.person("b"), w.person("c")]);
+  const started = [] as { orderId: string; userId: string }[];
+  for (const p of three) {
+    const r = await startCheckout({ repo: w.server, now: () => new Date() }, { userId: p.U.id, assessmentId: p.aid, inviteToken: token });
+    assert.ok(r.kind === "order" && r.discounted);
+    if (r.kind === "order") started.push({ orderId: r.order.id, userId: p.U.id });
+  }
+  const fourth = await w.person("d");
+  assert.deepEqual(await quoteInviteDiscount(w.server, { token, userId: fourth.U.id }), { kind: "none", reason: "cap" });
+  // 첫 번째 대기 주문이 1시간을 넘기면 자리를 세지 않고, 네 번째 사람이 시작할 때 그 주문은 취소된다
+  psqlRun(`update public.orders set created_at = now() - interval '2 hours' where id = '${started[0].orderId}'`);
+  assert.equal(await w.server.countInviteDiscountsUsed(inviter.U.id), 2);
+  const late = await startCheckout({ repo: w.server, now: () => new Date() }, { userId: fourth.U.id, assessmentId: fourth.aid, inviteToken: token });
+  assert.ok(late.kind === "order" && late.discounted);
+  const stale = psqlRun(`select status || ':' || coalesce(failure_code, '') from public.orders where id = '${started[0].orderId}'`);
+  assert.equal(stale, "canceled:DISCOUNT_STALE");
+  // 같은 사람이 다시 시작하면 이전 대기 주문은 취소되고 자리는 하나
+  const again = await startCheckout({ repo: w.server, now: () => new Date() }, { userId: three[1].U.id, assessmentId: three[1].aid, inviteToken: token });
+  assert.ok(again.kind === "order" && again.discounted);
+  assert.equal(psqlRun(`select count(*) from public.invite_discounts where invitee_user_id = '${three[1].U.id}'`), "1");
+  assert.equal(psqlRun(`select count(*) from public.orders where id = '${started[1].orderId}' and status = 'canceled'`), "1");
+  // 초대한 사람이 환불되면 링크의 할인이 멈춘다
+  const fifth = await w.person("e");
+  psqlRun(`update public.orders set status = 'refunded' where id = '${inviter.order.id}'`);
+  assert.deepEqual(await quoteInviteDiscount(w.server, { token, userId: fifth.U.id }), { kind: "none", reason: "inviter-not-paid" });
+});
+
+test("초대 할인(18번): 탈퇴하면 초대 링크가 지워지고 할인 기록은 주문처럼 남으며, 18번을 적용하기 전(표 · 함수 없음)에는 정가로 이어진다", async () => {
+  const w = await inviteWorld();
+  const inviter = await w.payer("탈퇴초대자");
+  await w.server.ensureProfile(inviter.U.id);
+  const token = await w.link(inviter);
+  const friend = await w.payer("탈퇴친구", token);
+  assert.equal(friend.discounted, true);
+  const done = await w.server.withdrawMemberData(inviter.U.id);
+  assert.ok(done.ok && done.counts.invites === 1);
+  assert.equal(await w.server.getInviteByToken(token), null);
+  assert.equal(psqlRun(`select count(*) from public.invite_discounts where invitee_user_id = '${friend.U.id}'`), "1", "할인 기록은 남는다");
+  assert.equal(psqlRun(`select count(*) from public.invite_discounts where invitee_user_id = '${friend.U.id}' and invite_id is null`), "1");
+
+  // 18번 전
+  const noFn = { code: "PGRST202", message: "Could not find the function public.invite_discount_status in the schema cache" };
+  const noTable = { code: "PGRST205", message: "Could not find the table 'public.invites' in the schema cache" };
+  const fakeBuilder = { select: () => fakeBuilder, eq: () => fakeBuilder, maybeSingle: async () => ({ data: null, error: noTable, status: 404 }) };
+  const fakeAdmin = new Proxy(admin, {
+    get(target, prop, receiver) {
+      if (prop === "from") return (table: string) => (table === "invites" ? fakeBuilder : target.from(table));
+      if (prop === "rpc") return async (name: string) => (name.includes("invite_discount") ? { data: null, error: noFn } : { data: null, error: { code: "x", message: "unexpected" } });
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as SupabaseClient;
+  const old = createSupabaseRepository(fakeAdmin);
+  const p = await w.person("예전환경3");
+  await assert.rejects(old.getInviteByToken(token), (e: unknown) => (e as { code?: string }).code === "42P01");
+  await assert.rejects(old.inviteDiscountStatus({ token, inviteeUserId: p.U.id, cap: 3 }), (e: unknown) => (e as { code?: string }).code === "42P01");
+  assert.deepEqual(await quoteInviteDiscount(old, { token, userId: p.U.id }), { kind: "none", reason: null });
+  const r = await startCheckout({ repo: old, now: () => new Date() }, { userId: p.U.id, assessmentId: p.aid, inviteToken: token });
+  assert.ok(r.kind === "order" && r.order.amount === 9900 && !r.discounted);
 });

@@ -5,6 +5,7 @@ import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonDisabled, buttonPrimary } from "@/components/ui/styles";
 import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
+import type { InviteQuote } from "@/lib/services/invite-service";
 import { nextActionForResult } from "@/lib/growth/next-action";
 import { salesClosedMessage, type GateReason } from "@/lib/services/capacity-service";
 import { canRetryReport, type ResultView } from "@/lib/services/report-service";
@@ -19,6 +20,7 @@ export function PurchasePanel({
   paymentsReady,
   paymentsNote,
   salesClosedReason = null,
+  invite = null,
 }: {
   view: ResultView;
   /** 구매하면 더 받는 내용 (미리보기의 잠금 목록 제목) */
@@ -27,7 +29,10 @@ export function PurchasePanel({
   paymentsNote: string | null;
   /** 지금 새 구매를 받지 않는 경우(리포트 준비 용량 · 하루 예산) — 결제를 시작하지 않고 이유를 알린다 */
   salesClosedReason?: { reason: GateReason | null } | null;
+  /** 초대 링크로 들어온 사람의 가격 확인 결과(서버가 만든 값) — eligible일 때만 정가와 초대 가격을 함께 보인다(운영자 예외 2026-10-16) */
+  invite?: InviteQuote | null;
 }) {
+  const discount = invite?.kind === "eligible" ? invite : null;
   const { paidOrder, report, refunded, assessment } = view;
   const action = nextActionForResult({
     purchase: paidOrder ? "paid" : refunded ? "refunded" : "none",
@@ -97,11 +102,24 @@ export function PurchasePanel({
           ))}
         </ul>
         <p className="mt-3 text-[14px] text-ink-3">한 번 구매로 위 내용을 모두 볼 수 있습니다. 일부를 따로 추가 결제하지 않습니다.</p>
-        <p className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-[24px] font-bold tabular-nums">{formatKrw(PERSONAL_REPORT.priceKrw)}</span>
-          <StatusBadge>가격 {PERSONAL_REPORT.priceNote}</StatusBadge>
-          <span className="text-[14px] text-ink-3">단건 구매 · 카드 결제</span>
-        </p>
+        {discount ? (
+          <div className="mt-4">
+            <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-[15px] text-ink-3">
+                정가 <span className="tabular-nums line-through">{formatKrw(discount.listKrw)}</span>
+              </span>
+              <span className="text-[15px] font-semibold text-ink-2">→ 초대 가격</span>
+              <span className="text-[24px] font-bold tabular-nums">{formatKrw(discount.priceKrw)}</span>
+            </p>
+            <p className="mt-1 text-[14px] text-ink-3">친구 초대 링크로 들어오셔서 적용돼요 · 처음 받을 때 한 번 · 단건 구매 · 카드 결제</p>
+          </div>
+        ) : (
+          <p className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-[24px] font-bold tabular-nums">{formatKrw(PERSONAL_REPORT.priceKrw)}</span>
+            <StatusBadge>가격 {PERSONAL_REPORT.priceNote}</StatusBadge>
+            <span className="text-[14px] text-ink-3">단건 구매 · 카드 결제</span>
+          </p>
+        )}
       </div>
       <div className="border-t border-line px-5 py-5 md:px-7">
         {salesClosedReason ? (
@@ -116,7 +134,7 @@ export function PurchasePanel({
         ) : paymentsReady ? (
           <form action={startCheckoutAction.bind(null, assessment.id)}>
             <button type="submit" className={`${buttonPrimary} w-full sm:w-auto`}>
-              {PERSONAL_REPORT.name} 전체 보기 · {formatKrw(PERSONAL_REPORT.priceKrw)}
+              {PERSONAL_REPORT.name} 전체 보기 · {formatKrw(discount ? discount.priceKrw : PERSONAL_REPORT.priceKrw)}{discount ? " (초대 가격)" : ""}
             </button>
           </form>
         ) : (

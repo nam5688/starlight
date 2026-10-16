@@ -9,7 +9,8 @@ import {
   type GatewayPayment,
   type OrderStatus,
 } from "../commerce/order.ts";
-import { isCashProduct, isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
+import { isInviteToken } from "../commerce/invite.ts";
+import { INVITE_DISCOUNT, isCashProduct, isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
 import { salesClosedMessage, type GateReason, type SaleGate } from "./capacity-service.ts";
 import type { Acquisition, CashRefundResult, MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
 import { nextPersonalSeq, paidPersonalOrders } from "./purchases.ts";
@@ -28,7 +29,8 @@ async function gateOpen(gate: SaleGateCheck | undefined, stage: "start" | "confi
 }
 
 export type StartCheckoutResult =
-  | { kind: "order"; order: OrderRecord }
+  /** discounted: 초대 할인(5,900원)이 확정된 주문 */
+  | { kind: "order"; order: OrderRecord; discounted?: boolean }
   | { kind: "already-paid"; order: OrderRecord }
   /** 다시 받기를 눌렀지만 가장 최근에 받은 리포트가 아직 완성되지 않았다(만드는 중이거나 실패) — 새로 결제하지 않고 그 리포트의 상태를 안내한다 */
   | { kind: "report-not-ready"; order: OrderRecord }
@@ -46,7 +48,7 @@ export type StartCheckoutResult =
  */
 export async function startCheckout(
   deps: { repo: MiyuRepository; now: () => Date; newOrderNumber?: (now: Date) => string; gate?: SaleGateCheck },
-  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null; again?: boolean },
+  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null; again?: boolean; inviteToken?: string | null },
 ): Promise<StartCheckoutResult> {
   const { repo } = deps;
   const assessment = await repo.getAssessment(input.assessmentId);
@@ -78,15 +80,49 @@ export async function startCheckout(
 
   const productId = personalProductId(received.length > 0 ? nextPersonalSeq(orders) : 1);
   const makeNumber = deps.newOrderNumber ?? ((now: Date) => createOrderNumber(now));
-  const inserted = await repo.insertOrder({
+  const newOrder = (amount: number) => ({
     orderNumber: makeNumber(deps.now()),
     userId: input.userId,
     assessmentId: assessment.id,
     productId,
-    amount: PERSONAL_REPORT.priceKrw,
+    amount,
     paymentEnv: input.paymentEnv ?? "test",
     acquisition: input.acquisition ?? null,
   });
+
+  // 초대 할인(운영자 2026-10-16): 첫 구매이고 초대 링크로 들어왔으며 서버가 할인 대상이라고 확인했을 때만 5,900원 주문을 만들고, 만든 뒤 DB에서 한도 · 첫 구매를 한 번 더 확정한다.
+  // 할인은 편의다 — 확인 · 확정이 어떤 이유로든 실패하면 정가 주문으로 이어 가고 구매를 막지 않는다.
+  const inviteToken = received.length === 0 && isInviteToken(input.inviteToken) ? input.inviteToken : null;
+  if (inviteToken) {
+    const cap = INVITE_DISCOUNT.maxPerInviter;
+    let eligible = false;
+    try {
+      eligible = (await repo.inviteDiscountStatus({ token: inviteToken, inviteeUserId: input.userId, cap })).ok;
+    } catch {
+      eligible = false;
+    }
+    if (eligible) {
+      const discounted = await repo.insertOrder(newOrder(INVITE_DISCOUNT.priceKrw));
+      if (discounted.ok) {
+        let claimed = false;
+        try {
+          claimed = (await repo.claimInviteDiscount({ token: inviteToken, inviteeUserId: input.userId, orderId: discounted.value.id, cap })).ok;
+        } catch {
+          claimed = false;
+        }
+        if (claimed) {
+          await repo.addPaymentEvent({ orderId: discounted.value.id, source: "checkout", status: "INVITE_DISCOUNT", detail: {} }).catch(() => {});
+          return { kind: "order", order: discounted.value, discounted: true };
+        }
+        // 확정하지 못했다: 할인 주문은 취소하고(결제되지 않게) 정가 주문으로 이어 간다
+        const canceled = await repo.updateOrder(discounted.value.id, ["pending"], { status: "canceled", failureCode: "DISCOUNT_DENIED", failureMessage: "초대 할인을 확정하지 못해 취소됨" });
+        if (canceled) await repo.addPaymentEvent({ orderId: discounted.value.id, source: "checkout", status: "DISCOUNT_DENIED", detail: {} });
+      }
+      // 같은 검사에 이미 대기 주문이 있어 만들지 못한 경우(동시에 두 번 누름)는 아래 정가 경로의 충돌 처리가 기존 주문을 돌려준다
+    }
+  }
+
+  const inserted = await repo.insertOrder(newOrder(PERSONAL_REPORT.priceKrw));
   if (inserted.ok) return { kind: "order", order: inserted.value };
 
   // 동시에 두 번 눌러 다른 요청이 먼저 만든 경우: 그 주문을 쓴다

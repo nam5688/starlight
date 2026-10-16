@@ -22,6 +22,7 @@ import { SectionTitle } from "@/components/report/summary-blocks";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
 import { ReadingReportView } from "@/components/report/reading-report-view";
 import { ContextPanel } from "@/components/results/context-panel";
+import { InviteSection } from "@/components/results/invite-section";
 import { PurchasePanel } from "@/components/results/purchase-panel";
 import { ReceivedReports, RepurchasePanel } from "@/components/results/received-reports";
 import { ReadingNav } from "@/components/report/reading-nav";
@@ -32,11 +33,15 @@ import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
+import { getInviteView, quoteInviteDiscount } from "@/lib/services/invite-service";
 import { receivedRowOf } from "@/lib/services/my-service";
 import { getResultView } from "@/lib/services/report-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { currentSaleGate } from "@/server/capacity";
-import { now, readRepository, reportGenerator } from "@/server/services";
+import { peekInviteToken } from "@/server/invite";
+import { logError } from "@/server/ops";
+import { getSiteUrl } from "@/server/session";
+import { now, readRepository, reportGenerator, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
 import { PageFallback } from "@/components/ui/page-fallback";
@@ -101,10 +106,16 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
     const content = report.content;
     if (isConcernReport(content)) notFound(); // 개인 통합 리포트 주문에는 고민 반영 리포트가 붙지 않는다
     const feedback = await (await readRepository()).getFeedback(report.id);
+    // 친구 초대(심층 리포트를 받은 분만) — 확인에 실패하면 이 구역만 보이지 않는다
+    const inviteView = await getInviteView(writeRepository(), { userId: member.userId, assessmentId: assessment.id }).catch((e) => {
+      logError("invite.view", e);
+      return { kind: "unavailable" as const };
+    });
     const footer = (
       <div className="space-y-4">
         <ReportFeedback reportId={report.id} initial={feedback?.rating ?? null} />
         {CONCERN_RECORDS.visible && <ContextPanel assessmentId={assessment.id} context={view.context} usesContext={usesContext} reportReady />}
+        {inviteView.kind === "available" && <InviteSection assessmentId={assessment.id} origin={await getSiteUrl()} view={inviteView} />}
         <section aria-labelledby="r-received" className="space-y-3">
           <h2 id="r-received" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
             받은 리포트
@@ -158,6 +169,8 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
     );
   }
 
+  // 초대 링크로 들어온 사람의 가격(운영자 예외 2026-10-16) — 서버가 대상인지 확인한 뒤에만 초대 가격을 함께 보인다
+  const inviteQuote = view.paidOrder ? null : await quoteInviteDiscount(writeRepository(), { token: await peekInviteToken(), userId: member.userId });
   // 잠긴 내용은 서버에서 아예 만들지 않는다 — 전체 요약 · 점수는 구매 후 리포트에만
   const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
   return (
@@ -209,7 +222,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
             <ReceivedReports rows={receivedRows} current={view.paidOrder?.orderNumber} />
           </section>
         )}
-        <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null} />
+        <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null} invite={inviteQuote} />
       </div>
     </>
   );

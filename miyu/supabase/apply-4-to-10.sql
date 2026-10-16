@@ -587,6 +587,17 @@ wd17 as (
               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
               where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as withdraw_fn
 ),
+-- 18번: 초대 링크 · 초대 할인 표와 함수, 탈퇴 함수의 초대 링크 삭제
+wd18 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'invites') as invites,
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'invite_discounts') as discounts,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'invite_discount_status') as status_fn,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'claim_invite_discount') as claim_fn,
+    coalesce((select bool_or(pg_get_functiondef(p.oid) like '%public.invites%')
+              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as withdraw_fn
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -712,5 +723,11 @@ select * from (
               when wd17.tbl or wd17.reserve_fn or wd17.save_fn or wd17.release_fn or wd17.withdraw_fn then '일부만' else '아직 안 함' end,
          '표 taste_reports (맛보기 리포트 · 회원 한 명당 한 줄) / 함수 reserve_taste_report · save_taste_report · release_taste_report / 탈퇴 함수에 맛보기 리포트 삭제 포함: ' || wd17.withdraw_fn::text
   from wd17
+  union all
+  select 18, '20261028000000_invites.sql',
+         case when wd18.invites and wd18.discounts and wd18.status_fn and wd18.claim_fn and wd18.withdraw_fn then '적용됨'
+              when wd18.invites or wd18.discounts or wd18.status_fn or wd18.claim_fn or wd18.withdraw_fn then '일부만' else '아직 안 함' end,
+         '표 invites (초대 링크) · invite_discounts (초대 할인 기록) / 함수 invite_discount_status · claim_invite_discount / 탈퇴 함수에 초대 링크 삭제 포함: ' || wd18.withdraw_fn::text
+  from wd18
 ) r
 order by "번호";

@@ -1,6 +1,7 @@
 // 서비스가 바깥(DB·결제사)과 주고받는 약속.
 // 웹(Next.js + Supabase + 토스페이먼츠)뿐 아니라 이후 다른 채널도 같은 서비스를 구현체만 바꿔 쓴다.
 
+import type { InviteDiscountCheck } from "../commerce/invite.ts";
 import type { Answers } from "../assessment/types.ts";
 import type { GatewayPayment, OrderStatus } from "../commerce/order.ts";
 import type { ReportStatus } from "../commerce/report.ts";
@@ -196,6 +197,12 @@ export type TasteReportRecord = { userId: string; assessmentId: string; status: 
 /** 맛보기 리포트 쓰기 자리 예약 결과 — reserved: 새로 쓸 수 있다 · busy: 다른 요청이 쓰는 중 · ready: 이미 받았다(record) */
 export type TasteReservation = { state: "reserved" } | { state: "busy" } | { state: "ready"; record: TasteReportRecord };
 
+/**
+ * 초대 링크(DB 변경 18번) — 심층 리포트를 산 결과 하나에 링크 하나. 토큰은 무작위 24자이며 이름 · 생년월일이 없다.
+ * inviterTier: deep = 심층 리포트 구매자(할인 대상 링크) · free = 무료 리포트(할인 없음, 나중에 궁합용).
+ */
+export type InviteRecord = { id: string; token: string; inviterUserId: string; assessmentId: string; inviterTier: "deep" | "free"; createdAt: string };
+
 /** 무료 질문 자리 예약 — id가 null이면 DB 변경 16번 전의 예전 방식(답을 받은 뒤에 한 번에 센다) */
 export type ChatReservation = { id: number | null };
 
@@ -319,6 +326,21 @@ export interface MiyuRepository {
   reserveTasteReport(input: { userId: string; assessmentId: string }): Promise<TasteReservation>;
   saveTasteReport(input: { userId: string; assessmentId: string; content: unknown; generator: string; generatorVersion: string }): Promise<void>;
   releaseTasteReport(input: { userId: string; assessmentId: string }): Promise<void>;
+
+  /**
+   * 초대 링크 · 초대 할인(DB 변경 18번) — 서버만 쓴다. 표 · 함수가 없으면 오류(코드 42P01).
+   * - createInvite: 이 결과의 링크를 만든다(이미 있으면 그 링크를 그대로 — 결과마다 하나). 초대한 사람이 그 결과의 주인이 아니면 오류
+   * - getInviteByAssessment / getInviteByToken: 링크 조회(없으면 null)
+   * - inviteDiscountStatus: 지금 이 사람이 이 링크로 할인받을 수 있는지 읽기만(화면의 가격 표시용)
+   * - claimInviteDiscount: 이미 만든 결제 대기 주문(할인 가격)에 할인을 확정한다 — 초대한 사람별 잠금 안에서 한도 · 첫 구매 · 본인 링크를 확인하므로 동시에 눌러도 한도를 넘지 않는다. 확정하지 못하면 아무것도 바꾸지 않고 이유를 돌려준다
+   * - countInviteDiscountsUsed: 이 초대한 사람의 링크로 할인이 잡힌 수(결제 완료 + 결제 대기 1시간 이내) — 결과 화면의 "3명 중 N명"
+   */
+  createInvite(input: { userId: string; assessmentId: string; token: string; tier: "deep" | "free" }): Promise<InviteRecord>;
+  getInviteByAssessment(userId: string, assessmentId: string): Promise<InviteRecord | null>;
+  getInviteByToken(token: string): Promise<InviteRecord | null>;
+  inviteDiscountStatus(input: { token: string; inviteeUserId: string; cap: number }): Promise<InviteDiscountCheck>;
+  claimInviteDiscount(input: { token: string; inviteeUserId: string; orderId: string; cap: number }): Promise<InviteDiscountCheck>;
+  countInviteDiscountsUsed(inviterUserId: string): Promise<number>;
 
   /**
    * 미유캐시 — 서버만 쓴다(충전은 결제 완료 처리 안에서 DB가 한다). 테이블 · 함수가 없으면(DB 변경 13번 전) 오류(코드 42P01)를 던진다.
