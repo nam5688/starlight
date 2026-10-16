@@ -7,7 +7,9 @@ import {
   CLOSENESS_LABEL, IPIP_FACETS, IPIP_REFERENCE, IPIP_REVIEW_VERSION, ITEM_FINDINGS, PERSPECTIVE_COMPARISON, PROPOSAL_VERSION, PROPOSED_ITEMS, READING_LIMITS,
 } from "../lib/assessment/drafts/ipip-review.ts";
 import { DRAFT_CONTENT_VERSION, DRAFT_ITEMS, PERSPECTIVES, type DraftItem, type PerspectiveId } from "../lib/assessment/drafts/situational-draft.ts";
-import { DAY_RULE_META, MONTH_RULE_META, PARTNER_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { COMPAT_RULE_META, DAY_RULE_META, MONTH_RULE_META, PAIR_RULE_META, PARTNER_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { COMPAT_RULE_VERSION } from "../lib/saju/interpret/compat.ts";
+import { PAIR_RULE_VERSION } from "../lib/report/compat/pair-evidence.ts";
 import { PARTNER_RULE_VERSION } from "../lib/saju/interpret/partner.ts";
 import { DAY_RULE_VERSION } from "../lib/saju/interpret/day-plain.ts";
 import { MONTH_RULE_VERSION } from "../lib/saju/interpret/months.ts";
@@ -66,6 +68,18 @@ ${PARTNER_RULE_META.map(block).join("\n\n")}
 오늘의 일진을 내 원국과 겹쳐 하루의 분위기를 읽는 규칙이다. 오늘 일어날 일을 말하지 않고 좋은 날 · 나쁜 날을 가르지 않는다. 같은 출처 · 같은 검토 상태(전문가 검토 전)다.
 
 ${DAY_RULE_META.map(block).join("\n\n")}
+
+## 사주 궁합 규칙 (${COMPAT_RULE_META.length}개, \`compat.ts\` · 규칙 ${COMPAT_RULE_VERSION})
+
+두 사람의 사주 원국만으로 관계를 읽는 규칙이다. 간단 궁합(무료)과 사주 궁합(유료)이 같은 규칙 · 같은 결과를 쓴다. 총점 · 커플 유형은 재미와 공유를 위한 정리이며 관계의 성공 확률 · 궁합의 정확도가 아니다. 같은 출처 · 같은 검토 상태(전문가 검토 전)다. 설계 · 분포 측정 · 한계는 \`docs/compat-engine.md\`.
+
+${COMPAT_RULE_META.map(block).join("\n\n")}
+
+## 리포트 궁합 — 두 사람 응답 비교 규칙 (${PAIR_RULE_META.length}개, \`compat/pair-evidence.ts\` · 규칙 ${PAIR_RULE_VERSION})
+
+두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교하는 규칙이다. **리포트 궁합은 아직 만들지 않았고** 이 규칙은 근거 빌더(순수 계산)로만 있다. 설계 가설이며 실제 사람의 응답 · 전문가 검토로 확인하지 못했다.
+
+${PAIR_RULE_META.map(block).join("\n\n")}
 `;
 writeFileSync(new URL("../docs/saju-rules.md", import.meta.url), sajuDoc);
 

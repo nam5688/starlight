@@ -18,7 +18,7 @@ export const metadata: Metadata = { alternates: { canonical: "/" } };
 const QUESTION_COUNT = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
 
 /**
- * 홈은 다섯 구역이다(운영자 방향 2026-10-16): 첫 소개 + 미유 대화창 → 궁합(준비 중) → 다른 상담 주제 → 리포트 · 가격 안내 → 자주 묻는 질문(+ 분석 방법과 한계).
+ * 홈은 다섯 구역이다(운영자 방향 2026-10-16): 첫 소개 + 미유 대화창 → 궁합(간단 궁합 무료 · 사주 궁합 · 리포트 궁합 준비 중) → 다른 상담 주제 → 리포트 · 가격 안내 → 자주 묻는 질문(+ 분석 방법과 한계).
  * 메인에서 남길 인상은 "검사해서 리포트를 사는 곳"이 아니라 "미유가 내 사주와 성향을 먼저 쉽게 풀어주고, 궁금한 건 대화로 이어가고, 전체는 리포트로 다시 보는 곳"이다.
  * 그래서 미유 캐릭터와 대화 예시를 첫 화면에 두고, 상세 항목표 · 상담 이용 조건은 리포트 예시 페이지(/report/sample)로 옮겼다. 삭제한 것은 되풀이되는 설명과 긴 비교표이지 미유 캐릭터와 말풍선이 아니다.
  */
@@ -47,9 +47,9 @@ export default function Home() {
               <Link href="/analyze" className={buttonPrimary}>
                 내 사주 무료로 보기
               </Link>
-              <a href="#home-compat" className={buttonSecondary}>
-                궁합 서비스 소개 · 준비 중
-              </a>
+              <Link href="/compat" className={buttonSecondary}>
+                무료 간단 궁합 보기
+              </Link>
             </div>
             <p className="mt-4 text-[14px] leading-[1.65] text-ink-2">
               {FREE_ANALYSIS_TIME} · 문항 {QUESTION_COUNT}개 · 무료 미리보기 · {PERSONAL_REPORT.name}{" "}
@@ -72,7 +72,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2. 궁합 (준비 중) */}
+      {/* 2. 궁합 (간단 궁합 무료 · 나머지 준비 중) */}
       <CompatSection />
 
       {/* 3. 다른 상담 주제 */}
