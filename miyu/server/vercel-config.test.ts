@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
-const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as { crons?: { path: string; schedule: string }[] };
+const config = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as { framework?: string; outputDirectory?: string; crons?: { path: string; schedule: string }[] };
 
 test("vercel.json의 정기 실행은 실제 있는 주소(/api/cron/reconcile)를 가리킨다", () => {
   assert.ok(config.crons && config.crons.length >= 1);
@@ -24,4 +24,9 @@ test("정기 실행 시각은 하루 한 번(분 · 시가 숫자, 나머지는 
     assert.match(hour, /^\d{1,2}$/, `시는 숫자 하나: ${c.schedule}`);
     assert.deepEqual([dom, month, dow], ["*", "*", "*"], `날 · 달 · 요일은 *: ${c.schedule}`);
   }
+});
+
+test("빌드 설정은 Next.js로 고정한다 — Vercel 프로젝트 설정에 예전 템플릿(Astro)의 출력 폴더(dist)가 남아 있어도 이 파일이 이긴다(2026-10-16 실제 배포 실패: \"No Output Directory named dist found\")", () => {
+  assert.equal(config.framework, "nextjs");
+  assert.equal(config.outputDirectory, ".next");
 });

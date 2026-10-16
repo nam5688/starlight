@@ -97,6 +97,8 @@
 | --- | --- | --- |
 | Framework Settings → **"Configuration Settings in the current Production deployment differ from your current Project Settings"** · Production Overrides에 **Astro** | 지금 Production 배포가 `main`(예전 Astro 템플릿)을 빌드한 것이고, 프로젝트 설정(Next.js · Root Directory `miyu`)은 미유 기준이라 서로 다르다는 안내다. **정상이다** | 고치지 않는다. **"Production Overrides"는 켜지 않는다**(켜면 Astro로 고정된다). 3단계로 Production 브랜치를 작업 브랜치로 바꾸고 새로 배포하면 사라진다 |
 | Root Directory 칸이 **비어 있다** | 저장소 맨 위(예전 템플릿)를 빌드한다 | Settings → General → Root Directory에 `miyu`를 넣고 Save |
+| **"The specified Root Directory \"meu\" does not exist"** | Root Directory 철자가 틀렸다(실제 폴더 이름은 **m-i-y-u**) | Root Directory를 `miyu`로 고치고 Save → Deployments에서 맨 위 배포의 Redeploy |
+| **"No Output Directory named \"dist\" found after the Build completed"** | 예전 템플릿(Astro)의 출력 폴더(`dist`) 설정이 프로젝트에 남아 있다 | 이 저장소의 `vercel.json`이 Next.js · `.next`로 고정해 두었다(커밋 이후 배포부터). 그래도 나오면 Settings → Build and Deployment → Framework Settings에서 Output Directory의 Override를 끈다 |
 | 처음 배포가 빨간색(실패) · 또는 Astro 화면이 보인다 | `main`에는 `miyu/`가 없다 | 아무것도 공개되지 않는다(템플릿뿐). 3 · 6단계로 작업 브랜치를 배포한다 |
 
 ## 알려진 한계 · 결정이 필요한 것
