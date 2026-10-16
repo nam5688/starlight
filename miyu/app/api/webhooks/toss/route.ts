@@ -6,9 +6,14 @@ import { queueAndScheduleReport } from "@/server/report-jobs";
 import { paymentGateway, writeRepository } from "@/server/services";
 
 /**
- * 토스페이먼츠 웹훅 (개발자센터 > 웹훅에 이 주소를 등록: https://<도메인>/api/webhooks/toss).
- * 알림 내용은 믿지 않고 결제사에 결제를 다시 조회해 주문을 맞춘다.
+ * 토스페이먼츠 웹훅 (개발자센터 > 웹훅에 이 주소를 등록: https://<도메인>/api/webhooks/toss, 이벤트는 `PAYMENT_STATUS_CHANGED`).
+ * 알림 내용은 믿지 않고 결제사에 결제를 다시 조회해 주문을 맞춘다(조회한 Payment 객체의 status · totalAmount · balanceAmount · cancels[].cancelAmount를 쓴다).
  * 10초 안에 200으로 응답해야 하며, 일시적인 오류면 500을 돌려 재전송을 받는다.
+ *
+ * **받는 이벤트는 `PAYMENT_STATUS_CHANGED`뿐이다.** `CANCEL_STATUS_CHANGED`는 공식 문서상 중국 · 동남아 해외 간편결제(비동기 승인) 전용이고 국내 결제(카드 등)에는 오지 않으므로
+ * 국내 카드 취소를 그 이벤트에 기대지 않는다 — 다른 이벤트는 받아도 무시한다(2026-10-16 공식 문서 확인).
+ * 국내 카드의 **부분 취소에 어떤 웹훅이 오는지는 공식 문서에 없다.** 그래서 웹훅이 오지 않아도 맞는 구조다: 토스에서 취소한 뒤 운영자가 /admin의 "결제사와 대조해 맞추기"를 누르거나,
+ * 정기 점검(최근 7일 결제)이 결제사를 다시 조회해 같은 결과로 맞춘다. 구매자가 결제창을 닫으면 웹훅이 오지 않는다는 점도 공식 문서에 있어 결제 승인 확인 · 정기 점검이 함께 막는다.
  */
 export async function POST(request: Request) {
   if (!paymentConfig().ok) return new Response("not configured", { status: 503 });
@@ -21,10 +26,7 @@ export async function POST(request: Request) {
   }
 
   const paymentKey = body?.data?.paymentKey;
-  if (
-    (body?.eventType !== "PAYMENT_STATUS_CHANGED" && body?.eventType !== "CANCEL_STATUS_CHANGED") ||
-    typeof paymentKey !== "string"
-  ) {
+  if (body?.eventType !== "PAYMENT_STATUS_CHANGED" || typeof paymentKey !== "string") {
     return Response.json({ ok: true, ignored: true });
   }
 

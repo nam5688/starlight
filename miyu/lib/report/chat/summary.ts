@@ -4,7 +4,7 @@
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다).
 import { CHAT_SUMMARY_POLICY } from "../../config/product.ts";
 import { TALK_COPY, type TalkModel } from "../reading/talk.ts";
-import { ROOMS, roomTopic, type RoomAction, type RoomId } from "../reading/talk-room.ts";
+import { intakeOption, ROOMS, roomTopic, type RoomAction, type RoomId } from "../reading/talk-room.ts";
 
 /** fixed: 방이 먼저 묻는 질문 · 내 경험 답장처럼 고정 문구의 질문 (직접 적은 질문이 아니다) */
 export type SummaryQa = { q: string; a: string; fixed?: boolean };
@@ -78,7 +78,7 @@ export function summarizeActions(model: TalkModel, room: RoomId, actions: readon
         break;
       case "intake": {
         if (!def.intake) break;
-        const opt = a.option === "skip" ? def.intake.skip : def.intake.options.find((o) => o.id === a.option);
+        const opt = intakeOption(def.intake, a.option);
         if (opt) qa.push({ q: shorten(def.intake.question, SUMMARY_LIMITS.questionChars), a: shorten(opt.label, SUMMARY_LIMITS.answerChars), fixed: true });
         break;
       }

@@ -3,6 +3,7 @@ import { combineNotifiers, createLogNotifier, createTelegramNotifier, TELEGRAM_R
 import { alertText, ALERT_ONCE_MS, raiseAlert, type Alert, type Notifier, type RaiseResult } from "@/lib/ops/alerts";
 import { redactSecrets, safeErrorMessage } from "@/lib/ops/redact";
 import { productNameOf } from "@/lib/config/product";
+import { nonCardNotice } from "@/lib/commerce/payment-method";
 import type { OpsEventInput, OrderRecord } from "@/lib/services/ports";
 import { paymentConfig, telegramEnv } from "./env";
 import { now, writeRepository } from "./services";
@@ -73,6 +74,19 @@ export async function notifyOrderEvent(kind: "paid" | "refunded", order: OrderRe
           lines: [`결제 환경 ${order.paymentEnv === "live" ? "실결제" : "테스트"}`],
         },
   );
+  // 카드만 운영하는 동안 카드가 아닌 결제수단으로 승인됐다면 따로 알린다 (결제는 정상 처리하고 환불 절차 · 결제위젯 설정을 운영자가 확인한다)
+  const nonCard = kind === "paid" ? nonCardNotice(order.method) : null;
+  if (nonCard) {
+    await alert({
+      kind: "payment.non_card",
+      severity: "warn",
+      title: `카드 외 결제수단으로 승인됨 · ${productName} ${won(order.amount)}`,
+      orderNumber: order.orderNumber,
+      dedupeKey: `payment.non_card:${order.orderNumber}`,
+      dedupeMs: ALERT_ONCE_MS,
+      lines: [`결제 환경 ${order.paymentEnv === "live" ? "실결제" : "테스트"}`, ...nonCard],
+    });
+  }
 }
 
 /**

@@ -156,6 +156,55 @@ test("결제 시작: 질문을 받을 수 없으면 결제하지 않는다 — �
   assert.equal(w.mem.orders.size, 0);
 });
 
+test("질문 없이 구매 시작(운영자 2026-10-16): 무료 질문이 남아 있어도 살 수 있고(입력창 위의 작은 구매 버튼), 다시 눌러도 대기 주문은 하나이며, 결제가 확인되면 질문 3개가 들어가고 그다음 요청은 새로 결제받지 않는다 — 질문 글이 없다", async () => {
+  const w = await world({ room: "love" });
+  const buy = () => startQuestionPayment(w.deps, { userId: USER, assessmentId: w.assessment.id, roomKey: "love", paymentEnv: "test" });
+  // 무료 질문이 2개 남아 있어도 구매는 시작된다 (질문 글 없이)
+  const first = await buy();
+  assert.equal(first.kind, "order");
+  if (first.kind !== "order") return;
+  assert.equal(first.order.amount, 2500);
+  assert.equal(parseCashProductId(first.order.productId)?.cash, 9, "질문 3개 = 9단위");
+  assert.equal(questionRoomOf(first.order.productId), "love", "결제 뒤 이 방으로 돌아온다");
+  // 두 번 눌러도 대기 주문은 하나, 같은 주문으로 간다
+  const second = await buy();
+  assert.equal(second.kind, "order");
+  const pending = [...w.mem.orders.values()].filter((o) => o.status === "pending");
+  assert.equal(pending.length, 1);
+  if (second.kind === "order") assert.equal(second.order.orderNumber, pending[0]!.orderNumber);
+  // 결제 승인이 확인되면 질문 3개가 한 번만 들어간다
+  const paid = await confirmPayment({ repo: w.mem.repo, gateway: w.toss.gateway }, { userId: USER, orderNumber: pending[0]!.orderNumber, paymentKey: "pk_early_1", amount: pending[0]!.amount });
+  assert.equal(paid.kind, "paid");
+  assert.equal((await getCashView(w.mem.repo, USER)).questions, 3);
+  // 결제해 둔 질문이 남아 있으면 새로 사지 않는다 (쓰지 않은 질문은 최대 2개 남는다는 규칙은 그대로)
+  assert.deepEqual(await buy(), { kind: "ask" });
+  // 무료 질문을 다 쓴 뒤에도(입력칸 자리의 큰 구매 버튼) 같은 방식이다
+  const used = await world({ room: "love" });
+  await used.spendFree(2);
+  assert.equal((await startQuestionPayment(used.deps, { userId: USER, assessmentId: used.assessment.id, roomKey: "love", paymentEnv: "test" })).kind, "order");
+  // 질문 글 · 개인 정보는 주문에 없다
+  assert.ok(!JSON.stringify([...w.mem.orders.values(), w.mem.opsEvents]).includes("연락이 뜸한"));
+});
+
+test("질문 없이 구매 시작 거절: 남의 결과 · 연결된 AI 없음 · 잠긴 방 · 심층 리포트로만 열리는 방 · 하루 예산 · 지금은 새 구매를 받지 않음 — 결제하지 않는다", async () => {
+  const w = await world({ room: "love" });
+  const mine = { userId: USER, assessmentId: w.assessment.id, roomKey: "love", paymentEnv: "test" as const };
+  assert.deepEqual(await startQuestionPayment(w.deps, { ...mine, userId: OTHER }), { kind: "refused", result: { ok: false, reason: "not-found", message: ASK_MESSAGES["not-found"] } });
+  assert.deepEqual(await startQuestionPayment({ ...w.deps, answerer: null }, mine), { kind: "refused", result: { ok: false, reason: "closed", message: ASK_MESSAGES.closed } });
+  const locked = await world({ tier: "free", room: "career" });
+  assert.deepEqual(await startQuestionPayment(locked.deps, { ...mine, assessmentId: locked.assessment.id, roomKey: "career" }), { kind: "refused", result: { ok: false, reason: "room-locked", message: ASK_MESSAGES["room-locked"] } });
+  const main = await world({ tier: "free", room: "main" });
+  const deepOnly = await startQuestionPayment(main.deps, { ...mine, assessmentId: main.assessment.id, roomKey: "main" });
+  assert.ok(deepOnly.kind === "refused" && !deepOnly.result.ok && deepOnly.result.reason === "deep-only");
+  // 하루 AI 예산이 찼으면 새 구매도 멈춘다
+  await w.mem.repo.addAiUsage({ reportId: null, provider: "t", model: "t", promptVersion: "t", inputTokens: 1, outputTokens: 1, estCostKrw: 10, latencyMs: 1, outcome: "ok", errorCode: null });
+  const budget = await startQuestionPayment({ ...w.deps, capacity: { dailyBudgetKrw: 5 } as AskDeps["capacity"] }, mine);
+  assert.ok(budget.kind === "refused" && !budget.result.ok && budget.result.reason === "budget");
+  const closed = await startQuestionPayment({ ...w.deps, saleGate: async () => ({ open: false, reason: "budget", queued: 0, generating: 0, todayCostKrw: 0, budgetUsedPct: 100 }) }, mine);
+  assert.equal(closed.kind, "sales-closed");
+  for (const x of [w, locked, main]) assert.equal(x.mem.orders.size, 0, "어느 경우에도 주문이 없다");
+});
+
 test("결제 시작: 무료 리포트의 무료 질문 글자 수는 300자, 결제한 질문은 500자까지 받는다", async () => {
   const w = await world({ tier: "free", room: "love" });
   // 무료 질문이 남았을 때는 300자 한도 — 300자를 넘으면 거절

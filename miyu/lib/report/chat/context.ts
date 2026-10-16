@@ -1,7 +1,7 @@
 // 자유 질문에 AI가 읽는 근거를 만든다 — 저장된 리포트(또는 코드가 계산한 풀이)의 글만 쓰고, 이름은 "이 분"으로 바꾼다.
 // 새 글 · 새 사실을 더하지 않는다. 무료 맛보기(구매 전)의 모델에는 잠긴 내용이 없으므로 그 모델로 만든 근거에도 맛보기에 보이는 글뿐이다(taste).
 import type { TalkModel, TalkPiece, TalkTopic } from "../reading/talk.ts";
-import { ROOMS, roomTopic, type RoomId } from "../reading/talk-room.ts";
+import { intakeOption, ROOMS, roomTopic, type RoomId } from "../reading/talk-room.ts";
 import type { ChatContext } from "./types.ts";
 
 /** 한 풀이에서 AI에게 주는 글의 한도 (글자 수) — 입력이 길어져 비용이 커지지 않게 */
@@ -65,8 +65,9 @@ export function buildChatContext(model: TalkModel, roomId: RoomId, opts: ChatCon
   const found = opts.topicId && (roomId === "main" || here.has(opts.topicId)) ? roomTopic(model, roomId, opts.topicId) : undefined;
   const topic = found ? topicContext(found) : null;
 
-  const option = room.intake && opts.intakeId ? [...room.intake.options, room.intake.skip].find((o) => o.id === opts.intakeId) : undefined;
-  const intake = room.intake && option && option.id !== room.intake.skip.id ? { question: room.intake.question, answer: option.label } : null;
+  const option = room.intake && opts.intakeId ? intakeOption(room.intake, opts.intakeId) : undefined;
+  // "딱히 없어요" · "잘 모르겠어요"처럼 그 밖의 답("skip")은 답변 근거로 보내지 않는다
+  const intake = room.intake && option && option.id !== "skip" ? { question: room.intake.question, answer: option.label } : null;
 
   const c = model.card;
   return {

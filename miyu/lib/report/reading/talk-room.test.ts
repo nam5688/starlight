@@ -48,7 +48,7 @@ const fixedCopy = (): string[] =>
     ...flat(ROOM_COPY),
     ...ROOM_ORDER.flatMap((id) => {
       const r = ROOMS[id];
-      return [r.label, r.mode, r.blurb, r.connect ?? "", r.connectNote ?? "", r.greeting("서윤"), ...(r.intake ? [r.intake.question, ...r.intake.options.flatMap((o) => [o.label, o.lead]), r.intake.skip.label, r.intake.skip.lead] : [])];
+      return [r.label, r.mode, r.blurb, r.connect ?? "", r.connectNote ?? "", r.greeting("서윤"), ...(r.intake ? [r.intake.question, ...r.intake.options.flatMap((o) => [o.label, o.lead]), ...(r.intake.legacySkip ? [r.intake.legacySkip.label, r.intake.legacySkip.lead] : [])] : [])];
     }),
   ].filter(Boolean);
 
@@ -68,11 +68,14 @@ test("방 정의: 여덟 곳이고 이름은 운영자가 정한 대로이며, �
     assert.equal(r.connect, `${r.mode} 모드로 접속합니다`);
     assert.ok(r.intake && r.intake.options.length >= 3, `${id}: 먼저 묻는 질문`);
     assert.equal(new Set(r.intake!.options.map((o) => o.id)).size, r.intake!.options.length, `${id}: 답 번호가 겹치지 않는다`);
-    assert.ok(!r.intake!.options.some((o) => o.id === "skip"), "skip은 따로");
-    for (const o of [...r.intake!.options, r.intake!.skip]) assert.ok(TALK_MOODS.includes(o.mood), `${id}/${o.id}: 알 수 없는 표정`);
+    for (const o of [...r.intake!.options, ...(r.intake!.legacySkip ? [r.intake!.legacySkip] : [])]) assert.ok(TALK_MOODS.includes(o.mood), `${id}/${o.id}: 알 수 없는 표정`);
   }
   assert.deepEqual(ROOMS.love.intake!.options.map((o) => o.label), ["솔로예요", "짝사랑하는 사람이 있어요", "썸 타는 중이에요", "연애 중이에요", "헤어진 지 얼마 안 됐어요", "결혼 준비 중이에요", "결혼했어요"]);
-  assert.equal(ROOMS.love.intake!.skip.label, "말하고 싶지 않아요", "답하지 않을 수 있다");
+  // 운영자 2026-10-16: "말하고 싶지 않아요" 건너뛰기 버튼은 없다 — 어느 방에서도 이 이름의 답을 고를 수 없고, 답을 꼭 골라야 풀이로 간다
+  for (const id of ROOM_ORDER) {
+    const labels = ROOMS[id].intake?.options.map((o) => o.label) ?? [];
+    assert.ok(!labels.includes("말하고 싶지 않아요"), `${id}: 건너뛰기 버튼이 없다`);
+  }
   assert.equal(ROOMS.love.intake!.options.find((o) => o.id === "breakup")!.mood, "worried", "헤어진 직후에는 걱정하는 표정");
   assert.equal(ROOMS.concern.chatOnly, true);
   // 궁합 비교는 아직 없으므로 연애 · 결혼 방은 준비 중이라고 밝힌다
@@ -149,12 +152,46 @@ test("연애 방: 모드 접속 안내 → 인사 → 먼저 묻는 질문으로
   assert.equal(startRoom(m, "main").lines.length, 3);
 });
 
-test("건너뛰기: 말하고 싶지 않아요를 고르면 괜찮다고 하고 풀이로 간다 (연애 상태를 억지로 묻지 않는다)", () => {
+test("먼저 묻는 질문에는 건너뛰는 버튼이 없다: 답 버튼만 나오고, 답을 고르면 풀이로 간다 — 딱히 없어요 · 잘 모르겠어요 · 그 밖의 고민이에요는 건너뛰기가 아니라 실제 답이다", () => {
   const m = model();
-  const a = applyAction(m, "love", startRoom(m, "love"), { t: "intake", option: "skip" });
-  assert.equal(a.state.intake, "skip");
-  assert.ok(miyuText(a.added).some((t) => t === ROOMS.love.intake!.skip.lead));
+  for (const id of ROOM_ORDER.filter((r) => r !== "main")) {
+    const r = replyOptions(m, id, startRoom(m, id));
+    assert.ok(r.kind === "intake", `${id}: 먼저 묻는 질문`);
+    if (r.kind !== "intake") continue;
+    assert.ok(!("skip" in r), `${id}: 건너뛰기 버튼이 없다`);
+    assert.equal(r.options.length, ROOMS[id].intake!.options.length, `${id}: 답 버튼 수`);
+    assert.ok(!r.options.some((c) => c.label === "말하고 싶지 않아요"), `${id}: 말하고 싶지 않아요 버튼이 없다`);
+  }
+  // 그 밖의 답은 풀이 앞의 한 줄로 이어 준다
+  for (const [id, label] of [["daily", "딱히 없어요"], ["year", "잘 모르겠어요"], ["marriage", "잘 모르겠어요"], ["concern", "그 밖의 고민이에요"]] as const) {
+    const opt = ROOMS[id].intake!.options.find((o) => o.label === label);
+    assert.ok(opt && opt.id === "skip", `${id}: ${label}`);
+    const a = applyAction(m, id, startRoom(m, id), { t: "intake", option: opt.id });
+    assert.equal(a.state.intake, "skip");
+    assert.ok(miyuText(a.added).some((t) => t === opt.lead));
+  }
+  // 연애 방은 답을 골라야 풀이가 열린다 (연애 상태를 고른 뒤에야 읽는다)
+  const a = applyAction(m, "love", startRoom(m, "love"), { t: "intake", option: "solo" });
+  assert.equal(a.state.intake, "solo");
   assert.ok(a.added.some((l) => l.from === "miyu" && l.say.kind === "answer"));
+});
+
+test("예전에 저장된 대화는 그대로 되살아난다: 연애 · 진로 · 재무 방에 남은 '말하고 싶지 않아요'(skip) 답은 읽히고 풀이로 이어지지만, 새 대화에서는 고를 수 없다", () => {
+  const m = model();
+  for (const id of ["love", "career", "money"] as const) {
+    const legacy = ROOMS[id].intake!.legacySkip!;
+    assert.equal(legacy.label, "말하고 싶지 않아요");
+    assert.ok(!ROOMS[id].intake!.options.some((o) => o.id === "skip"), `${id}: 화면 답에는 skip이 없다`);
+    const saved = { v: ROOM_SAVE_VERSION, actions: [{ t: "intake", option: "skip" }] };
+    const parsed = parseRoomSave(saved, m, id);
+    assert.deepEqual(parsed, [{ t: "intake", option: "skip" }], `${id}: 예전 저장본을 읽는다`);
+    const state = replayRoom(m, id, parsed);
+    assert.equal(state.intake, "skip");
+    assert.ok(miyuText(state.lines).some((t) => t === legacy.lead), `${id}: 예전 답의 한 줄이 되살아난다`);
+    assert.ok(state.lines.some((l) => l.from === "miyu" && l.say.kind === "answer"), `${id}: 풀이로 이어진다`);
+  }
+  // 건너뛰기가 없던 방(daily)에서 지어낸 번호는 버린다
+  assert.deepEqual(parseRoomSave({ v: ROOM_SAVE_VERSION, actions: [{ t: "intake", option: "nope" }] }, m, "love"), []);
 });
 
 test("내 경험 답장: 맞아요는 예시를 보여 주고, 상황에 따라 달라요는 자유 질문 상태에 따라 이어 가거나 준비 중 · 잠금을 밝히고, 어느 답도 풀이에 반영하지 않는다고 알린다", () => {
@@ -240,7 +277,7 @@ test("오늘의 한 장(원데이 미유): 고른 영역의 한 줄 팁이 풀�
   const r = replyOptions(m, "daily", a.state);
   assert.ok(r.kind === "chat" && r.feel.length === 0 && r.next === null, "내 경험 답장 · 다음 풀이가 없다");
   assert.ok(r.kind === "chat" && r.helpers.map((c) => c.key).join() === "basis", "분석 이유만 열 수 있다");
-  // 건너뛰면 영역 팁 없이 오늘의 분위기만
+  // "딱히 없어요"를 고르면 영역 팁 없이 오늘의 분위기만
   const skip = applyAction(m, "daily", s, { t: "intake", option: "skip" });
   assert.ok(!miyuText(skip.added).some((t) => Object.values(d.tips).includes(t)));
   // 이어 보기는 날짜별로 나뉜다 — 내일은 새 한 장
@@ -346,7 +383,7 @@ test("미유의 모든 말은 저장된 리포트의 글 · 사주 계산에서 
     const derived = (t: string) => [...m.topics, ...m.codeTopics].some((x) => (x.periodExample && norm(x.periodExample) === t) || norm(askFor(x.id, m.name)) === t || (x.askText && norm(x.askText) === t));
     for (const room of ROOM_ORDER) {
       const intake = ROOMS[room].intake;
-      const script: RoomAction[][] = intake ? [...intake.options, intake.skip].map((o) => [{ t: "intake", option: o.id } as RoomAction]) : [[{ t: "group", id: "me" } as RoomAction], [{ t: "topic", id: "flow" } as RoomAction]];
+      const script: RoomAction[][] = intake ? [...intake.options, ...(intake.legacySkip ? [intake.legacySkip] : [])].map((o) => [{ t: "intake", option: o.id } as RoomAction]) : [[{ t: "group", id: "me" } as RoomAction], [{ t: "topic", id: "flow" } as RoomAction]];
       for (const actions of script) {
         let st = startRoom(m, room);
         const seen: TalkLine[] = [...st.lines];
@@ -423,34 +460,42 @@ test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이�
   assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
 });
 
-test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 질문을 적고 '질문 3개 구매' 버튼을 누르면 구매한 뒤 그 질문에 바로 답한다는 것만 알리고(가격 · 글자 수 문장은 이 창에 없다), 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
+test("무료 질문을 모두 썼을 때의 안내창 문구: 다 썼다는 것 · 아래 '질문 3개 구매하기' 버튼을 누르면 바로 질문을 적을 수 있다는 것만 알리고(가격 · 글자 수 문장은 이 창에 없다), 해요체, 마감 타이머 · 불안 자극 없음, 값은 상수와 같다", () => {
   const c = TALK_COPY.recharge;
   assert.equal(c["free-used"].title, "무료 질문을 모두 썼어요");
-  assert.equal(c["free-used"].body, '이어서 묻고 싶다면 질문을 적고 "질문 3개 구매" 버튼을 눌러 주세요. 구매한 뒤 그 질문에 바로 답해요.');
-  assert.equal(c["paid-used"].body, '더 묻고 싶다면 질문을 적고 "질문 3개 구매" 버튼을 눌러 주세요. 구매한 뒤 그 질문에 바로 답해요.');
+  assert.equal(c["free-used"].body, '이어서 묻고 싶다면 아래 "질문 3개 구매하기" 버튼을 눌러 주세요. 구매하면 바로 질문을 적을 수 있어요.');
+  assert.equal(c["paid-used"].body, '더 묻고 싶다면 아래 "질문 3개 구매하기" 버튼을 눌러 주세요. 구매하면 바로 질문을 적을 수 있어요.');
   for (const v of [c["free-used"], c["paid-used"]]) assert.ok(!/\d+원|\d+자|두 배|충전|캐시/.test(v.body), `안내창에는 가격 · 글자 수 · 선불 충전 말이 없다(질문 개수만 알린다): ${v.body}`);
   assert.deepEqual(QUESTION_MAX, { free: 300, paid: 500 });
   assert.equal(QUESTION_PACK_PRICE_KRW, 2500);
-  assert.equal(c.payLabel, "질문 이어가기");
+  assert.equal(c.payLabel, "구매 버튼으로 가기");
   const texts: string[] = [...[c["free-used"], c["paid-used"], c.deep].flatMap((v) => [v.title, v.body]), c.later, c.payLabel, c.open];
   for (const text of texts) {
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정|충전|캐시/.test(text), `불안 · 압박 · 선불 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }
-  for (const text of [ROOM_COPY.chatTicketLead(2), ROOM_COPY.chatPayLead(QUESTION_PACK_PRICE_KRW), ROOM_COPY.chatPayLow, ROOM_COPY.chatPayNote(QUESTION_PACK_PRICE_KRW), TALK_COPY.freeQuestionTicket(2), TALK_COPY.freeQuestionPay, TALK_COPY.payButton(QUESTION_PACK_PRICE_KRW), TALK_COPY.payExplain, TALK_COPY.payExplainRest, TALK_COPY.payMoving, TALK_COPY.payNotDone]) {
+  for (const text of [ROOM_COPY.chatTicketLead(2), ROOM_COPY.chatPayLead, ROOM_COPY.chatPayLow, TALK_COPY.freeQuestionTicket(2), TALK_COPY.buyLabel, TALK_COPY.payMoving, TALK_COPY.paySuccess, TALK_COPY.payNotDone, TALK_COPY.payHasTickets]) {
     assert.ok(!/마감|서두르|지금\s*아니면|놓치면|곧\s*사라|할인|한정|충전|캐시/.test(text), `불안 · 압박 · 선불 표현 없음: ${text}`);
     assert.ok(!/(합니다|입니다|습니다)[.!]?$/.test(text), `해요체: ${text}`);
   }
-  assert.match(ROOM_COPY.chatPayLead(2500), /"질문 3개 구매 · 2,500원" 버튼/);
-  assert.match(ROOM_COPY.chatPayLead(2500), /적은 질문에 바로 답하고 1회가 사용돼요/);
-  assert.match(ROOM_COPY.chatPayNote(2500), /질문 3개 묶음 2,500원\(부가세 포함\)/);
-  assert.match(ROOM_COPY.chatPayNote(2500), /1개씩 결제하는 방법은 없어요/);
-  // 보내기 화살표 대신 구매 버튼: 이름에 개수와 가격이 있고, 그 아래 한 줄이 구매 뒤에 벌어질 일(바로 답변 · 1회 사용 · 남은 질문)을 말한다
-  assert.equal(TALK_COPY.payButton(2500), "질문 3개 구매 · 2,500원");
-  assert.equal(TALK_COPY.payExplain, "구매 후 작성한 질문에 바로 답변하며 1회가 사용돼요");
-  assert.equal(TALK_COPY.payExplainRest, "남은 2회는 이어서 쓸 수 있어요");
-  assert.equal(TALK_COPY.freeQuestionPay, "먼저 묻고 싶은 질문을 적어 주세요");
+  assert.match(ROOM_COPY.chatPayLead, /"질문 3개 구매하기" 버튼/);
+  assert.ok(!/질문을 적고|1회가 사용/.test(ROOM_COPY.chatPayLead), "구매하기 전에 질문을 적게 하지 않는다 — 구매하면 입력창이 열린다");
   assert.equal(TALK_COPY.freeQuestionTicket(2), "결제해 둔 질문 2개가 남아 있어요");
   assert.match(ROOM_COPY.chatTicketLead(1), /결제해 둔 질문이 1개 남아 있어요/);
-  assert.ok(ROOM_COPY.chatFreeNote.includes(`${QUESTION_MAX.free}자`), "무료 질문 안내에도 글자 수 한도가 있다");
+});
+
+test("질문 구매 버튼(운영자 2026-10-16): 이름은 '질문 3개 구매하기', 가격은 작고 연한 줄에 'VAT 포함'으로, 버튼 아래 설명 줄 · 낱개 결제 · 선불 표현은 없다", () => {
+  assert.equal(TALK_COPY.buyLabel, "질문 3개 구매하기");
+  assert.equal(TALK_COPY.buyVat(2500), "2,500원 (VAT 포함)");
+  assert.equal(TALK_COPY.buyVat(QUESTION_PACK_PRICE_KRW), `${QUESTION_PACK_PRICE_KRW.toLocaleString("ko-KR")}원 (VAT 포함)`);
+  // 예전의 설명 줄(구매 후 작성한 질문에 바로 답변 · 남은 회수 · 먼저 질문을 적어 주세요)은 더 이상 없다
+  const keys = Object.keys(TALK_COPY);
+  for (const gone of ["payButton", "payExplain", "payExplainRest", "freeQuestionPay"]) assert.ok(!keys.includes(gone), `${gone}는 없어졌다`);
+  for (const gone of ["chatPayNote", "chatFreeNote"]) assert.ok(!Object.keys(ROOM_COPY).includes(gone), `${gone}는 없어졌다`);
+});
+
+test("채팅 하단 안내문(운영자 2026-10-16): 한 줄만 — '답변은 입력해 주신 정보를 기반으로 해석한 내용이며 정확한 예측이나 진단이 아닙니다.' 가격 · 글자 수 · 남은 횟수 · AI가 쓴 글이라는 긴 설명은 붙이지 않는다", () => {
+  assert.equal(ROOM_COPY.chatAiNote, "답변은 입력해 주신 정보를 기반으로 해석한 내용이며 정확한 예측이나 진단이 아닙니다.");
+  assert.ok(!/\d|원|자까지|남았|쓰이지|AI가/.test(ROOM_COPY.chatAiNote), "숫자 · 가격 · 횟수 · 긴 설명이 없다");
+  assert.ok(ROOM_COPY.chatAiNote.length < 60, "한 줄이다");
 });

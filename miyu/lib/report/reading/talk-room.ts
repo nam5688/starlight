@@ -3,7 +3,7 @@
 // 이 파일은 AI를 부르지 않는다. 자유 질문의 답은 서버가 만들어 오고(자유 질문 행동 "free"), 이 파일은 그 글을 대화에 놓고 되살리기만 한다.
 // 눌러 준 답(연애 상태 등)은 풀이를 바꾸지 않는다. 풀이를 어떻게 읽을지 알려 주는 한 줄에만 쓴다.
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
-import { CHAT_SUMMARY_POLICY, formatKrw, QUESTION_PACK_SIZE } from "../../config/product.ts";
+import { CHAT_SUMMARY_POLICY, QUESTION_PACK_SIZE } from "../../config/product.ts";
 import { answerBubbles, extraBubbles, freeLeftText, nextTopic, QUESTION_MAX, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
 
 /** 미유의 표정 — 운영자가 보낸 캐릭터 시트의 표정 시트 6가지와 액션 포즈 3가지 (그림은 components/talk/miyu-moods.ts) */
@@ -19,7 +19,20 @@ export type TalkLine = { from: "me"; text: string } | { from: "miyu"; say: TalkS
 
 type IntakeOption = { id: string; label: string; lead: string; mood: TalkMood };
 /** 풀이 전에 먼저 묻는 질문 — 고른 답은 풀이를 어떻게 읽을지 알려 주는 한 줄(과 풀이 뒤의 덧붙임)에만 쓰고 풀이를 바꾸지 않는다 */
-export type Intake = { question: string; options: IntakeOption[]; skip: IntakeOption };
+export type Intake = {
+  question: string;
+  options: IntakeOption[];
+  /**
+   * 예전에 저장된 대화에 남아 있는 "말하고 싶지 않아요" 답을 되살릴 때만 쓴다 — 화면에는 보이지 않는다(운영자 2026-10-16: 건너뛰기 버튼을 없애고 답을 꼭 고르게 한다).
+   * 새 대화에서는 이 답을 고를 수 없다. 그 밖의 방의 "딱히 없어요" · "잘 모르겠어요" · "그 밖의 고민이에요"는 건너뛰기가 아니라 실제 답이라 options에 들어 있다.
+   */
+  legacySkip?: IntakeOption;
+};
+
+/** 번호로 먼저 묻는 질문의 답을 찾는다 — 예전 저장본의 "skip"은 legacySkip으로 되살린다 */
+export function intakeOption(intake: Intake, id: string): IntakeOption | undefined {
+  return intake.options.find((o) => o.id === id) ?? (id === "skip" ? intake.legacySkip : undefined);
+}
 
 export type RoomDef = {
   id: RoomId;
@@ -42,7 +55,10 @@ export type RoomDef = {
   greeting: (name: string) => string;
 };
 
-const SKIP = (lead: string, label = "말하고 싶지 않아요"): IntakeOption => ({ id: "skip", label, lead, mood: "basic" });
+/** 방에서 "그 밖의 경우"를 뜻하는 실제 답(딱히 없어요 · 잘 모르겠어요 · 그 밖의 고민이에요) — 번호는 예전 저장본과 같은 "skip"을 그대로 쓴다 */
+const ELSE = (lead: string, label: string): IntakeOption => ({ id: "skip", label, lead, mood: "basic" });
+/** 예전의 "말하고 싶지 않아요" — 새 대화에서는 보이지 않고 예전 저장본을 되살릴 때만 쓴다 */
+const LEGACY_SKIP = (lead: string): IntakeOption => ({ id: "skip", label: "말하고 싶지 않아요", lead, mood: "basic" });
 
 export const ROOM_COPY = {
   /** 먼저 묻는 질문의 답을 받은 뒤 한 번 보이는 작은 안내 */
@@ -87,19 +103,16 @@ export const ROOM_COPY = {
   chatLocked: "이야기를 이어 가는 건 리포트를 받은 분께 열려 있어요.",
   /** 무료 리포트로는 질문이 없는 방(나를 알아보기) — 심층 리포트로 이어 준다 */
   chatDeepOnly: "자세한 이야기는 심층 리포트에서 이어져요.",
-  /** 무료 질문을 모두 쓴 뒤 유료 질문(질문 3개 묶음 결제)으로 이어 가는 중 — 결제한 질문이 남아 있을 때(남은 개수) · 질문을 보낼 때 결제로 이어질 때 · 유료 질문을 지금 열 수 없을 때 */
+  /** 무료 질문을 모두 쓴 뒤 유료 질문(질문 3개 묶음 결제)으로 이어 가는 중 — 결제한 질문이 남아 있을 때(남은 개수) · 입력칸이 구매 버튼으로 바뀌어 있을 때 · 유료 질문을 지금 열 수 없을 때 */
   chatTicketLead: (left: number) => `무료 질문은 모두 썼어요. 결제해 둔 질문이 ${left}개 남아 있어요. 아래 입력창에 적어 보내면 바로 이어서 답해요.`,
-  chatPayLead: (priceKrw: number) => `무료 질문은 모두 썼어요. 더 묻고 싶다면 질문을 적고 아래 "질문 ${QUESTION_PACK_SIZE}개 구매 · ${formatKrw(priceKrw)}" 버튼을 눌러 주세요. 구매한 뒤 적은 질문에 바로 답하고 1회가 사용돼요. 나머지 ${QUESTION_PACK_SIZE - 1}회는 이어서 쓸 수 있어요.`,
+  chatPayLead: `무료 질문은 모두 썼어요. 더 묻고 싶다면 아래 "질문 ${QUESTION_PACK_SIZE}개 구매하기" 버튼을 눌러 주세요. 구매하면 바로 질문을 적을 수 있어요.`,
   chatPayLow: "무료 질문을 모두 썼어요. 유료 질문은 지금 열 수 없어요. 잠시 뒤에 다시 와 주세요.",
-  /** 입력창 위 안내(보조기기에도 읽힌다) — 묶음 가격 · 낱개 없음 · 남은 질문 · 답을 받지 못하면 쓰이지 않는다는 것. 구매하면 무슨 일이 일어나는지는 버튼 아래 한 줄(`TALK_COPY.payExplain`)이 말한다 */
-  chatPayNote: (priceKrw: number) => `질문 ${QUESTION_PACK_SIZE}개 묶음 ${formatKrw(priceKrw)}(부가세 포함)이에요. 1개씩 결제하는 방법은 없어요. 쓰지 않은 질문은 남아 있다가 이어서 쓸 수 있고, 답을 받지 못하면 그 질문은 쓰이지 않아요.`,
   /** 무료 맛보기에서 이 방의 풀이에 내 자료로 읽은 내용이 아직 없을 때 — 무료 질문을 열지 않는다(재료가 있는 방에서만 연다) */
   chatNoMaterial: "이 방의 무료 풀이에는 아직 이야기 나눌 내용이 없어서 무료 질문은 열리지 않았어요. 리포트를 받으면 이어서 물어볼 수 있어요.",
   /** 무료 맛보기에서 로그인한 분께 열어 주는 무료 질문(기본 2번) — 열려 있을 때 · 이미 썼을 때 */
   chatFreeUsed: "무료 질문을 모두 썼어요. 이어서 묻고 깊은 풀이를 보려면 리포트에서 이어져요.",
-  chatFreeNote: `무료 질문은 ${QUESTION_MAX.free}자까지 쓸 수 있고, 지금 보이는 맛보기 내용만 가지고 답해요. 깊은 풀이는 리포트에서 이어져요.`,
-  /** 자유 질문이 열려 있을 때 입력창 위에 작게 — AI가 쓴 답이라는 것과 예측이 아니라는 것 */
-  chatAiNote: "답은 AI가 내 리포트의 글과 적어 준 내용으로 쓴 해석이에요. 예측이나 진단이 아니에요.",
+  /** 자유 질문이 열려 있을 때 입력창 위에 작게 한 줄만(운영자 2026-10-16: "너무 구구절절" — 가격 · 글자 수 · 남은 횟수 문장은 이 줄에 붙이지 않는다) */
+  chatAiNote: "답변은 입력해 주신 정보를 기반으로 해석한 내용이며 정확한 예측이나 진단이 아닙니다.",
   /** 진로 방과 재무 방은 같은 저장된 "일과 돈" 풀이에서 보여 주는 소단락 · 질문 · 안내를 달리한다 — 새 글을 쓰지 않고 고르기만 한다 */
   focus: {
     career: {
@@ -148,8 +161,8 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         { id: "people", label: "사람 · 연애", lead: "사람 · 연애 쪽을 중심으로 오늘의 한 장을 읽어 볼게요.", mood: "playful" },
         { id: "money", label: "돈 · 소비", lead: "돈 · 소비 쪽을 중심으로 오늘의 한 장을 읽어 볼게요.", mood: "thinking" },
         { id: "mind", label: "컨디션 · 마음", lead: "컨디션 · 마음 쪽을 중심으로 오늘의 한 장을 읽어 볼게요.", mood: "basic" },
+        ELSE("괜찮아요. 오늘의 분위기부터 읽어 볼게요.", "딱히 없어요"),
       ],
-      skip: SKIP("괜찮아요. 오늘의 분위기부터 읽어 볼게요.", "딱히 없어요"),
     },
   },
   year: {
@@ -168,8 +181,8 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         { id: "money", label: "일 · 돈", lead: "일과 돈 쪽의 움직임까지 같이 볼게요.", mood: "thinking" },
         { id: "love", label: "사람 · 연애", lead: "사람과 인연 쪽의 움직임까지 같이 볼게요.", mood: "playful" },
         { id: "all", label: "전체 분위기", lead: "먼저 큰 분위기부터 볼게요.", mood: "basic" },
+        ELSE("괜찮아요. 큰 분위기부터 볼게요.", "잘 모르겠어요"),
       ],
-      skip: SKIP("괜찮아요. 큰 분위기부터 볼게요.", "잘 모르겠어요"),
     },
   },
   love: {
@@ -193,7 +206,7 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         { id: "wedding", label: "결혼 준비 중이에요", lead: "결혼을 준비 중이라면, 결혼 여부나 시기를 사주로 정하지 않고 서로 맞춰 가는 방식을 살펴보는 데 써 보세요.", mood: "happy" },
         { id: "married", label: "결혼했어요", lead: "결혼한 사이라면, 지금 관계에서 편한 점과 맞춰 가야 할 점을 보는 데 써 보세요.", mood: "happy" },
       ],
-      skip: SKIP("괜찮아요. 상황을 몰라도 읽을 수 있게 이야기할게요."),
+      legacySkip: LEGACY_SKIP("괜찮아요. 상황을 몰라도 읽을 수 있게 이야기할게요."),
     },
   },
   marriage: {
@@ -213,8 +226,8 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         { id: "preparing", label: "결혼을 준비 중이에요", lead: "결혼을 준비 중이라면, 서로 맞춰 가는 방식을 살펴보는 참고로 읽어 보세요.", mood: "happy" },
         { id: "married", label: "결혼했어요", lead: "결혼한 사이라면, 지금 관계에서 편한 점과 맞춰 가야 할 점을 보는 데 써 보세요.", mood: "happy" },
         { id: "notyet", label: "아직 생각 없어요", lead: "괜찮아요. 결혼과 상관없이 오래 가는 관계에서 내가 중요하게 보는 것을 가볍게 살펴봐요.", mood: "basic" },
+        ELSE("괜찮아요. 상황을 몰라도 읽을 수 있게 이야기할게요.", "잘 모르겠어요"),
       ],
-      skip: SKIP("괜찮아요. 상황을 몰라도 읽을 수 있게 이야기할게요.", "잘 모르겠어요"),
     },
   },
   career: {
@@ -235,7 +248,7 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         { id: "stuck", label: "요즘 일이 막막해요", lead: "막막할 때는 해석을 답으로 보기보다, 하나씩 확인해 볼 질문으로 읽어 보세요.", mood: "worried" },
         { id: "unsure", label: "잘 모르겠어요", lead: "괜찮아요. 일하는 방식부터 같이 볼게요.", mood: "basic" },
       ],
-      skip: SKIP("괜찮아요. 일하는 방식부터 같이 볼게요."),
+      legacySkip: LEGACY_SKIP("괜찮아요. 일하는 방식부터 같이 볼게요."),
     },
   },
   money: {
@@ -257,7 +270,7 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         { id: "worry", label: "돈 걱정이 자꾸 돼요", lead: "걱정이 클 때는 이야기를 답으로 쓰기보다 확인할 것을 정리하는 데 써 보세요.", mood: "worried" },
         { id: "unsure", label: "잘 모르겠어요", lead: "괜찮아요. 돈을 대하는 방식부터 같이 볼게요.", mood: "basic" },
       ],
-      skip: SKIP("괜찮아요. 돈을 대하는 방식부터 같이 볼게요."),
+      legacySkip: LEGACY_SKIP("괜찮아요. 돈을 대하는 방식부터 같이 볼게요."),
     },
   },
   concern: {
@@ -279,8 +292,8 @@ export const ROOMS: Record<RoomId, RoomDef> = {
         { id: "money", label: "돈 · 소비", lead: "돈 · 소비 고민이시군요.", mood: "thinking" },
         { id: "family", label: "가족 · 인간관계", lead: "가족이나 주변 사람과의 고민이시군요.", mood: "worried" },
         { id: "self", label: "나 자신", lead: "나 자신에 대한 고민이시군요.", mood: "basic" },
+        ELSE("괜찮아요. 편한 것부터 이야기해 주세요.", "그 밖의 고민이에요"),
       ],
-      skip: SKIP("괜찮아요. 편한 것부터 이야기해 주세요.", "그 밖의 고민이에요"),
     },
   },
 };
@@ -302,7 +315,7 @@ export type RoomState = {
   /** 주제마다 이미 연 답장 (TalkExtra · "yes" · "mixed" · "unsure") */
   used: Record<string, string[]>;
   current: string | null;
-  /** 먼저 묻는 질문에 고른 답의 번호 ("skip" 포함), 아직이면 null */
+  /** 먼저 묻는 질문에 고른 답의 번호 ("skip"은 "딱히 없어요" 같은 그 밖의 답 또는 예전 저장본의 건너뛰기), 아직이면 null */
   intake: string | null;
   /** "상황에 따라 달라요"를 누른 뒤 다음 자유 질문이 그 풀이에 이어지는지 */
   asking: { topic: string } | null;
@@ -433,7 +446,7 @@ function chatLead(model: TalkModel, ctx: RoomContext): TalkLine[] {
   const ch = model.chat;
   if (c === "ready") {
     if (ch.used && ch.cash && ch.cash.balance >= ch.cash.per) return [miyu(text(ROOM_COPY.chatTicketLead(Math.floor(ch.cash.balance / ch.cash.per))), "basic")];
-    if (ch.used && ch.pay) return [miyu(text(ROOM_COPY.chatPayLead(ch.pay.priceKrw)), "basic")];
+    if (ch.used && ch.pay) return [miyu(text(ROOM_COPY.chatPayLead), "basic")];
     if (ch.left !== undefined) return [miyu(text(`이 방에서 무료 질문을 ${freeLeftText(ch.left)} 더 할 수 있어요. 아래 입력창에 편하게 적어 주세요.`), "basic")];
     return [miyu(text(ROOM_COPY.chatReady), "basic")];
   }
@@ -474,7 +487,7 @@ export function applyAction(model: TalkModel, roomId: RoomId, state: RoomState, 
     }
     case "intake": {
       if (!room.intake || state.phase !== "intake") return nothing;
-      const opt = action.option === "skip" ? room.intake.skip : room.intake.options.find((o) => o.id === action.option);
+      const opt = intakeOption(room.intake, action.option);
       if (!opt) return nothing;
       const lead: TalkLine[] = [me(opt.label), miyu(text(opt.lead), opt.mood), miyu(text(ROOM_COPY.intakeNote, true), "basic")];
       const first = roomTopics(model, roomId)[0];
@@ -535,7 +548,7 @@ function withUsedState(state: RoomState, topic: string, key: string | null): Roo
 export type ReplyChip = { key: string; label: string; action: RoomAction };
 export type Replies =
   | { kind: "pick"; groups: ReplyChip[] }
-  | { kind: "intake"; options: ReplyChip[]; skip: ReplyChip }
+  | { kind: "intake"; options: ReplyChip[] }
   | { kind: "chat"; feel: ReplyChip[]; helpers: ReplyChip[]; next: ReplyChip | null; report: boolean; buy: TalkBuy | null; asking: boolean };
 
 /** 지금 보여 줄 답장 버튼 — 첫 화면(주제 2×2) · 먼저 묻는 질문 · 풀이를 읽은 뒤(내 경험 · 보조 버튼 · 다음 풀이 · 무료 맛보기의 이어 보기) */
@@ -544,7 +557,7 @@ export function replyOptions(model: TalkModel, roomId: RoomId, state: RoomState)
   if (state.phase === "pick") return { kind: "pick", groups: model.groups.map((g) => ({ key: g.id, label: g.chip, action: { t: "group", id: g.id } })) };
   if (state.phase === "intake" && room.intake) {
     const chip = (o: IntakeOption): ReplyChip => ({ key: o.id, label: o.label, action: { t: "intake", option: o.id } });
-    return { kind: "intake", options: room.intake.options.map(chip), skip: chip(room.intake.skip) };
+    return { kind: "intake", options: room.intake.options.map(chip) };
   }
   const empty = { feel: [] as ReplyChip[], helpers: [] as ReplyChip[], next: null, report: false, asking: state.asking !== null };
   const t = state.current ? roomTopic(model, roomId, state.current) : undefined;
@@ -613,7 +626,9 @@ export function parseRoomSave(raw: unknown, model: TalkModel, roomId: RoomId): R
   if (!raw || typeof raw !== "object" || (raw as RoomSave).v !== ROOM_SAVE_VERSION) return [];
   const topicIds = new Set(allTopics(model).map((t) => t.id));
   const groupIds = new Set(model.groups.map((g) => g.id));
-  const intakeIds = new Set(ROOMS[roomId].intake ? [...ROOMS[roomId].intake!.options.map((o) => o.id), "skip"] : []);
+  const intake = ROOMS[roomId].intake;
+  // 예전 저장본에 남은 "말하고 싶지 않아요"(skip)도 되살린다 — 새 대화에서는 고를 수 없다
+  const intakeIds = new Set(intake ? [...intake.options.map((o) => o.id), ...(intake.legacySkip ? [intake.legacySkip.id] : [])] : []);
   const out: RoomAction[] = [];
   for (const a of sanitizeRoomActions((raw as RoomSave).actions)) {
     if (a.t === "group" && groupIds.has(a.id)) out.push(a);

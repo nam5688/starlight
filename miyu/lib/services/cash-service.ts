@@ -7,7 +7,7 @@ import { canAffordQuestion, createQuestionNonce, questionProductId, questionQuot
 import { hasSupportContact } from "../config/business.ts";
 import { isCashProduct, MIYU_CASH, questionPackSalesOpen } from "../config/product.ts";
 import type { GateReason } from "./capacity-service.ts";
-import { gateQuestion, type AskDeps, type AskInput, type AskResult } from "./chat-service.ts";
+import { gatePurchase, gateQuestion, type AskDeps, type AskInput, type AskResult, type PurchaseInput } from "./chat-service.ts";
 import type { SaleGateCheck } from "./order-service.ts";
 import type { Acquisition, CashLedgerRecord, MiyuRepository, OrderRecord, PaymentEnv } from "./ports.ts";
 
@@ -27,19 +27,30 @@ export type StartQuestionPaymentResult =
   | { kind: "not-found" };
 
 /**
- * 질문 결제 시작. **질문을 받을 수 있는지(무료 질문 수 · 글자 수 · 위기 표현 · 잠긴 방 · 하루 예산)를 답할 때와 같은 규칙으로 먼저 확인한 뒤에만** 주문을 만든다 —
- * 마음이 많이 힘든 글은 결제 없이 안내로 끝나고, 무료 질문이 남았거나 결제한 질문이 하나라도 남아 있으면 새로 결제받지 않는다(그래서 쓰지 않은 질문은 최대 2개까지 남는다).
- * 질문 글은 확인에만 쓰고 저장하지 않는다(결제를 다녀오는 동안은 브라우저에만 남는다).
+ * 질문 3개 묶음 결제 시작(운영자 2026-10-16: 무료 질문을 다 쓰면 입력칸이 구매 버튼으로 바뀌고, 그전에는 입력창 위에 작은 구매 버튼이 있다 — 둘 다 **질문 없이** 구매를 시작한다).
+ * 질문 글(`question`)이 없으면 방 · 이어 갈 수 있는지 · 하루 예산만 확인하고(`gatePurchase`) 주문을 만든다. 무료 질문이 남아 있어도 살 수 있다(결제한 질문은 무료 질문을 다 쓴 뒤에 쓰인다).
+ * 질문 글이 함께 오면(예전 화면이 열려 있는 경우) **질문을 받을 수 있는지(무료 질문 수 · 글자 수 · 위기 표현 · 잠긴 방 · 하루 예산)를 답할 때와 같은 규칙으로 먼저 확인한 뒤에만** 주문을 만든다 —
+ * 마음이 많이 힘든 글은 결제 없이 안내로 끝나고, 무료 질문이 남았다면 결제 없이 묻게 한다.
+ * 어느 쪽이든 결제한 질문이 하나라도 남아 있으면 새로 결제받지 않는다(그래서 쓰지 않은 질문은 최대 2개까지 남는다).
+ * 질문 글은 확인에만 쓰고 저장하지 않는다.
  * 주문은 본인의 검사 결과 하나에 붙고(주문 표가 검사 결과 번호를 요구한다), 이 결과에 남아 있던 질문 결제 대기 주문은 새 결제 요청으로 대체한다(결제창을 닫고 다시 누른 경우).
  */
 export async function startQuestionPayment(
   deps: AskDeps & { newOrderNumber?: (now: Date) => string; nonce?: (room: string) => string; saleGate?: SaleGateCheck; /** 테스트용: 실결제 판매를 열어도 되는지(기본은 이용 기준 확정 + 문의 채널이 있을 때만) */ liveSalesOpen?: boolean },
-  input: AskInput & { paymentEnv?: PaymentEnv; acquisition?: Acquisition | null },
+  input: (PurchaseInput & { question?: undefined } | AskInput) & { paymentEnv?: PaymentEnv; acquisition?: Acquisition | null },
 ): Promise<StartQuestionPaymentResult> {
   const { repo } = deps;
-  const gate = await gateQuestion(deps, input);
-  if (!gate.ok) return { kind: "refused", result: gate.result };
-  if (gate.inQuota) return { kind: "ask" };
+  let room: string;
+  if (input.question === undefined) {
+    const gate = await gatePurchase(deps, input);
+    if (!gate.ok) return { kind: "refused", result: gate.result };
+    room = gate.loaded.room;
+  } else {
+    const gate = await gateQuestion(deps, input as AskInput);
+    if (!gate.ok) return { kind: "refused", result: gate.result };
+    if (gate.inQuota) return { kind: "ask" };
+    room = gate.loaded.room;
+  }
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
 
@@ -79,7 +90,7 @@ export async function startQuestionPayment(
       orderNumber: makeNumber(deps.now()),
       userId: input.userId,
       assessmentId: assessment.id,
-      productId: questionProductId(nonce(gate.loaded.room)),
+      productId: questionProductId(nonce(room)),
       amount: quote.priceKrw,
       paymentEnv: input.paymentEnv ?? "test",
       acquisition: input.acquisition ?? null,

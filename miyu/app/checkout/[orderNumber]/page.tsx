@@ -111,7 +111,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
         <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
           <span className="font-semibold text-ink">{isPack ? `질문 ${QUESTION_PACK_SIZE}개 = ${formatKrw(order.amount)}.` : `질문 1개 = ${formatKrw(order.amount)}.`}</span>{" "}
           {isPack
-            ? `무료 질문을 다 쓴 뒤 이어서 묻는 유료 질문 ${QUESTION_PACK_SIZE}개를 묶어서 결제해요(1개씩 결제하는 방법은 없어요). 결제가 확인되면 방금 적은 질문에 이어서 답하고, 그 질문에 하나가 쓰여요. 남은 ${QUESTION_PACK_SIZE - 1}개는 쓰지 않으면 그대로 남아 있다가 이어서 쓸 수 있어요. 답을 받지 못하면 그 질문은 쓰이지 않아요. 리포트는 새로 만들어지지 않아요. 가격과 환불 · 유효기간 기준은 아직 확정 전이에요.`
+            ? `유료 질문 ${QUESTION_PACK_SIZE}개를 묶어서 결제해요(1개씩 결제하는 방법은 없어요). 결제가 확인되면 채팅방으로 돌아가 바로 질문을 적을 수 있고, 질문을 보낼 때마다 하나씩 쓰여요. 쓰지 않은 질문은 그대로 남아 있다가 이어서 쓸 수 있어요. 답을 받지 못하면 그 질문은 쓰이지 않아요. 리포트는 새로 만들어지지 않아요. 가격과 환불 · 유효기간 기준은 아직 확정 전이에요.`
             : "무료 질문을 다 쓴 뒤 이어서 묻는 유료 질문 한 개의 결제예요. 결제가 확인되면 방금 적은 질문에 이어서 답하고, 리포트는 새로 만들어지지 않아요. 답을 받지 못하면 같은 결제로 다시 물을 수 있어요. 가격은 가안이에요."}
         </p>
       )}

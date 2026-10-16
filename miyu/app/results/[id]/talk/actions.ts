@@ -92,7 +92,7 @@ type AskInput = { assessmentId: unknown; room: unknown; roomKey: unknown; questi
 const failed = (reason: AskReason): AskResult => ({ ok: false, reason, message: ASK_MESSAGES[reason] });
 
 /** 질문 처리에 필요한 의존성 — 답하기와 질문 결제 시작이 같은 규칙(방 · 자료 · 한도)을 쓰도록 한 곳에서 만든다. 근거는 브라우저가 아니라 서버가 저장된 리포트(또는 무료 맛보기)에서 다시 만든다 */
-function askDeps(userId: string, assessmentId: string, room: RoomId, input: AskInput): AskDeps {
+function askDeps(userId: string, assessmentId: string, room: RoomId, input: Pick<AskInput, "topicId" | "intake" | "followUp">): AskDeps {
   const text = (v: unknown) => (typeof v === "string" && v.length <= 40 ? v : null);
   return {
     repo: writeRepository(),
@@ -141,11 +141,14 @@ export type QuestionPayResult =
   | { ok: true; kind: "safety"; paragraphs: string[] }
   | { ok: false; reason: AskReason; message: string };
 
+/** 구매 시작 요청 — 지금 화면은 질문 없이 보낸다(question 없음). 질문 글이 함께 오면(예전 화면이 열려 있는 경우) 질문을 받을 수 있는지까지 확인한다 */
+type PayInput = Omit<AskInput, "question"> & { question?: unknown };
+
 /**
- * 유료 질문 결제 시작 — 질문을 받을 수 있는지(무료 질문 수 · 글자 수 · 위기 표현 · 잠긴 방 · 하루 예산)를 답할 때와 같은 규칙으로 먼저 확인한 뒤에만 주문을 만든다.
- * 질문 글은 이 확인에만 쓰고 서버에 저장하지 않는다(결제를 다녀오는 동안은 브라우저에만 남는다). 금액은 서버가 정하고 브라우저가 보낸 값은 쓰지 않는다.
+ * 질문 3개 구매 시작(운영자 2026-10-16: 입력칸이 구매 버튼으로 바뀐다) — 질문 없이 방 · 이어 갈 수 있는지 · 하루 예산을 확인한 뒤 주문을 만든다.
+ * 질문 글이 함께 오면 질문을 받을 수 있는지(무료 질문 수 · 글자 수 · 위기 표현 · 잠긴 방 · 하루 예산)를 답할 때와 같은 규칙으로 먼저 확인한다. 질문 글은 이 확인에만 쓰고 서버에 저장하지 않는다. 금액은 서버가 정하고 브라우저가 보낸 값은 쓰지 않는다.
  */
-export async function startQuestionPaymentAction(input: AskInput): Promise<QuestionPayResult> {
+export async function startQuestionPaymentAction(input: PayInput): Promise<QuestionPayResult> {
   const { assessmentId, room, roomKey } = input;
   const fail = (reason: AskReason): QuestionPayResult => ({ ok: false, reason, message: ASK_MESSAGES[reason] });
   if (typeof assessmentId !== "string" || typeof roomKey !== "string" || typeof room !== "string" || !(room in ROOMS)) return fail("not-found");
@@ -156,7 +159,7 @@ export async function startQuestionPaymentAction(input: AskInput): Promise<Quest
   try {
     const r = await startQuestionPayment(
       { ...askDeps(member.userId, assessmentId, room as RoomId, input), saleGate: saleGateCheck },
-      { userId: member.userId, assessmentId, roomKey, question: input.question, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition() },
+      { userId: member.userId, assessmentId, roomKey, ...(input.question === undefined ? {} : { question: input.question }), paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition() },
     );
     if (r.kind === "order") return { ok: true, kind: "pay", orderNumber: r.order.orderNumber };
     if (r.kind === "ask") return { ok: true, kind: "ask" };

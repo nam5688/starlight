@@ -102,6 +102,8 @@ export type AskDeps = {
 };
 
 export type AskInput = { userId: string; assessmentId: string; roomKey: string; question: unknown };
+/** 질문 없이 질문 3개 묶음을 사려는 요청 — 입력칸이 구매 버튼으로 바뀌는 화면이 보낸다(운영자 2026-10-16) */
+export type PurchaseInput = Omit<AskInput, "question">;
 
 /** 이 방에서 앞서 나눈 질문과 답 중 최근 것 — 이어지는 질문이 이전 말을 이어받게 한다 */
 export function recentExchanges(actions: RoomAction[]): ChatExchange[] {
@@ -127,23 +129,25 @@ export type QuestionGate =
     }
   | { ok: false; result: AskResult };
 
-/**
- * 소유자 → 입력 정리 → 위기 표현 → 방 · 자료 확인 → 무료 질문 수 → 글자 수 → 이어 갈 수 있는 방인가 → 하루 예산.
- * 힘든 글(분명한 위기 표현)은 여기서 안내로 끝난다 — 결제도 AI 호출도 하지 않는다.
- */
-export async function gateQuestion(deps: AskDeps, input: AskInput): Promise<QuestionGate> {
-  const { repo } = deps;
-  const no = (result: AskResult): QuestionGate => ({ ok: false, result });
-  if (!TALK_ROOM_KEY.test(input.roomKey)) return no(fail("not-found"));
-  if (!(await owns(repo, input.userId, input.assessmentId))) return no(fail("not-found"));
+/** 하루 AI 예산에 닿았는가 — 닿으면 새 질문(과 새 구매)만 멈춘다 */
+async function overBudget(deps: AskDeps): Promise<boolean> {
+  const budget = deps.capacity?.dailyBudgetKrw ?? 0;
+  return budget > 0 && (await deps.repo.sumAiCostSince(seoulDayStart(deps.now()))) >= budget;
+}
 
-  const q = cleanQuestion(input.question);
-  if (!q.ok) return no(fail(q.reason));
-  // 스스로를 해치겠다는 분명한 표현은 운세 풀이로 답하지 않는다 — AI를 부르지 않고 횟수에도 세지 않는다.
-  // 힘든 마음의 표현(soft)이나 일반적인 슬픔 · 연애 고민은 막지 않고 답한다(soft는 답 뒤에 안내 한 문단을 붙인다)
-  const level = crisisLevel(q.text);
-  if (level === "hard") return no({ ok: true, kind: "safety", paragraphs: CRISIS_REPLY });
+/** 방 이름 모양 → 본인 결과인지 */
+async function gateOwner(deps: AskDeps, input: PurchaseInput): Promise<AskResult | null> {
+  if (!TALK_ROOM_KEY.test(input.roomKey)) return fail("not-found");
+  if (!(await owns(deps.repo, input.userId, input.assessmentId))) return fail("not-found");
+  return null;
+}
 
+/** 방을 열 수 있는지 확인한 결과 — 질문 확인(gateQuestion)과 구매 확인(gatePurchase)이 같이 쓴다 */
+type RoomGate = { ok: true; loaded: NonNullable<Awaited<ReturnType<AskDeps["loadAsk"]>>>; roomKey: string; policy: ReturnType<typeof roomPolicy> } | { ok: false; result: AskResult };
+
+/** AI 연결 → 자료 → 이 방을 열 수 있는가(잠긴 방 · 심층 리포트 전용 · 자료 없음) */
+async function gateRoom(deps: AskDeps): Promise<RoomGate> {
+  const no = (result: AskResult) => ({ ok: false as const, result });
   if (!deps.answerer) return no(fail("closed"));
   const loaded = await deps.loadAsk();
   if (!loaded) return no(fail("not-ready"));
@@ -154,6 +158,34 @@ export async function gateQuestion(deps: AskDeps, input: AskInput): Promise<Ques
   if (!policy.open) return no(fail("room-locked"));
   if (policy.needsDeep && policy.freeQuestions === 0) return no(fail("deep-only"));
   if (free && loaded.noMaterial) return no(fail("no-material"));
+  return { ok: true, loaded, roomKey, policy };
+}
+
+/**
+ * 소유자 → 입력 정리 → 위기 표현 → 방 · 자료 확인 → 무료 질문 수 → 글자 수 → 이어 갈 수 있는 방인가 → 하루 예산.
+ * 힘든 글(분명한 위기 표현)은 여기서 안내로 끝난다 — 결제도 AI 호출도 하지 않는다.
+ */
+/**
+ * 소유자 → 입력 정리 → 위기 표현 → 방 · 자료 확인 → 무료 질문 수 → 글자 수 → 이어 갈 수 있는 방인가 → 하루 예산.
+ * 힘든 글(분명한 위기 표현)은 여기서 안내로 끝난다 — 결제도 AI 호출도 하지 않는다.
+ */
+export async function gateQuestion(deps: AskDeps, input: AskInput): Promise<QuestionGate> {
+  const { repo } = deps;
+  const no = (result: AskResult): QuestionGate => ({ ok: false, result });
+  const notMine = await gateOwner(deps, input);
+  if (notMine) return no(notMine);
+
+  const q = cleanQuestion(input.question);
+  if (!q.ok) return no(fail(q.reason));
+  // 스스로를 해치겠다는 분명한 표현은 운세 풀이로 답하지 않는다 — AI를 부르지 않고 횟수에도 세지 않는다.
+  // 힘든 마음의 표현(soft)이나 일반적인 슬픔 · 연애 고민은 막지 않고 답한다(soft는 답 뒤에 안내 한 문단을 붙인다)
+  const level = crisisLevel(q.text);
+  if (level === "hard") return no({ ok: true, kind: "safety", paragraphs: CRISIS_REPLY });
+
+  const room = await gateRoom(deps);
+  if (!room.ok) return no(room.result);
+  const { loaded, roomKey, policy } = room;
+  const free = loaded.tier === "free";
 
   let used: number;
   try {
@@ -171,11 +203,26 @@ export async function gateQuestion(deps: AskDeps, input: AskInput): Promise<Ques
 
   if (!inQuota && !policy.cashAllowed) return no(fail(free ? "free-used" : "limit"));
 
-  const dayStart = seoulDayStart(deps.now());
-  const budget = deps.capacity?.dailyBudgetKrw ?? 0;
-  if (budget > 0 && (await repo.sumAiCostSince(dayStart)) >= budget) return no(fail("budget"));
+  if (await overBudget(deps)) return no(fail("budget"));
 
   return { ok: true, q: { text: q.text, length: q.length }, level, loaded, roomKey, inQuota, policy, used };
+}
+
+/** 질문 없이 질문 3개 묶음을 살 수 있는지 먼저 확인한 결과 */
+export type PurchaseGate = RoomGate;
+
+/**
+ * 질문 3개 구매(질문 없이) 확인 — 소유자 · AI 연결 · 이 방을 열 수 있는가 · 이 방이 결제한 질문으로 이어 갈 수 있는가 · 하루 예산.
+ * 무료 질문이 남아 있어도 살 수 있다(입력창 위의 작은 구매 버튼) — 결제한 질문은 무료 질문을 다 쓴 뒤에 쓰인다. 질문 글이 없으므로 글자 수 · 위기 표현 확인은 하지 않는다(질문을 보낼 때 그 확인을 한다).
+ */
+export async function gatePurchase(deps: AskDeps, input: PurchaseInput): Promise<PurchaseGate> {
+  const notMine = await gateOwner(deps, input);
+  if (notMine) return { ok: false, result: notMine };
+  const room = await gateRoom(deps);
+  if (!room.ok) return room;
+  if (!room.policy.cashAllowed) return { ok: false, result: fail("pay-unavailable") };
+  if (await overBudget(deps)) return { ok: false, result: fail("budget") };
+  return room;
 }
 
 /**
