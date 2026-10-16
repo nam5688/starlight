@@ -119,7 +119,7 @@ test("같은 입력을 독립으로 다시 쓴 글(R)은 X와 같은 글이 아�
 test("비교 판단(FINDINGS)의 인용이 모두 저장된 글에 실제로 있다", () => {
   for (const f of FINDINGS) {
     for (const q of f.quotes) {
-      const d = q.key === "H.v0.9" ? load("H.v0.9") : drafts[q.key as keyof typeof drafts];
+      const d = q.key.includes(".") ? load(q.key) : drafts[q.key as keyof typeof drafts];
       assert.ok(pickByPath(d, q.path), `${f.id} · ${q.key} ${q.path}: 글에 없다`);
     }
   }

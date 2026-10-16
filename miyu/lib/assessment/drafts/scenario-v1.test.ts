@@ -244,7 +244,12 @@ test("초안은 별도 버전이다: scenario-v1.ts는 다른 모듈을 불러�
       /* 없는 경로는 건너뛴다 */
     }
   }
-  assert.deepEqual(hits, [], `화면 · 서비스 · 리포트에 연결돼 있다: ${hits.join(", ")}`);
+  // 예외: 이 PC에서만 열리는 개발용 테스트 화면(/dev/scenario)과 그 서버 쪽 — production에서는 열리지 않고 아무것도 저장하지 않는다
+  const DEV_ONLY = ["server/dev-scenario.ts", "app/dev/scenario/page.tsx"];
+  assert.deepEqual(hits.filter((h) => !DEV_ONLY.includes(h)).sort(), [], `화면 · 서비스 · 리포트에 연결돼 있다: ${hits.join(", ")}`);
+  for (const f of DEV_ONLY) assert.match(readFileSync(join(root, f), "utf8"), /NODE_ENV === "production"/, `${f}: production에서 막는 확인이 없다`);
+  const devFiles = ["server/dev-scenario.ts", "app/dev/scenario/actions.ts"].map((f) => readFileSync(join(root, f), "utf8")).join("\n");
+  assert.doesNotMatch(devFiles, /\.(?:insert|upsert|update|delete)\(|saveAssessment|createOrder|startCheckout/, "테스트 화면은 회원 결과 · 주문을 쓰지 않는다");
   assert.equal(ASSESSMENT_MODULES.flatMap((m) => m.items).length, 22);
   assert.ok(THREAD_BY_ID.D4.scenes.every((id: SceneId) => SCENE_BY_ID[id]!.thread === "D4"));
 });

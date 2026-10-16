@@ -2,7 +2,7 @@ import "server-only";
 import { createAnthropicModel } from "@/lib/integrations/ai/providers";
 import { createSupabaseRepository } from "@/lib/integrations/supabase/repository";
 import type { TextModel } from "@/lib/report/ai/model";
-import { createAiReportGenerator } from "@/lib/report/ai/generator";
+import { createAiReportGenerator, type AiGeneratorOptions } from "@/lib/report/ai/generator";
 import { REPORT_AI_LIMITS } from "@/lib/report/ai/live-config";
 import { createApprovalLedger, tallyUsage, withChatApproval, type ChatApproval, type ChatPricing } from "@/lib/report/chat/approval";
 import type { ReportGenerator } from "@/lib/report/generator";
@@ -40,7 +40,7 @@ export function approvedLiveModel(raw: TextModel, cfg: Approved): TextModel {
 }
 
 /** 리포트 생성기 (AI_PROVIDER=anthropic) — 비교 실행에서 통과한 설정(읽기 구조 · 반복 고쳐 쓰기)과 같게 만든다. 내용 차이 검사는 보고만 한다(enforceDepth 끔) */
-export function liveReportGenerator(ai: Extract<AiConfig, { kind: "anthropic" }>): ReportGenerator {
+export function liveReportGenerator(ai: Extract<AiConfig, { kind: "anthropic" }>, extras: Pick<AiGeneratorOptions, "adaptEvidence" | "extraChecks"> = {}): ReportGenerator {
   const raw = createAnthropicModel({ apiKey: ai.apiKey, model: ai.model, effort: REPORT_AI_LIMITS.effort, timeoutMs: REPORT_AI_LIMITS.callTimeoutMs, ...(ai.baseUrl ? { baseUrl: ai.baseUrl } : {}) });
   return createAiReportGenerator({
     model: approvedLiveModel(raw, ai),
@@ -49,5 +49,7 @@ export function liveReportGenerator(ai: Extract<AiConfig, { kind: "anthropic" }>
     callTimeoutMs: REPORT_AI_LIMITS.callTimeoutMs,
     repairRepeats: true,
     enforceDepth: false,
+    // 장면 질문 테스트 화면(/dev/scenario)만 쓴다 — 응답 근거를 바꿔 끼우고 응답 사용 검사를 더한다. 기본은 없다(운영 경로는 그대로)
+    ...extras,
   });
 }

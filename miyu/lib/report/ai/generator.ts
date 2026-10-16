@@ -53,6 +53,16 @@ export type AiGeneratorOptions = {
    * 고쳐 쓰기가 한 번 더 들어 비용이 늘 수 있어(이미 잡아 둔 최악 비용 안) 기본은 끈다.
    */
   repairRepeats?: boolean;
+  /**
+   * 읽기 구조 초안에 더하는 확인(응답 지어내기 · 선택지 옮기기 · 답을 나열한 제목 — reading/answer-use.ts의 answerUseChecker).
+   * 돌려준 문장은 형식 오류와 같이 다루어 고쳐 쓰게 한다. 기본은 없다 — 지금 22문항 경로는 쓰지 않고 장면 질문을 연결할 때만 켠다.
+   */
+  extraChecks?: (draft: ReadingDraftV1) => string[];
+  /**
+   * 사주 · 응답 근거 목록을 만든 직후 근거를 바꾸는 자리(읽기 구조만) — 장면 질문의 근거로 바꿔 끼울 때 쓴다(개발용 테스트 화면 전용).
+   * 기본은 없다 — 지금 22문항 경로는 쓰지 않는다. 바꾼 근거가 지시문 · 검사 · 저장 형식에 그대로 쓰이므로 실제 생성과 같은 경로로 시험할 수 있다.
+   */
+  adaptEvidence?: (evidence: Evidence[], input: ReportInput) => Evidence[];
 };
 
 /** 모델 응답에서 JSON 객체를 꺼낸다 (앞뒤 설명 · 코드 블록이 붙어도) */
@@ -192,7 +202,8 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
     },
     async generate(input, ctx = {}) {
       const ref = seoulYm(now());
-      const evidence = buildEvidence(input, ref);
+      const baseEvidence = buildEvidence(input, ref);
+      const evidence = format === "reading-v1" && opts.adaptEvidence ? opts.adaptEvidence(baseEvidence, input) : baseEvidence;
       const context = input.context;
       if (format === "reading-v1") {
         const messages: ModelMessage[] = [{ role: "user", content: buildReadingUserMessage(evidence, ref.iso, context) }];
@@ -225,7 +236,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
             retry(["JSON 형식이 아닙니다. JSON 객체 하나만 출력해 주세요."]);
             continue;
           }
-          const checked = validateReadingDraft(parsed, evidence, { hasContext: Boolean(context) });
+          const checked = validateReadingDraft(parsed, evidence, { hasContext: Boolean(context), extra: opts.extraChecks });
           if (!checked.ok) {
             done("invalid");
             retry(checked.errors);

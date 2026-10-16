@@ -87,7 +87,18 @@ export function visibleTexts(d: ReadingDraftV1): { where: string; text: string }
   return out;
 }
 
-export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: { hasContext?: boolean } = {}): ReadingValidation {
+export function validateReadingDraft(
+  raw: unknown,
+  evidence: Evidence[],
+  opts: {
+    hasContext?: boolean;
+    /**
+     * 장면 질문(응답 근거)을 쓰는 생성에서 더하는 확인 — answer-use.ts의 answerUseChecker가 만든다(응답 지어내기 · 선택지 옮기기 · 답을 나열한 제목).
+     * 기본은 없다(지금 22문항 경로는 이 확인을 쓰지 않는다). 형식이 맞는 글에만 부르고, 돌려준 문장은 그대로 오류가 된다.
+     */
+    extra?: (draft: ReadingDraftV1) => string[];
+  } = {},
+): ReadingValidation {
   const errors: string[] = [];
   const d = raw as Partial<ReadingDraftV1> | null;
   if (!d || typeof d !== "object") return { ok: false, errors: ["JSON 객체가 아닙니다."] };
@@ -297,6 +308,8 @@ export function validateReadingDraft(raw: unknown, evidence: Evidence[], opts: {
       else seen.set(key, where);
     }
   }
+
+  if (opts.extra && errors.length === 0) errors.push(...opts.extra(d as ReadingDraftV1));
 
   return errors.length ? { ok: false, errors: [...new Set(errors)].slice(0, 30) } : { ok: true, draft: d as ReadingDraftV1 };
 }
