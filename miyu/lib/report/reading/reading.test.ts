@@ -432,8 +432,11 @@ test("소단락 반복 · 내용 검사: 소단락 글도 같은 문장 반복 �
   assert.ok(result.metrics.units >= 5 + 3 + 6, `의미 단위 ${result.metrics.units}`);
 });
 
-test("소단락: AI 지시문 0.9는 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
-  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.9");
+test("소단락: AI 지시문 0.10은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
+  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.10");
+  // 0.10 — 근거 목록에 없는 장면의 구체적 행동을 사실처럼 쓰지 않는다
+  assert.match(READING_SYSTEM_PROMPT, /근거 목록에 없는 장면에서의 이 사람의 구체적 행동을 사실처럼 쓰지 않는다/);
+  assert.match(READING_SYSTEM_PROMPT, /조건형으로만 쓰고/);
   // 0.9 — 응답 근거가 없는 주제는 "없다"고 쓰지 않고 사주 근거로 완결한다
   assert.match(READING_SYSTEM_PROMPT, /사주 근거만으로 풀이를 끝까지 쓴다/);
   assert.doesNotMatch(READING_SYSTEM_PROMPT, /응답이 없는 영역은 없다고 쓰고/);
