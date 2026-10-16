@@ -51,7 +51,8 @@ const sentencesOf = (t: string) => t.match(/[^.!?。\n]+[.!?。]?/g)?.map((s) =>
  * 용어 앞에 풀이가 먼저 오는 꼴 — 처음 쓸 때의 풀이로 본다(2026-10-16, 실제 AI의 첫 글이 모든 용어를 이 순서로 풀었는데 "용어(풀이)" 순서만 알아봐서 전부 걸렸다).
  *   · 괄호 안에 용어만 있고 앞에 한글 풀이가 네 글자 이상: "태어난 달의 기운(월령)" · "배우자 자리(일지)" (한자만 · 짧은 말은 풀이가 아니다)
  *   · 풀이 + "인 / 이라는 / 라는 / 이라고 부르는" + 용어: "나 자신을 나타내는 글자인 일간" (앞 풀이가 다섯 글자 이상)
- * "도움을 덜 받는 실령"처럼 용어 앞의 꾸미는 말만 있는 꼴은 알아보지 않는다 — 풀이인지 단순한 수식인지 낱말만으로 가를 수 없어서, 괄호로 풀어 달라고 요청한다.
+ * 그 밖에 인정하는 꼴(explainedHere): 용어 뒤 괄호 · "용어란 / 이라고 해요"(따옴표로 감싼 용어 포함) · 용어 뒤 줄표 풀이 · 바로 이어지는 문장의 풀이("이는 ~라는 뜻이에요").
+ * "도움을 덜 받는 실령"처럼 용어 앞의 꾸미는 말만 있는 꼴은 알아보지 않는다 — 풀이인지 단순한 수식인지 낱말만으로 가를 수 없어서 위의 꼴로 풀어 달라고 요청한다(내용 오류가 아니라 설명 방식의 문제다).
  */
 function explainedBefore(before: string, after: string): boolean {
   if (before.endsWith("(") && /^\s?\)/.test(after)) {
@@ -61,13 +62,26 @@ function explainedBefore(before: string, after: string): boolean {
   return Boolean(m && m[1].replace(/[^가-힣]/g, "").length >= 5);
 }
 
-function explainedHere(name: string, sentence: string, after: string, before = ""): boolean {
+/** 용어를 따옴표로 감싼 꼴("‘실령’이라고 해요")을 허용하는 짝 */
+const Q = "[‘’'\"“”「」『』]?";
+
+/** 바로 이어지는 문장이 앞 문장의 용어를 풀어 주는 꼴 — "~는 용어예요. 이는 ~라는 뜻이에요." */
+const DEMONSTRATIVE_GLOSS = /^(?:이는|이건|이것은|이 말은|그건|그것은|그 말은)\s*[^.!?]*[가-힣]{4,}[^.!?]*(?:뜻|의미|말해|가리켜)/;
+
+function explainedHere(name: string, sentence: string, after: string, before = "", next = ""): boolean {
   const paren = PAREN_EXPLAIN.exec(after);
   if (paren && paren[1].replace(/[^가-힣]/g, "").length >= 4) return true; // 한글 풀이가 네 글자 이상(한자만 있는 괄호는 풀이가 아니다)
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (new RegExp(`${escaped}(?:이란|란|이라는|라는|이라고 (?:해요|부르|불러|하는)|라고 (?:해요|부르|불러|하는)|이라 (?:부르|불러)|라 (?:부르|불러))`).test(sentence)) return true;
-  if (new RegExp(`${escaped}(?:은|는|이|가)\\s*[^.!?]{0,40}(?:뜻해요|뜻이에요|말해요|가리켜요|의미해요|말이에요|을 말|를 말|를 뜻|을 뜻)`).test(sentence)) return true;
-  return explainedBefore(before, after);
+  if (new RegExp(`${escaped}${Q}(?:이란|란|이라는|라는|이라고 (?:해요|부르|불러|하는)|라고 (?:해요|부르|불러|하는)|이라 (?:부르|불러)|라 (?:부르|불러))`).test(sentence)) return true;
+  const meansHere = new RegExp(`${escaped}${Q}(?:은|는|이|가)\\s*[^.!?]{0,40}(?:뜻해요|뜻이에요|말해요|가리켜요|의미해요|말이에요|을 말|를 말|를 뜻|을 뜻)`);
+  if (meansHere.test(sentence)) return true;
+  // 용어 바로 뒤의 줄표 · 쌍점 풀이: "실령 — 태어난 계절의 기운이 나를 돕지 않는다는 뜻이에요."
+  const dash = /^\s?[—–:：-]\s?([^.!?]{0,80})/.exec(after.replace(/^[‘’'"“”「」『』]/, ""));
+  if (dash && dash[1].replace(/[^가-힣]/g, "").length >= 4) return true;
+  if (explainedBefore(before, after)) return true;
+  // 바로 이어지는 문장의 풀이
+  if (next && (meansHere.test(next) || DEMONSTRATIVE_GLOSS.test(next.trim()))) return true;
+  return false;
 }
 
 /** 오류 문구에 붙이는 문장 일부 — 어디를 고쳐야 하는지 모델이 알 수 있게(필드 이름만으로는 이미 풀었다고 믿는 곳을 고치지 못한다) */
@@ -99,7 +113,9 @@ export function checkTermUse(texts: { where: string; text: string }[], evidence:
   const flagged = new Set<string>(); // 처음 쓴 곳에서 이미 지적한 용어 — 풀이는 처음 쓰는 곳에 붙이면 되므로 뒤에서 되풀이해 지적하지 않는다
 
   for (const { where, text } of texts) {
-    for (const sentence of sentencesOf(text)) {
+    const sents = sentencesOf(text);
+    for (const [si, sentence] of sents.entries()) {
+      const next = sents[si + 1] ?? "";
       const distinct = new Set<string>();
       for (const t of ALL_TERMS) {
         const re = new RegExp(t.re.source, "g");
@@ -131,7 +147,7 @@ export function checkTermUse(texts: { where: string; text: string }[], evidence:
           }
           // 설명 없는 용어
           if (!explained.has(t.name) && !flagged.has(t.name)) {
-            if (explainedHere(t.name, sentence, after, sentence.slice(0, m.index))) explained.add(t.name);
+            if (explainedHere(t.name, sentence, after, sentence.slice(0, m.index), next)) explained.add(t.name);
             else {
               flagged.add(t.name);
               errors.push(unexplainedMessage(where, t.name, snippetAround(sentence, m.index, m[0].length)));
@@ -159,7 +175,9 @@ export function chatTermIssues(text: string, o: { question: string; allowTerms: 
   const errors: string[] = [];
   const known = o.known ?? "";
   const explained = new Set<string>();
-  for (const sentence of sentencesOf(text)) {
+  const chatSents = sentencesOf(text);
+  for (const [si, sentence] of chatSents.entries()) {
+    const next = chatSents[si + 1] ?? "";
     const distinct = new Set<string>();
     for (const t of ALL_TERMS) {
       const re = new RegExp(t.re.source, "g");
@@ -173,7 +191,7 @@ export function chatTermIssues(text: string, o: { question: string; allowTerms: 
         }
         const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 64);
         if (!explained.has(t.name)) {
-          if (explainedHere(t.name, sentence, after, sentence.slice(0, m.index))) explained.add(t.name);
+          if (explainedHere(t.name, sentence, after, sentence.slice(0, m.index), next)) explained.add(t.name);
           else errors.push(unexplainedMessage("답변", t.name, snippetAround(sentence, m.index, m[0].length)).replace(/^답변: /, ""));
         }
         // 이 사람의 것으로 말해도 되는 판정인가 — 풀이 글에 그 낱말이 없으면 일반 설명으로만
