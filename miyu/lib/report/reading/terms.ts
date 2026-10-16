@@ -56,6 +56,17 @@ function explainedHere(name: string, sentence: string, after: string): boolean {
   return false;
 }
 
+/** 근거 사실(fact)이 가리키는 방향과 반대되는 용어인가 — 있으면 이유를 돌려준다 (월령 · 강약만. 다른 판정의 방향은 사람이 읽는 평가로 본다) */
+function directionConflict(name: string, byId: Map<string, Evidence>): string | null {
+  const month = byId.get("saju.structure.month")?.fact ?? "";
+  if (name === "득령" && month.includes("(실령)")) return "계산된 월령과 반대(득령) — 근거 사실은 월령을 얻지 못한 실령입니다.";
+  if (name === "실령" && month.includes("(득령)")) return "계산된 월령과 반대(실령) — 근거 사실은 월령을 얻은 득령입니다.";
+  const strength = byId.get("saju.structure.strength")?.fact ?? "";
+  if (name === "신강" && strength.includes("힘을 덜 받는 쪽")) return "계산된 강약 후보와 반대(신강) — 근거 사실은 힘을 덜 받는 쪽입니다.";
+  if (name === "신약" && /후보: 힘을 받는 쪽/.test(strength)) return "계산된 강약 후보와 반대(신약) — 근거 사실은 힘을 받는 쪽입니다.";
+  return null;
+}
+
 /**
  * 화면에 보이는 글(읽는 순서)에서 사주 용어 사용을 확인해 오류 목록을 돌려준다.
  * 근거 목록은 이 리포트를 쓰는 데 건네는 evidence 전체이며, 어떤 용어를 이 사람의 것으로 쓸 수 있는지를 정한다.
@@ -91,6 +102,12 @@ export function checkTermUse(texts: { where: string; text: string }[], evidence:
               errors.push(`${where}: 근거 없는 판정(${t.name}) — 강약은 후보이고 요소가 한쪽으로 모였을 때만 말할 수 있습니다. "힘을 받는 쪽 · 덜 받는 쪽"처럼 요소를 풀어 쓰세요.`);
               continue;
             }
+          }
+          // 계산된 방향과 반대로 쓰는 말 — 월령(득령 ↔ 실령) · 강약(신강 ↔ 신약)은 근거 사실의 방향을 바꾸지 못한다
+          const conflict = directionConflict(t.name, byId);
+          if (conflict) {
+            errors.push(`${where}: ${conflict}`);
+            continue;
           }
           // 설명 없는 용어
           if (!explained.has(t.name)) {

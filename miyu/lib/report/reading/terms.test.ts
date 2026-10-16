@@ -74,3 +74,18 @@ test("용어가 없는 글은 아무 오류도 내지 않는다", () => {
   assert.deepEqual(run(["상관없이 편안하게 쉬어요. 편인데도 꾸준해요. 주는 편인데 받는 데는 서툴러요."], []), []);
   assert.deepEqual(run(["통근 시간이 길어서 아침이 빠듯해요. 통근하는 길에 생각을 정리해요."], []), [], "출퇴근을 뜻하는 통근은 걸리지 않는다");
 });
+
+test("계산된 방향과 반대로 쓰면 막는다: 실령인데 득령이라고, 힘을 덜 받는 쪽인데 신강이라고 쓰는 글 (방향이 맞으면 통과)", () => {
+  const withFact = (id: string, fact: string): Evidence[] => STRUCTURE.map((e) => (e.id === id ? { ...e, fact } : e));
+  const shiryeong = withFact("saju.structure.month", "월령(태어난 달의 기운): 월지 술 가을 → 월령을 얻지 못함(실령)");
+  assert.ok(run(["득령(태어난 달의 도움을 받는 것)이라서 힘이 있어요."], shiryeong).some((e) => /계산된 월령과 반대\(득령\)/.test(e)));
+  assert.deepEqual(run(["실령(태어난 달의 도움을 못 받는 것)이라서 혼자 힘을 쓰기 쉬워요."], shiryeong), []);
+  const deuk = withFact("saju.structure.month", "월령(태어난 달의 기운): 월지 인 봄 → 월령을 얻음(득령)");
+  assert.ok(run(["실령(태어난 달의 도움을 못 받는 것)이라서 힘이 없어요."], deuk).some((e) => /계산된 월령과 반대\(실령\)/.test(e)));
+  const weakSide = withFact("saju.structure.strength", "일간 강약 후보(요소 기록, 점수 아님) → 후보: 힘을 덜 받는 쪽");
+  assert.ok(run(["신강(내 힘을 많이 받는 쪽)이라서 밀고 나가요."], weakSide).some((e) => /계산된 강약 후보와 반대\(신강\)/.test(e)));
+  assert.deepEqual(run(["신약(내 힘을 덜 받는 쪽)이라서 혼자 감당하면 지쳐요."], weakSide), []);
+  const strongSide = withFact("saju.structure.strength", "일간 강약 후보(요소 기록, 점수 아님) → 후보: 힘을 받는 쪽");
+  assert.ok(run(["신약(내 힘을 덜 받는 쪽)이라서 지쳐요."], strongSide).some((e) => /계산된 강약 후보와 반대\(신약\)/.test(e)));
+  assert.deepEqual(run(["신강(내 힘을 많이 받는 쪽)이라서 밀고 나가요."], strongSide), []);
+});
