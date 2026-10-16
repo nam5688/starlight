@@ -27,7 +27,12 @@ function entryOf(where: string, text: string): Entry {
 const sameFlow = (a: string, b: string) => a.startsWith("flow") && b.startsWith("flow");
 
 export function findRepeatedPhrases(d: ReadingDraftV1, minChars: number = REPEAT_MIN_CHARS): RepeatedPhrase[] {
-  const entries = visibleTexts(d).map((t) => entryOf(t.where, t.text));
+  return findRepeatedPhrasesIn(visibleTexts(d), minChars);
+}
+
+/** 글 조각(위치 + 글) 목록에서 되풀이를 찾는다 — 이전 읽기 구조와 영역별 이야기(story-validate.ts의 visibleStoryTexts)가 같이 쓴다 */
+export function findRepeatedPhrasesIn(texts: { where: string; text: string }[], minChars: number = REPEAT_MIN_CHARS): RepeatedPhrase[] {
+  const entries = texts.map((t) => entryOf(t.where, t.text));
   const seen = new Map<string, number>();
   const found = new Map<string, RepeatedPhrase>();
   entries.forEach((e, idx) => {

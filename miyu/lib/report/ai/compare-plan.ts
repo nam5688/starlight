@@ -6,6 +6,7 @@ import { buildUserMessage, SYSTEM_PROMPT } from "../v2/prompt.ts";
 import { isPersonalV2, isReadingReport, type AiUsageSample, type ReportContent } from "../generator.ts";
 import { checkReadingDepth, crossPersonOverlapReading } from "../reading/depth.ts";
 import { buildReadingUserMessage, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
+import { buildStoryUserMessage, STORY_SYSTEM_PROMPT } from "../reading/story-prompt.ts";
 import { checkDepth, crossPersonOverlap } from "../v2/depth.ts";
 import { checkPhilosophicalDepth, crossOverlapBlocks } from "../philosophy/depth.ts";
 import { readingBlocks } from "../philosophy/compare.ts";
@@ -19,14 +20,15 @@ import type { TextModel } from "./model.ts";
 
 /**
  * 무엇을 쓰게 하는가 — reading-v1: 지금 제품의 개인 통합 리포트(읽기 구조, 기본), personal-v2: 이전 AI 형식(비교 · 호환용),
- * philosophical-v0: 자기 이해 풀이 비교용 지시문(제품 미연결)
+ * philosophical-v0: 자기 이해 풀이 비교용 지시문(제품 미연결), story-v1: 영역별 이야기(2026-10-16 비교용 후보 — 칸을 채우지 않고 영역마다 하나의 이야기)
  */
-export type CompareVariant = "reading-v1" | "personal-v2" | "philosophical-v0";
+export type CompareVariant = "reading-v1" | "story-v1" | "personal-v2" | "philosophical-v0";
 
 /** 변형마다 AI에게 보내는 지시문 · 사용자 메시지 (비용 추정과 입력 토큰 보정에 같은 값을 쓴다) */
 export function promptsFor(variant: CompareVariant, evidence: ReturnType<typeof buildEvidence>, iso: string, context: Persona["input"]["context"]): [string, string] {
   if (variant === "philosophical-v0") return [PHILOSOPHY_SYSTEM_PROMPT, buildPhilosophyUserMessage(evidence, iso, context)];
   if (variant === "personal-v2") return [SYSTEM_PROMPT, buildUserMessage(evidence, iso, context)];
+  if (variant === "story-v1") return [STORY_SYSTEM_PROMPT, buildStoryUserMessage(evidence, iso, context)];
   return [READING_SYSTEM_PROMPT, buildReadingUserMessage(evidence, iso, context)];
 }
 
@@ -283,7 +285,7 @@ export async function runStage(opts: {
     if (variant === "philosophical-v0") {
       const blocks = runs.filter((r) => r.candidate === c.key && r.report && isPhilosophicalReport(r.report)).map((r) => readingBlocks(r.report as PhilosophicalReportV0));
       for (let i = 0; i < blocks.length; i++) for (let j = 0; j < blocks.length; j++) if (i !== j) values.push(crossOverlapBlocks(blocks[i], blocks[j]));
-    } else if (variant === "reading-v1") {
+    } else if (variant === "reading-v1" || variant === "story-v1") {
       const reports = runs.filter((r) => r.candidate === c.key && r.report && !isPhilosophicalReport(r.report) && isReadingReport(r.report)).map((r) => r.report as Extract<ReportContent, { kind: "integrated-reading" }>);
       for (let i = 0; i < reports.length; i++) for (let j = 0; j < reports.length; j++) if (i !== j) values.push(crossPersonOverlapReading(reports[i], reports[j]));
     } else {

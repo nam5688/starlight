@@ -43,6 +43,11 @@ const NEVER_TERMS: Term[] = [
 
 export const ALL_TERMS: Term[] = [...EXPLAIN_TERMS, ...STRUCTURE_TERMS, ...STRENGTH_TERMS, ...NEVER_TERMS];
 
+/** 글 한 덩어리(문단)에 쓰인 서로 다른 사주 용어 이름 — 문단마다 새 개념을 몇 개 가르치는지 셀 때 쓴다(영역별 이야기 검사) */
+export function distinctTerms(text: string): string[] {
+  return ALL_TERMS.filter((t) => new RegExp(t.re.source).test(text)).map((t) => t.name);
+}
+
 /** 낱말 뒤에 바로 붙은 괄호가 쉬운 풀이인지(한자만 있는 괄호는 풀이가 아니다) */
 const PAREN_EXPLAIN = /^\s?\(([^)]{2,60})\)/;
 const sentencesOf = (t: string) => t.match(/[^.!?。\n]+[.!?。]?/g)?.map((s) => s.trim()).filter(Boolean) ?? [];

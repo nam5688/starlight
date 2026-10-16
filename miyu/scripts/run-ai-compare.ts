@@ -37,7 +37,7 @@ const args = process.argv.slice(2);
 const arg = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
 const stageName = arg("--stage") ?? "stage-1";
 const variant = (arg("--variant") ?? "reading-v1") as CompareVariant;
-if (!["reading-v1", "personal-v2"].includes(variant)) throw new Error("--variant 은 reading-v1(기본) 또는 personal-v2만 쓸 수 있습니다.");
+if (!["reading-v1", "story-v1", "personal-v2"].includes(variant)) throw new Error("--variant 은 reading-v1(기본) · story-v1(영역별 이야기, 비교용 후보) · personal-v2만 쓸 수 있습니다.");
 const rehearsalFail = args.includes("--rehearsal-fail"); // 리허설에서 일부러 검사에 걸리는 글을 돌려줘 실패 경로(이유 · 글 저장 · 화면 안내)를 시험한다
 const rehearsal = args.includes("--rehearsal") || rehearsalFail;
 const only = arg("--only");
@@ -59,7 +59,7 @@ const solo = chosen.length === 1;
 
 const plan = planStage({ stage: stage.name, capKrw: remainingCap, personas, candidates: chosen.map((c) => ({ key: c.key, price: c.price })), settings, now, variant });
 console.log(`# ${solo ? `${stage.label.split(":")[0]}: 가상 인물 ${personas.length}명 × ${chosen[0].company} 1개 = 생성 ${personas.length}건 (한 모델만 — 이름을 가린 비교가 아님)` : stage.label}`);
-console.log(`- 비교 대상: **개인 통합 리포트**(9,900원 상품) — ${variant === "reading-v1" ? "읽기 구조(reading-v1, 지금 제품 형식)" : "이전 형식(personal-v2)"}. 고민 반영 리포트(4,900원)는 이 비교에 넣지 않았다(지시문이 아직 옛 규칙이라 검증하지 않음).`);
+console.log(`- 비교 대상: **개인 통합 리포트**(9,900원 상품) — ${variant === "reading-v1" ? "읽기 구조(reading-v1, 지금 제품 형식)" : variant === "story-v1" ? "영역별 이야기(story-v1, 비교용 후보 — 지금 제품 형식이 아님)" : "이전 형식(personal-v2)"}. 고민 반영 리포트(4,900원)는 이 비교에 넣지 않았다(지시문이 아직 옛 규칙이라 검증하지 않음).`);
 console.log("- 인물 1명은 '알려 준 고민'이 있어 개인 통합 리포트 안의 '알려 주신 고민까지 반영한 해석' 구역이 함께 나오지만, 그것이 고민 반영 리포트 상품은 아니다.");
 for (const c of chosen) console.log(`- 후보 ${c.key}: ${c.company} ${c.modelId} (입력 $${c.price.inputUsdPerMTok} · 출력 $${c.price.outputUsdPerMTok} / 100만 토큰) — 생각 · 추론 강도 중간`);
 console.log(`- 예상 비용(평소 수준): ${won(plan.expectedKrw)} · 모든 생성이 한 번에 끝나는 최악: ${won(plan.firstCallWorstKrw)} · 모두 고쳐 쓰기까지 가는 최악: ${won(plan.twoRoundWorstKrw)}`);

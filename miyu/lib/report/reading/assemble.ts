@@ -56,10 +56,11 @@ export function basisFor(ids: string[], evidence: Evidence[], extra: { uncertain
 const RESPONSE_GROUPS: { name: string; re: RegExp; note: string }[] = [
   { name: "기질 · 성격", re: /^survey\.(novelty|caution|sensitivity|persistence)\./, note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다." },
   { name: "가까운 관계에서의 반응(애착 경향)", re: /^survey\.(anxiety|avoidance|closeness)\./, note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다." },
+  { name: "평소 행동 방식", re: /^survey\.(ei|sn|tf|jp)\./, note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다." },
 ];
 
 /** "참고한 자료" 목록 — 어떤 자료가 있었고 어느 주제에 쓰였는지를 실제로 단 근거에서 센다 (말과 어긋나지 않게) */
-function buildInputs(args: { knownMbti: string | null; hasContext: boolean; hasSaju: boolean; topics: { topic: string; evidence: string[] }[]; allEvidence: Evidence[]; nickname: string }): ReadingInput[] {
+export function buildInputs(args: { knownMbti: string | null; hasContext: boolean; hasSaju: boolean; topics: { topic: string; evidence: string[] }[]; allEvidence: Evidence[]; nickname: string }): ReadingInput[] {
   const usedIn = (re: RegExp) => args.topics.filter((t) => t.evidence.some((id) => re.test(id))).map((t) => t.topic);
   const has = (re: RegExp) => args.allEvidence.some((e) => re.test(e.id));
   const out: ReadingInput[] = [

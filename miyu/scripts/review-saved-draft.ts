@@ -9,10 +9,14 @@ import { buildEvidence } from "../lib/report/ai/generator.ts";
 import { checkReadingDepth } from "../lib/report/reading/depth.ts";
 import { ISSUE_CLASS_LABEL, groupReadingIssues, type IssueClass } from "../lib/report/reading/issue-class.ts";
 import { READING_PROMPT_VERSION } from "../lib/report/reading/prompt.ts";
-import { findRepeatedPhrases } from "../lib/report/reading/repeat.ts";
-import { renderDraftMarkdown } from "../lib/report/reading/render-draft.ts";
+import { findRepeatedPhrases, findRepeatedPhrasesIn } from "../lib/report/reading/repeat.ts";
+import { renderDraftMarkdown, renderStoryDraftMarkdown } from "../lib/report/reading/render-draft.ts";
+import { storyDepthSource } from "../lib/report/reading/story-assemble.ts";
+import { STORY_AREAS } from "../lib/report/reading/story-plan.ts";
+import { STORY_PROMPT_VERSION } from "../lib/report/reading/story-prompt.ts";
+import { validateStoryDraft, visibleStoryTexts } from "../lib/report/reading/story-validate.ts";
 import { ALL_TERMS } from "../lib/report/reading/terms.ts";
-import type { ReadingDraftV1 } from "../lib/report/reading/types.ts";
+import type { ReadingDraftV1, StoryDraftV1 } from "../lib/report/reading/types.ts";
 import { validateReadingDraft, visibleTexts } from "../lib/report/reading/validate.ts";
 
 const args = process.argv.slice(2);
@@ -26,10 +30,13 @@ const persona = buildPersonas(10).find((p) => p.id === personaId);
 if (!persona) throw new Error(`가상 인물 ${personaId}가 없습니다.`);
 const evidence = buildEvidence(persona.input, { year: ry, month: rm });
 const raw = JSON.parse(readFileSync(file, "utf8"));
+// 영역별 이야기(story-v1)는 areas가 있다 — 같은 검사 도구로 형식에 맞는 검사를 쓴다
+const story = Array.isArray((raw as { areas?: unknown }).areas);
 const draft = raw as ReadingDraftV1;
+const storyDraft = raw as StoryDraftV1;
 
 if (args.includes("--render")) {
-  process.stdout.write(renderDraftMarkdown(draft));
+  process.stdout.write(story ? renderStoryDraftMarkdown(storyDraft) : renderDraftMarkdown(draft));
   process.exit(0);
 }
 if (args.includes("--evidence")) {
@@ -40,9 +47,9 @@ if (args.includes("--evidence")) {
 const log = (s = "") => console.log(s);
 log(`# 저장된 글 검토 (새 호출 없음 · 비용 0원)`);
 log(`- 파일: ${file}`);
-log(`- 가상 인물: ${personaId} · 근거 ${evidence.length}개 · 기준 월 ${ry}-${String(rm).padStart(2, "0")} · 현재 지시문 ${READING_PROMPT_VERSION} · 현재 검사 코드로 다시 돌림`);
+log(`- 가상 인물: ${personaId} · 근거 ${evidence.length}개 · 기준 월 ${ry}-${String(rm).padStart(2, "0")} · 형식 ${story ? "영역별 이야기(story-v1)" : "읽기 구조(reading-v1)"} · 현재 지시문 ${story ? STORY_PROMPT_VERSION : READING_PROMPT_VERSION} · 현재 검사 코드로 다시 돌림`);
 
-const v = validateReadingDraft(raw, evidence, { hasContext: Boolean(persona.input.context) });
+const v = story ? validateStoryDraft(raw, evidence, { hasContext: Boolean(persona.input.context) }) : validateReadingDraft(raw, evidence, { hasContext: Boolean(persona.input.context) });
 log(`\n## 1. 형식 · 근거 검사 (validateReadingDraft)`);
 if (v.ok) log("- 통과");
 else {
@@ -54,17 +61,17 @@ else {
 }
 
 log(`\n## 2. 내용 검사 (checkReadingDepth — 어림, 좋은 글의 보증이 아님)`);
-const depth = checkReadingDepth({ draft });
+const depth = checkReadingDepth({ draft: story ? storyDepthSource(storyDraft) : draft });
 log(`- 통과: ${depth.pass ? "예" : "아니오"}`);
 for (const f of depth.flags) log(`  - [${f.severity}] ${f.id}: ${f.message}`);
 
 log(`\n## 3. 되풀이 구절 (12자 이상 같은 토막이 두 칸에 있음)`);
-const reps = findRepeatedPhrases(draft);
+const reps = story ? findRepeatedPhrasesIn(visibleStoryTexts(storyDraft)) : findRepeatedPhrases(draft);
 if (reps.length === 0) log("- 없음");
 for (const r of reps) log(`- "${r.phrase}" (${r.where[0]} · ${r.where[1]})`);
 
 log(`\n## 4. 여러 칸에 나오는 말 (낱말 두 개 묶음의 앞 두 글자 기준 어림 — 몇 개 칸에 나오는지)`);
-const texts = visibleTexts(draft);
+const texts = story ? visibleStoryTexts(storyDraft) : visibleTexts(draft);
 const cover = new Map<string, Set<string>>();
 for (const { where, text } of texts) {
   const words = text.match(/[가-힣]{2,}/g) ?? [];
@@ -91,3 +98,22 @@ for (const { where, text } of texts) {
   }
 }
 if (seen.size === 0) log("- 없음");
+
+if (story) {
+  log(`\n## 6. 영역마다 이어 쓴 근거 (사주 · 개인 성향 · 입력한 MBTI)`);
+  const byId = new Map(evidence.map((e) => [e.id, e]));
+  for (const a of storyDraft.areas ?? []) {
+    const plan = STORY_AREAS.find((x) => x.id === a.id);
+    const ids = a.evidence ?? [];
+    const saju = ids.filter((id) => byId.get(id)?.source === "saju");
+    const survey = ids.filter((id) => byId.get(id)?.source === "survey");
+    const self = ids.filter((id) => byId.get(id)?.source === "self");
+    log(`- ${a.id}(${plan?.topic ?? ""}): 사주 ${saju.length} · 응답 ${survey.length}(${survey.join(", ") || "-"}) · 입력한 MBTI ${self.length ? "연결" : "-"} · 문단 ${a.paragraphs?.length ?? 0}개`);
+  }
+  const mbtiAreas = (storyDraft.areas ?? []).filter((a) => (a.evidence ?? []).includes("self.mbti")).length;
+  log(`- 입력한 MBTI를 연결한 영역 ${mbtiAreas}곳 (기준: 근거가 있으면 핵심 · 관계 · 일 가운데 2곳 이상, 시기에는 쓰지 않음)`);
+  const all = (storyDraft.areas ?? []).flatMap((a) => a.evidence ?? []);
+  const usedSurvey = new Set(all.filter((id) => byId.get(id)?.source === "survey"));
+  const allSurvey = evidence.filter((e) => e.source === "survey" && !e.uncertain);
+  log(`- 응답 근거 ${allSurvey.length}개 가운데 영역에 연결된 것 ${usedSurvey.size}개`);
+}

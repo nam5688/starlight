@@ -65,6 +65,7 @@ export function readingTexts(r: IntegratedReadingReport): TextParts {
     ...sections,
     r.flow.headline,
     r.flow.summary,
+    ...(r.flow.paragraphs ?? []),
     r.flow.cardText,
     ...r.flow.years.map((y) => y.theme),
     ...r.flow.periods.flatMap((p) => [p.theme, p.watch]),

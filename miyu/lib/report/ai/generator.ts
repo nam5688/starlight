@@ -15,10 +15,14 @@ import type { ConcernDraftV1, ConcernReportV1 } from "../concern/types.ts";
 import { validateConcernDraft } from "../concern/validate.ts";
 import type { ConcernInput, GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
 import { assembleReading } from "../reading/assemble.ts";
+import { assembleStory, storyDepthSource } from "../reading/story-assemble.ts";
+import { STORY_FORMAT } from "../reading/story-plan.ts";
+import { buildStoryRepairMessage, buildStoryUserMessage, STORY_PROMPT_VERSION, STORY_SYSTEM_PROMPT } from "../reading/story-prompt.ts";
+import { validateStoryDraft, visibleStoryTexts } from "../reading/story-validate.ts";
 import { checkReadingDepth } from "../reading/depth.ts";
 import { buildReadingRepairMessage, buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
-import { findRepeatedPhrases, repeatMessages } from "../reading/repeat.ts";
-import type { ReadingDraftV1 } from "../reading/types.ts";
+import { findRepeatedPhrases, findRepeatedPhrasesIn, repeatMessages, type RepeatedPhrase } from "../reading/repeat.ts";
+import type { IntegratedReadingReport, ReadingDraftV1, StoryDraftV1 } from "../reading/types.ts";
 import { plainPeriodLabel, validateReadingDraft } from "../reading/validate.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
 import { buildRepairMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from "../v2/prompt.ts";
@@ -39,9 +43,10 @@ export type AiGeneratorOptions = {
   callTimeoutMs?: number;
   /**
    * 개인 통합 리포트의 형식 — 기본은 읽기 구조(reading-v1: 결론 → 짧은 요약 → 쉬운 예시 → 접힌 풀이 · 근거, 예시 화면과 같은 구성).
+   * story-v1은 영역마다 하나의 이야기를 끝까지 쓰는 형식(2026-10-16, 반복을 만드는 칸의 나눔을 바꾼 비교용 후보 — 기본으로 바꾸는 것은 운영자 결정, 같은 저장 모양에 layout "story"로 구분).
    * personal-v2는 이전 형식이며 비교 · 호환용이다.
    */
-  format?: "reading-v1" | "personal-v2";
+  format?: "reading-v1" | "story-v1" | "personal-v2";
   /**
    * 형식 검사를 통과해도 내용 차이 검사(reading/depth.ts)에서 걸리면 한 번 고쳐 쓰게 하고 그래도 안 되면 실패로 남긴다 (읽기 구조만).
    * 낱말 · 표지를 센 어림이어서 기본은 끄고(보고만), 실제 AI를 연결할 때 운영자가 켠다. 모의 글은 이 검사를 통과할 수 없다.
@@ -119,7 +124,12 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
 
   const format = opts.format ?? "reading-v1";
   const caller = createModelCaller({ model, maxRetries, sleep, maxOutputTokens: opts.maxOutputTokens, callTimeoutMs: opts.callTimeoutMs });
-  const spec = format === "reading-v1" ? { system: READING_SYSTEM_PROMPT, promptVersion: READING_PROMPT_VERSION } : { system: SYSTEM_PROMPT, promptVersion: PROMPT_VERSION };
+  const spec =
+    format === "reading-v1"
+      ? { system: READING_SYSTEM_PROMPT, promptVersion: READING_PROMPT_VERSION }
+      : format === STORY_FORMAT
+        ? { system: STORY_SYSTEM_PROMPT, promptVersion: STORY_PROMPT_VERSION }
+        : { system: SYSTEM_PROMPT, promptVersion: PROMPT_VERSION };
   /** 호출 한 번 (일시 오류 재시도 · 사용 기록은 model-caller) */
   const call = (messages: ModelMessage[], ctx: GenerateContext) => caller.call(messages, ctx, spec);
   const concernSpec = { system: CONCERN_SYSTEM_PROMPT, promptVersion: CONCERN_PROMPT_VERSION };
@@ -205,20 +215,47 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const baseEvidence = buildEvidence(input, ref);
       const evidence = format === "reading-v1" && opts.adaptEvidence ? opts.adaptEvidence(baseEvidence, input) : baseEvidence;
       const context = input.context;
-      if (format === "reading-v1") {
-        const messages: ModelMessage[] = [{ role: "user", content: buildReadingUserMessage(evidence, ref.iso, context) }];
+      if (format === "reading-v1" || format === STORY_FORMAT) {
+        // 두 형식은 같은 순서로 쓴다: 초안 → 형식 검사 → (켜 둔 경우) 내용 검사 · 반복 확인 → 조립. 달라지는 것(자료 · 검사 · 조립)만 이 꾸러미에 둔다.
+        const story = format === STORY_FORMAT;
+        type AnyDraft = ReadingDraftV1 | StoryDraftV1;
+        const kit: {
+          message: string;
+          repair: (errors: string[]) => string;
+          validate: (parsed: unknown) => { ok: true; draft: AnyDraft } | { ok: false; errors: string[] };
+          depthErrors: (draft: AnyDraft) => string[];
+          repeats: (draft: AnyDraft) => RepeatedPhrase[];
+          assemble: (draft: AnyDraft) => IntegratedReadingReport;
+          promptVersion: string;
+        } = story
+          ? {
+              message: buildStoryUserMessage(evidence, ref.iso, context),
+              repair: buildStoryRepairMessage,
+              validate: (parsed) => validateStoryDraft(parsed, evidence, { hasContext: Boolean(context) }),
+              depthErrors: (draft) => {
+                const depth = checkReadingDepth({ draft: storyDepthSource(draft as StoryDraftV1) });
+                return depth.pass ? [] : depth.flags.filter((f) => f.severity === "fail").map((f) => f.message);
+              },
+              repeats: (draft) => findRepeatedPhrasesIn(visibleStoryTexts(draft as StoryDraftV1)),
+              assemble: (draft) => assembleStory({ draft: draft as StoryDraftV1, evidence, input, reference: ref, promptVersion: STORY_PROMPT_VERSION, ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, STORY_PROMPT_VERSION] }),
+              promptVersion: STORY_PROMPT_VERSION,
+            }
+          : {
+              message: buildReadingUserMessage(evidence, ref.iso, context),
+              repair: buildReadingRepairMessage,
+              validate: (parsed) => validateReadingDraft(parsed, evidence, { hasContext: Boolean(context), extra: opts.extraChecks }),
+              depthErrors: (draft) => {
+                const depth = checkReadingDepth({ draft: draft as ReadingDraftV1 });
+                return depth.pass ? [] : depth.flags.filter((f) => f.severity === "fail").map((f) => f.message);
+              },
+              repeats: (draft) => findRepeatedPhrases(draft as ReadingDraftV1),
+              assemble: (draft) => assembleReading({ draft: draft as ReadingDraftV1, evidence, input, reference: ref, promptVersion: READING_PROMPT_VERSION, ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, READING_PROMPT_VERSION] }),
+              promptVersion: READING_PROMPT_VERSION,
+            };
+        const messages: ModelMessage[] = [{ role: "user", content: kit.message }];
         let lastReadingErrors: string[] = [];
         // 형식은 맞지만 같은 표현이 되풀이돼 고쳐 쓰기를 부탁한 첫 초안 — 고쳐 쓴 글이 형식 검사에서 떨어지면 이것을 쓴다
-        let softFallback: ReadingDraftV1 | null = null;
-        const finish = (draft: ReadingDraftV1) =>
-          assembleReading({
-            draft,
-            evidence,
-            input,
-            reference: ref,
-            promptVersion: READING_PROMPT_VERSION,
-            ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, READING_PROMPT_VERSION],
-          });
+        let softFallback: AnyDraft | null = null;
         for (let round = 0; round <= maxRepairs; round++) {
           const called = await call(messages, ctx);
           const { result } = called;
@@ -226,7 +263,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           const retry = (errors: string[]) => {
             lastReadingErrors = errors;
             ctx.onAttempt?.({ round, errors, text: result.text });
-            messages.push({ role: "assistant", content: result.text.slice(0, 20000) }, { role: "user", content: buildReadingRepairMessage(errors) });
+            messages.push({ role: "assistant", content: result.text.slice(0, 20000) }, { role: "user", content: kit.repair(errors) });
           };
           let parsed: unknown;
           try {
@@ -236,7 +273,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
             retry(["JSON 형식이 아닙니다. JSON 객체 하나만 출력해 주세요."]);
             continue;
           }
-          const checked = validateReadingDraft(parsed, evidence, { hasContext: Boolean(context), extra: opts.extraChecks });
+          const checked = kit.validate(parsed);
           if (!checked.ok) {
             done("invalid");
             retry(checked.errors);
@@ -244,16 +281,16 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           }
           // 형식은 맞아도 조건 없는 단정 · 범용 문장 · 겹치는 말이 많으면 한 번 고쳐 쓰게 한다 (켜 둔 경우만)
           if (opts.enforceDepth) {
-            const depth = checkReadingDepth({ draft: checked.draft });
-            if (!depth.pass) {
+            const depthErrors = kit.depthErrors(checked.draft);
+            if (depthErrors.length > 0) {
               done("invalid");
-              retry(depth.flags.filter((f) => f.severity === "fail").map((f) => f.message));
+              retry(depthErrors);
               continue;
             }
           }
           // 같은 표현이 여러 곳에 되풀이되면 한 번 고쳐 쓰게 한다 (켜 둔 경우만, 마지막 시도에서는 그대로 받는다)
           if (opts.repairRepeats && round < maxRepairs) {
-            const repeats = findRepeatedPhrases(checked.draft);
+            const repeats = kit.repeats(checked.draft);
             if (repeats.length > 0) {
               softFallback ??= checked.draft;
               done("ok");
@@ -262,9 +299,9 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
             }
           }
           done("ok");
-          return finish(checked.draft);
+          return kit.assemble(checked.draft);
         }
-        if (softFallback) return finish(softFallback);
+        if (softFallback) return kit.assemble(softFallback);
         throw new Error(`리포트 형식 검사 실패: ${lastReadingErrors.slice(0, 3).join(" / ")}`);
       }
       const messages: ModelMessage[] = [{ role: "user", content: buildUserMessage(evidence, ref.iso, context) }];

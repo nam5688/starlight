@@ -5,6 +5,8 @@
 import { tendencyPhrase } from "../../assessment/dev-rules.ts";
 import type { IntegratedReadingReport } from "./types.ts";
 
+const AREA_NAME: Record<string, string> = { core: "내 사주의 중심", relation: "가까운 관계", "work-money": "일과 재물", flow: "앞으로의 흐름" };
+
 export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { tendencyName?: string } = {}): string {
   const out: string[] = [];
   const p = (...lines: string[]) => out.push(...lines, "");
@@ -30,11 +32,11 @@ export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { tenden
     if (b.caveat) p(`> ${b.caveat}`);
   }
   p(`## ${r.flow.topic}`, `### ${r.flow.headline}`);
-  p(r.flow.summary, `> ${r.flow.caveat}`, r.flow.cardText);
+  p(r.flow.summary, ...(r.flow.paragraphs ?? []), `> ${r.flow.caveat}`, r.flow.cardText);
   p(...r.flow.years.map((y) => `- ${y.year}: ${y.theme}`));
   for (const x of r.flow.periods) p(`**${x.period}** ${x.theme}`, x.watch);
   p("이런 모습이 이어지면 / 이렇게 될 수 있습니다", ...r.flow.scenarios.map((s) => `- ${s.when} → ${s.then}`));
   p("## 지금 확인해 볼 것");
-  p(...r.actions.map((a, i) => `${i + 1}. **${a.title}** ${a.detail}`));
+  p(...r.actions.map((a, i) => `${i + 1}. **${a.title}** ${a.detail}${a.area ? ` (${AREA_NAME[a.area] ?? a.area}에서)` : ""}`));
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }

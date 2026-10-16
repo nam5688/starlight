@@ -1,7 +1,8 @@
 // AI 품질 비교의 비용 계획을 계산해 보여 준다 (드라이런) — 어떤 AI도 부르지 않고, 키도 필요 없다.
 // 가상 인물의 실제 지시문 · 근거 목록 길이로 입력 토큰을 추정하고, 환율 · 여유율 가정과 재시도(고쳐 쓰기)를 포함해 단계별 비용을 낸다.
-// 실행: node scripts/compare-ai-dry-run.ts [--variant reading-v1|personal-v2|philosophical-v0]   (miyu 폴더에서)
+// 실행: node scripts/compare-ai-dry-run.ts [--variant reading-v1|story-v1|personal-v2|philosophical-v0]   (miyu 폴더에서)
 //   기본(reading-v1): 지금 제품의 개인 통합 리포트(읽기 구조) 지시문의 길이로 계산한다
+//   --variant story-v1 : 영역별 이야기(비교용 후보) 지시문
 //   --variant personal-v2 : 이전 AI 형식(개인 종합 리포트 v2) 지시문 · --variant philosophical-v0 : 비교용 "자기 이해 풀이" 지시문
 import { AI_CANDIDATES, COMPARE_STAGES } from "../lib/config/ai-candidates.ts";
 import { buildEvidence } from "../lib/report/ai/generator.ts";
@@ -11,7 +12,7 @@ import { MAX_OUTPUT_TOKENS, planStage, referenceFor, TYPICAL_OUTPUT_TOKENS } fro
 import { type CompareVariant, promptsFor } from "../lib/report/ai/compare-plan.ts";
 
 const argVariant = process.argv.includes("--variant") ? process.argv[process.argv.indexOf("--variant") + 1] : "reading-v1";
-if (argVariant !== "reading-v1" && argVariant !== "personal-v2" && argVariant !== "philosophical-v0") throw new Error(`알 수 없는 --variant: ${argVariant}`);
+if (argVariant !== "reading-v1" && argVariant !== "story-v1" && argVariant !== "personal-v2" && argVariant !== "philosophical-v0") throw new Error(`알 수 없는 --variant: ${argVariant}`);
 const variant: CompareVariant = argVariant;
 const won = (x: number) => `${Math.round(x).toLocaleString("ko-KR")}원`;
 const now = new Date("2026-10-12T03:00:00Z");
@@ -19,7 +20,7 @@ const settings = { fxKrwPerUsd: DEFAULT_FX_KRW_PER_USD, surcharge: DEFAULT_SURCH
 const cands = AI_CANDIDATES.map((c) => ({ key: c.key, price: c.price }));
 
 console.log("# AI 품질 비교 비용 계획 (드라이런 — 호출 없음, 예산 미승인)\n");
-console.log(`- 지시문: ${variant === "philosophical-v0" ? "자기 이해 풀이(비교용 v0)" : variant === "personal-v2" ? "개인 종합 리포트 v2(이전 형식)" : "개인 통합 리포트(읽기 구조 reading-v1, 지금 제품 형식)"}`);
+console.log(`- 지시문: ${variant === "philosophical-v0" ? "자기 이해 풀이(비교용 v0)" : variant === "personal-v2" ? "개인 종합 리포트 v2(이전 형식)" : variant === "story-v1" ? "개인 통합 리포트 · 영역별 이야기(story-v1, 비교용 후보)" : "개인 통합 리포트(읽기 구조 reading-v1, 지금 제품 형식)"}`);
 console.log(`- 환율 ${DEFAULT_FX_KRW_PER_USD.toLocaleString("ko-KR")}원/달러 (가정값, 2026-10 실제 환율은 확인하지 않음) · 부가세 등 여유율 ${Math.round((DEFAULT_SURCHARGE - 1) * 100)}%`);
 for (const c of AI_CANDIDATES) console.log(`- 후보 ${c.key}: ${c.company} \`${c.modelId}\` 입력 $${c.price.inputUsdPerMTok} / 출력 $${c.price.outputUsdPerMTok} (100만 토큰당) — 확인일 ${c.checkedAt}`);
 

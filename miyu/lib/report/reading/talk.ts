@@ -299,7 +299,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: TalkModelO
     timeline: { slots: report.timeline, reference: report.timelineReference },
     ...(current ? { periodExample: periodPlain(current.stemGroup, current.branchGroup).example } : {}),
     example: [note(f.scenarioNote), ...f.scenarios.map((s) => para(s.then, s.when))],
-    detail: [...f.years.map((y) => para(y.theme, y.year)), ...f.periods.flatMap((p) => [para(p.theme, p.period), para(p.watch, `${p.period} · 살펴볼 점`)]), note(f.statistics)],
+    detail: [...(f.paragraphs ?? []).map((t) => para(t)), ...f.years.map((y) => para(y.theme, y.year)), ...f.periods.flatMap((p) => [para(p.theme, p.period), para(p.watch, `${p.period} · 살펴볼 점`)]), note(f.statistics)],
     basis: f.basis,
     ...(report.calendars && report.calendars.items.length > 0 ? { calendar: { items: report.calendars.items, reference: report.timelineReference } } : {}),
   });

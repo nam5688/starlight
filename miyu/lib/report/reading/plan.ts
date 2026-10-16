@@ -118,7 +118,12 @@ export const READING_LIMITS = {
 } as const;
 
 /** 사주 용어 사용 한도 — 심층 리포트 본문에서는 용어를 설명과 함께 쓸 수 있다(terms.ts의 checkTermUse, 2026-10-16) */
-export const TERM_LIMITS = { /** 한 문장에 쓸 수 있는 서로 다른 용어 수 */ perSentenceMax: 2 } as const;
+export const TERM_LIMITS = {
+  /** 한 문장에 쓸 수 있는 서로 다른 용어 수 */
+  perSentenceMax: 2,
+  /** 한 문단에 쓸 수 있는 서로 다른 용어 수 — 영역별 이야기(story-v1)만 본다. 문단 하나에서 새 개념을 여럿 배워야 하는 글이 되지 않게(운영자 2026-10-16) */
+  perParagraphMax: 2,
+} as const;
 
 /**
  * 사주 전문 용어 낱말 모음 — 용어가 한 번이라도 나오는지 보는 데 쓴다.

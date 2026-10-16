@@ -78,6 +78,7 @@ export function ReadingReportView({
   const extras = report.extras;
   const focus = report.focus ?? [];
   const hasExtras = Boolean(extras && (extras.plain || extras.questions.length || extras.situations.length || extras.partner || extras.items));
+  const story = report.layout === "story";
   const used = report.inputs.filter((i) => i.status !== "none").map((i) => i.name.replace(/\(.*\)/, ""));
   const none = report.inputs.filter((i) => i.status === "none").map((i) => i.name);
   const nav = [
@@ -179,7 +180,7 @@ export function ReadingReportView({
               </h2>
               <div className="mt-6 space-y-10 [&>article+article]:border-t [&>article+article]:border-line [&>article+article]:pt-10">
                 {blocks.map((b) => (
-                  <BlockView key={b.id} block={b} id={id(b.id)} number={numberOf.get(b.id)!} hasCalendar={Boolean(report.calendars?.items.length)} />
+                  <BlockView key={b.id} block={b} id={id(b.id)} number={numberOf.get(b.id)!} hasCalendar={Boolean(report.calendars?.items.length)} story={story} />
                 ))}
               </div>
             </section>
@@ -196,7 +197,13 @@ export function ReadingReportView({
               {report.flow.topic}
             </p>
             <h3 className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">{report.flow.headline}</h3>
-            <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
+            {story ? (
+              <div className="mt-3">
+                <Paragraphs items={[report.flow.summary, ...(report.flow.paragraphs ?? [])]} />
+              </div>
+            ) : (
+              <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
+            )}
             <CaveatNote text={report.flow.caveat} />
 
             <LuckTimelineCard timeline={report.timeline} reference={report.timelineReference} />
@@ -221,6 +228,7 @@ export function ReadingReportView({
               )}
               <Fold label="자세한 풀이" wide>
                 <div className="divide-y divide-line [&>div]:py-6 [&>div:first-child]:pt-0 [&>div:last-child]:pb-0">
+                  {report.flow.periods.length > 0 && (
                   <div>
                     <p className="text-[16px] font-bold">시기별로 읽으면</p>
                     <ul className="mt-3 space-y-5">
@@ -233,6 +241,7 @@ export function ReadingReportView({
                       ))}
                     </ul>
                   </div>
+                  )}
                   <div>
                     <p className="text-[16px] font-bold">응답으로 본 가능성</p>
                     <Prose text={report.flow.scenarioNote} className="mt-0.5 text-[13px] leading-[1.6] text-ink-3" />
@@ -377,7 +386,34 @@ export function ReadingReportView({
 }
 
 /** 주제 하나 — 이름표 → 결론(제목) → 요약 2문장 → (그림) → 예시 1개 → 조건 한 줄 → 접힘 두 개 */
-function BlockView({ block: b, id, number, hasCalendar }: { block: ReadingBlock; id: string; number: number; hasCalendar: boolean }) {
+function BlockView({ block: b, id, number, hasCalendar, story = false }: { block: ReadingBlock; id: string; number: number; hasCalendar: boolean; story?: boolean }) {
+  // 영역별 이야기(story-v1) — 요약 · 예시 · 접힌 풀이 없이 영역 하나가 한 이야기로 이어진다. 첫 문단은 summary, 나머지는 details에 있다
+  if (story) {
+    const calendarNote = hasCalendar ? SECTION_CALENDAR_NOTE[b.id as keyof typeof SECTION_CALENDAR_NOTE] : undefined;
+    return (
+      <article id={id} aria-labelledby={`${id}-h`} className={SCROLL_MARGIN}>
+        <p className="mb-0.5 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
+          <NumberBadge n={number} />
+          {b.topic}
+        </p>
+        <h3 id={`${id}-h`} className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">
+          {b.headline}
+        </h3>
+        <div className="mt-3">
+          <Paragraphs items={[b.summary, ...b.details]} />
+        </div>
+        {b.caveat && <CaveatNote text={b.caveat} />}
+        {calendarNote && <p className="mt-3 text-[13px] leading-[1.6] text-ink-3">{calendarNote}</p>}
+        {REPORT_BASIS.visible && (
+          <FoldRow>
+            <Fold label="분석 근거 보기">
+              <BasisList basis={b.basis} />
+            </Fold>
+          </FoldRow>
+        )}
+      </article>
+    );
+  }
   const hasFoldA = b.details.length > 0 || b.traits || b.reactionFlow || b.detailExample || b.watch;
   return (
     <article id={id} aria-labelledby={`${id}-h`} className={SCROLL_MARGIN}>

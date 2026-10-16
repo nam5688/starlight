@@ -79,6 +79,8 @@ export type ReadingFlow = {
   topic: string;
   headline: string;
   summary: string;
+  /** 영역별 이야기(story) 형식 — 요약 다음에 이어지는 문단들. 이전 형식에는 없다 */
+  paragraphs?: string[];
   caveat: string;
   /** 지금 지나는 시기 카드의 쉬운 설명 2~3문장 */
   cardText: string;
@@ -106,6 +108,11 @@ export type ReadingInput = {
 
 export type IntegratedReadingReport = {
   kind: "integrated-reading";
+  /**
+   * 글의 짜임 — "story": 영역마다 하나의 이야기를 끝까지 쓴 형식(story-v1, 2026-10-16). 영역의 첫 문단은 summary에, 나머지 문단은 details에 담고 요약 · 예시 · 특징 카드 · 소단락 · 살펴볼 점은 없다.
+   * 없으면 예전 읽기 구조(reading-v1: 칸마다 요약 · 예시 · 풀이 · 살펴볼 점). 두 형식이 같은 저장 모양을 써서 채팅 · 관리자 · 내보내기가 둘 다 읽는다.
+   */
+  layout?: "story";
   source: DataSource;
   personName: string;
   /** 핵심 해석 한 문장 (모바일 두 줄 이내) */
@@ -119,8 +126,8 @@ export type IntegratedReadingReport = {
   timelineReference: { year: number; month: number };
   /** 월 단위 "움직이는 달" 달력 — 사용자의 사주 계산 결과로 코드가 만든다(AI가 쓰지 않는다). 규칙 버전과 함께 저장하고 열 때마다 새로 계산하지 않는다. 이전에 저장된 리포트에는 없다 */
   calendars?: { ruleVersion: string; items: MonthCalendar[] };
-  /** 다음 행동 체크리스트 */
-  actions: { title: string; detail: string }[];
+  /** 다음 행동 체크리스트 — area는 이 행동이 어느 영역의 풀이에서 나왔는지(story 형식만) */
+  actions: { title: string; detail: string; area?: string }[];
   // ── 실제 생성된 리포트에만 있는 값 (예시에는 없다). 글은 AI가 쓰고, 아래 값은 코드가 채운다 ──
   /** 만세력 계산 결과의 화면용 표 */
   saju?: SajuSection;
@@ -191,6 +198,45 @@ export type ReadingDraftV1 = {
   actions: { title: string; detail: string; evidence: string[] }[];
   focus?: { text: string; evidence: string[] }[];
 };
+
+// ── story-v1(영역별 이야기) — AI가 돌려주는 초안. 요약 · 예시 · 주의 · 행동을 칸마다 채우지 않고 영역마다 문단들로 한 이야기를 쓴다 ──
+
+export type StoryAreaId = "core" | "relation" | "work-money";
+
+export type StoryAreaDraft = {
+  id: StoryAreaId;
+  /** 이 영역에서만 말하는 연결 한 문장 — 본문을 다 쓴 뒤 풀이의 결론으로 쓴다 */
+  headline: string;
+  /** 이야기 문단들 — 사주에서 읽은 것 → 이 사람에게 나타나는 장면 → 겪기 쉬웠던 부담 → 방향 */
+  paragraphs: string[];
+  evidence: string[];
+};
+
+export type StoryFlowDraft = {
+  headline: string;
+  /** 계산된 시기를 풀이하고 이 사람이 그 시기를 어떻게 받아들일지까지 — 시기 이야기는 이 영역에만 쓴다 */
+  paragraphs: string[];
+  years: { year: string; theme: string }[];
+  scenarios: { when: string; then: string }[];
+  evidence: string[];
+};
+
+export type StoryActionArea = StoryAreaId | "flow";
+
+export type StoryDraftV1 = {
+  /** 이 사람의 중심이 되는 연결 한 문장 (공유용 카드에 실리므로 이름을 쓰지 않는다) */
+  headline: string;
+  cards: { strength: { keyword: string; note: string }; caution: { keyword: string; note: string }; flow: { keyword: string } };
+  areas: StoryAreaDraft[];
+  flow: StoryFlowDraft;
+  /** 알려 준 고민이 있을 때만 — 앞 영역의 결론을 지금 선택에 적용한다 */
+  focus?: { text: string; evidence: string[] }[];
+  /** 지금 해 볼 행동 세 가지 — 앞 영역에서 나온 것을 한곳에 모은다. area는 어느 영역의 풀이에서 나온 행동인지 */
+  actions: { title: string; detail: string; area: StoryActionArea; evidence: string[] }[];
+};
+
+/** 저장된 리포트가 영역별 이야기(story) 형식인가 */
+export const isStoryReport = (c: unknown): c is IntegratedReadingReport => isReadingReport(c) && c.layout === "story";
 
 /** 저장된 리포트가 이 읽기 구조인가 (kind만 본다. 실제로 생성된 리포트에는 saju · base · extras · generated가 있고, 예시 화면의 데이터에는 없다) */
 export const isReadingReport = (c: unknown): c is IntegratedReadingReport => typeof c === "object" && c !== null && (c as { kind?: unknown }).kind === "integrated-reading";

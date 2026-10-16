@@ -105,14 +105,21 @@ export const RULE_META: RuleMeta[] = [
     conditions: ["환산값 65 이상 또는 35 이하 — 80 이상 · 20 이하는 strong, 그 밖은 moderate"], exceptions: ["가운데 점수는 근거로 쓰지 않는다", "사주 근거와 점수를 합산하지 않는다", "높고 낮음을 좋고 나쁨으로 쓰지 않는다"], review: "dev-example", version: "survey-dev-0.1",
   },
   {
+    id: "survey-axis", title: "평소 행동 방식(에너지 · 정보 · 판단 · 생활, 개발용 문항)", match: /^survey\.(ei|sn|tf|jp)\.(high|low)$/, kind: "survey",
+    calculation: "개발용 예시 문항(status: dev-example) 응답을 0~100으로 환산한 네 가지 방향(에너지를 채우는 방식 · 정보를 받아들이는 방식 · 판단하는 기준 · 생활을 꾸리는 방식). 백분위 · 정확도가 아니다.",
+    interpretation: "환산값이 65 이상이면 높은 쪽, 35 이하이면 낮은 쪽의 행동 경향 문장(방향의 high/low 의미)을 근거로 쓴다. 사주에서 읽은 성향이 이 사람에게 어떤 장면으로 나타나는지 구체화하는 재료이며 가운데는 만들지 않는다.",
+    source: "미유가 만든 개발용 예시 문항과 임시 규칙(dev-rules). 방향 구성이 기존 성격 이론과 닮아 있다는 출처 점검(docs/assessment-source-audit.md)이 있고, 실제 사람 응답으로 검증하지 않았다. 글자 코드(네 글자)로 바꾸지 않는다.",
+    conditions: ["환산값 65 이상 또는 35 이하 — 80 이상 · 20 이하는 strong, 그 밖은 moderate"], exceptions: ["가운데 점수는 근거로 쓰지 않는다", "사주 근거와 점수를 합산하지 않는다", "입력한 MBTI와 다르면 응답이 먼저이고 차이는 상황별로 설명한다", "유형 이름 · 네 글자 코드로 쓰지 않는다"], review: "dev-example", version: "survey-dev-0.2",
+  },
+  {
     id: "survey-closeness", title: "관계 불안과 거리 두기가 함께 높음", match: /^survey\.closeness\.both$/, kind: "survey",
     calculation: "관계 불안 · 거리 두기 환산값(개발용 문항).", interpretation: "두 값이 모두 55 이상이면 가까워지고 싶은 마음과 거리를 두고 싶은 마음이 함께 나타난다고 읽는다.",
     source: "미유 임시 규칙(survey-evidence.ts). 실제 사람 응답으로 검증하지 않았다.", conditions: ["관계 불안 55 이상 그리고 거리 두기 55 이상 — moderate"], exceptions: ["애착 유형 진단으로 쓰지 않는다"], review: "dev-example", version: "survey-dev-0.1",
   },
   {
     id: "self-mbti", title: "본인이 입력한 MBTI", match: /^self\.mbti$/, kind: "self",
-    calculation: "본인이 입력한 4글자(검사 점수가 아님).", interpretation: "본인이 알고 있는 자기 인식 참고값이다. 선호가 어떤 장면에서 드러날 수 있는지 구체화하는 데 쓰고 행동의 원인으로 단정하지 않으며 사주 · 응답과 다를 때 덮어쓰지 않는다.",
-    source: "사용자 입력.", conditions: ["MBTI를 입력한 경우 — 항상 weak"], exceptions: ["자체 응답으로 MBTI를 환산하지 않는다", "공식 MBTI 검사 결과가 아니다"], review: "unreviewed", version: "0.1",
+    calculation: "본인이 입력한 4글자(검사 점수가 아님). 글자가 가리키는 선호의 방향은 일상의 말로 풀어 근거 문구에 붙인다(직접 쓴 한 줄 풀이, 공식 검사 설명이 아님).", interpretation: "본인이 알고 있는 자기 인식 참고값이다. 사주에서 읽은 성향이 이 사람에게 어떤 장면으로 나타나는지 구체화하는 데 쓰고(핵심 성향 · 가까운 관계 · 일 영역에서) 행동의 원인으로 단정하지 않으며 사주 · 응답과 다를 때 덮어쓰지 않는다 — 응답이 먼저이고 다르면 차이가 나타나는 상황으로 쓴다.",
+    source: "사용자 입력.", conditions: ["MBTI를 입력한 경우 — 항상 weak"], exceptions: ["자체 응답으로 MBTI를 환산하지 않는다", "공식 MBTI 검사 결과가 아니다", "알파벳 글자를 이유로 쓰지 않는다(\"INFJ라서\" 금지)", "시기 · 운 때문에 성향이 바뀐다고 쓰지 않는다"], review: "unreviewed", version: "0.2",
   },
 ];
 
