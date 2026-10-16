@@ -1,3 +1,4 @@
+import { REPORT_BASIS } from "@/lib/config/product";
 import type { Evidence } from "@/lib/report/evidence";
 import { ChevronIcon } from "@/components/ui/icons";
 import type { Paragraph } from "@/lib/report/v2/types";
@@ -19,6 +20,8 @@ export function ParagraphBlock({ paragraph, evidence }: { paragraph: Paragraph; 
 }
 
 export function EvidenceDetails({ ids, evidence }: { ids: string[]; evidence: Map<string, Evidence> }) {
+  // 분석 근거 화면 노출 스위치(lib/config/product.ts) — 숨김이면 근거 데이터는 그대로 두고 보이는 상자만 그리지 않는다
+  if (!REPORT_BASIS.visible) return null;
   const items = ids.map((i) => evidence.get(i)).filter((e): e is Evidence => Boolean(e));
   if (!items.length) return null;
   return (

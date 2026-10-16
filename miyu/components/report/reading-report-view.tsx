@@ -1,5 +1,6 @@
 import { ArrowIcon, ChevronIcon } from "@/components/ui/icons";
 import { tendencyPhrase } from "@/lib/assessment/dev-rules";
+import { REPORT_BASIS } from "@/lib/config/product";
 import { basisFor } from "@/lib/report/reading/assemble";
 import type { IntegratedReadingReport, ReadingBlock, ReadingGroupId } from "@/lib/report/reading/types";
 import type { SajuSection, ScoreRow } from "@/lib/report/types";
@@ -114,31 +115,33 @@ export function ReadingReportView({
             </a>
           </div>
 
-          <details className="group mt-3">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-end [&::-webkit-details-marker]:hidden">
-              <span className="inline-flex h-9 items-center gap-1 rounded-full border border-line-strong bg-canvas pr-2.5 pl-3.5 text-[13px] font-semibold text-ink-2 transition-colors hover:bg-mist">
-                참고한 자료 {used.length}개
-                <ChevronIcon className="size-4 transition-transform group-open:rotate-180" />
-              </span>
-            </summary>
-            <p className="mb-2 text-[13px] leading-[1.6] text-ink-3">
-              <span className="font-semibold text-ink-2">쓰지 않은 것</span> {none.join(" · ") || "없음"} — 자료가 없는 부분은 만들어 채우지 않았습니다.
-            </p>
-            <ul className="divide-y divide-line rounded-lg border border-line bg-canvas text-[14px]">
-              {report.inputs.map((i) => (
-                <li key={i.name} className="grid gap-0.5 px-4 py-3 md:grid-cols-[170px_minmax(0,1fr)] md:gap-4">
-                  <p className="font-semibold">
-                    {i.name}
-                    <span className={`ml-2 text-[13px] font-medium ${i.status === "none" ? "text-ink-3" : "text-accent"}`}>{STATUS_LABEL[i.status]}</span>
-                  </p>
-                  <p className="leading-[1.6] text-ink-2">
-                    {i.note}
-                    {i.usedIn.length > 0 && <span className="mt-1 block text-[13px] text-ink-3">쓰인 곳 · {i.usedIn.join(" · ")}</span>}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </details>
+          {REPORT_BASIS.visible && (
+            <details className="group mt-3">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-end [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex h-9 items-center gap-1 rounded-full border border-line-strong bg-canvas pr-2.5 pl-3.5 text-[13px] font-semibold text-ink-2 transition-colors hover:bg-mist">
+                  참고한 자료 {used.length}개
+                  <ChevronIcon className="size-4 transition-transform group-open:rotate-180" />
+                </span>
+              </summary>
+              <p className="mb-2 text-[13px] leading-[1.6] text-ink-3">
+                <span className="font-semibold text-ink-2">쓰지 않은 것</span> {none.join(" · ") || "없음"} — 자료가 없는 부분은 만들어 채우지 않았습니다.
+              </p>
+              <ul className="divide-y divide-line rounded-lg border border-line bg-canvas text-[14px]">
+                {report.inputs.map((i) => (
+                  <li key={i.name} className="grid gap-0.5 px-4 py-3 md:grid-cols-[170px_minmax(0,1fr)] md:gap-4">
+                    <p className="font-semibold">
+                      {i.name}
+                      <span className={`ml-2 text-[13px] font-medium ${i.status === "none" ? "text-ink-3" : "text-accent"}`}>{STATUS_LABEL[i.status]}</span>
+                    </p>
+                    <p className="leading-[1.6] text-ink-2">
+                      {i.note}
+                      {i.usedIn.length > 0 && <span className="mt-1 block text-[13px] text-ink-3">쓰인 곳 · {i.usedIn.join(" · ")}</span>}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </section>
 
         {focus.length > 0 && (
@@ -155,7 +158,7 @@ export function ReadingReportView({
             <div className="mt-4">
               <Paragraphs items={focus.map((f) => f.text)} />
             </div>
-            {report.generated && (
+            {REPORT_BASIS.visible && report.generated && (
               <FoldRow>
                 <Fold label="분석 근거 보기">
                   <BasisList basis={basisFor(focus.flatMap((f) => f.evidence), report.generated.evidence)} />
@@ -253,9 +256,11 @@ export function ReadingReportView({
                   </div>
                 </div>
               </Fold>
-              <Fold label="시기 계산과 해석 근거" wide>
-                <BasisList basis={report.flow.basis} />
-              </Fold>
+              {REPORT_BASIS.visible && (
+                <Fold label="시기 계산과 해석 근거" wide>
+                  <BasisList basis={report.flow.basis} />
+                </Fold>
+              )}
             </FoldRow>
           </article>
         </section>
@@ -409,9 +414,11 @@ function BlockView({ block: b, id, number, hasCalendar }: { block: ReadingBlock;
             {b.watch && <WatchNote text={b.watch} />}
           </Fold>
         )}
-        <Fold label="분석 근거 보기">
-          <BasisList basis={b.basis} />
-        </Fold>
+        {REPORT_BASIS.visible && (
+          <Fold label="분석 근거 보기">
+            <BasisList basis={b.basis} />
+          </Fold>
+        )}
       </FoldRow>
     </article>
   );

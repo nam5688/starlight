@@ -4,6 +4,7 @@
 // 화면의 흐림 처리는 장식일 뿐이고, 가려진 글자는 브라우저로 전송되지 않는다 (CSS로 가리기 금지 원칙).
 // 구매한 리포트에는 이 미리보기의 모든 항목이 실제로 들어 있어야 한다 (preview.test.ts가 확인한다).
 
+import { REPORT_BASIS } from "../config/product.ts";
 import { pillarsLine } from "../saju/display.ts";
 import type { SajuResult } from "../saju/engine.ts";
 import type { ElementReading } from "../saju/plain.ts";
@@ -127,10 +128,11 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
       : { status: "not-ready", message: saju.status === "invalid" ? saju.message : "만세력 계산 결과가 없습니다." };
 
   const locked: LockedFeature[] = [
-    ...(summary.insight ? [{ id: "tendency", title: "대표 경향을 그렇게 읽은 이유", teaser: "이 경향을 읽는 데 쓴 내 응답" }] : []),
+    // "그렇게 읽은 이유(근거 응답)"는 분석 근거 화면 노출 스위치(lib/config/product.ts)가 켜져 있을 때만 약속한다 — 꺼져 있으면 구매 후에도 보이지 않는다
+    ...(summary.insight && REPORT_BASIS.visible ? [{ id: "tendency", title: "대표 경향을 그렇게 읽은 이유", teaser: "이 경향을 읽는 데 쓴 내 응답" }] : []),
     { id: "core", title: "핵심 요약 나머지 2가지", teaser: "스트레스를 받기 쉬운 상황 · 바로 적용해볼 행동" },
     { id: "scores", title: "기질 · 관계(애착) 점수와 그 의미", teaser: "4가지 기질과 가까운 관계에서의 반응" },
-    { id: "detail", title: "상세 분석", teaser: "근거와 한계를 함께 적은 분석" },
+    { id: "detail", title: "상세 분석", teaser: "관점마다 풀이와 한계를 함께 적은 분석" },
     { id: "situations", title: "상황별 잘하는 점 · 주의할 점 상세", teaser: "일 · 관계 · 선택 · 갈등 4가지 상황" },
     ...(qs.length ? [{ id: "questions", title: `내 원국에서 나온 질문 ${qs.length}개의 답`, teaser: "질문마다 쉬운 말로 풀어 드립니다" }] : []),
     ...(extras.partner ? [{ id: "partner", title: "어울리는 관계 조건", teaser: "편안한 상대의 성향과 관계 주제가 두드러지는 해" }] : []),

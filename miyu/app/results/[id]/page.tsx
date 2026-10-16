@@ -29,7 +29,7 @@ import { ReceivedReports, RepurchasePanel } from "@/components/results/received-
 import { ReadingNav } from "@/components/report/reading-nav";
 import { ResultHeader } from "@/components/report/result-header";
 import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
-import { CONCERN_RECORDS } from "@/lib/config/product";
+import { CONCERN_RECORDS, REPORT_BASIS } from "@/lib/config/product";
 import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { buildFreePreview } from "@/lib/report/preview";
@@ -192,7 +192,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           { id: "r-self", label: "내 성향" },
           { id: "r-situations", label: "일 · 관계" },
           { id: "r-actions", label: "필요한 한 가지" },
-          { id: "r-basis", label: "분석 근거" },
+          ...(REPORT_BASIS.visible ? [{ id: "r-basis", label: "분석 근거" }] : preview.saju.status === "ok" ? [{ id: "r-basis", label: "내 사주 원국" }] : []),
           { id: "r-rooms", label: "상담방" },
           { id: "r-purchase", label: "구매 안내" },
         ]}

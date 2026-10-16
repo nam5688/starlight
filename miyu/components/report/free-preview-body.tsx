@@ -1,4 +1,5 @@
 import { StatusBadge } from "@/components/ui/source-badge";
+import { REPORT_BASIS } from "@/lib/config/product";
 import { ChevronIcon } from "@/components/ui/icons";
 import type { FreePreview } from "@/lib/report/preview";
 import { SajuChart } from "./detail-sections";
@@ -124,83 +125,99 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
         </section>
       )}
 
-      {/* ⑤ 원국 · 분석 근거 — 펼쳐 보기 */}
-      <section aria-labelledby={id("basis")}>
-        <h2 id={id("basis")} className="sr-only">
-          원국 · 분석 근거
-        </h2>
-        <details data-fold className="group min-w-0 rounded-lg border border-line-strong bg-canvas">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
-            <span className="min-w-0">
-              <span className="block text-[15px] font-semibold">원국 · 분석 근거 보기</span>
-              <span className="mt-0.5 block text-[13px] leading-[1.5] text-ink-3">사주 원국 표 · 오행 설명 · 평소 행동 방식 · 분석에 사용한 정보</span>
-            </span>
-            <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="space-y-10 border-t border-line px-4 py-5">
-            {saju.status === "ok" && (
-              <>
+      {/* ⑤ 원국 · 분석 근거 — 펼쳐 보기. 분석 근거 화면 노출 스위치(lib/config/product.ts)가 꺼져 있으면 "내 사주 원국"(계산 결과 표)만 남기고
+          오행 해설 · 응답 환산 막대 · 분석에 사용한 정보는 그리지 않는다 */}
+      {(REPORT_BASIS.visible || saju.status === "ok") && (
+        <section aria-labelledby={id("basis")}>
+          <h2 id={id("basis")} className="sr-only">
+            {REPORT_BASIS.visible ? "원국 · 분석 근거" : "내 사주 원국"}
+          </h2>
+          <details data-fold className="group min-w-0 rounded-lg border border-line-strong bg-canvas">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0">
+                <span className="block text-[15px] font-semibold">{REPORT_BASIS.visible ? "원국 · 분석 근거 보기" : "내 사주 원국 보기"}</span>
+                <span className="mt-0.5 block text-[13px] leading-[1.5] text-ink-3">{REPORT_BASIS.visible ? "사주 원국 표 · 오행 설명 · 평소 행동 방식 · 분석에 사용한 정보" : "태어난 날짜와 시간으로 계산한 여덟 글자"}</span>
+              </span>
+              <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-10 border-t border-line px-4 py-5">
+              {saju.status === "ok" && (
+                <>
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-ink-2">사주 원국</h3>
+                    <p className="mt-1 text-[13px] leading-relaxed text-ink-3">태어난 날짜와 시간으로 만세력에서 계산한 결과입니다.</p>
+                    <div className="mt-4">
+                      <SajuChart saju={saju.section} showGlossary />
+                    </div>
+                    {!REPORT_BASIS.visible &&
+                      saju.notes.map((n) => (
+                        <p key={n} className="mt-2 text-[13px] leading-relaxed text-ink-3">
+                          {n}
+                        </p>
+                      ))}
+                  </div>
+                  {REPORT_BASIS.visible && (
+                    <div>
+                      <h3 className="text-[15px] font-semibold text-ink-2">오행은 각각 무엇을 뜻하나요</h3>
+                      <ul className="mt-2 divide-y divide-line border-y border-line">
+                        {saju.elements.map((e) => (
+                          <li key={e.element} className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-1 py-3.5 sm:grid-cols-[104px_minmax(0,1fr)_72px]">
+                            <p className="text-[16px] font-semibold">
+                              {e.element}
+                              <span className="ml-1 text-[13px] font-normal text-ink-3">
+                                {e.hanja} · {e.image}
+                              </span>
+                            </p>
+                            <p className="col-span-1 text-[15px] leading-relaxed text-ink-2 sm:col-span-1">
+                              <span className="font-semibold text-ink">{e.keywords}</span>
+                              <span className="block text-[14px] text-ink-3">{e.force}</span>
+                            </p>
+                            <p className={`col-start-2 text-[14px] sm:col-start-3 sm:text-right ${e.level === "many" || e.level === "none" ? "font-semibold text-accent" : "text-ink-3"}`}>
+                              {e.count}개 · {e.levelLabel}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-[13px] leading-relaxed text-ink-3">개수는 원국의 천간 · 지지 글자 기준입니다 (지장간 제외). 많고 적음은 좋고 나쁨이 아니라 방향의 차이입니다.</p>
+                    </div>
+                  )}
+                </>
+              )}
+              {REPORT_BASIS.visible && (
+                <>
                 <div>
-                  <h3 className="text-[15px] font-semibold text-ink-2">사주 원국</h3>
-                  <p className="mt-1 text-[13px] leading-relaxed text-ink-3">태어난 날짜와 시간으로 만세력에서 계산한 결과입니다.</p>
-                  <div className="mt-4">
-                    <SajuChart saju={saju.section} showGlossary />
+                  <div className="flex items-baseline justify-between gap-3 border-b border-ink pb-2">
+                    <h3 className="text-[15px] font-semibold text-ink-2">평소 행동 방식</h3>
+                    <span className="text-[14px] font-semibold text-ink-2">이번 응답</span>
+                  </div>
+                  <p className="mt-2 text-[13px] leading-relaxed text-ink-3">0~100은 응답을 환산한 값이며 백분위나 정확도가 아닙니다.</p>
+                  <div className="divide-y divide-line">
+                    {preview.mbti.axes.map((r) => (
+                      <AxisBar key={r.id} row={r} />
+                    ))}
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-semibold text-ink-2">오행은 각각 무엇을 뜻하나요</h3>
-                  <ul className="mt-2 divide-y divide-line border-y border-line">
-                    {saju.elements.map((e) => (
-                      <li key={e.element} className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-1 py-3.5 sm:grid-cols-[104px_minmax(0,1fr)_72px]">
-                        <p className="text-[16px] font-semibold">
-                          {e.element}
-                          <span className="ml-1 text-[13px] font-normal text-ink-3">
-                            {e.hanja} · {e.image}
-                          </span>
-                        </p>
-                        <p className="col-span-1 text-[15px] leading-relaxed text-ink-2 sm:col-span-1">
-                          <span className="font-semibold text-ink">{e.keywords}</span>
-                          <span className="block text-[14px] text-ink-3">{e.force}</span>
-                        </p>
-                        <p className={`col-start-2 text-[14px] sm:col-start-3 sm:text-right ${e.level === "many" || e.level === "none" ? "font-semibold text-accent" : "text-ink-3"}`}>
-                          {e.count}개 · {e.levelLabel}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 text-[13px] leading-relaxed text-ink-3">개수는 원국의 천간 · 지지 글자 기준입니다 (지장간 제외). 많고 적음은 좋고 나쁨이 아니라 방향의 차이입니다.</p>
-                </div>
-              </>
-            )}
-            <div>
-              <div className="flex items-baseline justify-between gap-3 border-b border-ink pb-2">
-                <h3 className="text-[15px] font-semibold text-ink-2">평소 행동 방식</h3>
-                <span className="text-[14px] font-semibold text-ink-2">이번 응답</span>
-              </div>
-              <p className="mt-2 text-[13px] leading-relaxed text-ink-3">0~100은 응답을 환산한 값이며 백분위나 정확도가 아닙니다.</p>
-              <div className="divide-y divide-line">
-                {preview.mbti.axes.map((r) => (
-                  <AxisBar key={r.id} row={r} />
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-[15px] font-semibold text-ink-2">분석에 사용한 정보</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-                평소 행동 방식 문항 {preview.basis.mbtiItems}개 · 기질 문항 {preview.basis.temperamentItems}개 · 관계(애착) 문항 {preview.basis.relationshipItems}개 (모두 개발용 예시 문항)
-                {saju.status === "ok" && saju.chartLine && <> · 사주 {saju.chartLine}</>}
-              </p>
-              <p className="mt-2 text-[13px] leading-relaxed text-ink-3">사주와 심리검사 점수는 합산하지 않고 각각 따로 계산합니다.</p>
-              {saju.status === "ok" &&
-                saju.notes.map((n) => (
-                  <p key={n} className="mt-2 text-[13px] leading-relaxed text-ink-3">
-                    {n}
+                  <h3 className="text-[15px] font-semibold text-ink-2">분석에 사용한 정보</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
+                    평소 행동 방식 문항 {preview.basis.mbtiItems}개 · 기질 문항 {preview.basis.temperamentItems}개 · 관계(애착) 문항 {preview.basis.relationshipItems}개 (모두 개발용 예시 문항)
+                    {saju.status === "ok" && saju.chartLine && <> · 사주 {saju.chartLine}</>}
                   </p>
-                ))}
+                  <p className="mt-2 text-[13px] leading-relaxed text-ink-3">사주와 심리검사 점수는 합산하지 않고 각각 따로 계산합니다.</p>
+                  {saju.status === "ok" &&
+                    saju.notes.map((n) => (
+                      <p key={n} className="mt-2 text-[13px] leading-relaxed text-ink-3">
+                        {n}
+                      </p>
+                    ))}
+                </div>
+
+                </>
+              )}
             </div>
-          </div>
-        </details>
-      </section>
+          </details>
+        </section>
+      )}
     </div>
   );
 }

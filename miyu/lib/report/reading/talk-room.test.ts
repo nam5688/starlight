@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { QUESTION_PACK_PRICE_KRW } from "../../config/product.ts";
+import { QUESTION_PACK_PRICE_KRW, REPORT_BASIS } from "../../config/product.ts";
 import { SAMPLE_CHART } from "../../samples/sample-report.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
 import { dayReading } from "../../saju/interpret/day-plain.ts";
@@ -142,7 +142,8 @@ test("연애 방: 모드 접속 안내 → 인사 → 먼저 묻는 질문으로
   assert.equal(after.kind, "chat");
   if (after.kind === "chat") {
     assert.deepEqual(after.feel.map((c) => c.label), ["맞아요", "상황에 따라 달라요", "잘 모르겠어요"]);
-    assert.deepEqual(after.helpers.map((c) => c.key), ["example", "detail", "calendar-love", "basis"]);
+    // [분석 이유]는 분석 근거 화면 노출 스위치(REPORT_BASIS)가 켜져 있을 때만 보조 버튼이 된다 — 꺼져 있으면 일상 예시 · 더 자세히 · 달력만
+    assert.deepEqual(after.helpers.map((c) => c.key), ["example", "detail", "calendar-love", ...(REPORT_BASIS.visible ? ["basis"] : [])]);
     assert.equal(after.next?.label, "다음 풀이 · 끌리는 사람의 경향", "연애 방의 다음 풀이는 사주로 읽은 인연의 경향");
     assert.equal(after.buy, null, "리포트를 받은 분에게는 구매 버튼이 없다");
   }
@@ -276,7 +277,7 @@ test("오늘의 한 장(원데이 미유): 고른 영역의 한 줄 팁이 풀�
   assert.equal(miyuText(a.added).at(-1), "오늘의 무료 운세는 여기까지예요. 내일 새로운 한 장으로 다시 만나요.");
   const r = replyOptions(m, "daily", a.state);
   assert.ok(r.kind === "chat" && r.feel.length === 0 && r.next === null, "내 경험 답장 · 다음 풀이가 없다");
-  assert.ok(r.kind === "chat" && r.helpers.map((c) => c.key).join() === "basis", "분석 이유만 열 수 있다");
+  assert.ok(r.kind === "chat" && r.helpers.map((c) => c.key).join() === (REPORT_BASIS.visible ? "basis" : ""), REPORT_BASIS.visible ? "분석 이유만 열 수 있다" : "분석 근거를 숨기는 동안에는 보조 버튼이 없다");
   // "딱히 없어요"를 고르면 영역 팁 없이 오늘의 분위기만
   const skip = applyAction(m, "daily", s, { t: "intake", option: "skip" });
   assert.ok(!miyuText(skip.added).some((t) => Object.values(d.tips).includes(t)));

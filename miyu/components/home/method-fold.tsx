@@ -43,7 +43,7 @@ export function MethodFold() {
       </summary>
       <div className="pb-6">
         <p className="text-[15px] leading-[1.7] text-ink-2">
-          미유는 아래 정보를 한 사람의 해석으로 읽습니다. 사주와 심리 응답은 따로 계산하고 근거와 한계를 나눠 보여 드리며, 서로 합산한 종합 점수는 만들지 않습니다.
+          미유는 아래 정보를 한 사람의 해석으로 읽습니다. 사주와 심리 응답은 따로 계산하고 한계를 함께 밝히며, 서로 합산한 종합 점수는 만들지 않습니다.
         </p>
         <dl className="mt-4 border-t border-ink">
           {INFORMATION.map((p) => (

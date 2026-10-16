@@ -158,3 +158,17 @@ test("십성 대조(운영자가 전달한 지적): 일간 丁 기준으로 丙�
   // 같은 癸를 한쪽은 정관 · 다른 쪽은 편관으로 부르지 않는다 — 정관은 壬
   assert.equal(getTenGod(dm, "임" as never), "정관");
 });
+
+// ───────────── 분석 근거 화면 숨김(운영자 2026-10-16) ─────────────
+
+test("분석 근거 화면 노출 스위치: 꺼져 있고(숨김), 숨겨도 저장된 리포트의 근거 데이터 · AI에게 가는 근거 목록은 그대로다", async () => {
+  const { REPORT_BASIS } = await import("../../config/product.ts");
+  const { sampleReadingReport } = await import("../../samples/sample-reading-report.ts");
+  assert.equal(REPORT_BASIS.visible, false, "운영자 요청으로 숨긴다(켜려면 lib/config/product.ts 한 줄)");
+  // 근거 데이터는 지우지 않는다 — 주제마다 basis · 시기 basis · 사용한 자료 목록이 코드가 채운 그대로 있다
+  assert.ok(sampleReadingReport.blocks.every((b) => b.basis && b.basis.computed.length + b.basis.tradition.length > 0), "주제마다 근거 데이터가 남아 있다");
+  assert.ok(sampleReadingReport.flow.basis.computed.length > 0, "시기 근거 데이터가 남아 있다");
+  assert.ok(sampleReadingReport.inputs.length > 0);
+  // AI 요청의 근거 목록은 화면 스위치와 무관하다
+  assert.ok(JSON.parse(buildReadingUserMessage(SAMPLE_EVIDENCE, "2026-10-12", null).replace(/^[^{]*/, "")).evidence.length > 30);
+});

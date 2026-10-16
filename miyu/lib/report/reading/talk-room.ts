@@ -3,7 +3,7 @@
 // 이 파일은 AI를 부르지 않는다. 자유 질문의 답은 서버가 만들어 오고(자유 질문 행동 "free"), 이 파일은 그 글을 대화에 놓고 되살리기만 한다.
 // 눌러 준 답(연애 상태 등)은 풀이를 바꾸지 않는다. 풀이를 어떻게 읽을지 알려 주는 한 줄에만 쓴다.
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
-import { CHAT_SUMMARY_POLICY, QUESTION_PACK_SIZE } from "../../config/product.ts";
+import { CHAT_SUMMARY_POLICY, QUESTION_PACK_SIZE, REPORT_BASIS } from "../../config/product.ts";
 import { answerBubbles, extraBubbles, freeLeftText, nextTopic, QUESTION_MAX, TALK_COPY, type TalkBubble, type TalkBuy, type TalkExtra, type TalkModel, type TalkTopic } from "./talk.ts";
 
 /** 미유의 표정 — 운영자가 보낸 캐릭터 시트의 표정 시트 6가지와 액션 포즈 3가지 (그림은 components/talk/miyu-moods.ts) */
@@ -574,7 +574,8 @@ export function replyOptions(model: TalkModel, roomId: RoomId, state: RoomState)
     const wanted = roomId === "main" ? (["love", "money"] as const) : room.calendars;
     for (const c of wanted) if (!used.has(`calendar-${c}`)) helpers.push(helper(`calendar-${c}`));
   }
-  if (t.basis && !used.has("basis")) helpers.push(helper("basis"));
+  // [분석 이유]는 분석 근거 화면 노출 스위치(lib/config/product.ts)가 켜져 있을 때만 — 저장된 풀이의 근거 데이터(t.basis)는 그대로다
+  if (REPORT_BASIS.visible && t.basis && !used.has("basis")) helpers.push(helper("basis"));
   const next = nextTopic(roomTopics(model, roomId), t.id, new Set(state.opened));
   return {
     kind: "chat",

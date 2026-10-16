@@ -39,7 +39,9 @@ export default function Home() {
             </h1>
             <p className="mt-4 text-[16px] leading-[1.7] text-ink-2 md:text-[18px]">내가 어떤 사람인지, 왜 비슷한 상황에서 힘들고 부딪히는지.</p>
             <p className="mt-2 text-[16px] leading-[1.7] text-ink-2 md:text-[18px]">
-              사주에 더해 입력한 MBTI와 직접 답한 내용을 함께 반영해, <span className="font-semibold text-ink">미유가 먼저 쉽게 풀어주고 궁금한 건 대화로 이어가요.</span>
+              사주에 더해 MBTI 기질 성격 애착 테스트까지 반영해요.
+              <br />
+              <span className="font-semibold text-ink">나온 분석은 미유가 먼저 쉽게 풀어주고 궁금한 건 대화로 이어가요.</span>
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href="/analyze" className={buttonPrimary}>

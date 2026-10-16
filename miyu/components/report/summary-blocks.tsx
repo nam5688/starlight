@@ -1,4 +1,5 @@
 import type { CoreSummary, FreeSummary } from "@/lib/report/types";
+import { REPORT_BASIS } from "@/lib/config/product";
 import { ANSWER_LABEL } from "@/lib/report/free-insight";
 import { Fold, FoldRow } from "./reading-parts";
 import { AxisBar, ScoreBar } from "./score-bar";
@@ -38,18 +39,20 @@ export function TendencyBlock({
         <>
           <p className="mt-6 text-[13px] font-semibold text-ink-3">내 응답에서 읽은 것</p>
           <p className="mt-1.5 text-[16px] leading-[1.75]">{insight.text}</p>
-          <FoldRow>
-            <Fold label="이렇게 읽은 이유 보기" hint="이 문단에는 응답만 쓰였고, 사주와 합산하지 않았습니다." wide>
-              <ul className="divide-y divide-line">
-                {insight.basis.map((b) => (
-                  <li key={b.itemId} className="grid gap-1 py-3.5 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1fr)_140px] md:gap-4">
-                    <p className="text-[15px] leading-[1.65]">“{b.text}”</p>
-                    <p className="text-[14px] font-semibold text-accent-strong md:text-right">내 응답 · {ANSWER_LABEL[b.answer] ?? b.answer}</p>
-                  </li>
-                ))}
-              </ul>
-            </Fold>
-          </FoldRow>
+          {REPORT_BASIS.visible && (
+            <FoldRow>
+              <Fold label="이렇게 읽은 이유 보기" hint="이 문단에는 응답만 쓰였고, 사주와 합산하지 않았습니다." wide>
+                <ul className="divide-y divide-line">
+                  {insight.basis.map((b) => (
+                    <li key={b.itemId} className="grid gap-1 py-3.5 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1fr)_140px] md:gap-4">
+                      <p className="text-[15px] leading-[1.65]">“{b.text}”</p>
+                      <p className="text-[14px] font-semibold text-accent-strong md:text-right">내 응답 · {ANSWER_LABEL[b.answer] ?? b.answer}</p>
+                    </li>
+                  ))}
+                </ul>
+              </Fold>
+            </FoldRow>
+          )}
         </>
       )}
     </div>

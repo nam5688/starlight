@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
+import { REPORT_BASIS } from "../config/product.ts";
 import { calculateSaju } from "../saju/manseryeok-engine.ts";
 import { createAiReportGenerator } from "./ai/generator.ts";
 import { createMockModel } from "./ai/mock-model.ts";
@@ -41,7 +42,7 @@ test("대표 경향: 이름 전체와 한 줄 요약은 완성된 문장으로 �
     assert.equal(preview.action.lockedCount, 2);
     // 잠긴 목록에는 "이름 앞부분만 보인다"는 안내가 더는 없고, 근거 응답이 있을 때만 "그렇게 읽은 이유"를 약속한다
     assert.ok(!preview.locked.some((f) => /이름/.test(f.title + f.teaser)));
-    assert.equal(preview.locked.some((f) => f.id === "tendency"), Boolean(inp.summary.insight));
+    assert.equal(preview.locked.some((f) => f.id === "tendency"), Boolean(inp.summary.insight) && REPORT_BASIS.visible, "분석 근거를 화면에 보이지 않는 동안에는 \"그렇게 읽은 이유\"를 약속하지 않는다");
   }
 });
 

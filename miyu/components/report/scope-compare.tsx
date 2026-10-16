@@ -12,7 +12,6 @@ import { CHAT_ROOMS, formatKrw, PERSONAL_REPORT, REPORT_SCOPE, REPORT_TIER_NAMES
  */
 const FREE_ITEMS = ["대표 경향 이름과 한 줄 요약 · 핵심 요약 일부", "사주 원국 표와 쉬운 풀이", "상황별 해석의 첫 장면 · 내 원국이 던지는 질문", "무료 상담방과 방마다 정해진 무료 질문"];
 const DEEP_ITEMS = [
-  "대표 경향을 그렇게 읽은 이유(근거 응답)",
   "핵심 요약 전체 · 상세 분석",
   "상황별 잘하는 점 · 주의할 점",
   "어울리는 관계 조건 · 보완 아이템 · 실천 제안",
