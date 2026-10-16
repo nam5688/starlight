@@ -1,5 +1,6 @@
 // 무료 미리보기 — 서버에서 "공개할 것만" 골라 만든다.
-// 잠긴 항목에는 내용이 없다 (이름 일부, 문장 일부, 점수, 상세 분석, 실천 제안 나머지 모두 여기 들어오지 않는다).
+// 잠긴 항목에는 내용이 없다 (점수, 상세 분석, 그렇게 읽은 이유(근거 응답), 실천 제안 나머지 모두 여기 들어오지 않는다).
+// 대표 경향의 이름과 한 줄 요약은 가리지 않고 완성된 문장으로 보여 준다(운영자 2026-10-16) — 그래도 다른 유료 항목은 열지 않는다.
 // 화면의 흐림 처리는 장식일 뿐이고, 가려진 글자는 브라우저로 전송되지 않는다 (CSS로 가리기 금지 원칙).
 // 구매한 리포트에는 이 미리보기의 모든 항목이 실제로 들어 있어야 한다 (preview.test.ts가 확인한다).
 
@@ -24,8 +25,8 @@ export type LockedAnswer = { id: string; question: string; where: string };
 export type FreePreview = {
   version: string;
   source: DataSource;
-  /** 대표 경향 이름의 앞부분만 (예: "확인" + 가림 + "형") — 가려진 글자는 담지 않는다 */
-  tendency: { head: string; tail: string };
+  /** 대표 경향 — 이름 전체와 한 줄 요약(완결된 문장). 그렇게 읽은 이유(근거 응답)는 구매 후 */
+  tendency: { name: string; line: string };
   /**
    * 대표 경향 아래의 해석 — 응답이 뒷받침하는 문단이 있으면 전체를 보여 주고(근거 문항 번호는 보내지 않는다),
    * 없으면 일반 한 줄 요약의 앞부분만 보여 준다.
@@ -63,14 +64,6 @@ export type FreePreview = {
   /** "분석에 사용한 정보" 표 */
   basis: { mbtiItems: number; temperamentItems: number; relationshipItems: number };
 };
-
-/** "확인추구형" → { head: "확인", tail: "형" } — 가운데 글자는 담지 않는다 */
-export function maskTendencyName(name: string): { head: string; tail: string } {
-  const chars = Array.from(name);
-  const tail = chars[chars.length - 1] === "형" ? "형" : "";
-  const head = chars.slice(0, chars.length >= 4 ? 2 : 1).join("");
-  return { head, tail };
-}
 
 /** 쉼표 앞까지만 (쉼표가 없으면 앞 8글자) */
 export function maskOneLiner(text: string): string {
@@ -134,7 +127,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
       : { status: "not-ready", message: saju.status === "invalid" ? saju.message : "만세력 계산 결과가 없습니다." };
 
   const locked: LockedFeature[] = [
-    { id: "tendency", title: "대표 경향 이름 전체와 한 줄 요약", teaser: "지금은 이름 앞부분만 보입니다" },
+    ...(summary.insight ? [{ id: "tendency", title: "대표 경향을 그렇게 읽은 이유", teaser: "이 경향을 읽는 데 쓴 내 응답" }] : []),
     { id: "core", title: "핵심 요약 나머지 2가지", teaser: "스트레스를 받기 쉬운 상황 · 바로 적용해볼 행동" },
     { id: "scores", title: "기질 · 관계(애착) 점수와 그 의미", teaser: "4가지 기질과 가까운 관계에서의 반응" },
     { id: "detail", title: "상세 분석", teaser: "근거와 한계를 함께 적은 분석" },
@@ -169,7 +162,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
   return {
     version: PREVIEW_VERSION,
     source: summary.source,
-    tendency: maskTendencyName(summary.tendency.name),
+    tendency: { name: summary.tendency.name, line: summary.oneLiner },
     lead,
     core: { shown: rows, locked: lockedCore },
     mbti: summary.mbti,

@@ -1,5 +1,5 @@
 -- ME:U(미유) 실제 AI(Claude) 시험 — 호출 수 · 비용 · 질문 횟수 확인 (읽기만 한다 — 아무것도 만들거나 바꾸거나 지우지 않는다).
--- 리포트 생성과 채팅 질문이 하나의 승인(2026-10-15, 5,000원)을 나눠 쓰므로 둘을 함께 센다(구분은 "종류" 열: 채팅 · 리포트).
+-- 리포트 생성 · 맛보기 리포트 · 채팅 질문이 하나의 승인(2026-10-15, 5,000원)을 나눠 쓰므로 함께 센다(구분은 "항목" 앞의 종류: 채팅 · 맛보기 · 리포트). 맛보기 비용은 심층 리포트의 원가가 아니다.
 --
 -- 사용: Supabase 대시보드 → SQL Editor → New query → 이 파일 내용을 붙여넣고 Run. 시험 중간중간 · 끝난 뒤에 실행한다.
 -- 결과는 표 하나로 나온다(SQL Editor는 쿼리가 여러 개면 마지막 결과만 보여 주므로 하나로 합쳤다).
@@ -11,14 +11,14 @@
 
 select * from (
   select '1 호출 결과별' as "구분",
-         case when prompt_version like 'chat-%' then '채팅' else '리포트' end || ' / ' || provider || ' / ' || outcome || ' / ' || coalesce(error_code, '-') as "항목",
+         case when prompt_version like 'chat-%' then '채팅' when prompt_version like 'taste-%' then '맛보기' else '리포트' end || ' / ' || provider || ' / ' || outcome || ' / ' || coalesce(error_code, '-') as "항목",
          count(*)::bigint as "수",
          coalesce(sum(input_tokens), 0)::bigint as "입력_토큰",
          coalesce(sum(output_tokens), 0)::bigint as "출력_토큰",
          round(coalesce(sum(est_cost_krw), 0)::numeric, 1) as "비용_어림_원"
   from public.ai_usage
   where provider <> 'mock-local'
-  group by (prompt_version like 'chat-%'), provider, outcome, coalesce(error_code, '-')
+  group by prompt_version like 'chat-%', prompt_version like 'taste-%', provider, outcome, coalesce(error_code, '-')
 
   union all
 
@@ -38,7 +38,7 @@ select * from (
          coalesce(sum(output_tokens), 0)::bigint,
          round((coalesce(sum(est_cost_krw), 0) * 1.1)::numeric, 1)
   from public.ai_usage
-  where provider = 'anthropic' and prompt_version not like 'chat-%'
+  where provider = 'anthropic' and prompt_version not like 'chat-%' and prompt_version not like 'taste-%'
 
   union all
 
@@ -49,6 +49,16 @@ select * from (
          round((coalesce(sum(est_cost_krw), 0) * 1.1)::numeric, 1)
   from public.ai_usage
   where provider = 'anthropic' and prompt_version like 'chat-%'
+
+  union all
+
+  select '2 합계', '  그중 맛보기 리포트 (심층 리포트의 원가가 아니다)',
+         count(*) filter (where error_code is null or error_code not in ('RATE_LIMITED', 'AUTH', 'BILLING', 'INVALID_REQUEST', 'BUDGET_EXCEEDED'))::bigint,
+         coalesce(sum(input_tokens), 0)::bigint,
+         coalesce(sum(output_tokens), 0)::bigint,
+         round((coalesce(sum(est_cost_krw), 0) * 1.1)::numeric, 1)
+  from public.ai_usage
+  where provider = 'anthropic' and prompt_version like 'taste-%'
 
   union all
 

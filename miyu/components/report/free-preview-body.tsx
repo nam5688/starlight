@@ -4,7 +4,7 @@ import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import { StatusBadge } from "@/components/ui/source-badge";
 import type { FreePreview } from "@/lib/report/preview";
 import { SajuChart } from "./detail-sections";
-import { LockedMask, LockedText, LockTag } from "./locked";
+import { LockTag } from "./locked";
 import { AxisBar } from "./score-bar";
 import { SectionTitle } from "./summary-blocks";
 
@@ -23,29 +23,21 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { prev
 
   return (
     <div className="space-y-12">
-      {/* 1. 대표 경향 — 이름 앞부분만 */}
+      {/* 1. 대표 경향 — 이름과 한 줄 요약은 가리지 않고 완성된 문장으로(운영자 2026-10-16). 그렇게 읽은 이유(근거 응답)는 구매 후 */}
       <section aria-labelledby={id("tendency")}>
-        <h2 id={id("tendency")} className="flex scroll-mt-[44px] flex-wrap items-center gap-2 text-[13px] font-semibold text-accent md:scroll-mt-[52px]">
-          대표 경향 <LockTag>이름 전체는 구매 후</LockTag>
+        <h2 id={id("tendency")} className="scroll-mt-[44px] text-[13px] font-semibold text-accent md:scroll-mt-[52px]">
+          대표 경향
         </h2>
-        <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">
-          <span aria-label={`${tendency.head}로 시작하는 유형`}>{tendency.head}</span>
-          <LockedMask chars={2} />
-          {tendency.tail}
-        </p>
+        <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">{tendency.name}</p>
+        <p className="mt-3 border-l-[3px] border-accent pl-4 text-[18px] font-semibold leading-relaxed md:text-[20px]">{tendency.line}</p>
         <p className="mt-2 text-[13px] leading-relaxed text-ink-3">후보 유형 · 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아닙니다.</p>
-        {lead.kind === "insight" ? (
+        {lead.kind === "insight" && (
           <>
-            <h3 className="mt-8 text-[15px] font-semibold text-ink-2">내 응답에서 읽은 것</h3>
+            <h3 className="mt-8 flex flex-wrap items-center gap-2 text-[15px] font-semibold text-ink-2">
+              내 응답에서 읽은 것 <LockTag>그렇게 읽은 이유는 구매 후</LockTag>
+            </h3>
             <p className="mt-2 border-l-[3px] border-accent pl-4 text-[18px] font-semibold leading-relaxed md:text-[20px]">{lead.text}</p>
             <p className="mt-2 text-[13px] leading-relaxed text-ink-3">{lead.basisNote}</p>
-          </>
-        ) : (
-          <>
-            <h3 className="mt-8 text-[15px] font-semibold text-ink-2">한 줄 요약</h3>
-            <p className="mt-2 border-l-[3px] border-accent pl-4 text-[19px] font-semibold leading-snug md:text-[21px]">
-              {lead.shown} <LockedText chars={16} />
-            </p>
           </>
         )}
       </section>

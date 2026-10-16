@@ -9,7 +9,7 @@ import { buildDevFreeSummary } from "./build-free-summary.ts";
 import { buildReportExtras } from "./extras.ts";
 import { buildDevReport } from "./generate-dev-report.ts";
 import type { ReportInput } from "./generator.ts";
-import { buildFreePreview, maskOneLiner, maskTendencyName } from "./preview.ts";
+import { buildFreePreview, maskOneLiner } from "./preview.ts";
 import { STARTER_ACTIONS } from "./starter-actions.ts";
 
 const REF = { year: 2026, month: 10 };
@@ -22,24 +22,36 @@ function input(pattern: (i: number) => number, saju = A): ReportInput {
   return { nickname: "서윤", knownMbti: "INFJ", birthText: "", summary: buildDevFreeSummary(answersOf(pattern)), saju, gender: "female", context: null, reference: REF };
 }
 
-test("이름 · 문장 가리기: 앞부분만 남기고 가려진 글자는 담지 않는다", () => {
-  assert.deepEqual(maskTendencyName("확인추구형"), { head: "확인", tail: "형" });
-  assert.deepEqual(maskTendencyName("빠른시도형"), { head: "빠른", tail: "형" });
-  assert.deepEqual(maskTendencyName("거리유지형"), { head: "거리", tail: "형" });
-  assert.deepEqual(maskTendencyName("짧음"), { head: "짧", tail: "" });
+test("문장 가리기: 쉼표 앞까지만 남기고 가려진 글자는 담지 않는다 (대표 경향 이름 · 한 줄 요약은 2026-10-16부터 가리지 않는다)", () => {
   assert.equal(maskOneLiner("관계가 불확실할 때, 상대의 반응을 확인하려는 편입니다."), "관계가 불확실할 때,");
   assert.equal(maskOneLiner("쉼표가없는아주긴문장입니다"), "쉼표가없는아주긴");
 });
 
-test("잠금: 미리보기에는 전체 이름 · 나머지 요약 · 점수 · 상세 · 실천 나머지 · 질문 답 · 상황 설명이 전송 대상에 없다", () => {
+test("대표 경향: 이름 전체와 한 줄 요약은 완성된 문장으로 보이고, 그렇게 읽은 이유(근거 응답)와 다른 유료 항목은 열리지 않는다", () => {
+  for (const p of PATTERNS) {
+    const inp = input(p);
+    const preview = buildFreePreview({ summary: inp.summary, saju: inp.saju, reference: REF });
+    assert.deepEqual(preview.tendency, { name: inp.summary.tendency.name, line: inp.summary.oneLiner });
+    assert.ok(preview.tendency.name.endsWith("형") && preview.tendency.line.endsWith("."), "이름은 ~형, 한 줄 요약은 끝맺은 문장");
+    const json = JSON.stringify(preview);
+    for (const b of inp.summary.insight?.basis ?? []) assert.ok(!json.includes(b.text) && !json.includes(b.itemId), "제목을 공개해도 근거 응답은 구매 후");
+    // 제목 공개를 이유로 다른 유료 항목을 넓히지 않는다 — 잠긴 핵심 요약 · 실천 제안 나머지는 그대로 없다
+    assert.ok(!json.includes(inp.summary.core.stressTrigger) && !json.includes(inp.summary.core.tryNow));
+    assert.equal(preview.core.shown.length, 2);
+    assert.equal(preview.action.lockedCount, 2);
+    // 잠긴 목록에는 "이름 앞부분만 보인다"는 안내가 더는 없고, 근거 응답이 있을 때만 "그렇게 읽은 이유"를 약속한다
+    assert.ok(!preview.locked.some((f) => /이름/.test(f.title + f.teaser)));
+    assert.equal(preview.locked.some((f) => f.id === "tendency"), Boolean(inp.summary.insight));
+  }
+});
+
+test("잠금: 미리보기에는 나머지 요약 · 점수 · 상세 · 실천 나머지 · 질문 답 · 상황 설명이 전송 대상에 없다", () => {
   for (const p of PATTERNS) {
     const inp = input(p);
     const preview = buildFreePreview({ summary: inp.summary, saju: inp.saju, reference: REF });
     const json = JSON.stringify(preview);
     const extras = buildReportExtras({ summary: inp.summary, saju: inp.saju, reference: REF });
 
-    assert.ok(!json.includes(inp.summary.tendency.name), "전체 대표 경향 이름");
-    assert.ok(!json.includes(inp.summary.oneLiner), "전체 한 줄 요약");
     for (const b of inp.summary.insight?.basis ?? []) assert.ok(!json.includes(b.text) && !json.includes(b.itemId), "그렇게 읽은 이유(근거 문항 · 응답)는 구매 후");
     if (extras.plain) {
       // 오행별 풀이 중 맛보기로 여는 것은 가장 두드러진 기운 하나의 "관계" 한 줄뿐이다(운영자 2026-10-16). 일 · 선택 풀이와 나머지 기운의 관계 풀이는 구매 후
@@ -127,7 +139,8 @@ test("일관성: 미리보기에 보이는 모든 것이 구매한 리포트(개
         ["AI", aiReport.base, aiReport.extras],
       ] as const) {
         assert.ok(base && extras, `${label}: 요약과 구성 요소가 저장된다`);
-        assert.ok(base.tendency.name.startsWith(preview.tendency.head) && base.tendency.name.endsWith(preview.tendency.tail), `${label}: 이름`);
+        assert.equal(base.tendency.name, preview.tendency.name, `${label}: 이름`);
+        assert.equal(base.oneLiner, preview.tendency.line, `${label}: 한 줄 요약`);
         if (preview.lead.kind === "insight") {
           assert.equal(base.insight?.text, preview.lead.text, `${label}: 응답에서 읽은 문단이 그대로 들어 있다`);
           assert.ok(base.insight && base.insight.basis.length > 0, `${label}: 그렇게 읽은 이유(근거 응답)가 들어 있다`);
