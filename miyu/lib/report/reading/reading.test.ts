@@ -432,8 +432,8 @@ test("소단락 반복 · 내용 검사: 소단락 글도 같은 문장 반복 �
   assert.ok(result.metrics.units >= 5 + 3 + 6, `의미 단위 ${result.metrics.units}`);
 });
 
-test("소단락: AI 지시문 0.11은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
-  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.11");
+test("소단락: AI 지시문 0.12는 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고(0.11 이하 규칙은 그대로), 사용자 메시지에 소단락 질문을 싣는다", () => {
+  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.12");
   // 0.11 — 제목은 본문 뒤 결론으로 · 답을 나열하지 않기 · 두 가능성을 늘어놓고 끝내지 않기
   assert.match(READING_SYSTEM_PROMPT, /제목은 풀이의 결론이다/);
   assert.match(READING_SYSTEM_PROMPT, /본문을 다 쓴 뒤에 마지막으로 쓴다/);

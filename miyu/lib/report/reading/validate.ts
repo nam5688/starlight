@@ -3,7 +3,7 @@
 // 한계: 낱말 · 길이 · 표지를 세는 검사다. 좋은 글임을 보증하지 않는다 (가려 읽는 평가가 따로 있다).
 import type { Evidence } from "../evidence.ts";
 import { FORBIDDEN, CONTEXT_ATTRIBUTION, overlap, sentences } from "../v2/validate.ts";
-import { AGE_TEXT, ANSWER_ECHO, BLOCK_PLAN, CAUSE_NARROWING, HEDGE_REPEAT, JARGON, NO_DATA_TEXT, RAW_THEME_TEXT, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
+import { ADVICE_RULES, AGE_TEXT, ANSWER_ECHO, BLOCK_PLAN, CAUSE_NARROWING, HEDGE_REPEAT, JARGON, NO_DATA_TEXT, RAW_THEME_TEXT, READING_LIMITS as L, SCORE_TEXT } from "./plan.ts";
 import type { ReadingDraftV1 } from "./types.ts";
 
 export type ReadingValidation = { ok: true; draft: ReadingDraftV1 } | { ok: false; errors: string[] };
@@ -297,6 +297,7 @@ export function validateReadingDraft(
     if (NO_DATA_TEXT.test(t)) errors.push(`${where}: 응답이나 자료가 없다는 말("${NO_DATA_TEXT.exec(t)![0]}")을 본문에 쓰지 않습니다 — 응답 근거가 없는 주제는 사주 근거만으로 풀이를 끝까지 쓰세요(필요한 안내는 코드가 한곳에 붙입니다).`);
     if (AGE_TEXT.test(t)) errors.push(`${where}: 나이를 쓰지 않습니다.`);
     for (const f of FORBIDDEN) if (f.re.test(t)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
+    for (const f of ADVICE_RULES) if (f.re.test(t)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
     for (const y of t.match(/(?<![\d.])(?:19|20)\d{2}(?![\d.])/g) ?? []) if (!allowedYears.has(y)) errors.push(`${where}: 계산되지 않은 해 ${y}`);
     if (!opts.hasContext && /알려 주신/.test(t)) errors.push(`${where}: 고민을 알려 주지 않았는데 "알려 주신"을 썼습니다.`);
   }
