@@ -44,3 +44,22 @@ export const sceneCitations = (d: ReadingDraftV1): Record<string, string[]> =>
 
 /** 모든 글 조각을 하나로 */
 export const allText = (d: ReadingDraftV1) => visibleTexts(d).map((t) => t.text).join("\n");
+
+/** "blocks[love].sections[2].body" 같은 경로로 글의 한 자리를 읽는다 — 문서의 인용이 저장된 글과 어긋나지 않게 한다. 배열은 번호나 id로 고른다. */
+export function pickByPath(d: ReadingDraftV1, path: string): string | undefined {
+  let cur: unknown = d;
+  for (const m of path.matchAll(/([^.[\]]+)|\[([^\]]+)\]/g)) {
+    const name = m[1] ?? m[2]!;
+    if (Array.isArray(cur)) cur = /^\d+$/.test(name) ? cur[Number(name)] : (cur as { id?: string }[]).find((b) => b.id === name);
+    else cur = (cur as Record<string, unknown> | undefined)?.[name];
+  }
+  return typeof cur === "string" ? cur : undefined;
+}
+
+/**
+ * 글에 그대로 들어간 선택지 문장 — 사용자가 고른 말을 옮긴 것이다. 제품 검사(ANSWER_ECHO)는 "라고 답했어요" 같은 표시 말만 찾고 선택지 문장 자체는 찾지 못한다.
+ * 장면 질문을 실제 생성에 연결하면 이 검사를 검사 단계에 더해야 한다(연결하지 않았으므로 지금은 시험에서만 쓴다).
+ */
+export function echoedOptionTexts(text: string, optionTexts: string[]): string[] {
+  return optionTexts.filter((t) => text.includes(t));
+}
