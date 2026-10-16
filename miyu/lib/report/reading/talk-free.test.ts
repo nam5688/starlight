@@ -8,6 +8,7 @@ import { buildDevFreeSummary } from "../build-free-summary.ts";
 import { buildReportExtras } from "../extras.ts";
 import { buildFreePreview } from "../preview.ts";
 import { STARTER_ACTIONS } from "../starter-actions.ts";
+import { TASTE_SAMPLE } from "../taste/mock-model.ts";
 import { TALK_COPY, type TalkChat, type TalkModel } from "./talk.ts";
 import { buildFreeTalkModel } from "./talk-free.ts";
 import { partnerReading } from "../../saju/interpret/partner.ts";
@@ -191,4 +192,33 @@ test("무료 질문은 재료가 있는 방에서만 열린다: 내 자료(응�
 
   // 구매한 리포트(tier paid)는 재료 여부와 상관없이 늘 열린다
   assert.equal(roomHasMaterial({ ...empty, tier: "paid" }, "love"), true);
+});
+
+test("맛보기 리포트를 받았다면 나는 어떤 사람 · 가까운 관계 · 일과 돈 풀이가 그 글을 쓰고, 잠긴 내용은 여전히 없다 (받기 전에는 그대로)", () => {
+  const taste = { version: "taste-v1" as const, headline: TASTE_SAMPLE.headline, sections: TASTE_SAMPLE.sections.map((s) => ({ id: s.id, title: s.title, body: s.body })) };
+  for (const saju of [A, B]) {
+    const summary = buildDevFreeSummary(answersOf(PATTERNS[0]));
+    const preview = buildFreePreview({ summary, saju, reference: REF });
+    const base = { name: "서윤", preview, saju, today: TODAY, href: "/results/x#r-purchase", owned: false, chat: { state: "locked" } as TalkChat };
+    const without = buildFreeTalkModel(base);
+    const withTaste = buildFreeTalkModel({ ...base, taste });
+    const byId = (m: TalkModel, id: string) => m.topics.find((t) => t.id === id)!;
+    const pick = (id: string) => taste.sections.find((s) => s.id === id)!;
+    assert.deepEqual(byId(withTaste, "tendency").summary, [pick("self").body]);
+    assert.equal(byId(withTaste, "tendency").headline, pick("self").title);
+    assert.deepEqual(byId(withTaste, "love").summary, [pick("love").body]);
+    assert.equal(byId(withTaste, "love").headline, pick("love").title);
+    assert.deepEqual(byId(withTaste, "work-money").summary, [pick("work").body]);
+    // 받기 전에는 예전 풀이 그대로
+    assert.notDeepEqual(byId(without, "love").summary, [pick("love").body]);
+    // 잠긴 자리는 질문뿐이고(글이 늘어도) 전체 이름 · 점수 설명 · 질문의 답 · 잠긴 요약은 없다
+    const json = JSON.stringify(withTaste);
+    const extras = buildReportExtras({ summary, saju, reference: REF });
+    assert.ok(!json.includes(summary.tendency.name) && !json.includes(summary.oneLiner), "전체 이름 · 한 줄 요약");
+    assert.ok(!json.includes(summary.core.stressTrigger) && !json.includes(summary.core.tryNow), "잠긴 핵심 요약");
+    for (const q of extras.questions) assert.ok(!json.includes(q.answer), "질문의 답");
+    for (const id of ["tendency", "love", "work-money"]) assert.ok((byId(withTaste, id).locked?.hooks.length ?? 0) > 0, `${id}의 잠긴 질문`);
+    // 사주를 읽을 수 있고 맛보기 글이 있으니 자료가 있는 방으로 센다
+    assert.ok(byId(withTaste, "love").grounded);
+  }
 });

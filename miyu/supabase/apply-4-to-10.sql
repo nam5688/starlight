@@ -576,6 +576,17 @@ wd16 as (
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'chat_questions' and column_name = 'reserved_until') as reserved_col,
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'cash_ledger' and column_name = 'pack_order_id') as pack_col
 ),
+-- 17번: 맛보기 리포트 표(한 계정당 1번) · 예약 · 저장 · 풀기 함수
+wd17 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'taste_reports') as tbl,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'reserve_taste_report') as reserve_fn,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'save_taste_report') as save_fn,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'release_taste_report') as release_fn,
+    coalesce((select bool_or(pg_get_functiondef(p.oid) like '%taste_reports%')
+              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as withdraw_fn
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -695,5 +706,11 @@ select * from (
               when wd16.packs or wd16.refund_fn or wd16.reserve_fn or wd16.reserved_col or wd16.pack_col then '일부만' else '아직 안 함' end,
          '표 question_packs (묶음별 사용 · 환불 장부) / 함수 apply_cash_refund (부분 환불 반영) · reserve_chat_question (무료 질문 한도를 DB에서 보장) / 열 chat_questions.reserved_until: ' || wd16.reserved_col::text
   from wd16
+  union all
+  select 17, '20261027000000_taste_reports.sql',
+         case when wd17.tbl and wd17.reserve_fn and wd17.save_fn and wd17.release_fn and wd17.withdraw_fn then '적용됨'
+              when wd17.tbl or wd17.reserve_fn or wd17.save_fn or wd17.release_fn or wd17.withdraw_fn then '일부만' else '아직 안 함' end,
+         '표 taste_reports (맛보기 리포트 · 회원 한 명당 한 줄) / 함수 reserve_taste_report · save_taste_report · release_taste_report / 탈퇴 함수에 맛보기 리포트 삭제 포함: ' || wd17.withdraw_fn::text
+  from wd17
 ) r
 order by "번호";

@@ -12,6 +12,8 @@ import type {
   CashLedgerRecord,
   CashRefundResult,
   ChatReservation,
+  TasteReportRecord,
+  TasteReservation,
   FunnelEventName,
   InsertResult,
   MiyuRepository,
@@ -72,6 +74,24 @@ function toChatSummary(r: Row): ChatSummaryRecord {
 function summaryNotReady(what: string, error: { message: string; code?: string }, status?: number): { message: string; code?: string } {
   const missing = isMissingTableError(error) || ["42703", "PGRST204", "PGRST205"].includes(error.code ?? "") || (status === 404 && !error.code);
   return missing ? { code: "42P01", message: `${what}가 없습니다 (DB 변경 14번 필요)` } : error;
+}
+
+/** 17번 DB 변경 전 — 표(taste_reports)나 함수가 없다. 호출한 쪽이 "준비 중"으로 다루도록 코드 42P01로 통일한다 */
+function tasteNotReady(what: string, error: { message: string; code?: string }, status?: number): { message: string; code?: string } {
+  const missing = isMissingTableError(error) || isMissingFunction(error) || (status === 404 && !error.code);
+  return missing ? { code: "42P01", message: `${what}가 없습니다 (DB 변경 17번 필요)` } : error;
+}
+
+function toTaste(r: Row): TasteReportRecord {
+  return {
+    userId: r.user_id as string,
+    assessmentId: r.assessment_id as string,
+    status: r.status === "ready" ? "ready" : "pending",
+    content: r.content ?? null,
+    generator: (r.generator as string | null) ?? null,
+    generatorVersion: (r.generator_version as string | null) ?? null,
+    createdAt: r.created_at as string,
+  };
 }
 
 function toAssessment(r: Row): AssessmentRecord {
@@ -912,6 +932,43 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       if (reservation.id === null) return;
       const { error } = await db.rpc("release_chat_question", { p_id: reservation.id, p_user_id: input.userId });
       if (error) fail("무료 질문 자리 풀기", error);
+    },
+
+    // 맛보기 리포트 — 표 · 함수가 없으면(DB 변경 17번 전) 코드 42P01로 통일해 던진다 (호출한 쪽이 "준비 중"으로 다룬다)
+    async getTasteReport(userId) {
+      const { data, error, status } = await db.from("taste_reports").select("user_id, assessment_id, status, content, generator, generator_version, created_at").eq("user_id", userId).maybeSingle();
+      if (error) fail("맛보기 리포트 조회", tasteNotReady("taste_reports 테이블", error, status));
+      return data ? toTaste(data as Row) : null;
+    },
+    async reserveTasteReport({ userId, assessmentId }): Promise<TasteReservation> {
+      const { data, error } = await db.rpc("reserve_taste_report", { p_user_id: userId, p_assessment_id: assessmentId });
+      if (error) fail("맛보기 리포트 자리 예약", tasteNotReady("reserve_taste_report 함수", error));
+      const r = (data ?? {}) as Row;
+      if (r.state === "reserved") return { state: "reserved" };
+      if (r.state === "busy") return { state: "busy" };
+      if (r.state === "ready") {
+        return {
+          state: "ready",
+          record: {
+            userId,
+            assessmentId: r.assessmentId as string,
+            status: "ready",
+            content: r.content ?? null,
+            generator: (r.generator as string | null) ?? null,
+            generatorVersion: (r.generatorVersion as string | null) ?? null,
+            createdAt: r.createdAt as string,
+          },
+        };
+      }
+      fail("맛보기 리포트 자리 예약", { message: "알 수 없는 예약 결과입니다" });
+    },
+    async saveTasteReport({ userId, assessmentId, content, generator, generatorVersion }) {
+      const { error } = await db.rpc("save_taste_report", { p_user_id: userId, p_assessment_id: assessmentId, p_content: content, p_generator: generator, p_generator_version: generatorVersion });
+      if (error) fail("맛보기 리포트 저장", tasteNotReady("save_taste_report 함수", error));
+    },
+    async releaseTasteReport({ userId, assessmentId }) {
+      const { error } = await db.rpc("release_taste_report", { p_user_id: userId, p_assessment_id: assessmentId });
+      if (error) fail("맛보기 리포트 자리 풀기", tasteNotReady("release_taste_report 함수", error));
     },
 
     // 미유캐시 — 표 · 함수가 없으면(DB 변경 13번 전) 코드 42P01로 통일해 던진다 (호출한 쪽이 "캐시 준비 중"으로 다룬다)

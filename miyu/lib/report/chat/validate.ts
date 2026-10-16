@@ -38,7 +38,16 @@ export function validateChatAnswer(raw: string): ChatCheck {
     if (sentences(p).length > L.paragraph.sentencesMax) errors.push(`${i + 1}번째 문단은 ${L.paragraph.sentencesMax}문장 이하로 써 주세요.`);
   });
 
-  const text = paragraphs.join("\n");
+  errors.push(...contentIssues(paragraphs.join("\n")));
+  return errors.length > 0 ? { ok: false, errors: [...new Set(errors)] } : { ok: true, paragraphs };
+}
+
+/**
+ * 글의 내용 규칙 — 단정 · 진단 · 사건 예언 · 속마음 · 결정 대신 내리기 · 투자 · 사주 용어 · 점수 · 나이 · 원인 좁히기 · 합쇼체 · 마크다운 · 이모지.
+ * 자유 질문 답과 맛보기 리포트가 같은 규칙을 쓴다(분량 · 문단 규칙은 각자 따로 검사한다).
+ */
+export function contentIssues(text: string): string[] {
+  const errors: string[] = [];
   for (const f of FORBIDDEN) if (f.re.test(text)) errors.push(`쓸 수 없는 표현: ${f.why}`);
   for (const r of RULES) if (r.re.test(text)) errors.push(`쓸 수 없는 표현: ${r.why}`);
   if (JARGON.test(text)) errors.push("사주 용어(일간 · 대운 같은 말)는 쓰지 않고 쉬운 말로 풀어 써 주세요.");
@@ -46,5 +55,5 @@ export function validateChatAnswer(raw: string): ChatCheck {
   if (AGE_TEXT.test(text)) errors.push("나이를 말하는 표현은 쓰지 않습니다.");
   if (RAW_THEME_TEXT.test(text)) errors.push("시기 해석 키워드를 그대로 옮기지 않고 쉬운 말로 풀어 써 주세요.");
   if (CAUSE_NARROWING.test(text)) errors.push("원인을 하나로 좁히지 않고 \"~일 수 있어요\"로 써 주세요.");
-  return errors.length > 0 ? { ok: false, errors: [...new Set(errors)] } : { ok: true, paragraphs };
+  return errors;
 }

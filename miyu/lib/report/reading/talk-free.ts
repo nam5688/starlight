@@ -12,6 +12,7 @@ import { luckTimeline } from "../../saju/interpret/rules.ts";
 import { dayMasterShort } from "../../saju/plain.ts";
 import { dayKey } from "../../saju/interpret/day-plain.ts";
 import type { FreePreview } from "../preview.ts";
+import type { TasteReport } from "../taste/types.ts";
 import { groupsOf, type TalkChat, type TalkModel, type TalkPiece, type TalkTopic } from "./talk.ts";
 import { codeTopicsFor } from "./talk-code.ts";
 
@@ -26,6 +27,11 @@ export type FreeTalkInput = {
   /** 이미 구매한 회원(리포트를 준비 중이거나 이전 형식) — 버튼이 "내 리포트 보기"가 된다 */
   owned: boolean;
   chat: TalkChat;
+  /**
+   * 맛보기 리포트(무료 · 한 계정당 1번 · AI가 사주와 응답을 엮어 쓴 글) — 받았다면 "나는 어떤 사람?" · "가까운 관계" · "일과 돈" 풀이가 코드 문장 대신 이 글을 쓴다.
+   * 글 자체가 유료 핵심(실제 연애의 진행 · 어울리는 사람 · 시기 · 해 볼 것)을 담지 않도록 검사를 통과한 것뿐이다.
+   */
+  taste?: TasteReport | null;
 };
 
 const para = (text: string, label?: string): TalkPiece => ({ kind: "para", text, ...(label ? { label } : {}) });
@@ -50,6 +56,10 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
   const tendencyInsight = insight && insight.module === "temperament" ? insight : null;
   const work = preview.situations[0];
   const sajuRelation = preview.saju.status === "ok" ? preview.saju.relation : null;
+  const tasteOf = (id: "self" | "love" | "work") => input.taste?.sections.find((x) => x.id === id) ?? null;
+  const tasteSelf = tasteOf("self");
+  const tasteLove = tasteOf("love");
+  const tasteWork = tasteOf("work");
 
   const topics: TalkTopic[] = [];
 
@@ -59,13 +69,13 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     number: 1,
     chip: "나는 어떤 사람?",
     title: "나는 어떤 사람?",
-    headline: tendencyInsight ? "이런 순간이 있다면, 맞을 수 있어요" : (dmSentence ?? "내 모습을 가볍게 살펴봤어요"),
-    summary: tendencyInsight ? [tendencyInsight.text] : [dm ? `${dm.image}처럼 ${dm.short} 사람으로 읽혀요.` : "응답으로 읽은 내 모습은 리포트에서 풀어 드려요."],
+    headline: tasteSelf ? tasteSelf.title : tendencyInsight ? "이런 순간이 있다면, 맞을 수 있어요" : (dmSentence ?? "내 모습을 가볍게 살펴봤어요"),
+    summary: tasteSelf ? [tasteSelf.body] : tendencyInsight ? [tendencyInsight.text] : [dm ? `${dm.image}처럼 ${dm.short} 사람으로 읽혀요.` : "응답으로 읽은 내 모습은 리포트에서 풀어 드려요."],
     example: preview.core.shown.map((r) => para(r.text, r.label)),
     detail: [],
     basis: null,
-    ...(tendencyInsight ? { caveat: tendencyInsight.basisNote } : {}),
-    grounded: Boolean(tendencyInsight || dmSentence),
+    ...(tendencyInsight && !tasteSelf ? { caveat: tendencyInsight.basisNote } : {}),
+    grounded: Boolean(tasteSelf || tendencyInsight || dmSentence),
     locked: { hooks: [...preview.core.locked.map((c) => c.question), "새로운 일 앞에서 나는 먼저 해 보는 편일까, 따져 보는 편일까?"] },
   });
 
@@ -78,12 +88,12 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     number: 2,
     chip: "연애 · 관계",
     title: "가까운 관계",
-    headline: relationInsight ? "가까운 관계에서 이런 순간이 있을 수 있어요" : relationLine ? "가까운 관계에서는 이런 모습일 수 있어요" : partner ? "가까운 관계에서는 이런 쪽이 편해요" : "가까운 관계 이야기를 가볍게 살펴봤어요",
-    summary: loveSummary.length > 0 ? loveSummary : [partner ? partner.mood.line : "가까운 관계는 사주와 응답을 함께 봐야 풀리는 이야기라 리포트에서 이어서 풀어 드려요."],
+    headline: tasteLove ? tasteLove.title : relationInsight ? "가까운 관계에서 이런 순간이 있을 수 있어요" : relationLine ? "가까운 관계에서는 이런 모습일 수 있어요" : partner ? "가까운 관계에서는 이런 쪽이 편해요" : "가까운 관계 이야기를 가볍게 살펴봤어요",
+    summary: tasteLove ? [tasteLove.body] : loveSummary.length > 0 ? loveSummary : [partner ? partner.mood.line : "가까운 관계는 사주와 응답을 함께 봐야 풀리는 이야기라 리포트에서 이어서 풀어 드려요."],
     example: [],
     detail: [],
     basis: null,
-    grounded: Boolean(relationInsight || relationLine || partner),
+    grounded: Boolean(tasteLove || relationInsight || relationLine || partner),
     locked: { hooks: hooksOf(preview, ["close", "partner", "repeat", "years"]) },
   });
 
@@ -93,13 +103,13 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     number: 3,
     chip: "일 · 돈",
     title: "일과 돈",
-    headline: "일할 때는 이런 모습일 수 있어요",
-    summary: [work?.strengthLabel && work?.cautionLabel ? "일하고 공부할 때의 내 모습을 짧게 살펴봤어요." : "일하는 방식은 응답에 따라 달라서 리포트에서 풀어 드려요."],
+    headline: tasteWork ? tasteWork.title : "일할 때는 이런 모습일 수 있어요",
+    summary: [tasteWork ? tasteWork.body : work?.strengthLabel && work?.cautionLabel ? "일하고 공부할 때의 내 모습을 짧게 살펴봤어요." : "일하는 방식은 응답에 따라 달라서 리포트에서 풀어 드려요."],
     ...(work?.strengthLabel && work?.cautionLabel ? { traits: [{ name: work.title, shinesShort: work.strengthLabel, burdenShort: work.cautionLabel }] } : {}),
     example: preview.saju.status === "ok" && preview.saju.everyday.shown ? [para(preview.saju.everyday.shown, "내 원국에서 읽히는 한 줄")] : [],
     detail: [],
     basis: null,
-    grounded: Boolean((work?.strengthLabel && work?.cautionLabel) || (preview.saju.status === "ok" && preview.saju.everyday.shown)),
+    grounded: Boolean(tasteWork || (work?.strengthLabel && work?.cautionLabel) || (preview.saju.status === "ok" && preview.saju.everyday.shown)),
     locked: { hooks: hooksOf(preview, ["work", "stress"], ["돈을 쓰고 모을 때 내가 반복하는 습관은?"]) },
   });
 

@@ -1,3 +1,6 @@
+import { TasteReportSection } from "@/components/results/taste-report-section";
+import { tasteLockedItems } from "@/lib/report/taste/locked";
+import { tasteConnected } from "@/server/taste";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -165,6 +168,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
       <ReadingNav
         expandAll={false}
         items={[
+          ...(view.taste.kind !== "unavailable" ? [{ id: "r-taste", label: "맛보기 리포트" }] : []),
           { id: "r-tendency", label: "전체 요약" },
           { id: "r-saju", label: "사주 원국" },
           { id: "r-situations", label: "상황별" },
@@ -173,6 +177,8 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           { id: "r-locked", label: "구매 안내" },
         ]}
       />
+      {/* 내 맛보기 리포트(무료 · 한 계정당 1번) — AI가 사주와 응답을 엮어 쓴 글. 받기 전에는 받기 버튼, 받은 뒤에는 글과 잠긴 핵심 목록 */}
+      <TasteReportSection id="r-taste" assessmentId={assessment.id} state={view.taste} connected={tasteConnected()} locked={tasteLockedItems(preview)} />
       <div className="mx-auto w-full max-w-[720px] px-5 pt-6">
         <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
       </div>
@@ -189,7 +195,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
         chatReady={chatConnected()}
         buyHref={view.paidOrder ? undefined : "#r-purchase"}
         rooms={availableRooms(
-          buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" } }),
+          buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" }, taste: view.taste?.kind === "ready" ? view.taste.report : null }),
         )}
         remembered={await peekRoomChoice()}
       />

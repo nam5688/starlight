@@ -728,6 +728,9 @@ test("회원 탈퇴(10번 마이그레이션): 서버만 부를 수 있고, 그 
   const report = await repo.getReportByOrder(order.id);
   assert.equal(report?.status, "ready");
   await admin.from("report_feedback").insert({ report_id: report!.id, user_id: W.id, rating: 5 });
+  // 맛보기 리포트(17번) — 주문이 있는 검사는 지워지지 않고 비워지기만 하므로 탈퇴 함수가 직접 지워야 한다
+  assert.deepEqual(await repo.reserveTasteReport({ userId: W.id, assessmentId: paid.id }), { state: "reserved" });
+  await repo.saveTasteReport({ userId: W.id, assessmentId: paid.id, content: { version: "taste-v1", headline: "탈퇴시험", sections: [] }, generator: "test:m", generatorVersion: "p" });
 
   // 권한: 브라우저(로그인 회원 · 비로그인)는 이 함수를 부를 수 없다
   const asUser = await W.client.rpc("withdraw_member_data", { p_user_id: W.id });
@@ -749,6 +752,8 @@ test("회원 탈퇴(10번 마이그레이션): 서버만 부를 수 있고, 그 
   const done = await repo.withdrawMemberData(W.id);
   assert.equal(done.ok, true);
   assert.ok(done.ok && done.counts.reports === 1 && done.counts.personal_contexts === 1 && done.counts.concern_records === 1 && done.counts.feedback === 1 && done.counts.regions === 1);
+  assert.ok(done.ok && done.counts.taste_reports === 1, "맛보기 리포트 삭제");
+  assert.equal(await repo.getTasteReport(W.id), null, "맛보기 리포트 삭제 확인");
   assert.deepEqual(await repo.listConcernRecords(paid.id), [], "고민 기록 삭제");
 
   // 지워진 것
@@ -1774,4 +1779,92 @@ test("계좌 송금 환불 뒤에도 결제 재확인(대조)이 이상으로 �
   assert.equal((await w.server.getQuestionPack(order.id))?.refundedQuestions, 1);
   assert.equal(await w.balance(), 6);
   await w.server.spendCash({ userId: w.U.id, amount: w.per * 2, ref: `mr-clean-${randomUUID().slice(0, 8)}` });
+});
+
+test("맛보기 리포트(17번): 한 계정당 한 줄 — 동시에 8번 눌러도 한 번만 예약되고, 저장하면 다시 받을 수 없으며, 풀면 다시 열리고, 본인만 읽고 쓰기는 서버만 한다", async () => {
+  const U = await makeUser();
+  const V = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const savedU = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "맛보기" }, answers, today: new Date() });
+  const savedU2 = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "맛보기2" }, answers, today: new Date() });
+  const savedV = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: V.id, channel: "web", info: { ...info, nickname: "맛보기3" }, answers, today: new Date() });
+  assert.ok(savedU.ok && savedU2.ok && savedV.ok);
+  const a1 = savedU.ok ? savedU.assessment.id : "";
+  const a2 = savedU2.ok ? savedU2.assessment.id : "";
+  const av = savedV.ok ? savedV.assessment.id : "";
+
+  assert.equal(await server.getTasteReport(U.id), null);
+  // 동시에 8번 — 정확히 한 번만 예약되고 나머지는 "쓰는 중"
+  const raced = await Promise.all(Array.from({ length: 8 }, () => server.reserveTasteReport({ userId: U.id, assessmentId: a1 })));
+  assert.equal(raced.filter((r) => r.state === "reserved").length, 1, JSON.stringify(raced));
+  assert.equal(raced.filter((r) => r.state === "busy").length, 7);
+  assert.equal(psqlRun(`select count(*) from public.taste_reports where user_id = '${U.id}'`), "1");
+
+  // 풀면 다시 열린다 — 남의 검사에는 붙지 않는다(소유자 확인)
+  await server.releaseTasteReport({ userId: U.id, assessmentId: a1 });
+  assert.equal(await server.getTasteReport(U.id), null);
+  await assert.rejects(server.reserveTasteReport({ userId: U.id, assessmentId: av }), /./);
+  assert.deepEqual(await server.reserveTasteReport({ userId: U.id, assessmentId: a1 }), { state: "reserved" });
+
+  // 저장하면 끝 — 다시 받을 수 없고, 다른 검사에서도 받을 수 없다(예약 시 ready로 돌아온다)
+  const content = { version: "taste-v1", headline: "시험 제목", sections: [{ id: "self", title: "t", body: "b" }] };
+  await server.saveTasteReport({ userId: U.id, assessmentId: a1, content, generator: "test:m", generatorVersion: "taste-v1-prompt-0.1" });
+  const ready = await server.reserveTasteReport({ userId: U.id, assessmentId: a2 });
+  assert.ok(ready.state === "ready" && ready.record.assessmentId === a1 && (ready.record.content as { headline: string }).headline === "시험 제목");
+  await server.releaseTasteReport({ userId: U.id, assessmentId: a1 });
+  assert.equal((await server.getTasteReport(U.id))?.status, "ready", "완성된 줄은 풀어도 지워지지 않는다");
+  await assert.rejects(server.saveTasteReport({ userId: V.id, assessmentId: av, content, generator: "x", generatorVersion: "y" }), /./);
+
+  // 서버가 죽어 남은 예약은 5분 뒤 이어받는다
+  assert.deepEqual(await server.reserveTasteReport({ userId: V.id, assessmentId: av }), { state: "reserved" });
+  assert.deepEqual(await server.reserveTasteReport({ userId: V.id, assessmentId: av }), { state: "busy" });
+  psqlRun(`update public.taste_reports set reserved_until = now() - interval '1 minute' where user_id = '${V.id}'`);
+  assert.deepEqual(await server.reserveTasteReport({ userId: V.id, assessmentId: av }), { state: "reserved" });
+
+  // 접근 정책: 본인 줄만 읽고, 브라우저는 쓰기 · 함수 호출을 할 수 없다
+  const mine = await U.client.from("taste_reports").select("user_id, status").eq("user_id", U.id);
+  assert.equal(mine.data?.length, 1);
+  const others = await V.client.from("taste_reports").select("user_id").eq("user_id", U.id);
+  assert.equal(others.data?.length ?? 0, 0, "다른 회원의 맛보기 리포트는 보이지 않는다");
+  const write = await U.client.from("taste_reports").update({ status: "pending" }).eq("user_id", U.id).select();
+  assert.ok(write.error || (write.data ?? []).length === 0, "브라우저는 고칠 수 없다");
+  const forged = await U.client.from("taste_reports").insert({ user_id: U.id, assessment_id: a1, status: "pending" });
+  assert.ok(forged.error, "브라우저는 새 줄을 만들 수 없다");
+  const call = await U.client.rpc("reserve_taste_report", { p_user_id: U.id, p_assessment_id: a1 });
+  assert.ok(call.error, "브라우저는 예약 함수를 부를 수 없다");
+  const anonRead = await anon.from("taste_reports").select("user_id");
+  assert.ok(anonRead.error || (anonRead.data ?? []).length === 0, "비로그인은 읽을 수 없다");
+  // 용량 제한(32KB)
+  assert.throws(() => psqlRun(`update public.taste_reports set content = jsonb_build_object('x', repeat('가', 40000)) where user_id = '${U.id}'`), /check|violat/i);
+});
+
+test("17번을 적용하기 전 환경(표 · 함수 없음)에서도 앱이 멈추지 않는다 — 저장소가 42P01로 통일해 알리고, 서비스는 '준비 중'으로 닫고 결과 화면은 그대로다", async () => {
+  const U = await makeUser();
+  const server = createSupabaseRepository(admin);
+  const saved = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "예전환경2" }, answers, today: new Date() });
+  assert.ok(saved.ok);
+  const aid = saved.ok ? saved.assessment.id : "";
+  // 표 · 함수가 없다는 응답(PostgREST: 표 PGRST205 · 함수 PGRST202)을 돌려주는 클라이언트
+  const noTable = { code: "PGRST205", message: "Could not find the table 'public.taste_reports' in the schema cache" };
+  const noFn = { code: "PGRST202", message: "Could not find the function public.reserve_taste_report in the schema cache" };
+  const fakeBuilder = { select: () => fakeBuilder, eq: () => fakeBuilder, maybeSingle: async () => ({ data: null, error: noTable, status: 404 }) };
+  const fakeAdmin = new Proxy(admin, {
+    get(target, prop, receiver) {
+      if (prop === "from") return (table: string) => (table === "taste_reports" ? fakeBuilder : target.from(table));
+      if (prop === "rpc") return async (name: string) => (name.endsWith("_taste_report") ? { data: null, error: noFn } : { data: null, error: { code: "x", message: "unexpected" } });
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as SupabaseClient;
+  const old = createSupabaseRepository(fakeAdmin);
+  await assert.rejects(old.getTasteReport(U.id), (e: unknown) => (e as { code?: string }).code === "42P01");
+  await assert.rejects(old.reserveTasteReport({ userId: U.id, assessmentId: aid }), (e: unknown) => (e as { code?: string }).code === "42P01");
+  // 서비스는 닫고(not-ready), 결과 화면용 상태는 unavailable이다
+  const { requestTasteReport, tasteStateFor } = await import("../../lib/services/taste-service.ts");
+  const { createTasteWriter } = await import("../../lib/report/taste/writer.ts");
+  const { createMockTasteModel } = await import("../../lib/report/taste/mock-model.ts");
+  const writer = createTasteWriter({ model: createMockTasteModel(), maxRetries: 0, sleep: async () => {} });
+  const input = { profile: { saju: ["큰 강처럼 넓게 흐르는 사람이에요"], response: [] }, answers: [] };
+  const result = await requestTasteReport({ repo: old, writer, now: () => new Date(), loadInput: async () => ({ ok: true, input }) }, { userId: U.id, assessmentId: aid });
+  assert.ok(!result.ok && result.reason === "not-ready");
+  assert.deepEqual(await tasteStateFor(old, U.id, aid), { kind: "unavailable" });
 });

@@ -1,6 +1,7 @@
 import "server-only";
 import { createAnthropicModel } from "@/lib/integrations/ai/providers";
 import { createMockLocalModel } from "@/lib/integrations/ai/mock-local";
+import type { TextModel } from "@/lib/report/ai/model";
 import { tallyUsage, withChatApproval } from "@/lib/report/chat/approval";
 import { createChatAnswerer, type ChatAnswerer } from "@/lib/report/chat/answer";
 import { CHAT_LIMITS } from "@/lib/report/chat/plan";
@@ -15,6 +16,27 @@ import { now, writeRepository } from "./services";
 
 /** 사용 기록을 읽는 최대 줄 수 — 시험 기간(며칠)의 채팅 호출은 이보다 훨씬 적다. 넘으면 읽지 못한 것으로 보고 호출하지 않는다 */
 const USAGE_ROWS_MAX = 2000;
+
+type AnthropicChatConfig = Extract<ReturnType<typeof chatAiConfig>, { kind: "anthropic" }>;
+
+/**
+ * 실제 Anthropic 모델을 승인 가드로 감싼다 — 채팅과 맛보기 리포트가 같은 승인 · 같은 장부를 쓴다.
+ * 공통 승인(AI_APPROVED_*)이면 리포트 생성과 같은 장부로 센다. 채팅 전용 옛 승인(AI_CHAT_APPROVED_*)은 채팅 지시문 기록만 센다.
+ */
+export function guardedAnthropicModel(cfg: AnthropicChatConfig, raw: TextModel): TextModel {
+  return cfg.shared
+    ? approvedLiveModel(raw, cfg)
+    : withChatApproval(raw, {
+        approval: cfg.approval,
+        pricing: cfg.pricing,
+        now,
+        loadSpend: async (sinceIso, unknownRowKrw) => {
+          const rows = await writeRepository().listAiUsageSince(sinceIso, USAGE_ROWS_MAX);
+          if (rows.length >= USAGE_ROWS_MAX) throw new Error("사용 기록이 너무 많아 합계를 낼 수 없어요");
+          return tallyUsage(rows, raw, { surcharge: cfg.pricing.surcharge, unknownRowKrw });
+        },
+      });
+}
 
 // 승인 가드는 프로세스 안에서 센 값(local ledger)을 가진다 — 요청마다 새로 만들면 그 값이 사라지므로 설정이 같은 동안 하나를 계속 쓴다
 let cached: { key: string; answerer: ChatAnswerer } | null = null;
@@ -31,19 +53,7 @@ export function chatAnswerer(): ChatAnswerer | null {
   const key = `${cfg.shared}|${cfg.model}|${cfg.approval.capKrw}|${cfg.approval.maxCalls}|${cfg.approval.from}|${cfg.approval.through}|${cfg.pricing.fxKrwPerUsd}|${cfg.baseUrl ?? ""}`;
   if (cached?.key === key) return cached.answerer;
   const raw = createAnthropicModel({ apiKey: cfg.apiKey, model: cfg.model, effort: "low", timeoutMs: CHAT_LIMITS.thinkingCallTimeoutMs, ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}) });
-  // 공통 승인(AI_APPROVED_*)이면 리포트 생성과 같은 장부로 센다. 채팅 전용 옛 승인(AI_CHAT_APPROVED_*)은 채팅 지시문 기록만 센다
-  const model = cfg.shared
-    ? approvedLiveModel(raw, cfg)
-    : withChatApproval(raw, {
-        approval: cfg.approval,
-        pricing: cfg.pricing,
-        now,
-        loadSpend: async (sinceIso, unknownRowKrw) => {
-          const rows = await writeRepository().listAiUsageSince(sinceIso, USAGE_ROWS_MAX);
-          if (rows.length >= USAGE_ROWS_MAX) throw new Error("사용 기록이 너무 많아 합계를 낼 수 없어요");
-          return tallyUsage(rows, raw, { surcharge: cfg.pricing.surcharge, unknownRowKrw });
-        },
-      });
+  const model = guardedAnthropicModel(cfg, raw);
   const answerer = createChatAnswerer({
     model,
     maxOutputTokens: CHAT_LIMITS.thinkingMaxOutputTokens,

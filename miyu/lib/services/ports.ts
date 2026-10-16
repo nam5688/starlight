@@ -188,6 +188,14 @@ export type CashRefundResult =
   | { status: "amount-mismatch"; allowed: number[]; refundedKrw: number }
   | { status: "unavailable" };
 
+/**
+ * 맛보기 리포트(무료 · 한 계정당 1번) — 회원 한 명이 한 줄만 가진다. content는 lib/report/taste/types.ts의 TasteReport(읽을 때 모양을 다시 확인한다).
+ * pending = 작성 중(예약) · ready = 완성. DB 변경 17번 전에는 표가 없어 조회 · 쓰기 모두 오류(코드 42P01).
+ */
+export type TasteReportRecord = { userId: string; assessmentId: string; status: "pending" | "ready"; content: unknown | null; generator: string | null; generatorVersion: string | null; createdAt: string };
+/** 맛보기 리포트 쓰기 자리 예약 결과 — reserved: 새로 쓸 수 있다 · busy: 다른 요청이 쓰는 중 · ready: 이미 받았다(record) */
+export type TasteReservation = { state: "reserved" } | { state: "busy" } | { state: "ready"; record: TasteReportRecord };
+
 /** 무료 질문 자리 예약 — id가 null이면 DB 변경 16번 전의 예전 방식(답을 받은 뒤에 한 번에 센다) */
 export type ChatReservation = { id: number | null };
 
@@ -300,6 +308,17 @@ export interface MiyuRepository {
   reserveChatQuestion(input: { userId: string; assessmentId: string; roomKey: string; max: number }): Promise<ChatReservation | null>;
   confirmChatQuestion(reservation: ChatReservation, input: { userId: string; assessmentId: string; roomKey: string }): Promise<void>;
   releaseChatQuestion(reservation: ChatReservation, input: { userId: string }): Promise<void>;
+
+  /**
+   * 맛보기 리포트(DB 변경 17번) — 서버만 쓴다. 표 · 함수가 없으면 오류(코드 42P01).
+   * - getTasteReport: 이 회원의 줄(없으면 null)
+   * - reserveTasteReport: 한 번에 확인 · 예약(같은 회원의 동시 요청은 한 줄로, 예약은 5분 안에서만 유효)
+   * - saveTasteReport: 예약한 줄을 완성으로 바꾼다(예약이 사라졌으면 오류) · releaseTasteReport: 만들지 못했을 때 예약을 풀어 다시 받을 수 있게 한다(완성된 줄은 건드리지 않는다)
+   */
+  getTasteReport(userId: string): Promise<TasteReportRecord | null>;
+  reserveTasteReport(input: { userId: string; assessmentId: string }): Promise<TasteReservation>;
+  saveTasteReport(input: { userId: string; assessmentId: string; content: unknown; generator: string; generatorVersion: string }): Promise<void>;
+  releaseTasteReport(input: { userId: string; assessmentId: string }): Promise<void>;
 
   /**
    * 미유캐시 — 서버만 쓴다(충전은 결제 완료 처리 안에서 DB가 한다). 테이블 · 함수가 없으면(DB 변경 13번 전) 오류(코드 42P01)를 던진다.

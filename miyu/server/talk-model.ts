@@ -45,6 +45,7 @@ export function roomModelFor(view: ResultView, chat: { paid: TalkChat; free: Tal
     href: owned ? `/results/${assessment.id}` : `/results/${assessment.id}#r-purchase`,
     owned,
     chat: chat.free,
+    taste: view.taste?.kind === "ready" ? view.taste.report : null,
   });
   // 재료가 없는 방은 무료 질문을 열지 않는다 (질문 횟수를 쓰지 않고, 리포트를 받으면 열린다는 안내만 보인다)
   const noMaterial = room !== undefined && !roomHasMaterial(model, room);

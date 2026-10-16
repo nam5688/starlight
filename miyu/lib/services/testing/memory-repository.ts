@@ -41,6 +41,10 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const chatQuestions: { userId: string; assessmentId: string; roomKey: string; createdAt: string }[] = [];
   // 무료 질문 자리 예약(답을 기다리는 중) — 10분 안에만 센다
   const chatReservations: { id: number; userId: string; assessmentId: string; roomKey: string; until: number }[] = [];
+  // 맛보기 리포트 — 회원 한 명이 한 줄 (until: 작성 중 예약이 유효한 시각, 완성이면 null)
+  type TasteRow = { userId: string; assessmentId: string; status: "pending" | "ready"; content: unknown | null; generator: string | null; generatorVersion: string | null; createdAt: string; until: number | null };
+  const tasteReports = new Map<string, TasteRow>();
+  const tasteRecord = (r: TasteRow) => ({ userId: r.userId, assessmentId: r.assessmentId, status: r.status, content: r.content, generator: r.generator, generatorVersion: r.generatorVersion, createdAt: r.createdAt });
   let reservationSeq = 0;
   const liveReservations = (userId: string, roomKey: string) => chatReservations.filter((r) => r.userId === userId && r.roomKey === roomKey && r.until > now().getTime()).length;
   const chatSummaries: ChatSummaryRecord[] = [];
@@ -135,7 +139,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       if ([...orders.values()].some((o) => mine(o) && o.status === "pending" && now().getTime() - new Date(o.createdAt).getTime() < 3600_000)) return { ok: false, reason: "pending-order" };
       if ([...reports.values()].some((r) => r.userId === userId && (r.status === "queued" || r.status === "generating"))) return { ok: false, reason: "report-in-progress" };
       if ((wallets.get(userId) ?? 0) > 0) return { ok: false, reason: "cash-balance" };
-      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0, chat_summaries: 0 };
+      const counts = { reports: 0, assessments_deleted: 0, assessments_emptied: 0, personal_contexts: 0, concern_records: 0, feedback: 0, regions: 0, talk_rooms: 0, chat_questions: 0, chat_summaries: 0, taste_reports: 0 };
       for (const [k, f] of [...feedback]) {
         if (f.userId !== userId) continue;
         feedback.delete(k);
@@ -166,6 +170,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         chatSummaries.splice(i, 1);
         counts.chat_summaries++;
       }
+      if (tasteReports.delete(userId)) counts.taste_reports++;
       for (const [k, r] of [...reports]) {
         if (r.userId !== userId) continue;
         reports.delete(k);
@@ -504,6 +509,37 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       if (reservation.id === null) return;
       const i = chatReservations.findIndex((r) => r.id === reservation.id && r.userId === input.userId);
       if (i >= 0) chatReservations.splice(i, 1);
+    },
+    // 맛보기 리포트 — DB reserve_taste_report와 같은 규칙(한 회원 한 줄 · 예약 5분 · 확인과 예약이 한 번에)
+    async getTasteReport(userId) {
+      const r = tasteReports.get(userId);
+      return r ? tasteRecord(r) : null;
+    },
+    async reserveTasteReport({ userId, assessmentId }) {
+      const r = tasteReports.get(userId);
+      const nowMs = now().getTime();
+      if (r) {
+        if (r.status === "ready") return { state: "ready", record: tasteRecord(r) };
+        if (r.until !== null && r.until > nowMs) return { state: "busy" };
+        r.assessmentId = assessmentId;
+        r.until = nowMs + 5 * 60_000;
+        return { state: "reserved" };
+      }
+      tasteReports.set(userId, { userId, assessmentId, status: "pending", content: null, generator: null, generatorVersion: null, createdAt: iso(), until: nowMs + 5 * 60_000 });
+      return { state: "reserved" };
+    },
+    async saveTasteReport({ userId, assessmentId, content, generator, generatorVersion }) {
+      const r = tasteReports.get(userId);
+      if (!r || r.assessmentId !== assessmentId || r.status !== "pending") throw new Error("taste_not_reserved");
+      r.status = "ready";
+      r.content = content;
+      r.generator = generator;
+      r.generatorVersion = generatorVersion;
+      r.until = null;
+    },
+    async releaseTasteReport({ userId, assessmentId }) {
+      const r = tasteReports.get(userId);
+      if (r && r.assessmentId === assessmentId && r.status === "pending") tasteReports.delete(userId);
     },
     async getCashBalance(userId) {
       return wallets.get(userId) ?? 0;

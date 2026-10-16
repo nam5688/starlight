@@ -1,5 +1,6 @@
 // 리포트 생성과 조회. 결제가 확인된 주문에만 만들고, 완성된 리포트는 다시 만들지 않는다.
 
+import { tasteStateFor, type TasteViewState } from "./taste-service.ts";
 import { REPORT_GENERATING_STALE_MS, REPORT_GENERATION_TIMEOUT_MS, REPORT_MAX_ATTEMPTS, REPORT_RETRY_COOLDOWN_MS } from "../commerce/report.ts";
 import { isCashProduct, parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
 import { concernInputOf } from "../personalization/concern.ts";
@@ -267,6 +268,8 @@ export type ResultView = {
   context: PersonalContext | null;
   /** 이 결과로 받은 개인 통합 리포트 전부 — 최근에 받은 것부터. 이미 받은 리포트는 새로 받아도 그대로 남는다 */
   received: ReceivedReport[];
+  /** 맛보기 리포트(무료 · 한 계정당 1번) 상태 — DB 변경 17번 전이거나 조회가 실패하면 unavailable (결과 화면은 그대로 열린다) */
+  taste: TasteViewState;
 };
 
 /**
@@ -287,7 +290,8 @@ export async function getResultView(
   const received: ReceivedReport[] = paid.map((order, i) => ({ order, seq: parsePersonalSeq(order.productId) ?? 1, report: reports[i] }));
   const chosen =
     (input.orderNumber ? received.find((r) => r.order.orderNumber === input.orderNumber) : undefined) ?? received.find((r) => r.report?.status === "ready") ?? received[0] ?? null;
-  return { assessment, paidOrder: chosen?.order ?? null, refunded, report: chosen?.report ?? null, context, received };
+  const taste = await tasteStateFor(repo, input.userId, assessment.id).catch((): TasteViewState => ({ kind: "unavailable" }));
+  return { assessment, paidOrder: chosen?.order ?? null, refunded, report: chosen?.report ?? null, context, received, taste };
 }
 
 export type MyItem = {
