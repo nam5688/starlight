@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { saveResultAndContinue } from "@/app/analyze/actions";
 import { KakaoSymbol, kakaoButtonClass } from "@/components/auth/kakao-login-button";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
-import { LockIcon } from "@/components/ui/icons";
+import { CheckIcon } from "@/components/ui/icons";
 import { SourceBadge, StatusBadge } from "@/components/ui/source-badge";
 import { buttonSecondary, textLink } from "@/components/ui/styles";
 import type { Answers } from "@/lib/assessment/types";
@@ -53,10 +53,10 @@ export function FreeSummaryView({
       <h1 id="step-heading" tabIndex={-1} className="mt-3 text-[26px] font-bold tracking-tight outline-none md:text-[30px]">
         {info.nickname.trim()} 님의 무료 미리보기
       </h1>
-      <p className="mt-2 text-[15px] leading-relaxed text-ink-2">내 결과의 일부를 먼저 보여 드립니다. 잠긴 부분은 저장한 뒤 결과 화면에서 구매하면 볼 수 있습니다.</p>
+      <p className="mt-2 text-[15px] leading-relaxed text-ink-2">내 결과의 일부를 먼저 보여 드립니다. 결과를 저장하면 결과 화면에서 이어서 볼 수 있고, 심층 리포트는 그곳에서 구매할 수 있습니다.</p>
 
       <div className="mt-10 space-y-16">
-        <FreePreviewBody preview={preview} idPrefix="free-" ctaHref="#free-locked" ctaLabel="저장하고 전체 보기" />
+        <FreePreviewBody preview={preview} idPrefix="free-" />
 
         <section id="free-locked" aria-labelledby="free-locked-title" className="overflow-hidden rounded-xl border border-line-strong">
           <div className="border-b border-line px-5 py-5 md:px-7">
@@ -66,7 +66,7 @@ export function FreeSummaryView({
             <ul className="mt-4 space-y-2.5">
               {preview.locked.map((item) => (
                 <li key={item.id} className="flex gap-2.5 text-[15px] leading-relaxed">
-                  <LockIcon className="mt-1 size-4 shrink-0 text-ink-3" />
+                  <CheckIcon className="mt-1 size-4 shrink-0 text-accent" />
                   {item.title}
                 </li>
               ))}

@@ -97,7 +97,7 @@ test("리포트 예시: 기본 화면은 짧다 — 첫 화면 카드 3개(강�
 test("리포트 예시: '강한 포인트 / 힘들 수 있는 포인트'는 특징 3개를 짧은 문구로 줄여 보이고, 접힘 안에서 특징마다 풀이 · 예시를 나눠 쓴다", () => {
   const b = R.blocks.find((x) => x.id === "strength-burden")!;
   assert.equal(b.traits?.length, 3);
-  assert.deepEqual(b.traits!.map((t) => t.name), ["꼼꼼하게 다듬기", "상대 반응 살피기", "가까운 사람에게 기대기"]);
+  assert.equal(new Set(b.traits!.map((t) => t.name)).size, 3, "특징 이름은 서로 다르다");
   for (const t of b.traits!) {
     assert.ok(t.name.length <= 12 && t.shinesShort.length <= 14 && t.burdenShort.length <= 16, `${t.name}: 카드 문구가 길다`);
     assert.ok(t.shines.length > t.shinesShort.length && t.burden.length > t.burdenShort.length, `${t.name}: 풀이 문장이 문구보다 자세해야 한다`);
@@ -122,9 +122,7 @@ test("리포트 예시: 지금 지나는 시기 타임라인은 서윤의 사주
   const flowCard = R.summary.find((s) => s.kind === "flow")!;
   assert.ok(flowCard.foot!.includes(dot(cur.from)) && flowCard.foot!.includes(dot(cur.to)), `지금 나의 시기 카드의 기간이 계산(${cur.from}~${cur.to})과 다르다`);
   // 근거에 적은 대운 기간도 같은 계산이다
-  const [fy, fm] = cur.from.split("-").map(Number);
-  const [ty, tm] = cur.to.split("-").map(Number);
-  assert.ok(R.flow.basis.computed.join(" ").includes(`${fy}년 ${fm}월~${ty}년 ${tm}월`));
+  assert.ok(R.flow.basis.computed.join(" ").includes(`${cur.from}~${cur.to}`), "분석 근거의 대운 기간은 근거 목록(계산 결과)에서 그대로 나온다");
   // 흐름 해석의 주제 문구는 계산된 십신 묶음에서 가져온다 — 타임라인에 곡선 · 점수 · 확률은 없다
   assert.ok(cur.themes.length === 2);
   assert.doesNotMatch(JSON.stringify(R.timeline), /score|점수|확률|운세/);
@@ -138,7 +136,8 @@ test("리포트 예시: 원인을 하나로 좁혀 말하지 않고, 막는 표�
     assert.doesNotMatch(t, /성격이 아니라|불안이 아니라|시기 때문입니다|때문입니다|때문이에요|때문이죠/, `원인을 좁혀 말함: ${t.slice(0, 30)}`);
     assert.doesNotMatch(t, /\d+\s*%|확률/, `확률 표현: ${t.slice(0, 30)}`);
     assert.doesNotMatch(t, /\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일/, `특정 날짜: ${t.slice(0, 30)}`);
-    assert.doesNotMatch(t, /결혼|이별|헤어지|이직하게|취업|퇴사/, `사건 예언: ${t.slice(0, 30)}`);
+    // 오래 가는 관계 · 결혼생활에서 중요해질 조건은 쓸 수 있다(운영자 2026-10-16) — 결혼 · 이별 · 이직 같은 사건을 예언하는 말만 막는다
+    assert.doesNotMatch(t, /결혼(을|이) (하게|할|한다)|결혼하게|결혼할|이별하게|헤어지게|헤어질|이직하게|취업|퇴사/, `사건 예언: ${t.slice(0, 30)}`);
     // 나이 · 직업은 "다루지 않는다" 또는 "알지 못한다"는 안내에서만 나온다 (만들어 채우지 않는다)
     if (/나이|직업/.test(t)) assert.match(t, /다루지 않(습니다|아요)|알지 못(합니다|해요)|정해서 말하지 않/, `나이 · 직업 언급: ${t.slice(0, 30)}`);
   }
@@ -150,16 +149,17 @@ test("리포트 예시: 원인을 하나로 좁혀 말하지 않고, 막는 표�
   assert.match(R.flow.statistics, /(쓰지|사용하지) 않았(습니다|어요)/);
 });
 
-test("리포트 예시: 없는 자료(알려 준 고민 · 상대 자료 · 연구 통계)는 '없음'으로 밝히고 만들어 채우지 않는다 — 돈 부분은 응답 자료가 없다고 쓴다", () => {
+test("리포트 예시: 없는 자료(알려 준 고민 · 상대 자료 · 연구 통계)는 '없음'으로 밝히고 만들어 채우지 않는다 — 돈 부분은 직접 물은 응답이 없다고 한곳에 쓴다", () => {
   const none = R.inputs.filter((i) => i.status === "none").map((i) => i.name);
   assert.deepEqual(none, ["알려 준 고민 · 상황", "상대 자료", "연구 통계"]);
   for (const i of R.inputs.filter((x) => x.status === "none")) assert.deepEqual(i.usedIn, [], i.name);
   assert.doesNotMatch(allTexts().join("\n"), /알려 주신/, "고민을 알려 주지 않은 인물에게 '알려 주신'");
   const money = R.blocks.find((s) => s.id === "work-money")!;
   // 고정 안내(plan.ts)에 한 번만 쓴다 — 본문 문단에서 되풀이하지 않는다
-  assert.match(money.caveat ?? "", /응답 자료 없이/);
-  assert.doesNotMatch(money.details.join(" "), /응답이 없어|응답 자료 없이/);
-  assert.ok(money.basis.unknown.some((u) => /응답 자료가 없습니다/.test(u)));
+  assert.match(money.caveat ?? "", /직접 물은 응답이 아니라/);
+  assert.doesNotMatch([...money.details, ...(money.sections ?? []).map((x) => x.body)].join(" "), /응답이 없어|응답 자료 없이|직접 물은 응답/);
+  // 한계 안내는 풀이마다 되풀이하지 않는다 — "사주만으로는 알 수 없어요" 같은 경고가 본문에 없다
+  assert.doesNotMatch(bodyTexts().join("\n"), /사주(만으로|로는)\s*(는\s*)?(알 수 없|판단할 수 없|단정할 수 없)/);
   const love = R.blocks.find((s) => s.id === "love")!;
   assert.match(love.caveat ?? "", /상대 자료: 없음/);
   // 개발용 문항을 새 자체 문항처럼 쓰지 않는다

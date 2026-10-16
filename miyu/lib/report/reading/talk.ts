@@ -76,7 +76,7 @@ export type TalkCard = {
   inputs: string[];
 };
 
-/** 첫 화면에서 고르는 큰 묶음 — 묶음 안의 풀이는 이어서 고른다 (예: 내 성향 → 강한 포인트 · 힘들 수 있는 포인트 → 중요하게 여기는 것) */
+/** 첫 화면에서 고르는 큰 묶음 — 묶음 안의 풀이는 이어서 고른다 (예: 내 성향 → 강한 포인트 · 힘들 수 있는 포인트 → 부딪힐 때와 회복) */
 export type TalkGroup = { id: string; chip: string; topicIds: string[] };
 
 /**
@@ -235,7 +235,7 @@ export const freeQuestionPlaceholder = (left?: number) => `무료 질문 ${freeL
 const CHIP: Record<string, string> = {
   tendency: "나는 어떤 사람?",
   "strength-burden": "강한 포인트 · 힘들 수 있는 포인트",
-  values: "중요하게 여기는 것",
+  values: "부딪힐 때와 회복",
   love: "가까운 관계",
   "work-money": "일과 돈",
 };
@@ -260,7 +260,8 @@ function blockTopic(b: ReadingBlock, number: number): TalkTopic {
   return {
     id: b.id,
     number,
-    chip: CHIP[b.id] ?? b.topic,
+    // 예전에 받은 리포트의 values 풀이는 "중요하게 여기는 것"이었다 — 저장된 주제 이름을 따라 이름표를 정한다(저장된 글의 뜻이 바뀌어 보이지 않게)
+    chip: b.id === "values" && /중요하게 여기는/.test(b.topic) ? "중요하게 여기는 것" : (CHIP[b.id] ?? b.topic),
     title: b.topic,
     headline: b.headline,
     summary: [b.summary],

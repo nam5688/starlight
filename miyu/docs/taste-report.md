@@ -1,5 +1,10 @@
 # 맛보기 리포트 (운영자 요청 2026-10-16)
 
+> **2026-10-16 방향 변경(taste-v2)**: 맛보기 리포트는 "절반만 공개 + 잠긴 질문 목록"이 아니라 **사주를 읽고 응답으로 나타나는 모습을 풀어 주는 완결된 짧은 글**이 되었다. 네 부분은 **내 성향과 지나온 모습 · 일에서는 · 가까운 관계에서는 · 지금 나에게 필요한 한 가지**이고(지시문 `taste-v2-prompt-0.1`),
+> 아래 본문 중 "나는 이런 사람 · 연애 · 일과 돈 · 마음" · "잠긴 목록(`locked.ts`)" · "절반쯤만 공개"는 **taste-v1(이전 방식)** 설명이다. 이미 taste-v1로 받은 글은 저장된 그대로 읽는다(새 글은 한 계정에 한 번이라 다시 받을 수 없다).
+> v2의 규칙: 연애는 정확히 3문장 150~300자(무료 샘플의 범위) · 실제 연애의 진행 · 어울리는 사람 · 시기 · 결혼 · 썸 · 고백은 쓰지 않음 · **해 볼 행동은 action 한 곳에서만 한 가지(시점 · 기간 없이)** · 응답 읽어 주기("~라고 답했어요") · 풀이마다 붙는 한계 경고 · **"구매 후 · 심층 리포트에서" 같은 구매 예고 문장 금지** · "~했던 때가 있었을 거예요"는 섹션마다 한 번. 구매 안내는 결과 화면 아래 한곳이다.
+> 자세한 설명 · 예시 · 하지 못한 것은 `docs/saju-voice-direction.md`. **v2 지시문으로 실제 AI 글은 아직 한 번도 읽어 보지 못했다(검증되지 않음)** — 대리 작성기가 쓴 서윤 예시 한 편이 첫 시도에 검사를 통과했을 뿐이다.
+
 무료 분석(검사)을 마친 **로그인 회원**이 [맛보기 리포트 받기]를 누르면 AI가 **사주 계산에서 읽은 문구와 내가 직접 고른 실제 응답**을 엮어 짧은 글(나는 이런 사람 · 연애 · 일과 돈 · 마음)을 **한 번만** 써 준다. 구현됨 · **DB 17번 변경이 있어야 동작한다**(없으면 결과 화면에 "준비 중"으로 보이고 다른 화면은 그대로다).
 
 운영자 요청의 뜻: 무료 리포트 · 연애 방이 "테스트 답을 다시 말해 주는 한 줄"이어서 성의 없어 보인다 → *사주아이처럼 자세하게 풀되 50%만 열고 핵심은 유료 리포트에서, 사주만이 아니라 실제 응답 문항도 넣어 예상해서 쓰기, B안(AI가 쓰는 글) · 로그인해야 가능 · 한 계정당 1번.*
@@ -63,4 +68,4 @@
 
 ## 코드 위치
 
-`lib/report/taste/`(`types.ts` · `plan.ts` · `input.ts` · `prompt.ts` · `validate.ts` · `writer.ts` · `locked.ts` · `mock-model.ts`) · `lib/services/taste-service.ts` · `server/taste.ts` · `app/results/[id]/taste-actions.ts` · `components/results/taste-report-button.tsx` · `taste-report-section.tsx` · `supabase/migrations/20261027000000_taste_reports.sql`.
+`lib/report/taste/`(`types.ts` · `plan.ts` · `input.ts` · `prompt.ts` · `validate.ts` · `writer.ts` · `mock-model.ts`) · `lib/services/taste-service.ts` · `server/taste.ts` · `app/results/[id]/taste-actions.ts` · `components/results/taste-report-button.tsx` · `taste-report-section.tsx` · `supabase/migrations/20261027000000_taste_reports.sql`.

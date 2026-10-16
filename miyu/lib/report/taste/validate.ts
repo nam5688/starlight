@@ -1,23 +1,32 @@
 // 맛보기 리포트 검사 — 저장 · 표시하는 것은 이 검사를 통과한 글뿐이다.
 // 자유 질문 답과 같은 내용 규칙(단정 · 진단 · 사건 예언 · 사주 용어 · 점수 · 나이 · 속마음 · 결정 대신 내리기 · 투자 · 합쇼체 · 마크다운)에,
-// 맛보기 전용 규칙(섹션 · 분량 · 연애는 정확히 3문장 150자 이상 · 유료 리포트의 핵심을 미리 쓰지 않기)을 더했다. 낱말 · 표지를 센 어림이며 좋은 글의 보증이 아니다.
+// 맛보기 전용 규칙(섹션 · 분량 · 연애는 정확히 3문장 150자 이상 · 유료 리포트의 핵심을 미리 쓰지 않기 · 응답을 그대로 읽어 주지 않기 · 풀이마다 한계 경고를 붙이지 않기)을 더했다.
+// 낱말 · 표지를 센 어림이며 좋은 글의 보증이 아니다.
 import { contentIssues } from "../chat/validate.ts";
+import { ANSWER_ECHO, HEDGE_REPEAT } from "../reading/plan.ts";
 import { TASTE_PLAN as P } from "./plan.ts";
-import { TASTE_SECTION_IDS, TASTE_VERSION, type TasteReport, type TasteSection } from "./types.ts";
+import { TASTE_LEGACY_SECTION_IDS, TASTE_LEGACY_VERSION, TASTE_SECTION_IDS, TASTE_VERSION, type TasteReport, type TasteSection, type TasteSectionId } from "./types.ts";
 
 export type TasteCheck = { ok: true; report: TasteReport } | { ok: false; errors: string[] };
 
 /** 한 문장의 최대 글자 수 */
 const SENTENCE_MAX = 110;
 
+/** 해 볼 행동 · 조언의 지시 — "지금 나에게 필요한 한 가지"(action)에서만 쓴다. 다른 섹션은 "이런 면이 있어요"까지 */
+const ADVICE_RULE = { re: /(해 보세요|해보세요|해 보시|해보시|하세요|해 봐요|해 봅시다|해 보길|해 보는 게 좋|해 보면 좋|해 보면 돼|정해 보|나눠 보|적어 보|물어보)/, why: "해 볼 행동 · 조언의 지시는 '지금 나에게 필요한 한 가지'에서만 써 주세요" };
+/** 실천에 시점 · 기간을 임의로 정하지 않는다 */
+const ACTION_TIMING = { re: /오늘부터|내일|이번 주|매일|매주|\d+\s*(?:일|주|개월|달)\s*(?:동안|안에|마다|간)|\d+\s*분/, why: "실천에 시점 · 기간을 정해 말하지 않습니다" };
+
 /** 유료 리포트에서만 풀리는 핵심 — 맛보기에 미리 쓰지 않는다 */
 const LOCKED_RULES: { re: RegExp; why: string }[] = [
-  { re: /(해 보세요|해보세요|해 보시|해보시|하세요|해 봐요|해 봅시다|해 보길|해 보는 게 좋|해 보면 좋|해 보면 돼)/, why: "해 볼 행동 · 조언의 지시(유료 리포트에서 풀리는 부분)" },
   { re: /어울리는\s*(사람|상대|분)|잘 맞는\s*(사람|상대|분)|이상형|맞춰 줄 수 있는 사람/, why: "어울리는 사람(유료 리포트에서 풀리는 부분)" },
   { re: /\d{1,2}\s*월|올해|내년|내후년|\d{4}\s*년|연애운이 (강해|오|들어)|시기가 (오|찾아)/, why: "연애운이 강해지는 시기 · 날짜(유료 리포트에서 풀리는 부분)" },
   { re: /결혼|이혼|자녀|혼인|궁합/, why: "결혼 · 자녀 · 궁합 이야기" },
   { re: /(썸|고백|사귀게|연인이 (되|생)|만나게 (될|돼))/, why: "실제 연애의 진행 · 만남 예언(유료 리포트에서 풀리는 부분)" },
   { re: /(응답하신|답하신|문항|설문|검사에서|테스트에서|\d+\s*번 문항|매우 그렇다|전혀 아니다)/, why: "설문 · 응답 척도를 그대로 말하는 표현(일상의 행동으로 풀어 써 주세요)" },
+  { re: /구매 후|구매하면|구매한|심층 리포트|유료 리포트|리포트에서 (?:이어|풀|확인|만나)|결제|잠겨|잠금/, why: "구매 예고 · 잠금 안내(구매 안내는 화면이 한곳에서 합니다)" },
+  { re: ANSWER_ECHO, why: "응답을 그대로 읽어 주는 표현(사주에서 읽은 성향이 이 사람에게 어떤 장면으로 나타나는지로 풀어 써 주세요)" },
+  { re: HEDGE_REPEAT, why: "풀이마다 붙이는 한계 경고(\"사주만으로는 알 수 없어요\" 같은 말은 쓰지 않고 조건으로 녹여 주세요)" },
 ];
 
 /** 문장 나누기 — 마침표 · 물음표 · 느낌표 뒤 공백에서 끊는다 (짧은 문장도 센다) */
@@ -73,21 +82,33 @@ export function validateTaste(raw: string): TasteCheck {
   const all = [headline, ...sections.flatMap((s) => [s.title, s.body])].join("\n");
   errors.push(...contentIssues(all));
   for (const r of LOCKED_RULES) if (r.re.test(all)) errors.push(`쓸 수 없는 표현: ${r.why}`);
+  // 해 볼 행동은 action 섹션에서만 — 그 섹션에는 실천이 실제로 있어야 하고, 시점 · 기간은 정하지 않는다
+  for (const sec of sections) {
+    const text = `${sec.title} ${sec.body}`;
+    if (sec.id !== "action" && ADVICE_RULE.re.test(text)) errors.push(`쓸 수 없는 표현(${sec.id}): ${ADVICE_RULE.why}`);
+    if (sec.id === "action") {
+      if (!ADVICE_RULE.re.test(text)) errors.push("action에는 바로 해 볼 수 있는 행동 한 가지를 \"~해 보세요\"로 써 주세요.");
+      if (ACTION_TIMING.re.test(text)) errors.push(`쓸 수 없는 표현(action): ${ACTION_TIMING.why}`);
+    }
+  }
 
   const unique = [...new Set(errors)];
   return unique.length > 0 ? { ok: false, errors: unique } : { ok: true, report: { version: TASTE_VERSION, headline, sections } };
 }
 
-/** 저장된 글(JSON)을 읽을 때 모양을 다시 확인한다 — 모양이 맞지 않으면 null (화면은 보이지 않는다) */
+/** 저장된 글(JSON)을 읽을 때 모양을 다시 확인한다 — 모양이 맞지 않으면 null (화면은 보이지 않는다). 예전(v1) 글은 예전 섹션으로 읽는다 */
 export function readTasteReport(content: unknown): TasteReport | null {
   if (!content || typeof content !== "object") return null;
   const c = content as { version?: unknown; headline?: unknown; sections?: unknown };
-  if (c.version !== TASTE_VERSION || typeof c.headline !== "string" || !Array.isArray(c.sections)) return null;
+  if (typeof c.headline !== "string" || !Array.isArray(c.sections)) return null;
+  const version = c.version === TASTE_VERSION ? TASTE_VERSION : c.version === TASTE_LEGACY_VERSION ? TASTE_LEGACY_VERSION : null;
+  if (!version) return null;
+  const ids: readonly TasteSectionId[] = version === TASTE_VERSION ? TASTE_SECTION_IDS : TASTE_LEGACY_SECTION_IDS;
   const sections: TasteSection[] = [];
-  for (const id of TASTE_SECTION_IDS) {
+  for (const id of ids) {
     const s = (c.sections as { id?: unknown; title?: unknown; body?: unknown }[]).find((x) => x?.id === id);
     if (!s || typeof s.title !== "string" || typeof s.body !== "string") return null;
     sections.push({ id, title: s.title, body: s.body });
   }
-  return { version: TASTE_VERSION, headline: c.headline, sections };
+  return { version, headline: c.headline, sections };
 }

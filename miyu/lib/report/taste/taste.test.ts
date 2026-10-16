@@ -1,15 +1,11 @@
-// 실행: npm test — 맛보기 리포트: 실제 응답 근거 만들기 · 지시문 · 글 검사(연애는 정확히 3문장 150자 이상, 유료 핵심을 미리 쓰지 않기) · 쓰기(고쳐 쓰기 · 실패) · 잠긴 목록.
+// 실행: npm test — 맛보기 리포트(taste-v2): 실제 응답 근거 만들기 · 지시문 · 글 검사(연애는 정확히 3문장 150자 이상, 유료 핵심을 미리 쓰지 않기, 해 볼 행동은 action에서만, 구매 예고 · 응답 읽어 주기 · 한계 경고 금지) · 쓰기(고쳐 쓰기 · 실패) · 예전(v1) 글 읽기.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ASSESSMENT_MODULES } from "../../assessment/modules/index.ts";
-import { SAMPLE_CHART } from "../../samples/sample-report.ts";
-import { buildDevFreeSummary } from "../build-free-summary.ts";
-import { buildFreePreview } from "../preview.ts";
 import { ModelCallError, type ModelRequest, type ModelResult, type TextModel } from "../ai/model.ts";
 import { TASTE_ANSWERS_MAX, tasteAnswersOf } from "./input.ts";
-import { tasteLockedItems } from "./locked.ts";
 import { composeMockTaste, createMockTasteModel, TASTE_SAMPLE } from "./mock-model.ts";
-import { TASTE_PLAN } from "./plan.ts";
+import { TASTE_PLAN, tasteSectionLabel } from "./plan.ts";
 import { buildTasteRepairMessage, buildTasteUserMessage, TASTE_PROMPT_MARK, TASTE_PROMPT_VERSION, TASTE_SYSTEM_PROMPT } from "./prompt.ts";
 import { TASTE_SECTION_IDS } from "./types.ts";
 import { readTasteReport, tasteSentences, validateTaste } from "./validate.ts";
@@ -45,13 +41,14 @@ test("실제 응답 근거: 보통(3)은 빼고, 뚜렷한 답부터 한도까�
   assert.ok(!/19\d\d|20[0-2]\d\s*년\s*\d+\s*월/.test(msg), "생년월일 형태가 없다");
 });
 
-test("지시문: 사주만 쓰지 않고 실제 응답을 엮고, 절반만 공개하며 유료 핵심(연애의 진행 · 어울리는 사람 · 시기 · 해 볼 것)을 쓰지 않고, 연애는 정확히 3문장이다", () => {
+test("지시문: 사주를 읽고 응답으로 나타나는 모습을 구체화하며, 유료 핵심(연애의 진행 · 어울리는 사람 · 시기)과 구매 예고를 쓰지 않고, 연애는 정확히 3문장 · 해 볼 행동은 action에서만이다", () => {
   assert.ok(TASTE_SYSTEM_PROMPT.startsWith(TASTE_PROMPT_MARK));
-  for (const must of ["사주만으로 쓰지 않는다", "answers", "profile.saju", "profile.response", "해요체", "정확히 3문장", "쓰지 않는 것", "연애가 어떻게 진행될지", "어떤 사람이 어울리는지", "연애운이 강해지는 시기", "해 볼 행동", "JSON 하나만", "점수", "사주 용어", "한 줄 제목", "조건형"]) {
+  for (const must of ["사주를 읽고", "사주(profile.saju)에서 읽은 성향", "answers", "profile.response", "해요체", "정확히 3문장", "쓰지 않는 것", "연애가 어떻게 진행될지", "어떤 사람이 어울리는지", "연애운이 강해지는 시기", "해 볼 행동", "JSON 하나만", "점수", "사주 용어", "~했던 때가 있었을 거예요", "경고를 문장마다 붙이지 않는다", "구매 후", "조건형"]) {
     assert.ok(TASTE_SYSTEM_PROMPT.includes(must), must);
   }
   for (const id of TASTE_SECTION_IDS) assert.ok(TASTE_SYSTEM_PROMPT.includes(`- ${id} "${TASTE_PLAN.sections[id].label}"`), id);
-  assert.equal(TASTE_PROMPT_VERSION, "taste-v1-prompt-0.1");
+  assert.equal(TASTE_PROMPT_VERSION, "taste-v2-prompt-0.1");
+  assert.deepEqual([...TASTE_SECTION_IDS], ["self", "work", "love", "action"]);
   assert.ok(buildTasteRepairMessage(["가", "나"]).includes("- 가") && buildTasteRepairMessage(["가"]).includes("JSON 전체"));
 });
 
@@ -83,6 +80,10 @@ test("글 검사: 유료 리포트의 핵심(해 볼 행동 · 어울리는 사�
   const base = TASTE_SAMPLE.sections.find((s) => s.id === "love")!.body;
   const bad: [string, RegExp][] = [
     [`${base} 먼저 연락해 보세요.`, /해 볼 행동/],
+    [`${base} 자세한 이야기는 심층 리포트에서 이어져요.`, /구매 예고/],
+    [`${base} 나머지는 구매 후에 알 수 있어요.`, /구매 예고/],
+    [`${base} 사주만으로는 알 수 없어요.`, /한계 경고/],
+    [`${base} 그렇다고 응답에서 나타났어요.`, /응답을 그대로/],
     [`${base} 나에게 어울리는 사람은 차분한 상대예요.`, /어울리는 사람/],
     [`${base} 올해 가을에 연애운이 강해져요.`, /시기/],
     [`${base} 내년에는 좋은 사람이 생길 수 있어요.`, /시기/],
@@ -113,6 +114,29 @@ test("저장된 글 읽기: 모양이 맞는 것만 읽고, 아니면 null이다
   assert.equal(readTasteReport(null), null);
   assert.equal(readTasteReport({ version: "x", headline: "a", sections: [] }), null);
   assert.equal(readTasteReport({ ...v.report, sections: v.report.sections.slice(0, 3) }), null);
+  // 예전(v1) 글(self · love · work · heart)은 그대로 읽고, 새 글의 섹션으로는 읽지 않는다
+  const legacy = { version: "taste-v1", headline: "예전 글이에요 그대로 읽어요", sections: ["self", "love", "work", "heart"].map((id) => ({ id, title: `제목 ${id}`, body: `본문 ${id}` })) };
+  const old = readTasteReport(legacy);
+  assert.ok(old && old.version === "taste-v1" && old.sections.map((x) => x.id).join() === "self,love,work,heart");
+  assert.equal(readTasteReport({ ...legacy, version: "taste-v2" }), null, "v2는 새 섹션이어야 한다");
+  assert.equal(tasteSectionLabel("self", "taste-v1"), "나는 이런 사람");
+  assert.equal(tasteSectionLabel("heart", "taste-v1"), "지치거나 마음이 흔들릴 때");
+  assert.equal(tasteSectionLabel("self", "taste-v2"), TASTE_PLAN.sections.self.label);
+});
+
+test("글 검사(action): 해 볼 행동은 action에서만 쓰고 action에는 꼭 있어야 하며, 시점 · 기간을 정하지 않는다", () => {
+  const withAction = (body: string) => {
+    const s2 = sample();
+    s2.sections.find((x) => x.id === "action")!.body = body;
+    return JSON.stringify(s2);
+  };
+  assert.deepEqual(errorsOf(withAction("지금 부담스러운 일 하나를 골라 내가 결정할 것, 상대에게 확인할 것, 시작한 뒤 조정할 것으로 나눠 보세요. 모든 걸 미리 해결해 두지 않아도 움직일 수 있다는 기준을 만드는 연습이에요.")), []);
+  assert.ok(errorsOf(withAction("지금 부담스러운 일 하나를 골라 내가 결정할 것, 상대에게 확인할 것, 시작한 뒤 조정할 것을 분명히 해 두는 쪽이 도움이 돼요. 모든 걸 미리 해결해 두지 않아도 움직일 수 있다는 기준이 생겨요.")).some((e) => e.includes("action에는")));
+  assert.ok(errorsOf(withAction("오늘부터 매일 부담스러운 일 하나를 골라 내가 결정할 것, 상대에게 확인할 것, 시작한 뒤 조정할 것으로 나눠 보세요. 모든 걸 미리 해결해 두지 않아도 움직일 수 있다는 기준을 만드는 연습이에요.")).some((e) => e.includes("시점")));
+  // 다른 섹션의 해 볼 행동 지시는 막는다
+  const s3 = sample();
+  s3.sections[1].body += " 내일부터 확인 기준을 적어 보세요.";
+  assert.ok(errorsOf(JSON.stringify(s3)).some((e) => e.includes("action") || e.includes("해 볼 행동")));
 });
 
 test("쓰기: 통과한 글만 돌려주고, 검사에 걸리면 이유를 알려 한 번 고쳐 쓰게 하며, 그래도 걸리면 실패로 남긴다(사용 기록은 호출마다)", async () => {
@@ -120,7 +144,7 @@ test("쓰기: 통과한 글만 돌려주고, 검사에 걸리면 이유를 알�
   const ctx = { onUsage: (u: { outcome: string; promptVersion: string }) => usage.push(`${u.outcome}:${u.promptVersion}`) };
   const w = createTasteWriter({ model: createMockTasteModel(), sleep: async () => {} });
   const r = await w.write(input, ctx);
-  assert.equal(r.version, "taste-v1");
+  assert.equal(r.version, "taste-v2");
   assert.deepEqual(usage, [`ok:${TASTE_PROMPT_VERSION}`]);
   assert.equal(w.provider, "mock");
   assert.equal(w.promptVersion, TASTE_PROMPT_VERSION);
@@ -158,14 +182,4 @@ test("쓰기: 통과한 글만 돌려주고, 검사에 걸리면 이유를 알�
   };
   await assert.rejects(createTasteWriter({ model: down, sleep: async () => {} }).write(input), (e: unknown) => e instanceof TasteWriteError && e.code === "MODEL");
   assert.equal(n, 2, "일시 오류는 한 번 다시 시도");
-});
-
-test("잠긴 목록: 운영자가 정한 유료 핵심이 들어 있고, 구매한 리포트가 실제로 답하는 질문(무료 미리보기의 약속)만 쓴다", () => {
-  const preview = buildFreePreview({ summary: buildDevFreeSummary(ANSWERS), saju: SAMPLE_CHART, reference: { year: 2026, month: 10 } });
-  const items = tasteLockedItems(preview);
-  const titles = items.map((i) => i.title);
-  for (const t of ["실제 연애는 어떻게 흘러갈까?", "나에게 어울리는 사람은?", "연애운이 강해지는 시기는?"]) assert.ok(titles.includes(t), t);
-  const promised = new Set([...preview.answers.map((a) => a.question), "연애운이 강해지는 달은 언제일까?"]);
-  for (const i of items) assert.ok(promised.has(i.question) && i.question.endsWith("?"), i.question);
-  assert.ok(items.length >= 4);
 });

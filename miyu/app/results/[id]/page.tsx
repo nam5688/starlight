@@ -1,5 +1,4 @@
 import { TasteReportSection } from "@/components/results/taste-report-section";
-import { tasteLockedItems } from "@/lib/report/taste/locked";
 import { tasteConnected } from "@/server/taste";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -182,18 +181,19 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
         expandAll={false}
         items={[
           ...(view.taste.kind !== "unavailable" ? [{ id: "r-taste", label: "맛보기 리포트" }] : []),
-          { id: "r-tendency", label: "전체 요약" },
-          { id: "r-saju", label: "사주 원국" },
-          { id: "r-situations", label: "상황별" },
-          { id: "r-scores", label: "점수" },
+          { id: "r-tendency", label: "대표 경향" },
+          { id: "r-self", label: "내 성향" },
+          { id: "r-situations", label: "일 · 관계" },
+          { id: "r-actions", label: "필요한 한 가지" },
+          { id: "r-basis", label: "분석 근거" },
           { id: "r-rooms", label: "상담방" },
-          { id: "r-locked", label: "구매 안내" },
+          { id: "r-purchase", label: "구매 안내" },
         ]}
       />
-      {/* 내 맛보기 리포트(무료 · 한 계정당 1번) — AI가 사주와 응답을 엮어 쓴 글. 받기 전에는 받기 버튼, 받은 뒤에는 글과 잠긴 핵심 목록 */}
-      <TasteReportSection id="r-taste" assessmentId={assessment.id} state={view.taste} connected={tasteConnected()} locked={tasteLockedItems(preview)} />
+      {/* 내 맛보기 리포트(무료 · 한 계정당 1번) — AI가 사주를 읽고 응답으로 이 사람에게 어떻게 나타나는지 풀어 쓴 완결된 글. 받기 전에는 받기 버튼 */}
+      <TasteReportSection id="r-taste" assessmentId={assessment.id} state={view.taste} connected={tasteConnected()} />
       <div className="mx-auto w-full max-w-[720px] px-5 pt-6">
-        <FreePreviewBody preview={preview} idPrefix="r-" ctaHref="#r-purchase" />
+        <FreePreviewBody preview={preview} idPrefix="r-" />
       </div>
       {/* 결과 화면에서도 궁금한 주제의 상담방을 고른다(운영자 2026-10-15). 홈에서 심층 리포트로만 열리는 방을 골랐다면 그 방은 "이어서 이야기하기" 바로가기로 보인다(무료로 열리는 방은 분석 직후 바로 열려 이 화면에 기억이 남지 않는다) */}
       <section id="r-rooms" aria-labelledby="r-rooms-title" className="mx-auto w-full max-w-[720px] px-5 pt-12">

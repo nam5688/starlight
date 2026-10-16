@@ -111,10 +111,12 @@ test("접어 둔 분석 근거는 AI가 쓰지 않고 근거 목록에서 코드
   for (const id of report.blocks[0].evidence.filter((x) => x.startsWith("saju."))) assert.ok(tendency.tradition.includes(byId.get(id)!.cue), id);
   assert.ok(tendency.computed.some((l) => /^용어 · 일간\(日干\):/.test(l)), "용어 풀이에 한자가 있다");
   assert.ok(tendency.answers.some((l) => /신중함 \d+ \(응답 환산값/.test(l)));
-  assert.ok(tendency.answers.some((l) => /본인이 알고 있는 MBTI INFJ/.test(l)));
   assert.ok(tendency.unknown.some((l) => /전문가 검토 전 초안/.test(l)));
-  assert.ok(tendency.unknown.some((l) => /공식 MBTI 검사 결과가 아닙니다/.test(l)));
   assert.ok(tendency.unknown.some((l) => /개발용 예시/.test(l)));
+  // 입력한 MBTI는 참고값이다 — 근거로 달면 접어 둔 분석 근거에 "본인이 알고 있는 값 · 공식 검사 결과가 아님"이 남는다
+  const withMbti = basisFor(["saju.daymaster", "self.mbti"], evidence);
+  assert.ok(withMbti.answers.some((l) => /본인이 알고 있는 MBTI INFJ/.test(l)));
+  assert.ok(withMbti.unknown.some((l) => /공식 MBTI 검사 결과가 아닙니다/.test(l)));
   // 응답 근거를 달지 않은 주제는 응답 없이 사주만으로 읽었다고 밝힌다
   const sajuOnly = basisFor(["saju.daymaster"], evidence);
   assert.deepEqual(sajuOnly.answers, []);
@@ -305,7 +307,7 @@ test("저장된 리포트 글 뽑기: 읽기 구조 리포트도 이미 준 리�
   const t = reportTexts(report);
   assert.equal(t.headline, sampleReadingReport.headline);
   assert.equal(t.summary.length, 5);
-  assert.ok(t.all.some((x) => x.includes("후기부터 읽어 본 적 있죠")));
+  assert.ok(t.all.some((x) => x.includes("설명서를 끝까지 훑어본 뒤에야")));
   assert.ok(t.actions.length >= 3);
 });
 
@@ -313,8 +315,8 @@ test("반복 표현 검사: 서윤 예시에는 없고, 같은 구절이 서로 
   assert.deepEqual(findRepeatedPhrases(draft()), []);
   const d = draft();
   // 실제 AI 글(가상 인물)에서 같은 구절이 두 주제에 되풀이됐던 모양
-  d.blocks[0].details[0] = "응답에서는 상황이 바뀌면 방향을 빠르게 바꾸는 경향도 보여요. 처음엔 오래 재다가도 판이 달라지면 방향을 틀 수 있어요.";
-  d.blocks[4].details[0] = "응답에서는 익숙한 방식을 편하게 느끼고 상황이 바뀌면 방향을 빠르게 바꾸는 경향이 보여요.";
+  d.blocks[0].details[0] = "상황이 바뀌면 방향을 빠르게 바꾸는 경향도 보여요. 처음엔 오래 재다가도 판이 달라지면 방향을 틀 수 있어요.";
+  d.blocks[4].details[0] = "익숙한 방식을 편하게 느끼고 상황이 바뀌면 방향을 빠르게 바꾸는 경향이 보여요.";
   const found = findRepeatedPhrases(d);
   assert.equal(found.length, 1);
   assert.match(found[0].phrase, /상황이 바뀌면 방향을 빠르게 바꾸는 경향/);
@@ -329,8 +331,8 @@ test("반복 표현 검사: 서윤 예시에는 없고, 같은 구절이 서로 
 
 test("반복 표현 고쳐 쓰기(repairRepeats): 켜면 한 번 고쳐 쓰게 하고, 고쳐 쓴 글이 형식에서 떨어지거나 마지막에도 반복이 남으면 받아 둔다 — 실패로 만들지 않는다", async () => {
   const repeated = draft();
-  repeated.blocks[0].details[0] = "응답에서는 상황이 바뀌면 방향을 빠르게 바꾸는 경향도 보여요. 처음엔 오래 재다가도 판이 달라지면 방향을 틀 수 있어요.";
-  repeated.blocks[4].details[0] = "응답에서는 익숙한 방식을 편하게 느끼고 상황이 바뀌면 방향을 빠르게 바꾸는 경향이 보여요.";
+  repeated.blocks[0].details[0] = "상황이 바뀌면 방향을 빠르게 바꾸는 경향도 보여요. 처음엔 오래 재다가도 판이 달라지면 방향을 틀 수 있어요.";
+  repeated.blocks[4].details[0] = "익숙한 방식을 편하게 느끼고 상황이 바뀌면 방향을 빠르게 바꾸는 경향이 보여요.";
   const clean = draft();
 
   // 끄면(기본) 반복이 있어도 첫 응답을 그대로 받는다
@@ -408,16 +410,23 @@ test("소단락 반복 · 내용 검사: 소단락 글도 같은 문장 반복 �
   // 말만 조금 바꾼 같은 구절(12글자 이상)은 반복 검사가 찾는다
   const d2 = draft();
   const w2 = d2.blocks.find((b) => b.id === "work-money")!;
-  w2.sections![2].body = `${w2.sections![2].body} 마음이 앞서면 속도부터 늦춰요 같은 때에는 쉬어 가요.`;
-  assert.ok(findRepeatedPhrases(d2).some((x) => /마음이 앞서면 속도부터 늦춰요/.test(x.phrase)));
+  const lv2 = d2.blocks.find((b) => b.id === "love")!;
+  const snippet = lv2.sections![1].body.slice(0, 22);
+  w2.sections![2].body = `${w2.sections![2].body} ${snippet} 같은 때에는 쉬어 가요.`;
+  assert.ok(findRepeatedPhrases(d2).some((x) => snippet.includes(x.phrase.slice(0, 12)) || x.phrase.includes(snippet.slice(0, 12))), "다른 소단락의 구절을 그대로 가져오면 반복으로 찾는다");
   // 소단락 글도 내용 검사의 단위다 — 서윤 예시는 통과한다
   const result = checkReadingDepth({ draft: draft() });
   assert.equal(result.pass, true);
   assert.ok(result.metrics.units >= 5 + 3 + 6, `의미 단위 ${result.metrics.units}`);
 });
 
-test("소단락: AI 지시문 0.6은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
-  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.7");
+test("소단락: AI 지시문 0.8은 소단락 규칙(조건 · 장면 · 근거가 약하면 질문으로 · 상대와 돈의 선)과 사주 중심 풀이의 방향(응답은 구체화 · 공감과 예측 · 경고를 문장마다 붙이지 않기)을 담고, 사용자 메시지에 소단락 질문을 싣는다", () => {
+  assert.equal(READING_PROMPT_VERSION, "reading-v1-prompt-0.8");
+  assert.match(READING_SYSTEM_PROMPT, /풀이의 방향/);
+  assert.match(READING_SYSTEM_PROMPT, /응답을 그대로 읽어 주지 않는다/);
+  assert.match(READING_SYSTEM_PROMPT, /~했던 때가 있었을 거예요/);
+  assert.match(READING_SYSTEM_PROMPT, /경고를 붙이지 않는다/);
+  assert.match(READING_SYSTEM_PROMPT, /결혼을 하게 된다/);
   assert.match(READING_SYSTEM_PROMPT, /깊게 읽는 소단락/);
   assert.match(READING_SYSTEM_PROMPT, /근거가 약한 소단락은 늘려 쓰지 않는다/);
   assert.match(READING_SYSTEM_PROMPT, /업종 이름 추천을 쓰지 않는다/);
