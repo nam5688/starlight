@@ -44,6 +44,11 @@ export type FreePreview = {
         elements: Pick<ElementReading, "element" | "hanja" | "image" | "count" | "level" | "levelLabel" | "force" | "keywords">[];
         /** 일상에서 이렇게 나타날 수 있어요 — 첫 번째만 */
         everyday: { shown: string | null; lockedCount: number };
+        /**
+         * 가까운 관계에서는 이렇게 나타날 수 있어요 — 가장 두드러진 기운(많음 → 없음 → 적음 순) 하나의 관계 풀이 한 줄만(운영자 2026-10-16: 무료 리포트에도 사주로 읽은 연애 이야기를 조금).
+         * 나머지 기운의 관계 · 일 · 선택 풀이는 구매 후 리포트에 있다(맛보기는 한 줄, 같은 문장이 구매한 리포트의 오행별 풀이에 그대로 들어 있다).
+         */
+        relation: { lead: string; text: string } | null;
         notes: string[];
       }
     | { status: "not-ready"; message: string };
@@ -106,6 +111,13 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
   const shownQuestions = qs.slice(0, 2).map((q) => q.question);
 
   const plain = extras.plain;
+  // 가장 두드러진 기운 하나 — 많은 기운(개수가 많은 순) → 없는 기운 → 적은 기운. 보통(고른 기운)에는 관계 풀이가 없다
+  const notable = plain
+    ? [...plain.elements.filter((e) => e.level === "many").sort((a, b) => b.count - a.count), ...plain.elements.filter((e) => e.level === "none"), ...plain.elements.filter((e) => e.level === "few")].find((e) => e.domains)
+    : undefined;
+  const relation: { lead: string; text: string } | null = notable?.domains
+    ? { lead: `${notable.element}(${notable.image}) 기운이 ${notable.level === "many" ? "많아요" : notable.level === "none" ? "없어요" : "적어요"}`, text: notable.domains.relation }
+    : null;
   const sajuPart: FreePreview["saju"] =
     saju.status === "ok" && plain
       ? {
@@ -116,6 +128,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
           dayMaster: { label: plain.dayMaster.label, image: plain.dayMaster.image, trait: plain.dayMaster.trait },
           elements: plain.elements.map(({ element, hanja, image, count, level, levelLabel, force, keywords }) => ({ element, hanja, image, count, level, levelLabel, force, keywords })),
           everyday: { shown: plain.everyday[0] ?? null, lockedCount: Math.max(plain.everyday.length - 1, 0) },
+          relation,
           notes: saju.notes.filter((n) => n.kind !== "hour-unknown").map((n) => n.message),
         }
       : { status: "not-ready", message: saju.status === "invalid" ? saju.message : "만세력 계산 결과가 없습니다." };

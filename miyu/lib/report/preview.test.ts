@@ -42,8 +42,12 @@ test("잠금: 미리보기에는 전체 이름 · 나머지 요약 · 점수 · 
     assert.ok(!json.includes(inp.summary.oneLiner), "전체 한 줄 요약");
     for (const b of inp.summary.insight?.basis ?? []) assert.ok(!json.includes(b.text) && !json.includes(b.itemId), "그렇게 읽은 이유(근거 문항 · 응답)는 구매 후");
     if (extras.plain) {
+      // 오행별 풀이 중 맛보기로 여는 것은 가장 두드러진 기운 하나의 "관계" 한 줄뿐이다(운영자 2026-10-16). 일 · 선택 풀이와 나머지 기운의 관계 풀이는 구매 후
+      const shownRelation = preview.saju.status === "ok" ? preview.saju.relation?.text : undefined;
       for (const e of extras.plain.elements) {
-        if (e.domains) assert.ok(!json.includes(e.domains.relation) && !json.includes(e.domains.work) && !json.includes(e.domains.choice), `오행 ${e.element}의 관계 · 일 · 선택 풀이`);
+        if (!e.domains) continue;
+        assert.ok(!json.includes(e.domains.work) && !json.includes(e.domains.choice), `오행 ${e.element}의 일 · 선택 풀이`);
+        if (e.domains.relation !== shownRelation) assert.ok(!json.includes(e.domains.relation), `오행 ${e.element}의 관계 풀이(맛보기 한 줄 외)`);
       }
     }
     assert.ok(!json.includes(inp.summary.core.stressTrigger) && !json.includes(inp.summary.core.tryNow), "잠긴 핵심 요약 2개");
@@ -87,6 +91,24 @@ test("공개 범위: 핵심 요약 2개, 질문 2개, 실천 1개, 첫 상황 �
   assert.ok(p.saju.everyday.shown);
   assert.ok(p.saju.elements.every((e) => e.keywords.includes("·")), "오행 키워드");
   assert.match(p.saju.headline, /촛불처럼/, "정화 일간 — 쉬운 한 줄");
+});
+
+test("사주로 읽은 관계 한 줄: 가장 두드러진 기운(많음 → 없음 → 적음) 하나의 관계 풀이만 열리고, 같은 문장이 구매한 리포트의 오행별 풀이에 있다", () => {
+  for (const saju of [A, B]) {
+    const inp = input(PATTERNS[0], saju);
+    const p = buildFreePreview({ summary: inp.summary, saju: inp.saju, reference: REF });
+    const extras = buildReportExtras({ summary: inp.summary, saju: inp.saju, reference: REF });
+    assert.equal(p.saju.status, "ok");
+    if (p.saju.status !== "ok" || !extras.plain) return;
+    const rel = p.saju.relation;
+    assert.ok(rel, "두드러진 기운이 있으면 관계 한 줄이 있다");
+    const hit = extras.plain.elements.filter((e) => e.domains?.relation === rel.text);
+    assert.equal(hit.length, 1, "구매한 리포트의 오행별 풀이에 같은 문장이 있다");
+    const manyFirst = extras.plain.elements.filter((e) => e.level === "many").sort((a, b) => b.count - a.count)[0];
+    if (manyFirst) assert.equal(hit[0].element, manyFirst.element, "많은 기운이 있으면 그 기운의 풀이");
+    assert.ok(!/\d/.test(rel.lead + rel.text), "개수 숫자는 싣지 않는다");
+    assert.match(rel.lead, /기운이 (많아요|없어요|적어요)$/);
+  }
 });
 
 test("일관성: 미리보기에 보이는 모든 것이 구매한 리포트(개발용 · AI)에 실제로 들어 있다", async () => {

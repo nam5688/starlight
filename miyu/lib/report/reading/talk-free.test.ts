@@ -10,6 +10,7 @@ import { buildFreePreview } from "../preview.ts";
 import { STARTER_ACTIONS } from "../starter-actions.ts";
 import { TALK_COPY, type TalkChat, type TalkModel } from "./talk.ts";
 import { buildFreeTalkModel } from "./talk-free.ts";
+import { partnerReading } from "../../saju/interpret/partner.ts";
 import { applyAction, availableRooms, replyOptions, roomHasMaterial, roomTopics, ROOM_COPY, ROOM_ORDER, ROOMS, startRoom, type TalkLine } from "./talk-room.ts";
 
 const REF = { year: 2026, month: 10 };
@@ -41,10 +42,31 @@ test("잠금: 무료 맛보기 모델에는 전체 이름 · 나머지 요약 ·
       for (const s of extras.situations) assert.ok(!json.includes(s.strength) && !json.includes(s.caution) && !json.includes(s.scenario) && !json.includes(s.tip), `상황 설명 ${s.id}`);
       for (const s of extras.situations.slice(1)) assert.ok(!json.includes(s.strengthLabel) && !json.includes(s.cautionLabel), "첫 상황 외 라벨");
       for (const q of extras.questions) assert.ok(!json.includes(q.answer), "질문의 답");
-      if (extras.plain) for (const e of extras.plain.elements) if (e.domains) assert.ok(!json.includes(e.domains.relation) && !json.includes(e.domains.work) && !json.includes(e.domains.choice), `오행 ${e.element} 풀이`);
+      // 오행별 풀이 중 맛보기로 여는 것은 가장 두드러진 기운 하나의 "관계" 한 줄뿐이다(운영자 2026-10-16, 무료 미리보기와 같은 줄)
+      const shownRelation = model.topics.find((t) => t.id === "love")?.summary.join("\n") ?? "";
+      if (extras.plain)
+        for (const e of extras.plain.elements) {
+          if (!e.domains) continue;
+          assert.ok(!json.includes(e.domains.work) && !json.includes(e.domains.choice), `오행 ${e.element} 일 · 선택 풀이`);
+          if (!shownRelation.includes(e.domains.relation)) assert.ok(!json.includes(e.domains.relation), `오행 ${e.element} 관계 풀이(맛보기 한 줄 외)`);
+        }
       for (const b of summary.insight?.basis ?? []) assert.ok(!json.includes(b.text) && !json.includes(b.itemId), "그렇게 읽은 이유는 구매 후");
       assert.equal(model.card.tendency, null, "대표 경향 설명은 구매 후");
     }
+  }
+});
+
+test("무료 맛보기 연애 방: 사주에서 읽은 관계 한 줄이 함께 보이고(테스트 답을 다시 말해 주는 데 그치지 않게), 인연의 경향 문장을 되풀이하지 않으며, 질문 근거에도 같은 줄이 들어 간다", () => {
+  for (const saju of [A, B]) {
+    const { model } = freeModel(PATTERNS[0], saju);
+    const love = model.topics.find((t) => t.id === "love")!;
+    assert.ok(love.grounded);
+    const text = love.summary.join("\n");
+    assert.match(text, /기운이 (많아요|없어요|적어요) — /, "사주에서 읽은 관계 한 줄");
+    const partner = partnerReading(saju.status === "ok" ? saju : (undefined as never));
+    if (partner) assert.ok(!text.includes(partner.mood.line), "인연의 경향(분위기)은 '끌리는 사람의 경향' 풀이가 따로 보여 준다");
+    assert.ok(model.tasteProfile?.saju.some((l) => text.includes(l)), "질문 근거(profile)에도 같은 관계 줄이 있다");
+    assert.ok(model.tasteProfile && model.tasteProfile.response.length > 0, "응답에서 읽은 문구도 있다");
   }
 });
 

@@ -49,6 +49,7 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
   const relationInsight = insight && insight.module === "relationship" ? insight : null;
   const tendencyInsight = insight && insight.module === "temperament" ? insight : null;
   const work = preview.situations[0];
+  const sajuRelation = preview.saju.status === "ok" ? preview.saju.relation : null;
 
   const topics: TalkTopic[] = [];
 
@@ -68,18 +69,21 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     locked: { hooks: [...preview.core.locked.map((c) => c.question), "새로운 일 앞에서 나는 먼저 해 보는 편일까, 따져 보는 편일까?"] },
   });
 
-  // ② 가까운 관계 — 응답(관계 영역)이 뒷받침하면 그 문단, 아니면 사주로 읽은 편한 분위기
+  // ② 가까운 관계 — 응답(관계 영역)이 뒷받침하면 그 문단 + 사주에서 가장 두드러진 기운의 관계 풀이 한 줄(운영자 2026-10-16: 사주로 읽은 연애 이야기를 조금).
+  //    둘 다 없으면 사주로 읽은 편한 분위기. 인연의 경향(분위기)은 "끌리는 사람의 경향" 풀이(코드 계산)가 따로 보여 주므로 여기서는 되풀이하지 않는다.
+  const relationLine = sajuRelation ? `${sajuRelation.lead} — ${sajuRelation.text}` : null;
+  const loveSummary = [...(relationInsight ? [relationInsight.text] : []), ...(relationLine ? [relationLine] : [])];
   topics.push({
     id: "love",
     number: 2,
     chip: "연애 · 관계",
     title: "가까운 관계",
-    headline: relationInsight ? "가까운 관계에서 이런 순간이 있을 수 있어요" : partner ? "가까운 관계에서는 이런 쪽이 편해요" : "가까운 관계 이야기를 가볍게 살펴봤어요",
-    summary: [relationInsight ? relationInsight.text : partner ? partner.mood.line : "가까운 관계는 사주와 응답을 함께 봐야 풀리는 이야기라 리포트에서 이어서 풀어 드려요."],
+    headline: relationInsight ? "가까운 관계에서 이런 순간이 있을 수 있어요" : relationLine ? "가까운 관계에서는 이런 모습일 수 있어요" : partner ? "가까운 관계에서는 이런 쪽이 편해요" : "가까운 관계 이야기를 가볍게 살펴봤어요",
+    summary: loveSummary.length > 0 ? loveSummary : [partner ? partner.mood.line : "가까운 관계는 사주와 응답을 함께 봐야 풀리는 이야기라 리포트에서 이어서 풀어 드려요."],
     example: [],
     detail: [],
     basis: null,
-    grounded: Boolean(relationInsight || partner),
+    grounded: Boolean(relationInsight || relationLine || partner),
     locked: { hooks: hooksOf(preview, ["close", "partner", "repeat", "years"]) },
   });
 
@@ -117,6 +121,17 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     });
   }
 
+  // 자유 질문의 AI에게 건네는 "이미 공개된" 사주 · 응답 문구 — 방의 풀이 한 줄만 받으면 선택한 답을 풀어 쓴 답이 되므로 근거 종류별로 함께 준다.
+  // 무료 미리보기 · 이 대화가 이미 보여 주는 글뿐이다(잠긴 요약 · 점수 · 상세 · 풀이 본문은 없다). 숫자(개수)는 싣지 않는다.
+  const sajuOk = preview.saju.status === "ok" ? preview.saju : null;
+  const elementLines = sajuOk
+    ? sajuOk.elements.filter((e) => e.level === "many" || e.level === "none").map((e) => `${e.image} 기운이 ${e.level === "many" ? "많은" : "없는"} 구성이에요 — ${e.image} 기운은 ${e.force}이에요`)
+    : [];
+  const tasteProfile = {
+    saju: [dmSentence, sajuOk?.dayMaster.trait, ...elementLines, sajuOk?.everyday.shown, relationLine, partner?.mood.line].filter((t): t is string => Boolean(t)),
+    response: [tendencyInsight?.text, relationInsight?.text, ...preview.core.shown.map((r) => `${r.label}: ${r.text}`)].filter((t): t is string => Boolean(t)),
+  };
+
   const priceLabel = `리포트로 이어 보기 · ${formatKrw(PERSONAL_REPORT.priceKrw)}`;
   return {
     name: input.name,
@@ -135,8 +150,9 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     },
     topics,
     groups: groupsOf(topics),
-    codeTopics: codeTopicsFor({ saju, today, calendar: undefined, tier: "free" }),
+    codeTopics: codeTopicsFor({ saju, today, calendar: undefined, tier: "free", personality: { strength: work?.strengthLabel || null, caution: work?.cautionLabel || null } }),
     tier: "free",
+    tasteProfile,
     buy: { href: input.href, label: input.owned ? "내 리포트 보기" : priceLabel, owned: input.owned },
     dayKey: dayKey(today),
     chat: input.chat,

@@ -113,6 +113,11 @@ export type TalkModel = {
   codeTopics: TalkTopic[];
   /** paid: 저장된 리포트 전체 · free: 무료 맛보기(잠긴 내용은 담지 않는다) */
   tier: "paid" | "free";
+  /**
+   * 무료 맛보기에서만 — 무료 미리보기가 이미 공개한 사주 · 응답 문구를 근거 종류별로 모은 것이다(새 글 · 잠긴 내용 없음).
+   * 자유 질문의 AI가 방의 풀이 한 줄만 받아 "선택한 답을 풀어 쓴" 답이 되지 않게, 사주와 응답에서 읽힌 점을 함께 연결해 답하도록 건넨다.
+   */
+  tasteProfile?: { saju: string[]; response: string[] };
   buy: TalkBuy | null;
   /** 오늘(한국 날짜, YYYY-MM-DD) — 오늘의 한 장 방의 이어 보기 저장은 날짜별로 나눈다 */
   dayKey: string;
@@ -334,7 +339,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: TalkModelO
     },
     topics,
     groups: groupsOf(topics),
-    codeTopics: codeTopicsFor({ saju: opts.saju ?? null, today: opts.today ?? null, calendar, tier: "paid" }),
+    codeTopics: codeTopicsFor({ saju: opts.saju ?? null, today: opts.today ?? null, calendar, tier: "paid", personality: { strength: cardOf("strength").keyword || null, caution: cardOf("caution").keyword || null } }),
     tier: "paid",
     buy: null,
     dayKey: opts.today ? `${opts.today.year}-${String(opts.today.month).padStart(2, "0")}-${String(opts.today.day).padStart(2, "0")}` : "",

@@ -117,15 +117,17 @@ test("오늘의 한 장: 좋은 날 · 나쁜 날을 가르지 않고 예언 · 
   const texts: string[] = [];
   for (const [y, m, d] of SAMPLES) {
     const r = dayReading(chart(y, m, d), { year: 2026, month: 10, day: 15 });
-    texts.push(r.title, r.meaning, ...(r.relation ? [r.relation.line] : []), ...Object.values(r.tips));
+    texts.push(r.title, r.meaning, r.trait, r.careful, r.good, ...(r.relation ? [r.relation.line] : []), ...Object.values(r.tips));
   }
   for (const t of texts) {
     assert.doesNotMatch(t, /대길|흉|길한|운이 좋|운이 나|재수|행운|불운|조심하세요!|반드시|꼭 .*(생겨|일어)|\d+점|\d+%/, `예언 · 점수 · 길흉: ${t}`);
     assert.doesNotMatch(t, /일간|일지|십신|관성|재성|인성|식상|비겁|천간|지지|일진/, `사주 용어가 본문에: ${t}`);
   }
   for (const t of Object.values(DAY_NOTES)) assert.doesNotMatch(t, /대길|흉|운이 좋|운이 나|재수|행운|불운|반드시/, t);
-  assert.match(DAY_NOTES.limit, /100% 정확하거나 검증된 사실이 아니에요/);
-  assert.match(DAY_NOTES.limit, /좋고 나쁜 날을 가르는 것도 아니에요/);
+  // 안내는 짧고 친근하게(운영자 2026-10-16) — 전통 해석에 기반한 참고용 이야기라는 것과 마음먹기 달린 하루라는 말만 있고, 예언 · 점수 · 길흉은 없다
+  assert.match(DAY_NOTES.limit, /전통 해석에 기반한 참고용 이야기예요/);
+  assert.match(DAY_NOTES.limit, /마음먹기에 달린 하루/);
+  assert.ok(DAY_NOTES.limit.length < 60, "한 줄 안내");
   assert.match(DAY_NOTES.closing, /내일 새로운 한 장/);
 });
 

@@ -12,7 +12,7 @@ import { buildFreePreview } from "../preview.ts";
 import { buildDevFreeSummary } from "../build-free-summary.ts";
 import { ASSESSMENT_MODULES } from "../../assessment/modules/index.ts";
 import { ChatAnswerError, createChatAnswerer } from "./answer.ts";
-import { buildChatContext, ROOM_AI_FOCUS } from "./context.ts";
+import { buildChatContext, PROFILE_TEXT_MAX, ROOM_AI_FOCUS } from "./context.ts";
 import { composeMockChatAnswer, createMockChatModel } from "./mock-model.ts";
 import { CHAT_LIMITS } from "./plan.ts";
 import { buildChatRepairMessage, buildChatUserMessage, CHAT_PROMPT_MARK, CHAT_PROMPT_VERSION, CHAT_SYSTEM_PROMPT } from "./prompt.ts";
@@ -96,6 +96,46 @@ test("무료 맛보기의 근거는 taste로 표시되고 보이는 글뿐이다
   for (const t of free.topics) for (const h of t.locked?.hooks ?? []) assert.ok(!text.includes(h), h);
 });
 
+test("무료 맛보기의 질문에는 방의 풀이 한 줄만이 아니라 이미 공개된 사주 · 응답 문구가 근거 종류별로 함께 간다 (선택한 답을 풀어 쓰는 데 그치지 않게)", () => {
+  const free = buildFreeTalkModel({ name: "서윤", preview: FREE_PREVIEW, saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, href: "/results/x#r-purchase", owned: false, chat: { state: "ready", free: true } });
+  // 연애 방에는 연애 풀이 한 주제뿐이지만, 사주 · 응답에서 읽은 문구는 다른 주제의 것도 근거로 간다
+  const c = buildChatContext(free, "love", { topicId: "love", intakeId: "some" });
+  assert.ok(c.profile, "무료 맛보기에는 profile이 있다");
+  assert.ok(c.profile!.saju.length >= 2, "사주에서 읽은 문구(일간 비유 · 기운 · 원국에서 읽히는 한 줄 · 인연의 경향)");
+  assert.ok(c.profile!.response.length >= 1, "응답에서 읽은 문구(편한 환경 · 자주 반복되는 반응)");
+  // 응답 문구는 무료 미리보기가 이미 공개한 글뿐이다 (잠긴 핵심 요약 · 점수 · 상세는 없다)
+  const shown = [FREE_PREVIEW.lead.kind === "insight" ? FREE_PREVIEW.lead.text : "", ...FREE_PREVIEW.core.shown.map((r) => `${r.label}: ${r.text}`)];
+  for (const line of c.profile!.response) assert.ok(shown.includes(line), `공개되지 않은 응답 문구: ${line}`);
+  for (const l of FREE_PREVIEW.core.locked) assert.ok(!JSON.stringify(c.profile).includes(l.question), l.question);
+  // 사주 문구에는 점수 · 개수 숫자가 없다(숫자는 답에서 막는 표현이다)
+  for (const line of c.profile!.saju) assert.ok(!/\d/.test(line), `숫자가 든 사주 문구: ${line}`);
+  // 질문 근거로 실제 AI에 가는 글에 profile이 들어 있다
+  const msg = buildChatUserMessage({ context: c, question: "요즘 연애가 잘 안 풀리는 느낌이에요.", recent: [], referenceDate: "2026-10-15" });
+  assert.ok(msg.includes('"profile"') && msg.includes('"saju"') && msg.includes('"response"'));
+  // 구매한 리포트의 풀이에는 profile이 없다 (그 풀이 글이 사주 · 응답을 함께 풀어 쓴 것이다)
+  const paid = buildChatContext(model, "love", { topicId: "love" });
+  assert.equal(paid.profile, null);
+  assert.ok(!buildChatUserMessage(ask()).includes('"profile"'));
+});
+
+test("무료 맛보기 profile: 이름은 가리고, 글자 수 한도 안에서 응답 문구를 먼저 담아 두 종류가 모두 남는다", () => {
+  const base = buildFreeTalkModel({ name: "서윤", preview: FREE_PREVIEW, saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, href: "/results/x#r-purchase", owned: false, chat: { state: "ready", free: true } });
+  const named = { ...base, tasteProfile: { saju: ["서윤은 큰 강처럼 넓게 흐르는 사람이에요"], response: ["서윤은 확인하고 시작하는 편일 수 있어요"] } };
+  const p = buildChatContext(named, "love", { topicId: "love" }).profile!;
+  assert.ok(p.saju[0].startsWith("이 분은") && p.response[0].startsWith("이 분은") && !JSON.stringify(p).includes("서윤"));
+  // 사주 문구가 아주 길어도 응답 문구가 밀려나지 않고, 두 종류 합이 한도를 넘지 않는다
+  const long = { ...base, tasteProfile: { saju: Array.from({ length: 40 }, (_, i) => `사주에서 읽은 아주 긴 문구 ${"가".repeat(80)}${i}`), response: ["응답에서 읽은 짧은 문구예요"] } };
+  const q = buildChatContext(long, "love", { topicId: "love" }).profile!;
+  assert.deepEqual(q.response, ["응답에서 읽은 짧은 문구예요"]);
+  assert.ok(q.saju.length > 0 && [...q.saju, ...q.response].join("").length <= PROFILE_TEXT_MAX);
+  // profile이 없거나 비어 있으면 입력에 싣지 않는다
+  const none = buildChatContext({ ...base, tasteProfile: undefined }, "love", { topicId: "love" });
+  assert.equal(none.profile, null);
+  assert.ok(!buildChatUserMessage({ context: none, question: "요즘 고민이 있어요", recent: [], referenceDate: "2026-10-15" }).includes('"profile"'));
+  const empty = buildChatContext({ ...base, tasteProfile: { saju: [], response: [] } }, "love", { topicId: "love" });
+  assert.ok(!buildChatUserMessage({ context: empty, question: "요즘 고민이 있어요", recent: [], referenceDate: "2026-10-15" }).includes('"profile"'));
+});
+
 test("근거: 이 방의 풀이 글만 담고 이름은 가리며, 이 방에서 열 수 없는 풀이는 쓰지 않는다", () => {
   const c = buildChatContext(model, "love", { topicId: "love", intakeId: "some", followUp: true });
   assert.equal(c.room.label, ROOMS.love.label);
@@ -142,7 +182,9 @@ test("지시문과 입력: 이름 · 생년월일이 없고, 근거 안에서만
   assert.ok(withMemory.includes('"memory"') && withMemory.includes("지난 질문"));
   assert.ok(!buildChatUserMessage(ask()).includes('"memory"') && !buildChatUserMessage(ask({ memory: [] })).includes('"memory"'));
   for (const must of ["memory", "이어질 때만", "새 근거가 아니다", "단정하지 않는다"]) assert.ok(CHAT_SYSTEM_PROMPT.includes(must), `memory 지시: ${must}`);
-  assert.equal(CHAT_PROMPT_VERSION, "chat-v1-prompt-0.4");
+  // 사주에서 읽은 점 → 응답에서 읽은 반응 → 만나는 장면 순서로 잇고, 사주와 응답이 다르면 차이를 설명하며, 문구를 베끼지 않는다 (무료 맛보기 profile)
+  for (const must of ["profile", "saju는 사주에서 읽은 문구", "response는 사용자의 응답이 뒷받침한 문구", "사주에서는 ~로 읽혀요", "하나로 맞추지 않는다", "그대로 베끼지 말고", "물 기운이 많은 구성"]) assert.ok(CHAT_SYSTEM_PROMPT.includes(must), `profile 지시: ${must}`);
+  assert.equal(CHAT_PROMPT_VERSION, "chat-v1-prompt-0.5");
   assert.ok(buildChatRepairMessage(["가", "나"]).includes("- 가") && buildChatRepairMessage(["가"]).includes("처음부터 다시"));
 });
 

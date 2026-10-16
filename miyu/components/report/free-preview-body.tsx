@@ -134,8 +134,19 @@ export function FreePreviewBody({ preview, idPrefix, ctaHref, ctaLabel }: { prev
                   </li>
                 )}
               </ul>
-              <p className="mt-2 text-[14px] text-ink-3">
-                일간의 잘하는 점 · 주의할 점과, 각 기운이 관계 · 일 · 선택에서 어떻게 나타나는지는 구매 후 리포트에 있습니다.{" "}
+              {saju.relation && (
+                <div className="mt-6">
+                  <h3 className="text-[15px] font-semibold text-ink-2">가까운 관계에서는 이렇게 나타날 수 있어요</h3>
+                  <ul className="mt-2 divide-y divide-line border-y border-line">
+                    <li className="py-3.5 text-[16px] leading-relaxed">
+                      {saju.relation.lead} — {saju.relation.text}
+                    </li>
+                  </ul>
+                  <p className="mt-2 text-[14px] text-ink-3">전통 해석을 쉬운 말로 옮긴 한 가지이고, 성격을 확정하는 말이 아니에요.</p>
+                </div>
+              )}
+              <p className="mt-4 text-[14px] text-ink-3">
+                일간의 잘하는 점 · 주의할 점과, 나머지 기운이 관계 · 일 · 선택에서 어떻게 나타나는지는 구매 후 리포트에 있습니다.{" "}
                 <Link href={ctaHref} className={cta}>
                   보기
                 </Link>

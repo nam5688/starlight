@@ -84,5 +84,27 @@ export function buildChatContext(model: TalkModel, roomId: RoomId, opts: ChatCon
     },
     followUp: Boolean(opts.followUp),
     taste: model.tier === "free",
+    profile: model.tier === "free" && model.tasteProfile ? profileContext(model.tasteProfile, plain) : null,
   };
+}
+
+/** 근거 종류별 문구의 글자 수 한도 — 입력이 길어져 비용이 커지지 않게(무료 미리보기가 이미 보여 주는 짧은 문구라 보통 한도 안이다) */
+export const PROFILE_TEXT_MAX = 1400;
+
+function profileContext(p: NonNullable<TalkModel["tasteProfile"]>, plain: (s: string) => string): NonNullable<ChatContext["profile"]> {
+  let used = 0;
+  const take = (v: string[]) => {
+    const out: string[] = [];
+    for (const raw of v) {
+      const t = plain(raw);
+      if (used + t.length > PROFILE_TEXT_MAX) break;
+      out.push(t);
+      used += t.length;
+    }
+    return out;
+  };
+  // 응답에서 읽은 점을 먼저 담아 한도에 닿아도 두 종류가 모두 남게 한다(사주 문구가 길어도 응답 문구가 밀려나지 않는다)
+  const response = take(p.response);
+  const saju = take(p.saju);
+  return { saju, response };
 }

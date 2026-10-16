@@ -4,7 +4,8 @@ import test from "node:test";
 import { SAMPLE_CHART } from "../../samples/sample-report.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
 import { TALK_COPY } from "./talk.ts";
-import { codeTopicsFor, TALK_ASK_MARRIAGE, TALK_ASK_PARTNER } from "./talk-code.ts";
+import { dayReading } from "../../saju/interpret/day-plain.ts";
+import { codeTopicsFor, dailyParagraphs, TALK_ASK_MARRIAGE, TALK_ASK_PARTNER } from "./talk-code.ts";
 import { buildTalkModel } from "./talk.ts";
 
 const TODAY = { year: 2026, month: 10, day: 15 };
@@ -76,4 +77,34 @@ test("오늘의 한 장 무료 혜택을 끄면(DAILY_FREE) 무료 맛보기에�
   const paid = codeTopicsFor({ saju: SAMPLE_CHART, today: TODAY, calendar: cal, tier: "paid", dailyFree: false }).find((t) => t.id === "daily")!;
   assert.equal(paid.locked, undefined);
   assert.ok(paid.summary.length > 0);
+});
+
+test("오늘의 한 장 풀이: 한 줄이 아니라 사주 풀이 → 응답에서 읽은 평소 모습과 만나는 지점 → 조심해 볼 점 → 좋아지는 부분으로 200자 이상 이어지고, 쉬운 말이다 (운영자 2026-10-16)", () => {
+  if (SAMPLE_CHART.status !== "ok") throw new Error("샘플 원국");
+  const d = dayReading(SAMPLE_CHART, TODAY);
+  const withP = dailyParagraphs(d, { strength: "신중하게 끝까지 이어가는 힘", caution: "완벽해질 때까지 시작이 늦어짐" });
+  assert.ok(withP.join("").length >= 200, `${withP.join("").length}자`);
+  assert.ok(withP.some((p) => p.includes("'신중하게 끝까지 이어가는 힘'") && p.includes("'완벽해질 때까지 시작이 늦어짐'이에요") && p.includes(d.trait)), "응답에서 읽은 평소 모습과 오늘의 분위기가 만나는 문단");
+  assert.ok(withP.includes(d.careful) && withP.includes(d.good), "조심해 볼 점과 좋아지는 부분이 하나씩");
+  // 응답에서 읽은 문구가 없으면 지어내지 않고 그 문단만 빠진다 (그래도 사주 풀이 + 조심 + 좋아지는 부분이 있다)
+  const none = dailyParagraphs(d, undefined);
+  assert.ok(!none.some((p) => p.includes("내 응답에서 읽은 평소 모습")) && none.includes(d.careful) && none.includes(d.good));
+  // 한쪽만 있어도 말이 되고, 받침에 따라 이에요 · 예요가 맞는다
+  assert.ok(dailyParagraphs(d, { strength: "다듬어서 내놓는 힘", caution: null }).some((p) => p.includes("강한 쪽은 '다듬어서 내놓는 힘'이에요.")));
+  assert.ok(dailyParagraphs(d, { strength: null, caution: "반응이 궁금해지는 마음" }).some((p) => p.includes("'반응이 궁금해지는 마음'이에요.")));
+  assert.ok(dailyParagraphs(d, { strength: "조용한 편안함", caution: null }).some((p) => p.includes("'조용한 편안함'이에요.")) === true);
+  assert.ok(dailyParagraphs(d, { strength: "꼼꼼한 마무리", caution: "너무 서두르기" }).some((p) => p.includes("'너무 서두르기'예요.")));
+  // 사주 용어 · 점수 · 길흉 · 예언이 본문에 없다
+  for (const t of withP) {
+    assert.doesNotMatch(t, /일간|일지|십신|관성|재성|인성|식상|비겁|천간|지지|일진|\d+점|\d+%|대길|흉|운이 좋|운이 나|반드시/, t);
+  }
+});
+
+test("오늘의 한 장: 풀이는 방의 근거에서 길게 보이고(무료 맛보기 · 구매한 리포트 모두), 안내는 한 줄이다", () => {
+  for (const tier of ["free", "paid"] as const) {
+    const t = codeTopicsFor({ saju: SAMPLE_CHART, today: TODAY, calendar: undefined, tier, dailyFree: true, personality: { strength: "다듬어서 내놓는 힘", caution: "반응이 궁금해지는 마음" } }).find((x) => x.id === "daily")!;
+    assert.ok(t.summary.join("").length >= 200, `${tier}: 풀이 ${t.summary.join("").length}자`);
+    assert.ok(t.caveat!.startsWith("전통 해석에 기반한 참고용 이야기예요.") && t.caveat!.length < 130, `${tier}: 안내는 짧다`);
+    assert.ok(!/100% 정확하거나|좋고 나쁜 날을 가르는/.test(t.caveat!), "길던 안내 문구는 없다");
+  }
 });

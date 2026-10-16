@@ -4,7 +4,7 @@
 // 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다).
 import { DAILY_FREE, PARTNER_AGE_DIRECTION } from "../../config/product.ts";
 import type { SajuResult } from "../../saju/engine.ts";
-import { DAY_AREAS, DAY_NOTES, dayReading, type DayArea } from "../../saju/interpret/day-plain.ts";
+import { DAY_AREAS, DAY_NOTES, dayReading, type DayArea, type DayReading } from "../../saju/interpret/day-plain.ts";
 import { monthsAtLevel, MONTH_NOTES, type MonthCalendar } from "../../saju/interpret/months.ts";
 import { PARTNER_NOTES, partnerBasis, partnerReading } from "../../saju/interpret/partner.ts";
 import type { TalkBubble, TalkPiece, TalkTopic } from "./talk.ts";
@@ -18,7 +18,34 @@ export type CodeTopicInput = {
   dailyFree?: boolean;
   /** 인연의 경향에서 나이 차의 큰 방향을 보여 줄지 (없으면 lib/config/product.ts의 PARTNER_AGE_DIRECTION) */
   ageDirection?: boolean;
+  /**
+   * 오늘의 한 장에서 사주 풀이와 겹쳐 읽을 "응답에서 읽은 평소 모습" — 리포트(또는 무료 미리보기)가 이미 보여 주는 짧은 문구(강한 쪽 · 힘들 수 있는 쪽)다. 없으면 겹쳐 읽는 문단은 빼고 사주 풀이만 쓴다.
+   */
+  personality?: { strength: string | null; caution: string | null };
 };
+
+/** 마지막 글자의 받침에 따라 "이에요 · 예요" — 문구는 응답에서 읽은 짧은 말이라 끝 글자가 제각각이다 */
+const copula = (s: string) => {
+  const c = s.trim().charCodeAt(s.trim().length - 1);
+  return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0 ? "이에요" : "예요";
+};
+
+/**
+ * 오늘의 한 장 풀이 문단(운영자 2026-10-16: 한 줄이 아니라 사주에서 어떤지 → 평소 모습과 만나는 지점 → 조심해 볼 점 → 좋아지는 부분) — 고정 문구와 계산 결과로만 만든다.
+ * 응답에서 읽은 평소 모습이 있으면 그 문구를 그대로 인용하고, 없으면 그 문단은 만들지 않는다(없는 성향을 지어내지 않는다).
+ */
+export function dailyParagraphs(d: DayReading, personality?: CodeTopicInput["personality"]): string[] {
+  const strength = personality?.strength?.trim() || null;
+  const caution = personality?.caution?.trim() || null;
+  const out = [d.meaning];
+  if (d.relation) out.push(d.relation.line);
+  if (strength || caution) {
+    const who = strength && caution ? `강한 쪽은 '${strength}', 힘들 수 있는 쪽은 '${caution}'${copula(caution)}.` : strength ? `강한 쪽은 '${strength}'${copula(strength)}.` : `힘들 수 있는 쪽은 '${caution!}'${copula(caution!)}.`;
+    out.push(`내 응답에서 읽은 평소 모습을 보면, ${who} ${d.trait}`);
+  }
+  out.push(d.careful, d.good);
+  return out;
+}
 
 const para = (text: string, label?: string): TalkPiece => ({ kind: "para", text, ...(label ? { label } : {}) });
 const note = (text: string): TalkPiece => ({ kind: "note", text });
@@ -53,7 +80,7 @@ export function codeTopicsFor(input: CodeTopicInput): TalkTopic[] {
       chip: "오늘의 한 장",
       title: "오늘의 한 장",
       headline: `오늘은 ${d.title}이에요`,
-      summary: [d.meaning, ...(d.relation ? [d.relation.line] : [])],
+      summary: dailyParagraphs(d, input.personality),
       caveat: `${DAY_NOTES.limit}${d.dayUncertain ? ` ${DAY_NOTES.uncertain}` : ""}`,
       example: [],
       detail: [],
