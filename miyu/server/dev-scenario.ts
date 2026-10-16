@@ -159,7 +159,7 @@ async function liveResult(input: LabInput): Promise<LabResult> {
       if (errs.length === 0) lastOk = d;
       return errs;
     },
-  });
+  }, "reading-v1"); // 장면 질문 테스트 화면은 이전 읽기 구조(reading-v1)의 근거 바꿔 끼우기 · 응답 사용 검사를 쓴다 — 새 리포트 기본 형식(story-v1)과 따로 둔다
   let report: IntegratedReadingReport | null = null;
   let error: string | null = null;
   try {

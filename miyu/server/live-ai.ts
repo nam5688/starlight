@@ -1,4 +1,5 @@
 import "server-only";
+import { REPORT_GENERATION } from "@/lib/config/product";
 import { createAnthropicModel } from "@/lib/integrations/ai/providers";
 import { createSupabaseRepository } from "@/lib/integrations/supabase/repository";
 import type { TextModel } from "@/lib/report/ai/model";
@@ -40,11 +41,11 @@ export function approvedLiveModel(raw: TextModel, cfg: Approved): TextModel {
 }
 
 /** 리포트 생성기 (AI_PROVIDER=anthropic) — 비교 실행에서 통과한 설정(읽기 구조 · 반복 고쳐 쓰기)과 같게 만든다. 내용 차이 검사는 보고만 한다(enforceDepth 끔) */
-export function liveReportGenerator(ai: Extract<AiConfig, { kind: "anthropic" }>, extras: Pick<AiGeneratorOptions, "adaptEvidence" | "extraChecks"> = {}): ReportGenerator {
+export function liveReportGenerator(ai: Extract<AiConfig, { kind: "anthropic" }>, extras: Pick<AiGeneratorOptions, "adaptEvidence" | "extraChecks"> = {}, format: "reading-v1" | "story-v1" = REPORT_GENERATION.format): ReportGenerator {
   const raw = createAnthropicModel({ apiKey: ai.apiKey, model: ai.model, effort: REPORT_AI_LIMITS.effort, timeoutMs: REPORT_AI_LIMITS.callTimeoutMs, ...(ai.baseUrl ? { baseUrl: ai.baseUrl } : {}) });
   return createAiReportGenerator({
     model: approvedLiveModel(raw, ai),
-    format: "reading-v1",
+    format,
     maxOutputTokens: REPORT_AI_LIMITS.maxOutputTokens,
     callTimeoutMs: REPORT_AI_LIMITS.callTimeoutMs,
     repairRepeats: true,

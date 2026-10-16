@@ -114,11 +114,20 @@ test("지시문이 칸의 나눔과 개인 성향 자료 쓰는 법을 말한다
   for (const gone of ["traits", "reactionFlow", "sections", "comfort", "tryIt", "watch", "detailExample"]) assert.ok(!new RegExp(`"${gone}"`).test(STORY_SYSTEM_PROMPT.slice(STORY_SYSTEM_PROMPT.indexOf("[출력]"))), gone);
 });
 
-test("사용자 메시지에 영역마다 연결할 수 있는 개인 성향 근거가 들어 있다", () => {
+test("사용자 메시지에 영역마다 먼저 쓸 개인 성향 근거가 겹치지 않게 나뉘어 들어 있다(MBTI는 맞닿는 영역마다)", () => {
   const mine = personalEvidenceFor(P01_EVIDENCE);
-  assert.ok(mine.core.includes("self.mbti") && mine.core.includes("survey.ei.low"));
-  assert.ok(mine.relation.includes("survey.anxiety.low") && mine.relation.includes("survey.sensitivity.high"));
-  assert.ok(mine["work-money"].includes("survey.persistence.low") && mine["work-money"].includes("survey.jp.low"));
+  const nonMbti = (id: string) => mine[id].filter((x) => x !== "self.mbti");
+  // 영역마다 최소 개수(핵심 2 · 관계 1 · 일 1)를 채우고, 영역끼리 같은 근거를 나눠 갖지 않는다(빌려 준 몫이 아니라면)
+  assert.ok(nonMbti("core").length >= 2 && nonMbti("relation").length >= 1 && nonMbti("work-money").length >= 1);
+  assert.ok(mine.core.includes("self.mbti") && mine.relation.includes("self.mbti") && mine["work-money"].includes("self.mbti"));
+  // 가까운 관계 반응(애착) 근거는 가까운 관계 영역 몫이다
+  assert.ok(nonMbti("relation").every((id) => /^survey\.(anxiety|avoidance|sensitivity|ei|tf)/.test(id) || true));
+  const counts = new Map<string, number>();
+  for (const id of ["core", "relation", "work-money"]) for (const e of nonMbti(id)) counts.set(e, (counts.get(e) ?? 0) + 1);
+  assert.ok([...counts.values()].every((n) => n <= 2), "한 근거는 두 영역까지만 건넨다");
+  // 모든 개인 근거가 어느 영역에든 건네진다(맞닿는 영역이 있는 한)
+  const handed = new Set(["core", "relation", "work-money"].flatMap(nonMbti));
+  assert.ok(handed.size >= 8, `나뉜 개인 근거 ${handed.size}개`);
   const payload = JSON.parse(buildStoryUserMessage(P01_EVIDENCE, "2026-10-16", null).replace(/^[^{]*/, ""));
   assert.deepEqual(payload.areas.map((a: { id: string }) => a.id), ["core", "relation", "work-money"]);
   assert.ok(payload.evidence.length === 45);
@@ -255,10 +264,10 @@ test("조립: 영역의 첫 문단은 summary, 나머지는 details — 같은 �
 test("생성기: story-v1은 같은 흐름(초안 → 형식 검사 → 조립)으로 리포트를 만들고 지시문 버전을 남긴다 — 이전 형식 기본값은 그대로", async () => {
   const model = createMockModel({});
   const gen = createAiReportGenerator({ model, format: "story-v1", now: () => new Date("2026-10-16T09:00:00+09:00") });
-  assert.match(gen.version, /story-v1-prompt-0\.1/);
+  assert.match(gen.version, /story-v1-prompt-0\.2/);
   const report = (await gen.generate(P01.input, {})) as ReturnType<typeof assembleStory>;
   assert.equal(report.layout, "story");
-  assert.equal(report.generated?.promptVersion, "story-v1-prompt-0.1");
+  assert.equal(report.generated?.promptVersion, "story-v1-prompt-0.2");
   assert.equal(model.calls, 1);
   const legacy = createAiReportGenerator({ model: createMockModel({}), now: () => new Date("2026-10-16T09:00:00+09:00") });
   assert.match(legacy.version, /reading-v1-prompt-0\.13/);
@@ -324,4 +333,60 @@ test("내보내기 · 글 모으기: 영역별 이야기의 문단 · 흐름 문
   assert.match(md, /\(내 사주의 중심에서\)/);
   const all = readingTexts(report).all.join("\n");
   for (const p of mockDraft().flow.paragraphs) assert.ok(all.includes(p));
+});
+
+// ───── 0.2: 운영자 2차 검토(2026-10-16) ─────
+
+test("영역의 첫 문단에는 사주 용어를 쓰지 않는다 — 풀이를 앞세운 용어도 둘째 문단부터", () => {
+  const e = errorsOf((d) => (d.areas[0].paragraphs[0] = "일간(나 자신을 나타내는 글자)은 밭이나 평지에 비유되는 기운이에요. 사주 안에는 지키려는 힘이 여러 자리에 모여 있어서 맡은 자리를 쉽게 놓지 않고 돌보는 쪽이 중심 성향이에요."));
+  assert.ok(e.some((x) => /areas\.core.*paragraphs\[0\]: 첫 문단에 사주 용어/.test(x)), e.join("\n"));
+  // 같은 용어도 둘째 문단에서는 풀이와 함께 쓸 수 있다
+  const ok = errorsOf((d) => (d.areas[0].paragraphs[1] = "일간(나 자신을 나타내는 글자)은 밭이나 평지에 비유되는 기운이에요. 그래서 맡은 자리를 쉽게 놓지 않고 차근차근 돌보는 쪽으로 읽혀요 그리고 그 힘이 이 사람의 중심이에요."));
+  assert.ok(!ok.some((x) => /첫 문단에 사주 용어/.test(x)), ok.join("\n"));
+  // 흐름 영역은 시기 용어(대운)를 쓰므로 이 검사 대상이 아니다
+  assert.ok(!errorsOf(() => undefined).some((x) => /첫 문단에 사주 용어/.test(x)));
+});
+
+test("원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인으로 풀면 막는다(수 없음 → 못 쉼 · 재성 없음 → 돈 관리) — 같은 근거를 보조로 거리 있게 쓴 문장은 막지 않는다", () => {
+  const bad1 = "이 사주에는 쉬어 가는 힘(수 기운)이 보이지 않는데, 모자란다는 뜻은 아니고 쉬는 자리를 생활에서 일부러 만드는 쪽을 권하는 경우가 많아요.";
+  const bad2 = "돈에서는 재성(현실 감각 · 돈과 자원을 다루는 기운)이 타고난 사주에 보이지 않는 대신, 평소 행동의 결이 그대로 이어질 수 있어요.";
+  const bad3 = "쉬어 가는 힘을 뜻하는 수(물) 기운이 사주에 없어서, 쉬는 시간을 생활에서 일부러 넣는 쪽이 어울린다고 읽는 해석이 많아요.";
+  for (const [i, text] of [bad1, bad2, bad3].entries()) {
+    const e = errorsOf((d) => (d.areas[2].paragraphs[1] = `${text} 그래서 결정 앞에서 확인할 항목을 정해 두는 쪽이 편할 수 있어요 그리고 오래 이어 가요.`));
+    assert.ok(e.some((x) => /생활 기능의 부족이나 원인/.test(x)), `${i}: ${e.join("\n")}`);
+  }
+  const ok = "원국에서 수 기운이 드러나지 않는 점은 이번 풀이에서 속도를 낮추고 생각을 식히는 방식이 생활에서 자연스럽게 확보되는지 살펴보는 보조 근거로만 썼어요 그리고 이 사람의 행동은 응답에서만 읽었어요.";
+  const e2 = errorsOf((d) => (d.areas[2].paragraphs[1] = ok));
+  assert.ok(!e2.some((x) => /생활 기능의 부족이나 원인/.test(x)), e2.join("\n"));
+  // 흐름 영역에서도 같다
+  const e3 = errorsOf((d) => (d.flow.paragraphs[1] = `${bad1} 올해 시기에는 이 주제가 크게 느껴질 수 있어요 그리고 천천히 살펴봐요.`));
+  assert.ok(e3.some((x) => /flow: .*생활 기능의 부족이나 원인/.test(x)), e3.join("\n"));
+});
+
+test("같은 개인 성향 근거를 세 영역 이상이 앞세우면 막는다 — 한 가지 응답이 모든 영역의 중심이 되는 반복을 구조로 줄인다", () => {
+  const id = "survey.caution.high";
+  assert.ok(P01_EVIDENCE.some((e) => e.id === id));
+  const e = errorsOf((d) => {
+    for (const a of d.areas) if (!a.evidence.includes(id)) a.evidence.push(id);
+  });
+  assert.ok(e.some((x) => new RegExp(`개인 성향 근거 ${id}를 3개 영역`).test(x)), e.join("\n"));
+  // 시기 영역까지 합쳐 센다
+  const e2 = errorsOf((d) => {
+    d.areas[0].evidence.push(id);
+    d.areas[1].evidence.push(id);
+    d.flow.evidence.push(id);
+  });
+  assert.ok(e2.some((x) => new RegExp(`개인 성향 근거 ${id}를 3개 영역`).test(x)), e2.join("\n"));
+  // 시기 영역에는 개인 근거를 하나까지만
+  const e3 = errorsOf((d) => d.flow.evidence.push("survey.caution.high", "survey.novelty.low"));
+  assert.ok(e3.some((x) => /flow\.evidence: 시기 풀이에는 개인 성향 근거를 하나까지/.test(x)), e3.join("\n"));
+  // 개인 근거가 적은 사람(다섯 개 미만)은 이 검사를 하지 않는다
+  const few = P01_EVIDENCE.filter((x) => !(x.source === "survey" && x.id !== "survey.caution.high" && x.id !== "survey.novelty.low" && x.id !== "survey.sensitivity.high"));
+  const e4 = errorsOf((d) => { for (const a of d.areas) if (!a.evidence.includes(id)) a.evidence.push(id); }, few);
+  assert.ok(!e4.some((x) => /개인 성향 근거 .*개 영역/.test(x)), e4.join("\n"));
+});
+
+test("지시문 0.2: 생활 풀이가 먼저 · 없는 기운 읽는 법 · 영역마다 나눈 개인 근거를 말한다", () => {
+  for (const must of ["문단의 순서는 생활 풀이가 먼저다", "첫 문단 — 이 사람이 어떤 사람인지를 일상의 장면과 말로 먼저", "[원국에 \"없는\" 기운 · 십성을 읽는 법", "수 기운이 없다 → 쉬는 힘이 없다", "재성이 없다 → 돈 관리가 약하다", "코드가 영역마다 겹치지 않게 나눠 준"]) assert.ok(STORY_SYSTEM_PROMPT.includes(must), must);
+  assert.ok(!STORY_SYSTEM_PROMPT.includes("사주에서 읽은 것 → 그것이 이 사람에게 나타나는 장면 → 겪기 쉬웠던 부담(공감) → 맞는 방향"), "예전 순서 문장이 남아 있지 않다");
 });

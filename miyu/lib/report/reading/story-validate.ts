@@ -1,10 +1,11 @@
 // 영역별 이야기(story-v1, AI 초안)의 형식 검사 — 근거 ID · 글자와 문장 수 · 영역마다 개인 성향 근거 연결 · MBTI 쓰임 · 시기 이야기는 흐름에만 · 행동은 마지막에만 · 쉬운 말 · 금지 표현 · 반복.
 // 이전 읽기 구조(validate.ts)와 같은 글 규칙(textIssues)을 쓰고, 달라진 구조에 맞는 확인만 더한다. 예시(sample-story-report.ts)가 이 검사를 그대로 통과해야 한다.
+// 0.2(운영자 2차 검토 2026-10-16): 영역의 첫 문단은 사주 용어 없이 이 사람의 모습부터 · 없는 기운/십성을 생활 기능의 부족이나 원인으로 풀지 않기 · 같은 개인 성향 근거를 세 영역 이상이 앞세우지 않기를 더했다.
 // 한계: 낱말 · 길이 · 표지를 세는 검사다. 같은 결론을 말만 바꿔 되풀이하는 것(구조 반복)은 이 검사가 아니라 칸의 나눔(영역마다 하나의 연결)과 사람이 읽는 평가가 본다.
 import type { Evidence } from "../evidence.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
 import { READING_LIMITS as L, TERM_LIMITS } from "./plan.ts";
-import { FORMULA_BUDGET, MBTI_AREAS, PERIOD_TALK, STORY_AREAS, STORY_FLOW_TOPIC, STORY_LIMITS as S, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
+import { ABSENCE_MAPPING, FIRST_PARAGRAPH_TERMS_MAX, FORMULA_BUDGET, MBTI_AREAS, PERIOD_TALK, PERSONAL_REUSE, STORY_AREAS, STORY_FLOW_TOPIC, STORY_LIMITS as S, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
 import { distinctTerms } from "./terms.ts";
 import type { StoryDraftV1 } from "./types.ts";
 import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./validate.ts";
@@ -93,6 +94,17 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
     if (n > TASK_PER_AREA_MAX) errors.push(`${where}: "~해 보세요" 같은 행동 과제 문장이 ${n}개 — 영역 본문에는 ${TASK_PER_AREA_MAX}개까지만 두고 구체적인 실천은 마지막 actions에 모으세요.`);
   };
 
+  // 없는 기운 · 십성을 생활 기능의 부족이나 원인으로 풀지 않는다 — 한 문장에 이름 + 없음 + (기능어 또는 인과 연결)이 함께 있으면 막는다
+  const absenceIssues = (paragraphs: unknown[], where: string) => {
+    for (const p of paragraphs.filter(isString)) {
+      for (const sentence of p.split(/(?<=[.!?])\s+/)) {
+        if (!ABSENCE_MAPPING.kind.test(sentence) || !ABSENCE_MAPPING.absent.test(sentence)) continue;
+        const hit = ABSENCE_MAPPING.gloss.exec(sentence) ?? ABSENCE_MAPPING.causal.exec(sentence);
+        if (hit) errors.push(`${where}: "${sentence.slice(0, 40)}…" — 원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인("${hit[0]}")으로 풀지 않습니다. 근거는 "전통 해석에서 생활에서 채우라고 권하는 경우가 많다 · 시기에 그 주제가 크게 느껴질 수 있다"까지만 말하고, 이 사람의 행동은 응답 근거로 쓰세요.`);
+      }
+    }
+  };
+
   // 핵심 문장 · 첫 화면 카드 — 공유용 카드 이미지에 그대로 실리므로 이름을 쓰지 않는다
   text(d.headline, "headline", L.headline.min, L.headline.max);
   for (const [k, label] of [["strength", "내가 강한 포인트"], ["caution", "내가 힘들 수 있는 포인트"], ["flow", "지금 나의 시기"]] as const) {
@@ -124,6 +136,12 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
     const lim = S.paragraphs[plan.id];
     const paragraphs = list<string>(a.paragraphs, `${w}.paragraphs`, lim.min, lim.max);
     paragraphs.forEach((t, i) => paragraph(t, `${w}.paragraphs[${i}]`));
+    // 첫 문단은 이 사람이 어떤 사람인지 일상의 말로 — 사주 용어는 둘째 문단부터(고객은 첫 장부터 용어를 배우러 온 것이 아니다)
+    if (isString(paragraphs[0])) {
+      const firstTerms = distinctTerms(paragraphs[0]);
+      if (firstTerms.length > FIRST_PARAGRAPH_TERMS_MAX) errors.push(`${w}.paragraphs[0]: 첫 문단에 사주 용어(${firstTerms.join(" · ")})를 쓰지 않습니다 — 이 사람이 어떤 사람인지를 일상의 말로 먼저 쓰고, 그렇게 읽은 이유(사주)는 둘째 문단부터 쓰세요.`);
+    }
+    absenceIssues(paragraphs, w);
     if (isString(a.headline) && paragraphs.some((t) => isString(t) && t.includes(a.headline.trim()))) errors.push(`${w}: 문단이 제목을 그대로 되풀이합니다 — 제목은 본문을 다 쓴 뒤의 결론이고 문단은 그 연결을 풀어 쓰는 글입니다.`);
     tasks(paragraphs, w);
     for (const t of paragraphs) if (isString(t) && PERIOD_TALK.test(t)) errors.push(`${w}: 시기 이야기("${PERIOD_TALK.exec(t)![0]}")는 "${STORY_FLOW_TOPIC}" 영역에만 씁니다 — 이 영역에서는 시기를 말하지 않고, 같은 이야기를 두 번 풀지 않습니다.`);
@@ -138,6 +156,15 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
       mbtiAreas++;
       if (!paragraphs.some((t) => isString(t) && MBTI_MENTION.test(t))) errors.push(`${w}: 입력한 MBTI 근거를 달았는데 본문에서 쓰지 않았습니다 — "입력해 주신 성향까지 함께 보면 ~"처럼 이 영역의 장면을 구체화하는 데 쓰거나 근거에서 빼세요.`);
     }
+  }
+  // 같은 개인 성향 근거(MBTI 제외)를 세 영역 이상이 앞세우지 않는다 — 한 가지 응답이 모든 영역을 끌고 가면 글 전체가 한 모티프의 되풀이가 된다
+  const nonMbti = personal.filter((e) => e.id !== "self.mbti");
+  if (nonMbti.length >= PERSONAL_REUSE.minPoolToCheck) {
+    const usedIn = new Map<string, string[]>();
+    const addUse = (id: string, area: string) => usedIn.set(id, [...new Set([...(usedIn.get(id) ?? []), area])]);
+    for (const a of areas) if (a && isIds(a.evidence)) for (const id of a.evidence) if (nonMbti.some((e) => e.id === id)) addUse(id, a.id);
+    if (d.flow && isIds(d.flow.evidence)) for (const id of d.flow.evidence) if (nonMbti.some((e) => e.id === id)) addUse(id, "flow");
+    for (const [id, where] of usedIn) if (where.length > PERSONAL_REUSE.maxAreas) errors.push(`areas: 개인 성향 근거 ${id}를 ${where.length}개 영역(${where.join(" · ")})이 앞세웠습니다 — 같은 응답이 모든 영역을 끌고 가면 글이 한 가지 모티프의 되풀이가 됩니다. ${PERSONAL_REUSE.maxAreas}개 영역까지만 쓰고, 나머지 영역은 그 영역에 맞닿는 다른 근거에서 출발하세요(사용자 메시지 areas[].personalEvidence가 영역마다 나눠 준 것).`);
   }
   if (mbtiAvailable && mbtiAreas < MBTI_AREAS.min) errors.push(`areas: 입력한 MBTI(self.mbti)를 핵심 · 가까운 관계 · 일과 재물 영역 가운데 ${MBTI_AREAS.min}곳 이상에 연결해 주세요 (지금 ${mbtiAreas}곳). 맞닿는 곳에서 한 영역에 한 번, 알파벳 글자 없이 "입력해 주신 성향"으로.`);
 
@@ -156,6 +183,7 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
     const fp = list<string>(f.paragraphs, "flow.paragraphs", S.paragraphs.flow.min, S.paragraphs.flow.max);
     fp.forEach((t, i) => paragraph(t, `flow.paragraphs[${i}]`));
     tasks(fp, "flow");
+    absenceIssues(fp, "flow");
     list<{ year: string; theme: string }>(f.years, "flow.years", refs.length ? S.flow.years.min : 0, S.flow.years.max).forEach((y, i) => {
       // "2026"과 "2026년"을 모두 받는다(조립할 때 숫자 네 자리로 맞춘다) — 대리 작성기 두 건이 "2026년"으로 써서 해는 맞는데 형식만으로 걸렸다
       if (!isString(y?.year) || !years.has(y.year.replace(/\s*년$/, ""))) errors.push(`flow.years[${i}]: 계산된 해가 아닙니다 (${y?.year}). ${[...years].join(" · ") || "계산된 해 없음"}만 쓸 수 있습니다.`);
@@ -167,6 +195,8 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
       if (isString(s?.then) && !/수 있(?:습니다|어요|죠)|수도 있(?:습니다|어요|죠)|일 수|가능성/.test(s.then)) errors.push(`flow.scenarios[${i}].then: 확률이 아닌 가능성으로 써 주세요 ("~할 수 있어요").`);
     });
     ids(f.evidence, "flow.evidence", { needSaju: true, period: refs.length > 0 });
+    const flowPersonal = isIds(f.evidence) ? f.evidence.filter((id) => personal.some((e) => e.id === id && id !== "self.mbti")) : [];
+    if (flowPersonal.length > 1) errors.push(`flow.evidence: 시기 풀이에는 개인 성향 근거를 하나까지만 연결합니다(지금 ${flowPersonal.length}개: ${flowPersonal.join(" · ")}) — 시기는 거의 사주만으로 쓰고, 이 사람이 시기를 받아들이는 모습 한 군데에만 씁니다.`);
     if (isIds(f.evidence) && f.evidence.includes("self.mbti")) errors.push('flow.evidence: 입력한 MBTI는 시기 풀이에 쓰지 않습니다(시기나 운 때문에 성향이 바뀐다고 읽히지 않게).');
   }
 

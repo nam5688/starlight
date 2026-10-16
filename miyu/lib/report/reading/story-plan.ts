@@ -18,6 +18,8 @@ export type StoryAreaPlan = {
   sources: string;
   /** 이 영역과 맞닿는 개인 성향 근거(evidence의 topics) — 하나 이상 연결해야 한다 */
   personalTopics: Topic[];
+  /** 개인 근거를 영역마다 나눠 건넬 때 이 영역이 먼저 가져가는 근거 ID 모양 — `sources` 문장과 같은 뜻이다(핵심 · 일은 평소 행동 방식 · 기질, 가까운 관계는 관계 반응 · 타인 반응 민감도) */
+  prefer: RegExp;
   /** 개인 성향 근거를 몇 개 이상 연결해야 하는가 (근거가 그만큼 있을 때) */
   personalMin: number;
 };
@@ -31,6 +33,7 @@ export const STORY_AREAS: StoryAreaPlan[] = [
     ask: "이 사주의 중심 성향이 이 사람에게는 어떤 모습으로 나타나는가를 한 흐름으로 — 잘해 왔을 부분 · 그 힘이 부담으로 바뀌는 장면 · 그때 맞는 방향. 강점과 부담, 부딪힘과 회복은 따로 나누지 않고 하나의 이야기로 잇는다",
     sources: "사주(원국 · 십신 · 월령 · 통근 · 강약 후보) + 평소 행동 방식 네 가지 + 기질 + 입력한 MBTI(선호 방향의 구체화)",
     personalTopics: ["personality"],
+    prefer: /^survey\.(ei|sn|tf|jp|novelty|caution|persistence)\./,
     personalMin: 2,
   },
   {
@@ -41,6 +44,7 @@ export const STORY_AREAS: StoryAreaPlan[] = [
     ask: "가까운 사람 앞에서 마음을 주고 표현하는 방식, 거리와 속도를 조절하는 방식, 서운하거나 부딪혔을 때 풀어 가는 방식이 어떻게 이어지는가, 그리고 편안한 관계의 조건. 상대 자료는 없으므로 상대 없이 본다(상대의 마음 · 나이 · 직업 · 만날 날짜는 쓰지 않는다). 오래 가는 관계 · 결혼생활에서 중요해질 조건은 쓸 수 있다(결혼을 하게 된다 · 언제 한다는 예언만 쓰지 않는다)",
     sources: "사주(배우자 자리 · 합 · 충 · 관계 십신) + 가까운 관계 반응(관계 불안 · 거리 두기) + 타인 반응 민감도 + 입력한 MBTI(표현의 속도 · 방식)",
     personalTopics: ["love", "relationship", "marriage"],
+    prefer: /^survey\.(anxiety|avoidance|sensitivity)\./,
     personalMin: 1,
   },
   {
@@ -51,6 +55,7 @@ export const STORY_AREAS: StoryAreaPlan[] = [
     ask: "이 사람의 힘이 잘 쓰이는 일의 조건(역할 · 권한 · 속도 · 협업 방식 · 평가받는 기준)과 막히는 조건, 그리고 돈을 대하는 모습. 직업 · 업종 이름을 추천하지 않는다. 재물 해석 근거가 목록에 있을 때만 돈을 풀고, 근거가 약하면 한 문단 안으로 짧게 쓰며 늘려 쓰지 않는다. 시기 이야기는 하지 않는다",
     sources: "사주(재성 · 관성 · 식상 분포와 조합) + 평소 행동 방식(정보 · 판단 · 생활) + 기질(새로움 · 신중함 · 지속성) + 입력한 MBTI(일을 납득하는 방식)",
     personalTopics: ["work", "money"],
+    prefer: /^survey\.(sn|tf|jp|novelty|caution|persistence)\./,
     personalMin: 1,
   },
 ];
@@ -95,7 +100,30 @@ export const FORMULA_BUDGET: { re: RegExp; max: number; label: string }[] = [
 /** 입력한 MBTI를 쓰는 영역 수 — 핵심 · 가까운 관계 · 일 가운데 둘 이상(시기에는 쓰지 않는다) */
 export const MBTI_AREAS = { min: 2 } as const;
 
-export const STORY_PROMPT_VERSION = "story-v1-prompt-0.1";
+export const STORY_PROMPT_VERSION = "story-v1-prompt-0.2";
 export const STORY_FORMAT = "story-v1";
+
+/**
+ * 없는 기운 · 십성을 생활 기능의 부족이나 원인으로 풀지 않는다(운영자 2차 검토 2026-10-16 — "수 없음 → 못 쉼 · 목 없음 → 시작 못 함" 같은 단순 풀이로 돌아가지 않게).
+ * 근거의 cue는 "전통 해석에서는 생활에서 의식적으로 채우는 쪽을 권하는 경우가 많다 · 결함이라는 뜻은 아니다"까지만 말한다. 한 문장에 ① 오행 · 십성 이름 ② 없음 표현 ③ (생활 기능어 또는 이어 주는 말)이 함께 있으면 막는다.
+ * 낱말로 센 어림이며, 말을 바꿔 쓴 단정은 못 잡는다 — 지시문과 사람이 읽는 평가가 함께 본다.
+ */
+export const ABSENCE_MAPPING = {
+  /** 오행 · 십성 이름 — "수 기운" · "수(물)" · 재성 · 식상 등 */
+  kind: /(?:[목화토금수]\s*(?:\([^)]*\))?\s*기운|[목화토금수]\([^)]*\)|비겁|식상|재성|관성|인성|비견|겁재|식신|상관|편재|정재|편관|정관|편인|정인)/,
+  /** 없음 표현 */
+  absent: /(?:없|보이지 않|드러나지 않|비어 있|부족)/,
+  /** 생활 기능어 — 오행 이름을 쉬는 힘 · 시작하는 힘 같은 기능으로 번역한 말 */
+  gloss: /(?:쉬어 가는 힘|쉬는 힘|쉬어 가는 일|쉬는 것이|시작하는 힘|결단하는 힘|정리하는 힘|돈 관리|돈복|재물복|서툴|못 쉬|쉬지 못|시작을 못|결정을 못|약해|약하)/,
+  /** 없음에서 이어지는 인과 · 보상 연결 */
+  causal: /(?:대신|그래서|그러니|때문에|탓에|덕분에|이라서|이어서|니까)/,
+} as const;
+
+/** 같은 개인 성향 근거(MBTI 제외)를 앞세울 수 있는 영역 수 — 한 가지 응답이 모든 영역을 끌고 가면 글이 한 모티프로 반복된다(운영자 2차 검토). 개인 근거가 이보다 적으면 이 검사는 하지 않는다 */
+export const PERSONAL_REUSE = { maxAreas: 2, minPoolToCheck: 5 } as const;
+
+/** 영역의 첫 문단은 이 사람이 어떤 사람인지 일상의 말로 먼저 — 사주 용어(풀이가 붙은 것도)는 둘째 문단부터 쓴다(운영자 2차 검토: 첫 장부터 일간 · 통근 · 월령을 공부하게 하지 않는다) */
+export const FIRST_PARAGRAPH_TERMS_MAX = 0;
+
 
 export const storyAreaPlan = (id: string): StoryAreaPlan | undefined => STORY_AREAS.find((a) => a.id === id);

@@ -11,3 +11,13 @@
 | `seoyun-round2-repaired.json` · `.md` | 같은 오류 한 줄을 알려 주고 그 문장만 고쳐 쓰게 한 글(제품의 고쳐 쓰기 한 번과 같은 절차) — 통과. `lib/samples/sample-story-draft.ts`의 출처 |
 
 검사가 글을 본 뒤에 고쳐진 곳(연도 표기 · 맺음 틀 예산 · "천간합" 오탐)은 사후 수정입니다. 측정과 읽고 알게 된 것은 `docs/story-structure-v1.md` 9장에 있습니다.
+
+## prompt-0.2 폴더 (2026-10-16 2차 — 지시문 `story-v1-prompt-0.2`)
+
+| 파일 | 내용 |
+| --- | --- |
+| `prompt-0.2/P01-first-response.json` | P01 첫 글 — 형식 검사 불통과(입력한 MBTI 근거를 달았지만 본문에서 쓰지 않음 · "정관"의 설명 방식) |
+| `prompt-0.2/P01-after-one-rewrite.json` · `.md` | 같은 오류를 알려 주고 한 번 고쳐 쓴 글(제품의 고쳐 쓰기 한 번과 같은 절차) — 통과. `.md`는 읽는 순서로 풀어 쓴 글 |
+| `prompt-0.2/seoyun-first-response.json` · `.md` | 서윤 첫 글 — 한 번에 통과. `lib/samples/sample-story-draft.ts`(개발용 `/dev/story`)가 이 글이다 |
+
+실제 서비스 AI의 글이 아니다. 측정과 한계는 `docs/story-structure-v1.md` 11장.

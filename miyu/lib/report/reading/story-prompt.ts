@@ -2,6 +2,8 @@
 // 그 지시문의 해당 부분을 그대로 가져다 쓰며, 칸의 나눔이 달라진 부분(리포트의 모양 · 영역마다 맡은 질문 · 개인 성향 자료를 쓰는 법 · 제목 · 구성과 분량 · 출력)만 새로 쓴다.
 // 이름 · 생년월일 원문은 보내지 않는다. 제목 위 이름표 · 접어 둔 "분석 근거" · 안전 안내 · 큰 흐름 타임라인 · 월별 달력은 AI가 쓰지 않는다 — 코드가 채운다(story-assemble.ts).
 //
+// 0.2(2026-10-16, 운영자 2차 검토): 영역의 문단 순서를 "이 사람의 모습(생활 풀이) → 그렇게 읽은 이유(사주) → 응답으로 나타나는 방식 → 부담 → 방향"으로 바꾸고 첫 문단에는 사주 용어를 쓰지 않는다 ·
+//   없는 기운 · 십성을 생활 기능의 부족이나 원인으로 풀지 않는다 · 같은 개인 성향 근거는 두 영역까지만(코드가 영역마다 나눠 건넨다).
 // 0.1(2026-10-16, 운영자 검토): 비교용 후보이며 확정본이 아니다. 실제 AI로는 아직 시험하지 못했다(대리 작성기로만).
 //   ① 칸 98개를 영역 4개로 — 영역마다 하나의 연결을 끝까지 쓴다. 행동은 마지막 세 가지에만, 시기는 흐름 영역에만.
 //   ② 성격 4축(평소 행동 방식)과 입력한 MBTI를 영역마다 적극 연결한다 — 사주 70 : 개인 성향 30은 근거 개수가 아니라 영역별 사용 규칙으로 맞춘다.
@@ -12,7 +14,7 @@ import { glossaryFor } from "../../saju/glossary.ts";
 import type { Evidence } from "../evidence.ts";
 import { READING_SYSTEM_PROMPT } from "./prompt.ts";
 import { READING_LIMITS as L, TERM_LIMITS } from "./plan.ts";
-import { FORMULA_BUDGET, STORY_ACTIONS_ASK, STORY_AREAS, STORY_FLOW_ASK, STORY_FLOW_SOURCES, STORY_FLOW_TOPIC, STORY_FOCUS_ASK, STORY_LIMITS as S, STORY_PROMPT_VERSION, TASK_PER_AREA_MAX } from "./story-plan.ts";
+import { FORMULA_BUDGET, PERSONAL_REUSE, STORY_ACTIONS_ASK, STORY_AREAS, STORY_FLOW_ASK, STORY_FLOW_SOURCES, STORY_FLOW_TOPIC, STORY_FOCUS_ASK, STORY_LIMITS as S, STORY_PROMPT_VERSION, TASK_PER_AREA_MAX } from "./story-plan.ts";
 import { periodRefs } from "./validate.ts";
 
 export { STORY_PROMPT_VERSION };
@@ -35,7 +37,8 @@ const INTRO = `너는 ME:U(미유)의 개인 통합 리포트 작성자다. 사�
 
 const SHAPE = `[리포트의 모양 — 칸을 채우지 않고, 영역마다 하나의 이야기를 끝까지 쓴다]
 - 이 리포트는 영역 넷(내 사주의 중심과 지나온 모습 · 가까운 관계에서의 나 · 일과 재물의 방향 · 현재와 앞으로의 흐름)이 각각 한 사람의 이야기로 이어지는 글이다. 영역마다 요약 · 예시 · 주의 · 행동을 따로 채우지 않는다. 문단은 필요한 만큼만 쓰고, 같은 말을 채우려고 문단을 늘리지 않는다.
-- 영역을 쓰기 전에 먼저 "이 영역에서만 말할 연결 하나"를 정한다. 근거 둘 이상을 겹쳐야 보이는 연결이다(약한 연결 "신중해서 시간이 걸려요" / 좋은 연결 "확인하는 시간이 길어질수록, 기다리는 쪽에게는 그 시간이 거리로 느껴질 수 있어요" — 다른 소재의 예, 따라 쓰지 않는다). 그 연결이 영역의 제목(headline)이 되고, 문단들은 그 연결을 이어서 풀어 쓴다: 사주에서 읽은 것 → 그것이 이 사람에게 나타나는 장면 → 겪기 쉬웠던 부담(공감) → 맞는 방향.
+- 영역을 쓰기 전에 먼저 "이 영역에서만 말할 연결 하나"를 정한다. 근거 둘 이상을 겹쳐야 보이는 연결이다(약한 연결 "신중해서 시간이 걸려요" / 좋은 연결 "확인하는 시간이 길어질수록, 기다리는 쪽에게는 그 시간이 거리로 느껴질 수 있어요" — 다른 소재의 예, 따라 쓰지 않는다). 그 연결이 영역의 제목(headline)이 되고, 문단들은 그 연결을 이어서 풀어 쓴다.
+- **문단의 순서는 생활 풀이가 먼저다**: ① 첫 문단 — 이 사람이 어떤 사람인지를 일상의 장면과 말로 먼저 쓴다(사주 용어 · 응답을 읽어 주는 말투 · 한자어 없이, 친구에게 "이 사람은 이런 사람이야" 하고 말해 주듯. 용어 풀이로 시작하지 않는다 — 검사가 첫 문단의 사주 용어를 막는다) → ② 그렇게 읽은 이유(사주) — 쉬운 말로 먼저 풀어 쓰고 용어는 꼭 필요할 때만 풀이를 앞세워 한 번 → ③ 응답과 입력해 주신 성향으로 이 사람에게 나타나는 방식 → ④ 겪기 쉬웠던 부담(공감) → ⑤ 맞는 방향. 문단 수가 적은 영역은 ②와 ③을 한 문단에 잇는다. 사주 설명서처럼 "용어 → 풀이 → 생활" 순서로 쓰지 않는다.
 - 영역끼리 결론이 겹치지 않는다. 한 영역에서 푼 연결은 다른 영역에서 다시 풀지 않는다 — 다른 영역에서는 그 영역에서만 새로 알 수 있는 연결을 쓴다. 맨 위 headline · cards · 영역 제목은 서로 다른 면을 말한다. 같은 뜻을 낱말만 바꿔 되풀이하지 않고, 같은 장면 · 같은 낱말은 한 영역에서만 자세히 쓴다.
 - 영역의 맺음을 같은 틀로 되풀이하지 않는다. "~쪽이 맞아 보여요. 그래도 ~라면 ~볼 때예요"를 네 영역이 모두 쓰면 글이 틀에 박힌다 — 방향은 영역마다 다른 모양(구분하는 기준 · 건넬 말 한 문장 · 먼저 확인할 질문 · 조건)으로 쓰고, "맞아 보여요"는 리포트 전체에서 ${FORMULA_BUDGET[0].max}번까지, "~볼 때예요"는 ${FORMULA_BUDGET[1].max}번까지만 쓴다(검사가 센다). "입력해 주신 성향까지 함께 보면" 같은 이음 문구도 영역마다 다른 말로 쓴다.
 - 한 가지 큰 연결(이 사람의 중심 연결)은 핵심 영역에서 풀고, 다른 영역에서는 그 연결을 한 문장 안으로만 되짚거나 되짚지 않는다. 같은 응답 근거(예: 신중함)를 여러 영역이 같은 표현으로("위험과 변수를 먼저 살피는") 쓰지 않는다 — 영역마다 그 근거가 그 영역에서 다르게 나타나는 모습을 쓴다. 고민(focus)과 행동(actions)도 앞 영역의 문장을 옮기지 않고 새 표현으로 쓴다.
@@ -52,7 +55,7 @@ ${STORY_AREAS.map((a) => `- ${a.id} (${a.topic}): ${a.ask}.\n  우선 참고: ${
 
 const PERSONAL = `[개인 성향 자료(응답 · 입력한 MBTI)를 쓰는 법 — 사주가 틀이고, 이 사람에게는 어떻게 나타나는지 구체화한다]
 - 근거 목록의 개인 성향 자료는 source가 survey(기질 · 평소 행동 방식 · 가까운 관계 반응)와 self(입력한 MBTI)다. 사주 풀이 한 문단, 응답 풀이 한 문단, MBTI 한 문단을 따로 붙이지 않는다. 한 문단 안에서 이어 쓴다: "사주에서는 ~로 읽히는데, 평소 행동에서는 ~로 나타나서 ~가 되기 쉬워요."
-- 영역마다 그 영역과 맞닿는 개인 성향 근거(evidence의 topics, 사용자 메시지 areas[].personalEvidence 참고)를 연결하고 그 ID를 해당 영역의 evidence에 단다. 영역마다 다른 근거를 고른다(앞 영역에서 쓴 응답을 같은 뜻으로 되풀이하지 않는다).
+- 영역마다 그 영역과 맞닿는 개인 성향 근거(evidence의 topics, 사용자 메시지 areas[].personalEvidence 참고)를 연결하고 그 ID를 해당 영역의 evidence에 단다. 영역마다 다른 근거에서 출발한다 — 사용자 메시지의 areas[].personalEvidence는 코드가 영역마다 겹치지 않게 나눠 준 "이 영역이 먼저 쓸 개인 근거"다. 같은 개인 근거(MBTI 제외)는 ${PERSONAL_REUSE.maxAreas}개 영역까지만 앞세우고(검사가 센다) 앞 영역에서 쓴 응답을 같은 뜻으로 되풀이하지 않는다. 한 가지 응답(예: 신중함 · 확인)이 모든 영역의 중심이 되면 글 전체가 한 모티프의 되풀이가 된다 — 영역마다 그 영역의 근거(핵심: 기질 · 평소 행동 / 관계: 가까운 관계 반응 / 일: 정보 · 판단 · 생활 방식)가 만드는 다른 모습을 쓴다. 시기 영역(flow)에는 개인 성향 근거를 하나까지만 쓴다.
 - 평소 행동 방식(에너지 · 정보 · 판단 · 생활)은 점수나 이름이 아니라 행동으로 풀어 쓴다("혼자 정리하며 채움"은 "사람을 만난 뒤에는 혼자 정리하는 시간이 있어야 편해지는 모습"으로).
 - 입력한 MBTI는 근거 문구의 "선호가 가리키는 방향"을 이 장면에서 구체화하는 데 쓴다. 핵심 · 가까운 관계 · 일과 재물 영역 가운데 두 곳 이상에서, 맞닿는 곳에서만, 한 영역에 한 번, 본문에 "입력해 주신 성향까지 함께 보면 ~로 나타날 수 있어요"처럼 짧게 쓴다. 알파벳 글자(네 글자 코드)를 본문에 쓰지 않고, 그 글자를 이유로 쓰지 않으며("~ 유형이라서" 금지), 시기 영역에는 쓰지 않는다.
 - 응답이 입력한 MBTI와 다르면 응답이 먼저이고, MBTI로 응답을 덮어쓰지 않는다. 차이는 지우지 않고 어떤 상황에서 어느 쪽이 나타나는지로 쓴다("입력해 주신 성향은 안에서 정리하는 쪽을 가리키는데 평소 행동에서는 함께할 때 힘이 난다면, 정리가 필요한 순간에는 혼자 · 평소에는 사람 곁에서").
@@ -77,6 +80,11 @@ const SOURCES = `[자료의 종류를 섞지 않는다]
 - 문장이 사주에서 읽은 것인지, 응답으로 확인된 것인지, 둘을 이어 본 추정인지 구분되게 쓴다. 추정을 사실처럼 단정하지 않는다.
 - 응답 근거가 없는 영역도 사주에서 읽히는 성향은 조건형으로 쓸 수 있다. 다만 기질 · 성격 · 애착 · MBTI의 유형 이름이나 검사 결과처럼 만들어 내지 않는다.
 - 이 글은 개인 리포트다. 궁합 · 다른 상품 · 가격 · 구매 · 질문권을 이 글 안에서 안내하지 않는다.`;
+
+const ABSENCE = `[원국에 "없는" 기운 · 십성을 읽는 법 — 오행 하나를 생활 기능 하나로 옮기지 않는다]
+- 근거의 "~가 없음" · "~가 두드러짐"은 전통 해석에서 그 주제를 어떻게 읽는지의 보조 근거다. "수 기운이 없다 → 쉬는 힘이 없다 · 못 쉰다", "목이 없다 → 시작을 못 한다", "재성이 없다 → 돈 관리가 약하다 · 돈복이 없다" 같은 한 줄 번역을 쓰지 않는다. 오행 이름을 쉬어 가는 힘 · 시작하는 힘 · 결단하는 힘 같은 생활 기능으로 바꿔 쓰지도 않는다(근거 문구에 적힌 기능 풀이를 그대로 옮기지 않는다).
+- "없음"은 (가) 그 주제가 시기(대운 · 세운)에 들어올 때 상대적으로 크게 느껴질 수 있다 (나) 전통 해석에서는 생활에서 의식적으로 채우는 쪽을 권하는 경우가 많다 — 이 둘까지만 말하고, 이 사람의 능력 · 결함 · 행동의 원인으로 쓰지 않는다. 쓸 때는 "이번 풀이에서는 보조 근거로 살펴봤어요" 정도의 거리로 쓰고, 문장 하나에 "없음"과 그 결과("~해서 ~가 약해요 · ~ 대신 ~예요 · ~ 때문에 ~")를 이어 붙이지 않는다(검사가 막는다).
+- 이 사람의 실제 행동(쉬는 방식 · 시작하는 방식 · 돈을 대하는 방식)은 응답 근거가 있을 때 응답 근거로만 쓴다. 응답 근거가 없으면 그 행동은 쓰지 않거나 조건형 질문("~는 어떤 편인지 살펴볼 만해요")으로 둔다. 돈은 재물 해석 근거(재성 · 식상 · 관련 조합)가 목록에 있을 때만 풀고, 재성이 없다는 사실을 돈 풀이의 원인이나 이유로 쓰지 않는다.`;
 
 const RELATION_WORK = `[가까운 관계와 일과 재물 영역을 쓸 때]
 - 가까운 관계는 상대 없이 이 사람의 반응만 쓴다. 상대의 나이 · 직업 · 속마음 · 만날 날짜 · 헤어질 시점을 쓰지 않고, "상대가 왜 그랬는지는 알 수 없다"는 선을 지킨다. 인연이 오는 달 · 시점은 쓰지 않는다(월별 달력을 코드가 따로 붙인다). 오래 가는 관계 · 결혼생활에서 중요해질 조건(마음을 주는 방식 · 서운함이 쌓이는 지점 · 관계에서 맡기 쉬운 역할 · 편안한 상대의 특성 · 조율)은 쓸 수 있다 — 결혼을 하게 된다 · 언제 한다 · 어떤 상대와 한다는 예언만 쓰지 않는다. 성별에 따라 가사 · 경제 역할을 정하지 않고, 출산 · 자녀 · 배우자의 외모 · 직업 · 나이 · 결혼 날짜를 쓰지 않는다.
@@ -130,6 +138,7 @@ export const STORY_SYSTEM_PROMPT = [
     ["(제품 검사가 설명 없는 용어와 근거 없는 판정을 막는다).", `(제품 검사가 설명 없는 용어와 근거 없는 판정을 막는다). 한 문단에서 새로 설명하는 용어는 ${TERM_LIMITS.perParagraphMax}개까지이고, 월령 · 통근 · 강약 같은 구조 용어는 한 문단에 몰아 쓰지 않는다 — 고객은 용어를 배우러 온 것이 아니라 자기 이야기를 들으러 왔다. 갈림(강약을 한쪽으로 정하지 않은 상태)은 판정이 아니라 계산 상태이므로 사람의 성격 변화로 풀지 않는다.`],
   ]),
   SOURCES,
+  ABSENCE,
   RELATION_WORK,
   TONE,
   TITLES,
@@ -140,10 +149,34 @@ export const STORY_SYSTEM_PROMPT = [
   OUTPUT,
 ].join("\n\n");
 
-/** 영역마다 연결할 수 있는 개인 성향 근거 ID — 지시문의 "영역마다 맞닿는 근거를 연결한다"를 모델이 고르기 쉽게 건넨다 */
+/**
+ * 영역마다 먼저 쓸 개인 성향 근거 ID를 겹치지 않게 나눈다(운영자 2차 검토 — 같은 응답이 모든 영역을 끌고 가는 반복을 근거를 나눠 건네는 것으로 줄인다).
+ * 영역이 먼저 가져갈 근거(story-plan의 prefer — 핵심 · 일은 평소 행동 방식 · 기질, 가까운 관계는 관계 반응 · 타인 반응 민감도)를 정하고, 후보 영역이 적은 근거부터 하나씩, 여러 영역이 후보면 지금까지 가장 적게 받은 영역에 둔다. 입력한 MBTI는 맞닿는 영역마다 건넨다(영역마다 다른 방향을 구체화한다).
+ * 영역이 최소 개수(personalMin)를 못 채우면 다른 영역에 준 근거 가운데 맞닿는 것을 빌려 준다(그 근거는 두 영역이 쓴다 — 검사는 두 영역까지 허용한다).
+ */
 export function personalEvidenceFor(evidence: Evidence[]): Record<string, string[]> {
   const personal = evidence.filter((e) => (e.source === "survey" || e.source === "self") && !e.uncertain);
-  return Object.fromEntries(STORY_AREAS.map((a) => [a.id, personal.filter((e) => e.topics.some((t) => a.personalTopics.includes(t))).map((e) => e.id)]));
+  const matches = (e: Evidence, a: (typeof STORY_AREAS)[number]) => e.topics.some((t) => a.personalTopics.includes(t));
+  const assigned: Record<string, string[]> = Object.fromEntries(STORY_AREAS.map((a) => [a.id, [] as string[]]));
+  // 영역이 먼저 가져갈 근거(prefer)가 있으면 그 영역들끼리 나누고, 어느 영역의 prefer에도 없으면 맞닿는 주제의 영역끼리 나눈다
+  const candidates = (e: Evidence) => {
+    const preferred = STORY_AREAS.filter((a) => matches(e, a) && a.prefer.test(e.id)).map((a) => a.id);
+    return preferred.length > 0 ? preferred : STORY_AREAS.filter((a) => matches(e, a)).map((a) => a.id);
+  };
+  const rest = personal.filter((e) => e.id !== "self.mbti").map((e) => ({ e, cand: candidates(e) })).filter((x) => x.cand.length > 0);
+  rest.sort((x, y) => x.cand.length - y.cand.length);
+  for (const { e, cand } of rest) {
+    const pick = cand.reduce((best, id) => (assigned[id].length < assigned[best].length ? id : best), cand[0]);
+    assigned[pick].push(e.id);
+  }
+  for (const a of STORY_AREAS) {
+    const own = assigned[a.id].length;
+    if (own >= a.personalMin) continue;
+    const borrow = personal.filter((e) => e.id !== "self.mbti" && matches(e, a) && !assigned[a.id].includes(e.id)).slice(0, a.personalMin - own);
+    assigned[a.id].push(...borrow.map((e) => e.id));
+  }
+  for (const e of personal.filter((x) => x.id === "self.mbti")) for (const a of STORY_AREAS) if (matches(e, a)) assigned[a.id].push(e.id);
+  return assigned;
 }
 
 export function buildStoryUserMessage(evidence: Evidence[], referenceDate: string, context: PersonalContextInput | null = null): string {

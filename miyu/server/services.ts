@@ -2,6 +2,7 @@ import "server-only";
 import { createTossPaymentGateway } from "@/lib/integrations/tosspayments/gateway";
 import { createSupabaseRepository } from "@/lib/integrations/supabase/repository";
 import { createMockLocalModel } from "@/lib/integrations/ai/mock-local";
+import { REPORT_GENERATION } from "@/lib/config/product";
 import { createAiReportGenerator } from "@/lib/report/ai/generator";
 import { devReportGenerator } from "@/lib/report/generate-dev-report";
 import type { ReportGenerator } from "@/lib/report/generator";
@@ -34,7 +35,7 @@ export function paymentGateway() {
  */
 export function reportGenerator(): ReportGenerator {
   const ai = aiConfig();
-  if (ai.kind === "mock-local") return createAiReportGenerator({ model: createMockLocalModel({ baseUrl: ai.baseUrl }) });
+  if (ai.kind === "mock-local") return createAiReportGenerator({ model: createMockLocalModel({ baseUrl: ai.baseUrl }), format: REPORT_GENERATION.format });
   // 실제 Claude — 운영자가 승인 금액 · 호출 수 · 기간을 직접 적었을 때만(없으면 aiConfig가 invalid가 되어 개발용 생성기로 두고 호출하지 않는다)
   if (ai.kind === "anthropic") return liveReportGenerator(ai);
   return devReportGenerator;
