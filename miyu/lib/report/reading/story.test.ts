@@ -184,6 +184,22 @@ test("행동 세 가지는 서로 다른 영역에서 나와야 한다(적어도
   assert.ok(errorsOf((d) => ((d.actions[0] as { area: string }).area = "unknown")).some((e) => /actions\[0\]\.area/.test(e)));
 });
 
+test("연도는 \"2026\"도 \"2026년\"도 받고(대리 작성기 두 건이 \"2026년\"으로 써서 걸렸다) 저장할 때 숫자 네 자리로 맞춘다 — 계산되지 않은 해는 그대로 막는다", () => {
+  assert.equal(errorsOf((d) => d.flow.years.forEach((y) => (y.year = `${y.year}년`))).filter((e) => /flow\.years/.test(e)).length, 0);
+  assert.ok(errorsOf((d) => (d.flow.years[0].year = "2031년")).some((e) => /flow\.years\[0\].*계산된 해가 아닙니다/.test(e)));
+  const d = mockDraft();
+  d.flow.years.forEach((y) => (y.year = `${y.year}년`));
+  const report = assembleStory({ draft: d, evidence: P01_EVIDENCE, input: P01.input, reference: { ...REF, iso: "2026-10-16" }, promptVersion: "x", ruleVersions: [] });
+  assert.ok(report.flow.years.every((y) => /^\d{4}$/.test(y.year)));
+});
+
+test("같은 맺음 틀(\"~쪽이 맞아 보여요\" · \"~볼 때예요\")을 영역마다 되풀이하면 예산을 넘는다고 알려 준다", () => {
+  const many = (phrase: string) => errorsOf((d) => d.areas.forEach((a) => (a.paragraphs[1] = `${a.paragraphs[1]} 그래서 ${a.id} 쪽은 ${phrase}`)));
+  assert.ok(many("먼저 확인하는 쪽이 맞아 보여요. 그 위에 한 번 더 맞아 보여요.").some((e) => /"맞아 보여요"이\(가\) \d+곳에 나와요\(4곳까지\)/.test(e)));
+  assert.ok(many("그래도 계속 무겁다면 물어볼 때예요.").some((e) => /"~볼 때예요"이\(가\) 3곳에 나와요\(2곳까지\)/.test(e)));
+  assert.equal(errorsOf(() => undefined).filter((e) => /나와요\(\d곳까지\)/.test(e)).length, 0);
+});
+
 test("한 문단에 새로 설명하는 사주 용어는 둘까지 — 문단 하나에서 새 개념을 여럿 배우지 않게", () => {
   const three = "[모의 생성] 월령(태어난 달의 기운)과 일간(나 자신을 나타내는 글자), 통근(뿌리의 힘)을 각각 한 문장씩 나눠 씁니다. 그래도 한 문단에 셋이면 많습니다.";
   const e = errorsOf((d) => (d.areas[0].paragraphs[2] = three));
@@ -264,6 +280,15 @@ test("생성기: 시도마다 원문과 오류가 남는다(첫 응답 · 고쳐
   await assert.rejects(() => gen.generate(P01.input, { onAttempt: (a) => attempts.push(a) }));
   assert.deepEqual(attempts.map((a) => a.round), [0, 1]);
   assert.ok(attempts.every((a) => a.errors.length > 0 && a.text.length > 0));
+});
+
+test("생성기: 고쳐 쓴 응답이 통과해도 첫 응답(걸림)과 고쳐 쓴 응답(통과)의 원문이 따로 남는다", async () => {
+  const attempts: { round: number; errors: string[]; text: string; accepted?: boolean }[] = [];
+  const gen = createAiReportGenerator({ model: createMockModel({ invalidTimes: 1 }), format: "story-v1", now: () => new Date("2026-10-16T09:00:00+09:00") });
+  await gen.generate(P01.input, { onAttempt: (a) => attempts.push(a) });
+  assert.deepEqual(attempts.map((a) => [a.round, Boolean(a.accepted)]), [[0, false], [1, true]]);
+  assert.ok(attempts[0].errors.length > 0 && attempts[1].errors.length === 0);
+  assert.ok(Array.isArray(JSON.parse(attempts[1].text).areas), "통과한 응답의 원문은 이야기 초안(JSON)이다");
 });
 
 test("반복 확인은 영역별 이야기에서도 같은 구절이 두 곳에 있으면 위치와 함께 찾는다", () => {

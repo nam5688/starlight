@@ -142,7 +142,7 @@ export type CompareRun = {
    * 검사에 걸린 응답마다 걸린 이유 전체와 그 글 (읽기 구조만, 가상 인물의 글). 실패 원인을 보려는 진단용이다 —
    * 글 내용이 들어 있으므로 cost-and-checks.json에는 이유(errors)만 싣고 글(text)은 따로 저장한다.
    */
-  attempts: { round: number; errors: string[]; text: string }[];
+  attempts: { round: number; errors: string[]; text: string; accepted?: boolean }[];
   report: ReportContent | PhilosophicalReportV0 | null;
   /** 내용 차이 검사 결과 (lib/report/v2/depth.ts) — 낱말 · 표지를 세는 어림이며 좋은 글이라는 보증이 아니다. 가려 읽는 평가가 따로 있다 */
   depth: { pass: boolean; fails: string[]; warns: string[]; conditionRatio: number; selfOverlapMax: number } | null;

@@ -299,6 +299,8 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
             }
           }
           done("ok");
+          // 통과한 응답의 원문도 남긴다 — 첫 응답(검사에 걸림) · 고쳐 쓴 응답(통과)을 각각 보관할 수 있게
+          ctx.onAttempt?.({ round, errors: [], text: result.text, accepted: true });
           return kit.assemble(checked.draft);
         }
         if (softFallback) return kit.assemble(softFallback);

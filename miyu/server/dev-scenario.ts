@@ -166,7 +166,9 @@ async function liveResult(input: LabInput): Promise<LabResult> {
     const out = await generator.generate(person, {
       signal: AbortSignal.timeout(280_000),
       onUsage: (u) => samples.push(u),
-      onAttempt: (a) => rounds.push({ round: a.round, errors: a.errors }),
+      onAttempt: (a) => {
+        if (!a.accepted) rounds.push({ round: a.round, errors: a.errors });
+      },
     });
     report = out as IntegratedReadingReport;
   } catch (e) {

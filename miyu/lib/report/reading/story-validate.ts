@@ -4,7 +4,7 @@
 import type { Evidence } from "../evidence.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
 import { READING_LIMITS as L, TERM_LIMITS } from "./plan.ts";
-import { MBTI_AREAS, PERIOD_TALK, STORY_AREAS, STORY_FLOW_TOPIC, STORY_LIMITS as S, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
+import { FORMULA_BUDGET, MBTI_AREAS, PERIOD_TALK, STORY_AREAS, STORY_FLOW_TOPIC, STORY_LIMITS as S, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
 import { distinctTerms } from "./terms.ts";
 import type { StoryDraftV1 } from "./types.ts";
 import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./validate.ts";
@@ -157,7 +157,8 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
     fp.forEach((t, i) => paragraph(t, `flow.paragraphs[${i}]`));
     tasks(fp, "flow");
     list<{ year: string; theme: string }>(f.years, "flow.years", refs.length ? S.flow.years.min : 0, S.flow.years.max).forEach((y, i) => {
-      if (!isString(y?.year) || !years.has(y.year)) errors.push(`flow.years[${i}]: 계산된 해가 아닙니다 (${y?.year}). ${[...years].join(" · ") || "계산된 해 없음"}만 쓸 수 있습니다.`);
+      // "2026"과 "2026년"을 모두 받는다(조립할 때 숫자 네 자리로 맞춘다) — 대리 작성기 두 건이 "2026년"으로 써서 해는 맞는데 형식만으로 걸렸다
+      if (!isString(y?.year) || !years.has(y.year.replace(/\s*년$/, ""))) errors.push(`flow.years[${i}]: 계산된 해가 아닙니다 (${y?.year}). ${[...years].join(" · ") || "계산된 해 없음"}만 쓸 수 있습니다.`);
       text(y?.theme, `flow.years[${i}].theme`, 8, S.flow.years.themeMax);
     });
     list<{ when: string; then: string }>(f.scenarios, "flow.scenarios", S.flow.scenarios.min, S.flow.scenarios.max).forEach((s, i) => {
@@ -195,6 +196,12 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
 
   // 쉬운 말 · 금지 표현 · 해 · 반복 (화면에 보이는 모든 글 — 이전 형식과 같은 규칙)
   const texts = visibleStoryTexts(d as StoryDraftV1);
+  // 영역 본문 · 흐름 문단 전체에서 같은 맺음 틀이 예산을 넘는지(표지를 센 어림)
+  const bodyText = texts.filter((t) => /^(areas\.[\w-]+\.paragraphs|flow\.paragraphs)/.test(t.where)).map((t) => t.text).join("\n");
+  for (const f of FORMULA_BUDGET) {
+    const n = bodyText.match(f.re)?.length ?? 0;
+    if (n > f.max) errors.push(`areas: "${f.label}"이(가) ${n}곳에 나와요(${f.max}곳까지) — 영역마다 같은 틀로 맺지 말고, 방향을 질문 · 기준 · 건넬 말 · 조건처럼 영역에 맞는 다른 모양으로 쓰세요.`);
+  }
   errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext) }));
   for (const { where, text: t } of texts) if (TYPE_CODE.test(t)) errors.push(`${where}: 알파벳 유형 코드("${TYPE_CODE.exec(t)![0]}")를 쓰지 않습니다 — 입력한 MBTI는 "입력해 주신 성향"으로 부릅니다.`);
 

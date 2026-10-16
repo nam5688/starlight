@@ -150,7 +150,7 @@ writeFileSync(
       estimateRatio: result.estimateRatio,
       crossPersonOverlap: result.crossPersonOverlap,
       // 글 내용(attempts[].text)은 여기에 싣지 않는다 — 걸린 이유(errors)만. 글은 failed/ 폴더에 따로 둔다
-      runs: result.runs.map(({ report, attempts, ...rest }) => ({ ...rest, attempts: attempts.map((a) => ({ round: a.round, errors: a.errors })), hasReport: report !== null })),
+      runs: result.runs.map(({ report, attempts, ...rest }) => ({ ...rest, attempts: attempts.map((a) => ({ round: a.round, errors: a.errors, ...(a.accepted ? { accepted: true } : {}) })), hasReport: report !== null })),
     },
     null,
     2,
@@ -169,6 +169,12 @@ safely("검사에 걸린 글", () => {
   // 실패 원인을 보려는 진단용 — 가상 인물의 글이다. 이 폴더는 저장소에 올라가지 않는다
   for (const run of result.runs) {
     for (const a of run.attempts) {
+      if (a.accepted) {
+        // 검사를 통과한 응답의 원문 — 첫 응답(failed/)과 고쳐 쓴 응답(여기)을 따로 보관한다. 고객용 완성본은 blind/ 의 글(생략 없는 전문)이다
+        mkdirSync(join(dir, "accepted"), { recursive: true });
+        writeFileSync(join(dir, "accepted", `${run.persona}-${run.blind}-round${a.round + 1}.json`), a.text);
+        continue;
+      }
       mkdirSync(join(dir, "failed"), { recursive: true });
       writeFileSync(join(dir, "failed", `${run.persona}-${run.blind}-round${a.round + 1}.txt`), `# 검사에 걸린 이유\n${a.errors.map((e) => `- ${e}`).join("\n")}\n\n# 그때의 글\n${a.text}\n`);
     }

@@ -66,7 +66,8 @@ export function assembleStory(o: AssembleStoryOptions): IntegratedReadingReport 
     caveat: FLOW_CAVEAT,
     // 계산된 현재 시기가 있으면 시기 카드의 글도 쉬운 말 설명(period-plain.ts)에서 코드가 채운다 — AI가 다시 쓴 글로 덮어쓰지 않는다
     cardText: current ? `${periodPlain(current.stemGroup, current.branchGroup).meaning} ${periodPlain(current.stemGroup, current.branchGroup).example}` : draft.flow.paragraphs[0],
-    years: draft.flow.years,
+    // 화면은 숫자 네 자리만 보인다("2026년"으로 와도 맞춘다)
+    years: draft.flow.years.map((y) => ({ ...y, year: y.year.replace(/\s*년$/, "") })),
     periods: [],
     scenarios: draft.flow.scenarios,
     scenarioNote: SCENARIO_NOTE,

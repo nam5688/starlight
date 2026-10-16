@@ -12,7 +12,7 @@ import { glossaryFor } from "../../saju/glossary.ts";
 import type { Evidence } from "../evidence.ts";
 import { READING_SYSTEM_PROMPT } from "./prompt.ts";
 import { READING_LIMITS as L, TERM_LIMITS } from "./plan.ts";
-import { STORY_ACTIONS_ASK, STORY_AREAS, STORY_FLOW_ASK, STORY_FLOW_SOURCES, STORY_FLOW_TOPIC, STORY_FOCUS_ASK, STORY_LIMITS as S, STORY_PROMPT_VERSION, TASK_PER_AREA_MAX } from "./story-plan.ts";
+import { FORMULA_BUDGET, STORY_ACTIONS_ASK, STORY_AREAS, STORY_FLOW_ASK, STORY_FLOW_SOURCES, STORY_FLOW_TOPIC, STORY_FOCUS_ASK, STORY_LIMITS as S, STORY_PROMPT_VERSION, TASK_PER_AREA_MAX } from "./story-plan.ts";
 import { periodRefs } from "./validate.ts";
 
 export { STORY_PROMPT_VERSION };
@@ -37,6 +37,8 @@ const SHAPE = `[리포트의 모양 — 칸을 채우지 않고, 영역마다 �
 - 이 리포트는 영역 넷(내 사주의 중심과 지나온 모습 · 가까운 관계에서의 나 · 일과 재물의 방향 · 현재와 앞으로의 흐름)이 각각 한 사람의 이야기로 이어지는 글이다. 영역마다 요약 · 예시 · 주의 · 행동을 따로 채우지 않는다. 문단은 필요한 만큼만 쓰고, 같은 말을 채우려고 문단을 늘리지 않는다.
 - 영역을 쓰기 전에 먼저 "이 영역에서만 말할 연결 하나"를 정한다. 근거 둘 이상을 겹쳐야 보이는 연결이다(약한 연결 "신중해서 시간이 걸려요" / 좋은 연결 "확인하는 시간이 길어질수록, 기다리는 쪽에게는 그 시간이 거리로 느껴질 수 있어요" — 다른 소재의 예, 따라 쓰지 않는다). 그 연결이 영역의 제목(headline)이 되고, 문단들은 그 연결을 이어서 풀어 쓴다: 사주에서 읽은 것 → 그것이 이 사람에게 나타나는 장면 → 겪기 쉬웠던 부담(공감) → 맞는 방향.
 - 영역끼리 결론이 겹치지 않는다. 한 영역에서 푼 연결은 다른 영역에서 다시 풀지 않는다 — 다른 영역에서는 그 영역에서만 새로 알 수 있는 연결을 쓴다. 맨 위 headline · cards · 영역 제목은 서로 다른 면을 말한다. 같은 뜻을 낱말만 바꿔 되풀이하지 않고, 같은 장면 · 같은 낱말은 한 영역에서만 자세히 쓴다.
+- 영역의 맺음을 같은 틀로 되풀이하지 않는다. "~쪽이 맞아 보여요. 그래도 ~라면 ~볼 때예요"를 네 영역이 모두 쓰면 글이 틀에 박힌다 — 방향은 영역마다 다른 모양(구분하는 기준 · 건넬 말 한 문장 · 먼저 확인할 질문 · 조건)으로 쓰고, "맞아 보여요"는 리포트 전체에서 ${FORMULA_BUDGET[0].max}번까지, "~볼 때예요"는 ${FORMULA_BUDGET[1].max}번까지만 쓴다(검사가 센다). "입력해 주신 성향까지 함께 보면" 같은 이음 문구도 영역마다 다른 말로 쓴다.
+- 한 가지 큰 연결(이 사람의 중심 연결)은 핵심 영역에서 풀고, 다른 영역에서는 그 연결을 한 문장 안으로만 되짚거나 되짚지 않는다. 같은 응답 근거(예: 신중함)를 여러 영역이 같은 표현으로("위험과 변수를 먼저 살피는") 쓰지 않는다 — 영역마다 그 근거가 그 영역에서 다르게 나타나는 모습을 쓴다. 고민(focus)과 행동(actions)도 앞 영역의 문장을 옮기지 않고 새 표현으로 쓴다.
 - 행동은 영역 본문에서 "이런 방향이 이 사람에게 맞아 보여요" 정도로만 잇는다. "~해 보세요"처럼 과제를 내는 문장은 영역마다 ${TASK_PER_AREA_MAX}개를 넘기지 않는다. 구체적인 실천은 마지막 actions 세 가지에 모은다. 문단마다 "적어 보세요 · 정해 보세요 · 말해 보세요"를 붙이면 사주 풀이가 아니라 과제가 된다.
 - 시기 이야기(대운 · 세운 · 올해 · 내년 · 연도)는 "${STORY_FLOW_TOPIC}" 영역에만 쓴다. 다른 영역에서는 시기를 말하지 않는다(검사가 막는다).
 - 알려 준 고민(context)이 있으면 focus에서 앞의 성향 설명을 다시 쓰지 않고, 앞 영역의 결론을 지금 선택에 적용한다.
@@ -102,7 +104,7 @@ const COMPOSE = `[구성과 분량] — 글자 수는 공백을 포함한다.
 - headline: 이번 리포트의 중심이 된 연결 한 문장 (${L.headline.min}~${L.headline.max}자, 이름을 쓰지 않는다).
 - cards: strength(내가 강한 포인트) · caution(내가 힘들 수 있는 포인트)는 keyword (4~${L.card.keywordMax}자)와 note (${L.card.noteMin}~${L.card.noteMax}자), flow(지금 나의 시기)는 keyword만 쓴다 (지금 지나는 시기의 주제 한 줄. 기간 문장은 코드가 계산해 붙이니 쓰지 않는다). 이름을 쓰지 않는다.
 - areas: 사용자 메시지의 areas 순서대로 3개(core · relation · work-money). 영역마다 headline(그 영역의 결론 한 문장, ${S.areaHeadline.min}~${S.areaHeadline.max}자) · paragraphs(core ${lim("core")} · relation ${lim("relation")} · work-money ${lim("work-money")}, 문단마다 ${S.paragraph.min}~${S.paragraph.max}자 · ${S.paragraph.sentencesMax}문장 이하) · evidence. 한 문단에 사주 용어는 ${TERM_LIMITS.perParagraphMax}개까지만 쓴다.
-- flow(${STORY_FLOW_TOPIC}): headline(${L.blockHeadline.min}~${S.flow.headlineMax}자) · paragraphs(${lim("flow")}, 문단마다 같은 한도) · years(${S.flow.years.min}~${S.flow.years.max}개: periods 목록에 있는 해만, theme 8~${S.flow.years.themeMax}자) · scenarios(${S.flow.scenarios.min}~${S.flow.scenarios.max}개: when — "지금 모습이 이어지면 · 이렇게 바뀌면"(10~${S.flow.scenarios.whenMax}자), then — 가능성(15~${S.flow.scenarios.thenMax}자, "~할 수 있어요"로 끝맺음. 확률 · 단정 금지)) · evidence(시기 근거 ID를 반드시 포함).
+- flow(${STORY_FLOW_TOPIC}): headline(${L.blockHeadline.min}~${S.flow.headlineMax}자) · paragraphs(${lim("flow")}, 문단마다 같은 한도) · years(${S.flow.years.min}~${S.flow.years.max}개: periods 목록에 있는 해만, year는 "2026"처럼 숫자 네 자리, theme 8~${S.flow.years.themeMax}자) · scenarios(${S.flow.scenarios.min}~${S.flow.scenarios.max}개: when — "지금 모습이 이어지면 · 이렇게 바뀌면"(10~${S.flow.scenarios.whenMax}자), then — 가능성(15~${S.flow.scenarios.thenMax}자, "~할 수 있어요"로 끝맺음. 확률 · 단정 금지)) · evidence(시기 근거 ID를 반드시 포함).
   시기를 말할 때는 쉬운 제목 → 생활에서 뜻하는 것 → 이 사람이 그 시기를 어떻게 받아들일지(기회가 와도 확인을 더 하다 늦어질 수 있는지, 먼저 움직이는 쪽인지) 순서로 한 이야기로 쓴다. 시기는 사건 예언이 아니라 그 시기에 두드러지는 주제 · 살릴 점 · 살펴볼 점이다. "성과 · 수입 · 관리", "표현 · 생산 · 새로운 시도" 같은 해석 키워드 나열은 그대로 옮기지 않는다. 문장마다 "예측이 아니에요"를 붙이지 않는다(안내는 코드가 한곳에 붙인다). 연구 통계는 쓰지 않는다. periods에 current가 없으면 가까운 해들의 주제를 쓴다. 시기 근거에 학파 · 경계 때문에 달라질 수 있는 것(uncertain)은 해석의 근거로 쓰지 않는다.
 - focus: context가 있을 때만 ${L.focus.min}~${L.focus.max}문단(${L.focus.textMin}~${L.focus.textMax}자). 첫 문단은 "알려 주신 ~"처럼 고객이 말해 준 내용임을 밝히며 시작한다. context는 해석의 초점과 예시만 고르는 용도이며 근거가 아니다 — evidence에는 여전히 사주 근거를 단다. 알려 준 이야기를 사주로 알아맞힌 것처럼 쓰지 않고, context에 없는 사람 · 사건을 지어내지 않으며, 상대방의 성격을 단정하지 않는다. 앞 영역의 성향 설명을 다시 쓰지 않고 그 결론을 지금 선택에 적용한다. context가 없으면 focus는 빈 배열이고 "알려 주신"이라는 말도 쓰지 않는다.
 - actions: ${S.actions.count}개 — title(어떤 상황에서, 6~${S.actions.titleMax}자) · detail(그때 해 볼 작은 행동, ${S.actions.detailMin}~${S.actions.detailMax}자, 적거나 묻거나 정하는 것처럼 실제로 하는 행동. "무엇을 줄이라"가 아니라 "어떤 방식을 바꾸면 되는지"로) · area(이 행동이 어느 영역의 풀이에서 나왔는지: core · relation · work-money · flow) · evidence. 적어도 두 영역에서 나온 서로 다른 상황의 서로 다른 행동으로 쓰고 시점이나 기간을 임의로 정하지 않는다.`;
