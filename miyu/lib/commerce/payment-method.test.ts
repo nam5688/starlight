@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isCardMethod, nonCardNotice } from "./payment-method.ts";
+import { isCardMethod, nonCardNotice, widgetVariantKeyFrom } from "./payment-method.ts";
 
 test("카드만 운영: 결제수단이 카드면 알릴 것이 없고, 카드가 아닌 결제수단(계좌이체 · 가상계좌 · 간편결제 · 휴대폰 · 상품권) · 알 수 없는 결제수단이면 운영자 확인 안내를 돌려준다", () => {
   assert.equal(isCardMethod("카드"), true);
@@ -15,4 +15,14 @@ test("카드만 운영: 결제수단이 카드면 알릴 것이 없고, 카드�
   assert.equal(nonCardNotice("계좌이체", false), null);
   // 안내에는 고객 정보가 없다 — 결제수단 이름만
   assert.ok(!nonCardNotice("계좌이체")!.join(" ").includes("@"));
+});
+
+test("결제위젯 UI 이름(variantKey): 비었거나 이상한 글자가 들어 있으면 DEFAULT를 쓰고, 알맞은 이름은 그대로 쓴다", () => {
+  assert.equal(widgetVariantKeyFrom(undefined), "DEFAULT");
+  assert.equal(widgetVariantKeyFrom("  "), "DEFAULT");
+  assert.equal(widgetVariantKeyFrom("MIYU_CARD"), "MIYU_CARD");
+  assert.equal(widgetVariantKeyFrom(" card-only "), "card-only");
+  assert.equal(widgetVariantKeyFrom("a b"), "DEFAULT");
+  assert.equal(widgetVariantKeyFrom('x"><script>'), "DEFAULT");
+  assert.equal(widgetVariantKeyFrom("x".repeat(61)), "DEFAULT");
 });

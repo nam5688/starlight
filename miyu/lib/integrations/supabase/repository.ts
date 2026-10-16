@@ -582,6 +582,26 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       return [...(pending.data ?? []), ...(paid.data ?? [])].slice(0, opts.limit).map(toOrder);
     },
 
+    async listOrdersWithOpenPacks({ userId, limit }) {
+      // 묶음 장부(question_packs)에서 남은 질문이 있는 줄을 찾는다 — 열의 값끼리 비교하는 조건은 쓸 수 없어 읽어 온 뒤 거른다
+      let packs = db.from("question_packs").select("order_id, questions, used, refunded_questions").order("purchased_at", { ascending: false }).limit(userId ? 200 : 1000);
+      if (userId) packs = packs.eq("user_id", userId);
+      const { data, error } = await packs;
+      if (error) {
+        if (isMissingTableError(error)) return []; // 16번 전
+        fail("남은 질문이 있는 묶음 조회", error);
+      }
+      const ids = (data ?? [])
+        .filter((r) => Number(r.questions) - Number(r.used) - Number(r.refunded_questions) > 0)
+        .reverse() // 오래된 순
+        .slice(0, limit)
+        .map((r) => r.order_id as string);
+      if (ids.length === 0) return [];
+      const orders = await db.from("orders").select().in("id", ids).eq("status", "paid").order("approved_at", { ascending: true });
+      if (orders.error) fail("남은 질문이 있는 묶음의 주문 조회", orders.error);
+      return (orders.data ?? []).map(toOrder);
+    },
+
     async listRecentOrders(limit) {
       const { data, error } = await db.from("orders").select().order("created_at", { ascending: false }).limit(limit);
       if (error) fail("최근 주문 조회", error);

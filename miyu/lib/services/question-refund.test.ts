@@ -362,3 +362,149 @@ test("결제 시작 화면 흐름은 그대로: 질문이 하나라도 남아 �
   assert.equal(await w.balance(), 0);
   assert.equal((await startQuestionPayment(deps, input)).kind, "order", "환불로 질문이 없어지면 새 묶음을 결제할 수 있다");
 });
+
+// ───────────── 고객이 다시 접속하지 않아도 반영되는가: 질문 사용 전 확인 · 정기 점검 ─────────────
+// 호스팅의 정기 실행이 하루 한 번뿐이거나(Vercel Hobby) 웹훅이 오지 않아도, 결제사에서 환불한 질문은 쓰이지 않아야 한다.
+
+import { askFreeQuestion } from "./chat-service.ts";
+import { reconcileOpenPacksOfUser } from "./reconcile-service.ts";
+import type { ChatContext } from "../report/chat/types.ts";
+
+const CONTEXT: ChatContext = { room: { label: "연애", mode: "연애박사 미유", focus: "연애 · 관계" }, intake: null, topic: null, overview: { headline: "확인을 중요하게 여겨요", tendency: null, strength: null, caution: null, flow: null }, followUp: false, taste: false };
+
+let askRefSeq = 0;
+/** 무료 질문을 다 쓴 상태로 만들어 두고(연애 방 3개), 질문 답변 의존물을 돌려준다 — verify를 주면 질문 사용 전 확인이 켜진다 */
+function paidAsker(w: Awaited<ReturnType<typeof world>>, verify?: AskDeps["verifyBeforeUse"]) {
+  for (let i = 0; i < 3; i++) w.mem.chatQuestions.push({ userId: USER, assessmentId: w.assessment.id, roomKey: "love", createdAt: w.now().toISOString() });
+  const deps: AskDeps = {
+    ...w.askDeps,
+    newRef: () => `q-ref-${++askRefSeq}`,
+    loadAsk: async () => ({ context: CONTEXT, referenceDate: "2026-10-15", tier: "paid", room: "love", roomKey: "love" }),
+    ...(verify ? { verifyBeforeUse: verify } : {}),
+  };
+  const ask = () => askFreeQuestion(deps, { userId: USER, assessmentId: w.assessment.id, roomKey: "love", question: "요즘 연락이 뜸한 사람이 있어요" });
+  return { ask, deps };
+}
+const verifyWith = (w: Awaited<ReturnType<typeof world>>): NonNullable<AskDeps["verifyBeforeUse"]> => async (userId) => {
+  await reconcileOpenPacksOfUser({ repo: w.mem.repo, gateway: w.toss.gateway, now: w.now }, userId);
+};
+
+test("고객이 다시 접속하지 않아도: 토스에서 2개를 부분 취소한 뒤 알림 · 정기 점검이 없었어도, 질문을 쓰는 순간 환불이 먼저 반영돼 환불받은 질문은 쓰이지 않는다", async () => {
+  const w = await world();
+  const { order, paymentKey } = await w.buyPack();
+  w.toss.cancel(paymentKey, 1667); // 토스 관리자에서 2개 환불 — 웹훅은 오지 않았고 고객은 화면을 열지 않았다
+  assert.equal(await w.balance(), 9, "아직 장부에 반영되지 않았다");
+  const { ask } = paidAsker(w, verifyWith(w));
+
+  const first = await ask();
+  assert.ok(first.ok && first.kind === "answer", JSON.stringify(first));
+  const pack = (await w.mem.repo.getQuestionPack(order.id))!;
+  assert.deepEqual({ rq: pack.refundedQuestions, krw: pack.refundedKrw, used: pack.used }, { rq: 2, krw: 1667, used: 1 }, "질문을 쓰기 전에 환불이 반영돼 남은 1개로 답했다");
+  assert.equal(await w.balance(), 0);
+  const second = await ask();
+  assert.ok(!second.ok && second.reason === "need-payment", "환불받은 질문 2개는 쓸 수 없다");
+});
+
+test("확인이 없었다면(비교): 같은 상황에서 환불받은 질문까지 3개를 모두 쓸 수 있었다 — 질문 사용 전 확인이 막는 구멍", async () => {
+  const w = await world();
+  const { paymentKey } = await w.buyPack();
+  w.toss.cancel(paymentKey, 1667);
+  const { ask } = paidAsker(w); // verifyBeforeUse 없음
+  for (let i = 0; i < 3; i++) {
+    const r = await ask();
+    assert.ok(r.ok && r.kind === "answer", `${i + 1}번째`);
+  }
+});
+
+test("질문 사용 전 확인은 같은 환불을 두 번 반영하지 않는다: 이미 반영한 부분 취소가 있고 환불이 더 없으면 장부는 그대로이며 질문은 정상으로 답한다", async () => {
+  const w = await world();
+  const { order, paymentKey } = await w.buyPack();
+  w.toss.cancel(paymentKey, 834);
+  await w.sync(paymentKey); // 웹훅이 와서 이미 반영됨 (질문 1개 환불 — 남은 2개)
+  const { ask } = paidAsker(w, verifyWith(w));
+  assert.ok((await ask()).ok);
+  assert.ok((await ask()).ok);
+  assert.ok(!(await ask()).ok, "환불 1개 + 사용 2개 = 3개");
+  const pack = (await w.mem.repo.getQuestionPack(order.id))!;
+  assert.equal(pack.refundedQuestions, 1);
+  assert.equal(w.mem.ledger.filter((l) => l.kind === "refund_claw").length, 1);
+});
+
+test("전액 취소도 질문을 쓰기 전에 반영된다: 주문이 환불됨으로 바뀌고 남은 질문이 없어져 질문은 결제가 필요하다고 안내한다", async () => {
+  const w = await world();
+  const { order, paymentKey } = await w.buyPack();
+  w.toss.cancel(paymentKey); // 전액
+  const { ask } = paidAsker(w, verifyWith(w));
+  const r = await ask();
+  assert.ok(!r.ok && r.reason === "need-payment");
+  assert.equal((await w.mem.repo.getOrderById(order.id))?.status, "refunded");
+  assert.equal(await w.balance(), 0);
+});
+
+test("결제사 조회가 안 될 때: 질문은 막지 않고(열어 둔다) 장부는 바뀌지 않으며, 확인 단계가 오류를 던져도 질문은 그대로 답한다 — 환불은 정기 점검이 이어서 맞춘다", async () => {
+  const w = await world();
+  const { order, paymentKey } = await w.buyPack();
+  w.toss.cancel(paymentKey, 834);
+  w.toss.state.lookupDown = true;
+  const outcomes = await reconcileOpenPacksOfUser({ repo: w.mem.repo, gateway: w.toss.gateway, now: w.now }, USER);
+  assert.deepEqual(outcomes.map((o) => o.kind), ["error"], "조회 실패는 error로 돌려준다(환불로도 정상으로도 단정하지 않는다)");
+  assert.equal(await w.balance(), 9);
+
+  const { ask } = paidAsker(w, verifyWith(w));
+  assert.ok((await ask()).ok, "조회가 안 되어도 질문은 열려 있다");
+  // 확인 단계가 예상하지 못한 오류를 던져도 질문은 그대로 답한다 (같은 세계 — 결제해 둔 질문이 남아 있다)
+  const thrower = paidAsker(w, async () => {
+    throw new Error("boom");
+  });
+  const afterThrow = await thrower.ask();
+  assert.ok(afterThrow.ok && afterThrow.kind === "answer", "확인 단계의 오류가 질문을 막지 않는다");
+  assert.equal(await w.balance(), 3, "질문 2개를 썼다 (환불은 아직 반영되지 않았다)");
+
+  // 조회가 돌아오면 정기 점검이 이어서 맞춘다
+  w.toss.state.lookupDown = false;
+  const deps = { repo: w.mem.repo, gateway: w.toss.gateway, now: w.now };
+  const sweep = await reconcileBatch(deps);
+  assert.equal(sweep.counts["partial-refund"], 1);
+  assert.equal((await w.mem.repo.getQuestionPack(order.id))?.refundedQuestions, 1);
+});
+
+test("정기 점검은 결제한 지 7일이 지나도 남은 질문이 있는 묶음을 계속 확인한다 — 다 쓴 묶음은 다시 확인하지 않는다", async () => {
+  const w = await world();
+  const open = await w.buyPack(); // 남은 질문이 있는 묶음
+  w.toss.cancel(open.paymentKey, 834);
+  const t0 = w.now().getTime();
+  const later = () => new Date(t0 + 30 * 86_400_000); // 30일 뒤 (7일 점검 기간 밖)
+  const deps = { repo: w.mem.repo, gateway: w.toss.gateway, now: later };
+
+  const sweep = await reconcileBatch(deps);
+  assert.equal(sweep.checked, 1, "결제한 지 30일이 지났지만 남은 질문이 있어 확인한다");
+  assert.equal(sweep.counts["partial-refund"], 1);
+  assert.equal(await w.balance(), 6);
+
+  // 한 번 더 — 이미 반영돼 있으니 장부는 그대로
+  const again = await reconcileBatch(deps);
+  assert.equal(again.counts["partial-refund"], 0);
+  assert.equal(await w.balance(), 6);
+
+  // 질문을 모두 쓰고 나면 더는 정기 점검 대상이 아니다 (환불이 나중에 와도 쓰이지 않을 질문이 없다 — 관리자 재확인 버튼이 맞춘다)
+  await w.spend("u-1");
+  await w.spend("u-2");
+  const done = await reconcileBatch(deps);
+  assert.equal(done.checked, 0);
+});
+
+test("남은 질문이 있는 묶음 목록: 회원별로 나뉘고 · 다 쓴 묶음과 환불로 정산된 묶음은 빠지며 · 결제 완료가 아닌 주문은 없다", async () => {
+  const w = await world();
+  const a = await w.buyPack();
+  const b = await w.buyPack();
+  const ids = async (userId?: string) => (await w.mem.repo.listOrdersWithOpenPacks({ ...(userId ? { userId } : {}), limit: 10 })).map((o) => o.id).sort();
+  assert.deepEqual(await ids(USER), [a.order.id, b.order.id].sort());
+  assert.deepEqual(await ids("22222222-2222-4222-8222-222222222222"), [], "다른 회원의 묶음은 보이지 않는다");
+  await w.spend("x-1");
+  await w.spend("x-2");
+  await w.spend("x-3"); // 가장 먼저 산 묶음(a)을 모두 사용
+  assert.deepEqual(await ids(USER), [b.order.id]);
+  w.toss.cancel(b.paymentKey); // b 전액 환불
+  await w.sync(b.paymentKey);
+  assert.deepEqual(await ids(USER), [], "환불된 주문(결제 완료가 아님)은 빠진다");
+});

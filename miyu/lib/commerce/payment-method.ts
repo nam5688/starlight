@@ -19,3 +19,12 @@ export function nonCardNotice(method: string | null | undefined, cardOnly: boole
     "카드가 아닌 결제수단은 취소 가능 기간이 달라(계좌이체 180일 · 가상계좌 보통 365일 · 휴대폰 결제는 결제한 달에만) 환불 절차가 달라집니다",
   ];
 }
+
+/** 토스 결제위젯의 결제수단 화면(결제 UI) 이름 — 기본은 DEFAULT. 토스 어드민에서 카드만 보이는 UI를 따로 만들었다면 그 UI의 variantKey를 환경변수 TOSS_WIDGET_VARIANT_KEY에 적는다(비밀값이 아니다) */
+export const DEFAULT_WIDGET_VARIANT_KEY = "DEFAULT";
+
+/** 환경변수 값이 variantKey 모양이 아니면(비었거나 이상한 글자가 있으면) 기본값을 쓴다 — 화면 코드에 아무 글이나 들어가지 않게 */
+export function widgetVariantKeyFrom(raw: string | undefined): string {
+  const v = (raw ?? "").trim();
+  return /^[A-Za-z0-9_-]{1,60}$/.test(v) ? v : DEFAULT_WIDGET_VARIANT_KEY;
+}

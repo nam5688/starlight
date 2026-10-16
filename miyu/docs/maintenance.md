@@ -76,6 +76,17 @@
 
 `lib/`(핵심 폴더)는 Next.js · React · 외부 SDK를 불러오지 않는다 (`lib/core.test.ts`가 검사). 채널 전용 코드는 `server/` · `app/` · `components/`에 둔다. 새 라이브러리는 꼭 필요할 때만, 먼저 `npm run deps`로 라이선스 · 보안을 본다.
 
+## 3-1. 배포 · 정기 점검 · 결제수단 설정을 어디서 고치나
+
+| 바꾸고 싶은 것 | 고치는 곳 |
+| --- | --- |
+| 정기 점검 시각 · 횟수(Vercel) | `miyu/vercel.json`의 `crons` — Hobby는 하루 한 번만(더 자주 쓰면 배포가 실패한다). Pro로 올리면 `*/10 * * * *`처럼 바꾸고 `server/vercel-config.test.ts`의 하루 한 번 검사도 함께 고친다 |
+| 결제 화면에 보일 결제수단(카드만) | 토스 결제위젯 어드민의 결제수단 목록 · 결제 UI(코드가 아니다). 결제 UI 이름을 바꿨으면 환경변수 `TOSS_WIDGET_VARIANT_KEY` — [`setup-guide.md`](./setup-guide.md) |
+| 질문을 쓰기 직전 환불 확인 · 정기 점검의 대상 | `lib/services/reconcile-service.ts`(`reconcileOpenPacksOfUser` · `RECONCILE_DEFAULTS.openPackLimit`) · `server/reconcile.ts`(`verifyPacksBeforeUse`) · `lib/services/chat-service.ts`(`verifyBeforeUse`) |
+| 배포 정보 · 정기 점검 점검 문구 | `lib/ops/deploy-info.ts` (`CRON_STALE_HOURS` 포함) |
+| 계좌 송금 환불 절차 | `supabase/manual-refund-check.sql` · `manual-refund-apply.sql` · [`runbook.md`](./runbook.md) — 바꾸면 `supabase/tests/db.test.ts`의 송금 환불 시험이 두 파일을 그대로 읽어 돌리므로 같이 통과해야 한다 |
+| 테스트 배포 방법 | [`deploy-vercel-test.md`](./deploy-vercel-test.md) |
+
 ## 4. DB 변경 규칙 (마이그레이션)
 
 - **새 파일로만 추가한다** (`supabase/migrations/날짜_이름.sql`). 이미 적용한 파일은 고치지 않는다 — 적용한 DB에 다시 실행하라고 안내하지 않는다.

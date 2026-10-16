@@ -556,6 +556,15 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const p = packs.get(orderId);
       return p ? { ...p } : null;
     },
+    async listOrdersWithOpenPacks({ userId, limit }) {
+      return [...packs.values()]
+        .filter((p) => (userId ? p.userId === userId : true) && packRemaining(p) > 0)
+        .sort((a, b) => (a.purchasedAt < b.purchasedAt ? -1 : a.purchasedAt > b.purchasedAt ? 1 : 0))
+        .map((p) => orders.get(p.orderId))
+        .filter((o): o is OrderRecord => o !== undefined && o.status === "paid")
+        .slice(0, limit)
+        .map((o) => ({ ...o }));
+    },
     async applyCashRefund({ orderId, canceledTotal }) {
       return applyRefund(orderId, canceledTotal);
     },

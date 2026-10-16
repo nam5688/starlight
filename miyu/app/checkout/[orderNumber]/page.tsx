@@ -5,8 +5,8 @@ import { Suspense } from "react";
 import { TossCheckout } from "@/components/checkout/toss-checkout";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
-import { cashOrderKind, formatKrw, isCashProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, productNameOf, QUESTION_PACK_SIZE } from "@/lib/config/product";
-import { paymentConfig } from "@/server/env";
+import { cashOrderKind, formatKrw, LAUNCH_PAYMENT_METHODS, isCashProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, productNameOf, QUESTION_PACK_SIZE } from "@/lib/config/product";
+import { paymentConfig, widgetVariantKey } from "@/server/env";
 import { readRepository, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 import { resultPathOf } from "@/server/order-paths";
@@ -93,8 +93,10 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
           실제로 돈이 결제되지 않는 테스트 환경입니다.
         </p>
       )}
-      <div className="mt-6">
+      {LAUNCH_PAYMENT_METHODS.cardOnly && <p className="mt-4 text-[13px] text-ink-3">지금은 카드 결제만 지원해요.</p>}
+      <div className="mt-3">
         <TossCheckout
+          methodsVariantKey={widgetVariantKey()}
           clientKey={config.clientKey}
           customerKey={profile.paymentCustomerKey}
           orderId={order.orderNumber}

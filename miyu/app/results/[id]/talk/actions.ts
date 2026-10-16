@@ -14,6 +14,7 @@ import { roomModelFor } from "@/server/talk-model";
 import { chatConfig, paymentConfig, paymentEnvOf } from "@/server/env";
 import { getMember } from "@/server/member";
 import { logError } from "@/server/ops";
+import { verifyPacksBeforeUse } from "@/server/reconcile";
 import { now, readRepository, writeRepository } from "@/server/services";
 
 type Input = { assessmentId: unknown; roomKey: unknown; actions?: unknown };
@@ -100,6 +101,8 @@ function askDeps(userId: string, assessmentId: string, room: RoomId, input: Pick
     now,
     config: chatConfig(),
     capacity: chatCapacity(),
+    // 결제한 질문을 쓰기 직전에 결제사 기록을 다시 확인한다 (환불된 질문을 쓰지 않게 — 실패해도 질문은 막지 않는다)
+    verifyBeforeUse: verifyPacksBeforeUse,
     loadAsk: async () => {
       const view = await getResultView(await readRepository(), { userId, assessmentId });
       if (!view) return null;

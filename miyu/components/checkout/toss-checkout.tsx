@@ -7,7 +7,7 @@ import { formatKrw } from "@/lib/config/product";
 
 /**
  * 토스페이먼츠 주문서형 결제 화면.
- * 보여줄 결제수단(카드 기본, 간편결제 추가 등)은 토스페이먼츠 상점관리자의 결제 UI 설정에서 정한다.
+ * 보여줄 결제수단은 토스페이먼츠 어드민의 결제위젯 설정(기능 > 결제수단 목록 · 결제 UI 설정)에서 정한다 — 출시 초기에는 카드만 보여야 한다(docs/setup-guide.md).
  * 금액·주문번호는 서버가 만든 값을 그대로 쓰고, 승인은 서버에서 다시 확인한다.
  */
 export function TossCheckout({
@@ -16,12 +16,15 @@ export function TossCheckout({
   orderId,
   orderName,
   amount,
+  methodsVariantKey = "DEFAULT",
 }: {
   clientKey: string;
   customerKey: string;
   orderId: string;
   orderName: string;
   amount: number;
+  /** 결제수단 화면(결제 UI) 이름 — 서버가 환경변수에서 읽어 준다 */
+  methodsVariantKey?: string;
 }) {
   const [status, setStatus] = useState<"loading" | "ready" | "requesting" | "error">("loading");
   const [message, setMessage] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export function TossCheckout({
         const widgets = toss.widgets({ customerKey });
         await widgets.setAmount({ currency: "KRW", value: amount });
         await Promise.all([
-          widgets.renderPaymentMethods({ selector: "#toss-payment-methods", variantKey: "DEFAULT" }),
+          widgets.renderPaymentMethods({ selector: "#toss-payment-methods", variantKey: methodsVariantKey }),
           widgets.renderAgreement({ selector: "#toss-agreement", variantKey: "AGREEMENT" }),
         ]);
         widgetsRef.current = widgets;
@@ -47,7 +50,7 @@ export function TossCheckout({
         setMessage("결제 화면을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
       }
     })();
-  }, [clientKey, customerKey, amount]);
+  }, [clientKey, customerKey, amount, methodsVariantKey]);
 
   async function pay() {
     const widgets = widgetsRef.current;

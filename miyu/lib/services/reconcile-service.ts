@@ -12,6 +12,8 @@
 // - 같은 대조를 여러 번 해도 결과가 같다 (중복 반영 · 중복 리포트 없음).
 // - 실제 환불은 하지 않는다. 결제사에서 이미 취소된 것을 주문에 맞출 뿐이다.
 // - 질문 3개 묶음의 **부분 취소**는 결제사의 누적 취소액을 묶음 장부에 반영해 남은 질문을 회수한다(웹훅을 놓쳤거나 늦게 와도 이 대조가 맞춘다).
+// - 남은 질문이 있는 묶음은 결제한 지 7일이 지나도 계속 확인한다(`listOrdersWithOpenPacks`). 호스팅의 정기 실행이 하루 한 번뿐이어도 환불된 질문이 쓰이지 않도록,
+//   질문을 쓰기 직전에도 그 회원의 남은 묶음을 같은 방식으로 다시 확인한다(`reconcileOpenPacksOfUser`).
 
 import type { GatewayPayment } from "../commerce/order.ts";
 import { isCashProduct } from "../config/product.ts";
@@ -26,6 +28,12 @@ export const RECONCILE_DEFAULTS = {
   /** 결제 완료 주문을 이 기간만큼 거슬러 올라가 결제사 기록과 맞는지 확인한다 */
   paidLookbackMs: 7 * 24 * 3600_000,
   batchLimit: 50,
+  /**
+   * 결제한 지 오래돼도 남은 질문이 있는 묶음은 나이와 상관없이 이만큼까지 다시 확인한다 (결제사에서 나중에 부분 취소될 수 있다).
+   * 오래된 묶음부터 이 개수까지만 보므로 남은 질문이 있는 묶음이 이보다 많으면 뒤쪽은 다음 점검으로 밀린다 — 질문을 쓰기 직전의 확인(회원 단위)은 이 한도와 상관없이 항상 한다.
+   * 결제사 조회 한 번이 0.3초쯤이라 200건이면 1분 안쪽이다(실제 소요는 재지 못했다).
+   */
+  openPackLimit: 200,
 } as const;
 
 export type ReconcileOptions = Partial<typeof RECONCILE_DEFAULTS>;
@@ -171,8 +179,12 @@ export async function reconcileBatch(deps: Deps, options: ReconcileOptions = {})
     paidSince: new Date(now - o.paidLookbackMs).toISOString(),
     limit: o.batchLimit,
   });
+  // 결제한 지 7일이 지났어도 남은 질문이 있는 묶음은 계속 본다 — 이미 위 목록에 들어 있는 주문은 다시 세지 않는다
+  const seen = new Set(orders.map((x) => x.id));
+  const openPacks = (await deps.repo.listOrdersWithOpenPacks({ limit: o.openPackLimit }).catch(() => [])).filter((x) => !seen.has(x.id));
+  const targets = [...orders, ...openPacks];
   const outcomes: ReconcileOutcome[] = [];
-  for (const order of orders) {
+  for (const order of targets) {
     try {
       outcomes.push(await reconcileOrder(deps, order, options));
     } catch {
@@ -181,5 +193,24 @@ export async function reconcileBatch(deps: Deps, options: ReconcileOptions = {})
   }
   const counts = { paid: 0, "partial-refund": 0, refunded: 0, closed: 0, waiting: 0, ok: 0, anomaly: 0, error: 0 } satisfies Record<ReconcileOutcome["kind"], number>;
   for (const r of outcomes) counts[r.kind]++;
-  return { checked: orders.length, outcomes, counts };
+  return { checked: targets.length, outcomes, counts };
+}
+
+/**
+ * 질문을 쓰기 직전 확인 — 이 회원의 남은 질문이 있는 묶음을 결제사 기록으로 다시 확인해 부분 · 전액 취소를 장부에 먼저 반영한다.
+ * 결제사에서 환불한 질문을 고객이 아직 쓰지 못하게 막는 마지막 안전장치이며, 고객이 화면을 다시 열지 않았거나 호스팅의 정기 실행이 아직 오지 않았어도 동작한다.
+ * 결제사 조회가 실패한 묶음은 error로 돌려준다(막을지는 부르는 쪽이 정한다 — 질문 답변은 막지 않고 운영 기록만 남긴다).
+ */
+export async function reconcileOpenPacksOfUser(deps: Deps, userId: string, options: ReconcileOptions = {}): Promise<ReconcileOutcome[]> {
+  const o = { ...RECONCILE_DEFAULTS, ...options };
+  const orders = await deps.repo.listOrdersWithOpenPacks({ userId, limit: o.openPackLimit });
+  const outcomes: ReconcileOutcome[] = [];
+  for (const order of orders.filter((x) => x.userId === userId)) {
+    try {
+      outcomes.push(await reconcileOrder(deps, order, options));
+    } catch {
+      outcomes.push({ kind: "error", order, code: "RECONCILE_EXCEPTION" });
+    }
+  }
+  return outcomes;
 }

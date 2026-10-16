@@ -6,6 +6,8 @@ import type { CapacityConfig } from "@/lib/services/capacity-service";
 import { DEFAULT_EXTRA_QUESTIONS, type ChatServiceConfig } from "@/lib/services/chat-service";
 import type { PaymentEnv } from "@/lib/services/ports";
 import { isTossDocsKey } from "./setup-checks";
+import { widgetVariantKeyFrom } from "@/lib/commerce/payment-method";
+import { deployInfoFrom } from "@/lib/ops/deploy-info";
 
 // 웹 채널 서버 설정. 값은 .env.local(로컬) 또는 Vercel 환경변수에서 읽는다.
 // 값이 없으면 해당 기능은 "설정 전"으로 표시되고 동작하지 않는다.
@@ -192,4 +194,14 @@ export function chatAiConfig(): ChatAiConfig {
 export function siteUrl(): string {
   const raw = read("SITE_URL");
   return /^https?:\/\/[^/]+$/.test(raw) ? raw : "http://localhost:3000";
+}
+
+/** 지금 돌고 있는 코드의 배포 정보(브랜치 · 커밋) — Vercel이 넣어 주는 시스템 환경변수. 관리자 화면에만 보인다 (lib/ops/deploy-info.ts) */
+export function deployInfo() {
+  return deployInfoFrom(process.env);
+}
+
+/** 토스 결제위젯의 결제수단 화면(결제 UI) 이름 — 기본 DEFAULT. 카드만 보이는 UI를 따로 만들었다면 TOSS_WIDGET_VARIANT_KEY에 그 이름을 적는다 */
+export function widgetVariantKey(): string {
+  return widgetVariantKeyFrom(process.env.TOSS_WIDGET_VARIANT_KEY);
 }

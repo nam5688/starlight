@@ -2,6 +2,9 @@
 // 실행 전 local-stack.sh start 필요. 실행: npm run test:db
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createHmac, randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -1625,4 +1628,150 @@ test("16번을 적용하기 전 환경(함수 · 열 없음)에서도 앱이 멈
   assert.deepEqual(await old.reserveChatQuestion({ userId: w.U.id, assessmentId: w.aid, roomKey: "love", max: 2 }), { id: null });
   assert.deepEqual(await old.applyCashRefund({ orderId: order.id, canceledTotal: 834 }), { status: "unavailable" });
   assert.equal(await old.countChatQuestionsInRoom(w.U.id, "love"), 0, "함수가 없으면 예전 방식으로 센다");
+});
+
+test("남은 질문이 있는 묶음 목록(정기 점검 · 질문 사용 전 확인): 회원별로 나뉘고, 다 쓴 묶음 · 환불로 정산된 묶음 · 환불된 주문은 빠지며, 오래된 순으로 나온다", async () => {
+  const a = await packWorld("열린묶음A");
+  const b = await packWorld("열린묶음B");
+  const first = await a.buy();
+  const second = await a.buy();
+  const other = await b.buy();
+  // (시험 DB에는 다른 시험에서 남은 묶음이 많을 수 있어 전체 목록은 한도를 크게 잡는다)
+  const ids = async (userId?: string) => (await a.server.listOrdersWithOpenPacks({ ...(userId ? { userId } : {}), limit: 1000 })).map((o) => o.id);
+
+  assert.deepEqual(await ids(a.U.id), [first.id, second.id], "내 묶음 둘 — 오래된 순");
+  assert.deepEqual(await ids(b.U.id), [other.id], "다른 회원의 묶음은 섞이지 않는다");
+  const all = await ids();
+  for (const id of [first.id, second.id, other.id]) assert.ok(all.includes(id), "전체 목록(정기 점검)에는 모두 있다");
+
+  // 가장 먼저 산 묶음을 모두 쓰면 목록에서 빠진다 (질문은 먼저 산 묶음부터 쓰인다)
+  for (let i = 0; i < 3; i++) assert.notEqual(await a.server.spendCash({ userId: a.U.id, amount: a.per, ref: `list-use-${randomUUID().slice(0, 8)}` }), null);
+  assert.deepEqual(await ids(a.U.id), [second.id]);
+
+  // 전액 환불로 정산된 묶음(주문이 환불됨)은 빠진다
+  assert.ok(await a.server.updateOrder(second.id, ["paid"], { status: "refunded" }));
+  assert.deepEqual(await ids(a.U.id), []);
+  // limit 안에서 자른다
+  assert.deepEqual((await b.server.listOrdersWithOpenPacks({ userId: b.U.id, limit: 0 })).length, 0);
+
+  // 정리: 남은 질문을 써서 다른 시험(탈퇴 등)에 영향을 주지 않게 한다
+  await b.server.spendCash({ userId: b.U.id, amount: b.per * 3, ref: `list-clean-${randomUUID().slice(0, 8)}` });
+});
+
+// ───────────── 계좌 송금 환불 절차(운영자가 SQL Editor에서 실행하는 두 파일) ─────────────
+
+// (이 파일의 URL 변수가 전역 URL을 가리므로 경로는 import.meta.dirname으로 만든다)
+const SQL_DIR = join(import.meta.dirname, "..");
+const psqlFile = (sql: string): string => {
+  const file = join(mkdtempSync(join(tmpdir(), "miyu-sql-")), "run.sql");
+  writeFileSync(file, sql, "utf8");
+  return execFileSync("psql", ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-q", "-tA", "-F", "|", "-f", file], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+};
+const checkSql = (orderNumber: string) => readFileSync(join(SQL_DIR, "manual-refund-check.sql"), "utf8").replaceAll("'여기에_주문번호'", `'${orderNumber}'`);
+const applySql = (orderNumber: string, questions: number, memo: string) =>
+  readFileSync(join(SQL_DIR, "manual-refund-apply.sql"), "utf8")
+    .replaceAll("'여기에_주문번호'", `'${orderNumber}'`)
+    .replace(/p_questions\s+int\s+:=\s+\d+;/, `p_questions int := ${questions};`)
+    .replace(/p_memo\s+text\s+:=\s+'[^']*';/, `p_memo text := '${memo}';`);
+const failure = (fn: () => unknown): string => {
+  try {
+    fn();
+  } catch (e) {
+    return String((e as { stderr?: string }).stderr ?? e);
+  }
+  return "";
+};
+
+test("계좌 송금 환불(결제사 취소가 안 될 때): 확인 파일이 보낼 금액을 보여 주고, 반영 파일이 묶음 장부 · 지갑 · 운영 기록을 한 번에 맞추며, 누적 송금액이 정확히 결제액(2,500원)이 된다", async () => {
+  const w = await packWorld("송금환불");
+  const order = await w.buy();
+  const user = w.U.id;
+
+  // ① 확인: 보낼 금액표 (질문 1개 834 · 2개 1667 · 3개 2500)
+  const before = psqlFile(checkSql(order.orderNumber));
+  assert.match(before, new RegExp(`${order.orderNumber} · paid · 2500원`));
+  assert.match(before, /3 · 0 · 0 · 3/, "질문 수 · 쓴 질문 · 환불한 질문 · 남은 질문");
+  assert.match(before, /질문 1개를 환불하려면 보낼 금액.*\|834원/);
+  assert.match(before, /질문 2개를 환불하려면 보낼 금액.*\|1667원/);
+  assert.match(before, /질문 3개를 환불하려면 보낼 금액.*\|2500원/);
+  assert.ok(!before.includes("지난 송금 환불 기록") || !/\|지난 송금 환불 기록\|/.test(before), "아직 송금 환불 기록이 없다");
+
+  // ③ 반영: 1개 (834원) — 날짜가 들어간 메모는 통과한다
+  psqlFile(applySql(order.orderNumber, 1, "송금 2026-10-17 · 접수 3번"));
+  let pack = await w.server.getQuestionPack(order.id);
+  assert.deepEqual(pack && { rq: pack.refundedQuestions, krw: pack.refundedKrw, used: pack.used }, { rq: 1, krw: 834, used: 0 });
+  assert.equal(await w.balance(), 6, "지갑에서 질문 1개(3단위)를 회수했다");
+  assert.equal((await w.server.getOrderByNumber(order.orderNumber))?.status, "paid", "주문 상태는 바꾸지 않는다");
+  const events = await w.server.listOpsEvents({ orderNumber: order.orderNumber, kinds: ["admin.manual_refund"], limit: 5 });
+  assert.equal(events.length, 1);
+  assert.match(events[0].message, /접수 3번/);
+  assert.deepEqual({ q: events[0].detail.questions, sent: events[0].detail.sentKrw, cum: events[0].detail.cumulativeKrw, clawed: events[0].detail.clawed }, { q: 1, sent: 834, cum: 834, clawed: 1 });
+  await w.consistent("송금 환불 1개");
+
+  // ④ 다시 확인: 남은 질문 2개 · 다음 송금액 833 · 1666 · 지난 기록이 보인다
+  const mid = psqlFile(checkSql(order.orderNumber));
+  assert.match(mid, /3 · 0 · 1 · 2/);
+  assert.match(mid, /질문 1개를 환불하려면 보낼 금액.*\|833원/);
+  assert.match(mid, /질문 2개를 환불하려면 보낼 금액.*\|1666원/);
+  assert.match(mid, /지난 송금 환불 기록\|.*질문 1개 · 834원/);
+
+  // 남은 2개를 마저 환불 — 누적 송금액이 정확히 결제액
+  psqlFile(applySql(order.orderNumber, 2, "나머지 환불 접수 4번"));
+  pack = await w.server.getQuestionPack(order.id);
+  assert.deepEqual(pack && { rq: pack.refundedQuestions, krw: pack.refundedKrw }, { rq: 3, krw: 2500 });
+  assert.equal(await w.balance(), 0);
+  const all = await w.server.listOpsEvents({ orderNumber: order.orderNumber, kinds: ["admin.manual_refund"], limit: 5 });
+  assert.equal(all.reduce((sum, e) => sum + Number(e.detail.sentKrw), 0), 2500, "송금 기록의 합 = 결제액 (834 + 1666)");
+  await w.consistent("송금 환불 전부");
+
+  // 더 환불할 질문이 없으면 거부하고 아무것도 바꾸지 않는다
+  assert.match(failure(() => psqlFile(applySql(order.orderNumber, 1, "한 번 더"))), /환불할 수 있는 질문은 0 개까지/);
+  assert.equal((await w.server.getQuestionPack(order.id))?.refundedKrw, 2500);
+  assert.equal((await w.server.listOpsEvents({ orderNumber: order.orderNumber, kinds: ["admin.manual_refund"], limit: 5 })).length, 2);
+  assert.equal(user.length > 0, true);
+});
+
+test("계좌 송금 환불은 잘못된 입력을 거부하고 아무것도 바꾸지 않는다: 계좌번호 · 전화번호가 든 메모 · 없는 주문 · 질문 묶음이 아닌 주문 · 환불된 주문 · 0개", async () => {
+  const w = await packWorld("송금환불거부");
+  const order = await w.buy();
+  const snapshot = async () => ({ pack: await w.server.getQuestionPack(order.id), balance: await w.balance(), events: (await w.server.listOpsEvents({ orderNumber: order.orderNumber, kinds: ["admin.manual_refund"], limit: 5 })).length });
+  const start = await snapshot();
+
+  assert.match(failure(() => psqlFile(applySql(order.orderNumber, 1, "국민 110-123-456789 로 송금"))), /계좌번호 · 전화번호는 적지 마세요/);
+  assert.match(failure(() => psqlFile(applySql(order.orderNumber, 1, "연락처 01012345678"))), /계좌번호 · 전화번호는 적지 마세요/);
+  assert.match(failure(() => psqlFile(applySql(order.orderNumber, 0, "개수 0"))), /1 이상/);
+  assert.match(failure(() => psqlFile(applySql(order.orderNumber, 4, "너무 많이"))), /3 개까지 남았는데 4 개/);
+  assert.match(failure(() => psqlFile(applySql("MEU-NOPE-000000", 1, "없는 주문"))), /찾지 못했습니다/);
+  assert.deepEqual(await snapshot(), start, "거부된 요청은 아무것도 바꾸지 않았다");
+
+  // 질문 묶음이 아닌 주문(개인 통합 리포트) · 환불된 주문
+  const personal = await w.server.insertOrder({ orderNumber: createOrderNumber(new Date()), userId: w.U.id, assessmentId: w.aid, productId: "personal-integrated-report", amount: 9900, paymentEnv: "test" });
+  assert.ok(personal.ok);
+  if (personal.ok) {
+    await w.server.updateOrder(personal.value.id, ["pending"], { status: "paid", paymentKey: `pk-${randomUUID()}`, approvedAt: new Date().toISOString() });
+    assert.match(failure(() => psqlFile(applySql(personal.value.orderNumber, 1, "리포트 주문"))), /질문 묶음 주문이 아닙니다/);
+  }
+  const second = await w.buy();
+  await w.server.updateOrder(second.id, ["paid"], { status: "refunded" });
+  assert.match(failure(() => psqlFile(applySql(second.orderNumber, 1, "이미 환불됨"))), /결제 완료 주문이 아닙니다/);
+
+  // 확인 파일은 없는 주문번호에서 "찾지 못했습니다"를 보여 준다
+  assert.match(psqlFile(checkSql("MEU-NOPE-000000")), /이 주문번호를 찾지 못했습니다/);
+  // 정리: 남은 질문을 써서 다른 시험에 영향을 주지 않게 한다
+  await w.server.spendCash({ userId: w.U.id, amount: w.per * 3, ref: `mr-clean-${randomUUID().slice(0, 8)}` });
+});
+
+test("계좌 송금 환불 뒤에도 결제 재확인(대조)이 이상으로 보지 않는다: 토스 기록은 결제 완료(DONE) 그대로라 ok이고, 장부의 환불 반영은 되돌려지지 않는다", async () => {
+  const w = await packWorld("송금환불대조");
+  const order = await w.buy();
+  psqlFile(applySql(order.orderNumber, 1, "송금 완료"));
+  const toss = createFakeToss(() => new Date());
+  // 토스에는 같은 주문의 결제가 승인(DONE) 상태로 남아 있다
+  toss.approveBehindOurBack(`pk-manual-${randomUUID().slice(0, 6)}`, order.orderNumber, order.amount);
+  const fresh = (await w.server.getOrderById(order.id))!;
+  const out = await reconcileOrder({ repo: w.server, gateway: toss.gateway, now: () => new Date() }, { ...fresh, paymentKey: null });
+  assert.equal(out.kind, "ok");
+  assert.equal((await w.server.getQuestionPack(order.id))?.refundedQuestions, 1);
+  assert.equal(await w.balance(), 6);
+  await w.server.spendCash({ userId: w.U.id, amount: w.per * 2, ref: `mr-clean-${randomUUID().slice(0, 8)}` });
 });

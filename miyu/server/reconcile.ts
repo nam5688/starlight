@@ -2,14 +2,15 @@ import "server-only";
 import { after } from "next/server";
 import { newErrorId } from "@/lib/ops/redact";
 import type { OrderRecord } from "@/lib/services/ports";
-import { reconcileBatch, reconcileOrder, type ReconcileOptions, type ReconcileOutcome, type ReconcileSummary } from "@/lib/services/reconcile-service";
+import { reconcileBatch, reconcileOpenPacksOfUser, reconcileOrder, type ReconcileOptions, type ReconcileOutcome, type ReconcileSummary } from "@/lib/services/reconcile-service";
 import { paymentConfig } from "./env";
 import { alert, logError, notifyOrderEvent, notifyPartialRefund, recordOps } from "./ops";
 import { queueAndScheduleReport, runReportInline } from "./report-jobs";
 import { now, paymentGateway, writeRepository } from "./services";
 
 // 결제사 기록과 우리 주문을 대조해 맞춘다 (lib/services/reconcile-service.ts).
-// 실행 방법: ① 정기 실행 주소(/api/cron/reconcile) ② 관리자 화면 버튼 ③ 고객이 MY · 결과 · 주문 화면을 열 때 본인 대기 주문만
+// 실행 방법: ① 정기 실행 주소(/api/cron/reconcile) ② 관리자 화면 버튼 ③ 고객이 MY · 결과 · 주문 화면을 열 때 본인 대기 주문과 남은 질문이 있는 묶음
+// ④ 고객이 결제한 질문을 쓰기 직전(verifyPacksBeforeUse) — 정기 실행이 하루 한 번뿐이어도, 고객이 다시 접속하지 않아도 환불된 질문을 쓰지 못하게 하는 안전장치
 
 /**
  * 리포트 준비 방식
@@ -93,7 +94,29 @@ export async function reconcileOneNow(order: OrderRecord): Promise<ReconcileOutc
 }
 
 /**
- * 고객이 화면을 열 때, 본인의 오래된 대기 주문만 응답 뒤 백그라운드에서 대조한다.
+ * 결제한 질문을 쓰기 직전 확인 — 이 회원의 남은 질문이 있는 묶음을 결제사 기록으로 다시 확인해 부분 · 전액 취소를 장부에 먼저 반영한다.
+ * 결제사 조회가 실패해도 질문은 막지 않는다(fail-open): 한 질문(약 833원)을 잘못 내주는 것보다 결제사 장애 때 유료 질문을 모두 막는 쪽이 더 크다.
+ * 대신 실패는 운영 기록(`pack.verify_failed`, 알림은 하루 한 번)으로 남고 정기 점검 · 결제 재확인이 이어서 맞춘다. 고객 정보 · 질문 내용은 기록에 넣지 않는다.
+ */
+export async function verifyPacksBeforeUse(userId: string): Promise<void> {
+  if (!paymentConfig().ok) return;
+  try {
+    const outcomes = await reconcileOpenPacksOfUser(deps("inline"), userId);
+    for (const outcome of outcomes) {
+      if (outcome.kind === "error") {
+        await recordOps({ kind: "pack.verify_failed", severity: "warn", orderNumber: outcome.order.orderNumber, message: `질문을 쓰기 전 결제사 확인에 실패해 확인 없이 진행했습니다 (${outcome.code})` });
+        await alert({ kind: "pack.verify_failed", severity: "warn", title: "질문 사용 전 환불 확인 실패 — 확인 없이 진행됨", orderNumber: outcome.order.orderNumber, dedupeKey: `pack-verify:${outcome.order.orderNumber}`, dedupeMs: 24 * 3600_000, lines: [outcome.code, "결제사 조회가 계속 실패하면 /admin의 결제 재확인으로 맞춰 주세요"] });
+      } else {
+        await report(outcome);
+      }
+    }
+  } catch (e) {
+    logError("pack.verify-before-use", e);
+  }
+}
+
+/**
+ * 고객이 화면을 열 때, 본인의 오래된 대기 주문과 남은 질문이 있는 묶음만 응답 뒤 백그라운드에서 대조한다.
  * 결제가 승인됐는데 돌아오지 못한 고객이 MY를 열면 자동으로 맞춰진다. 실패해도 화면에는 영향이 없다.
  * userId는 로그인 확인을 마친 회원 번호만 넘긴다 (after 안에서는 로그인 쿠키를 읽을 수 없어 서버 저장소로 본인 주문만 조회한다).
  */
@@ -121,6 +144,8 @@ export function reconcileUserInBackground(userId: string): void {
           logError("reconcile.user", e);
         }
       }
+      // 결제한 지 오래돼도 남은 질문이 있는 묶음은 결제사 기록과 맞는지 확인한다 (환불된 질문이 남은 질문 수에 남아 보이지 않게)
+      await verifyPacksBeforeUse(userId);
     } catch (e) {
       logError("reconcile.user", e);
     }

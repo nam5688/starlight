@@ -87,6 +87,11 @@ export type AskDeps = {
   /** 테스트용: 결제한 질문 사용 참조번호를 정한다 */
   newRef?: () => string;
   /**
+   * 결제한 질문을 쓰기 직전에 부른다 — 이 회원의 남은 질문이 있는 묶음을 결제사 기록으로 다시 확인해, 결제사에서 이미 환불한 질문이 있으면 장부에 먼저 반영한다.
+   * 이 확인이 실패해도(결제사 조회 장애 등) 질문은 막지 않는다 — 부르는 쪽이 오류를 삼키고 운영 기록만 남기며, 환불은 정기 점검 · 알림이 이어서 맞춘다.
+   */
+  verifyBeforeUse?: (userId: string) => Promise<void>;
+  /**
    * 이 질문에 쓸 자료와 기준 날짜. tier는 구매해 준비된 리포트가 있으면 paid(심층 리포트), 없으면 free(무료 리포트).
    * room · roomKey는 서버가 정한 값이다(오늘의 운세 방은 날짜별 방). 분석 결과를 찾지 못하면 null.
    */
@@ -286,6 +291,13 @@ async function askFreeQuestionNow(deps: AskDeps, input: AskInput): Promise<AskRe
   let cashRef: string | null = null;
   let balance: number | null = null;
   if (!useFree) {
+    // 결제사에서 이미 환불된 질문을 쓰지 않도록 쓰기 직전에 결제사 기록을 다시 확인한다(고객이 화면을 다시 열지 않았거나 정기 점검이 아직 오지 않았어도 반영된다).
+    // 확인에 실패해도 질문은 막지 않는다 — 한 질문(약 833원)을 잘못 내주는 것보다 장애 때 모든 질문을 막는 쪽이 더 크다고 보고, 실패는 운영 기록 · 알림으로 남는다.
+    try {
+      await deps.verifyBeforeUse?.(input.userId);
+    } catch {
+      // 확인 실패는 부르는 쪽이 기록한다
+    }
     const ref = (deps.newRef ?? defaultRef)();
     try {
       balance = await repo.spendCash({ userId: input.userId, amount: MIYU_CASH.perQuestion, ref });

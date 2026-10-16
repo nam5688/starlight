@@ -336,6 +336,12 @@ export interface MiyuRepository {
 
   /** 재확인 대상: 일정 시간 넘게 "대기"인 주문 + 최근에 결제 완료된 주문 (결제사 기록과 어긋나는지 확인) */
   listOrdersForReconcile(opts: { pendingCreatedBefore: string; paidSince: string; limit: number }): Promise<OrderRecord[]>;
+  /**
+   * 남은 질문이 있는 묶음의 결제 완료 주문(오래된 순) — 결제한 지 오래돼도 결제사에서 부분 취소될 수 있어 정기 점검과 질문 사용 전 확인이 나이와 상관없이 다시 확인한다.
+   * userId가 있으면 그 회원의 것만(질문을 쓰기 전 확인 — 모두 읽는다), 없으면 전체(정기 점검 — 묶음이 아주 많으면 최근 1,000개 안에서만 찾는다).
+   * 묶음 장부가 없으면(DB 변경 16번 전) 빈 목록.
+   */
+  listOrdersWithOpenPacks(opts: { userId?: string; limit: number }): Promise<OrderRecord[]>;
   /** 관리자 화면용 */
   listRecentOrders(limit: number): Promise<OrderRecord[]>;
   getOrderById(id: string): Promise<OrderRecord | null>;

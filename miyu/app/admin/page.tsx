@@ -10,7 +10,8 @@ import { getAdminOverview, adminLookup, type AdminReportRow, type OrderTraceForA
 import { recentOrdersForAdmin, type AdminRecentOrder } from "@/lib/services/admin-support-service";
 import { costSummary, saleGate, type CapacityConfig, type CostSummary, type SaleGate } from "@/lib/services/capacity-service";
 import type { OpsEventRecord } from "@/lib/services/ports";
-import { capacityConfig, telegramEnv } from "@/server/env";
+import { DEPLOY_WHERE_LABEL, deployNotes } from "@/lib/ops/deploy-info";
+import { capacityConfig, deployInfo, telegramEnv } from "@/server/env";
 import { isTestEnvironment } from "@/server/ops";
 import { getAdminMember } from "@/server/member";
 import { now, writeRepository } from "@/server/services";
@@ -40,7 +41,17 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
   const note = typeof params.note === "string" ? params.note.slice(0, 200) : "";
   const repo = writeRepository();
   const cfg = capacityConfig();
-  const [overview, lookup, gate, cost, recent] = await Promise.all([getAdminOverview(repo, now()), adminLookup(repo, q, now()), saleGate(repo, cfg, now(), "start"), costSummary(repo, cfg, now()), recentOrdersForAdmin(repo, now(), 30)]);
+  const [overview, lookup, gate, cost, recent, heartbeat] = await Promise.all([
+    getAdminOverview(repo, now()),
+    adminLookup(repo, q, now()),
+    saleGate(repo, cfg, now(), "start"),
+    costSummary(repo, cfg, now()),
+    recentOrdersForAdmin(repo, now(), 30),
+    repo.listOpsEvents({ kinds: ["cron.heartbeat"], limit: 1 }),
+  ]);
+  const deploy = deployInfo();
+  const lastCron = heartbeat[0] ?? null;
+  const notes = deployNotes(deploy, lastCron?.createdAt ?? null, now());
   const { counts } = overview;
 
   return (
@@ -88,6 +99,43 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
           사업 지표 보기 (단계별 흐름 · 매출 · 광고 채널 · 만족도)
         </Link>
       </p>
+
+      <section aria-labelledby="a-deploy">
+        <h2 id="a-deploy" className="text-[18px] font-bold">
+          배포 정보 · 정기 점검
+        </h2>
+        <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-[14px] sm:grid-cols-[auto_1fr]">
+          <dt className="text-ink-3">환경</dt>
+          <dd>{DEPLOY_WHERE_LABEL[deploy.where]}</dd>
+          <dt className="text-ink-3">브랜치</dt>
+          <dd className="font-mono text-[13px]">{deploy.branch ?? "-"}</dd>
+          <dt className="text-ink-3">커밋</dt>
+          <dd className="font-mono text-[13px]">
+            {deploy.commitShort ? (
+              deploy.commitUrl ? (
+                <a href={deploy.commitUrl} target="_blank" rel="noreferrer" className={textLink}>
+                  {deploy.commitShort}
+                </a>
+              ) : (
+                deploy.commitShort
+              )
+            ) : (
+              "-"
+            )}
+          </dd>
+          <dt className="text-ink-3">정기 점검 마지막 실행</dt>
+          <dd>{lastCron ? `${time(lastCron.createdAt)} (${lastCron.message})` : "기록 없음"}</dd>
+        </dl>
+        <ul className="mt-3 space-y-1.5 text-[14px] leading-relaxed">
+          {notes.map((n) => (
+            <li key={n.text} className={n.level === "warn" ? "text-caution" : "text-ink-2"}>
+              {n.level === "warn" ? "확인 필요 · " : "정상 · "}
+              {n.text}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-3">커밋 번호는 GitHub의 작업 브랜치 커밋 목록에서 찾아 올리려던 버전(8128fab 또는 그 이후)인지 확인하세요. 비밀값은 이 화면에 나오지 않습니다.</p>
+      </section>
 
       <section aria-labelledby="a-capacity">
         <h2 id="a-capacity" className="text-[18px] font-bold">
