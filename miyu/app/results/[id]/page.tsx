@@ -5,7 +5,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ReportFeedback } from "@/components/results/report-feedback";
+import { MiyuFirst } from "@/components/results/miyu-first";
 import { TalkEntry } from "@/components/results/talk-entry";
+import { talkRoomPath } from "@/components/talk/room-paths";
 import { buildTalkModel } from "@/lib/report/reading/talk";
 import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
 import { availableRooms } from "@/lib/report/reading/talk-room";
@@ -172,11 +174,16 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   const inviteQuote = view.paidOrder ? null : await quoteInviteDiscount(writeRepository(), { token: await peekInviteToken(), userId: member.userId });
   // 잠긴 내용은 서버에서 아예 만들지 않는다 — 전체 요약 · 점수는 구매 후 리포트에만
   const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
+  const freeRooms = availableRooms(
+    buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" }, taste: view.taste?.kind === "ready" ? view.taste.report : null }),
+  );
   return (
     <>
       <ClearAnalyzeDraft />
       <Track name="preview_view" />
       <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위입니다." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      {/* 분석을 마친 직후의 두 선택 — 미유가 먼저 풀어 주는 길 / 바로 전체 리포트 읽기 (운영자 방향 2026-10-16) */}
+      {freeRooms.includes("main") && <MiyuFirst talkHref={talkRoomPath(assessment.id, "main")} reportHref="#r-tendency" />}
       <ReadingNav
         expandAll={false}
         items={[
@@ -207,9 +214,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
         tier="simple"
         chatReady={chatConnected()}
         buyHref={view.paidOrder ? undefined : "#r-purchase"}
-        rooms={availableRooms(
-          buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" }, taste: view.taste?.kind === "ready" ? view.taste.report : null }),
-        )}
+        rooms={freeRooms}
         remembered={await peekRoomChoice()}
       />
       <div className="mx-auto w-full max-w-[720px] space-y-12 px-5 pt-12 pb-16">

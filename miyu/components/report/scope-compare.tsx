@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { CheckIcon, ChevronIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
-import { buttonPrimary, pageWide } from "@/components/ui/styles";
+import { buttonPrimary } from "@/components/ui/styles";
 import { CHAT_ROOMS, formatKrw, PERSONAL_REPORT, REPORT_SCOPE, REPORT_TIER_NAMES } from "@/lib/config/product";
 
 /**
- * 홈의 가격 구역 — 긴 항목표 대신 무료 · 유료 카드 두 개(운영자 제안 2026-10-16).
+ * 무료 리포트 · 심층 리포트의 제공 범위와 상담 이용 조건 — 리포트 예시 페이지(/report/sample)에 모은다(운영자 제안 2026-10-16: 홈에는 기본 가격만 두고 상세 항목은 예시 페이지로).
  * 카드의 줄은 `REPORT_SCOPE`(무료 / 구매 후 범위의 한 곳) · `CHAT_ROOMS`(방마다 무료 질문 수)를 줄여 쓴 것이다. 범위를 바꾸면 이 줄도 같이 고친다.
- * 자세한 항목표는 "전체 제공 항목 보기"에 접어 두고, 무료 질문을 다 쓴 뒤 이어 가는 방법은 가격 · 약속을 하지 않고 채팅 화면에서 안내한다고만 밝힌다.
+ * 자세한 항목표는 "전체 제공 항목과 상담 이용 횟수 보기"에 접어 두고, 무료 질문을 다 쓴 뒤 이어 가는 방법은 가격 · 약속을 하지 않고 채팅 화면에서 안내한다고만 밝힌다.
+ * 무료는 핵심을 완결해 설명하고 심층은 삶의 영역과 해석의 깊이를 넓힌다 — 예전의 "답을 가렸다가 유료에서 연다"는 비교는 쓰지 않는다.
  */
 const FREE_ITEMS = ["대표 경향 이름과 한 줄 요약 · 핵심 요약 일부", "사주 원국 표와 쉬운 풀이", "상황별 해석의 첫 장면 · 내 원국이 던지는 질문", "무료 상담방과 방마다 정해진 무료 질문"];
 const DEEP_ITEMS = [
@@ -18,12 +19,13 @@ const DEEP_ITEMS = [
   "모든 상담방 열림 · MY 저장 · 다시보기",
 ];
 
-export function PriceSection() {
+export function ScopeCompare() {
   return (
-    <section aria-labelledby="home-price" className={`${pageWide} py-12 md:py-16`}>
-      <h2 id="home-price" className="text-[22px] leading-snug font-bold tracking-tight md:text-[28px]">
-        무료로 먼저 보고, 더 궁금할 때 깊게 알아보세요.
+    <section aria-labelledby="sample-scope" className="mx-auto w-full max-w-[720px] px-5 py-12 md:py-16">
+      <h2 id="sample-scope" className="text-[22px] leading-snug font-bold tracking-tight md:text-[26px]">
+        무료와 심층 리포트, 무엇이 다른가요
       </h2>
+      <p className="mt-2 text-[15px] leading-[1.7] text-ink-2">무료 리포트는 핵심을 끝까지 풀어 주고, 심층 리포트는 삶의 영역과 해석의 깊이를 넓혀요. 가격과 이용 조건은 아래에서 확인할 수 있어요.</p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl bg-canvas p-6 shadow-soft">
@@ -111,7 +113,7 @@ export function PriceSection() {
 
       <div className="mt-6">
         <Link href="/analyze" className={`${buttonPrimary} w-full sm:w-auto sm:px-10`}>
-          무료 분석 시작하기
+          내 사주 무료로 보기
         </Link>
       </div>
     </section>
