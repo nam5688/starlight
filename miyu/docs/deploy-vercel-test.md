@@ -91,6 +91,14 @@
 4. "확인 필요" 문구가 있으면 그 문장대로 고친다(예: 커밋 번호를 읽지 못함 → 4단계 2번).
 5. **정기 점검 마지막 실행**은 배포한 **다음 날**(한국 새벽 3시대) 다시 열어 시각이 찍혔는지 본다. 기록 없음이면 Settings → Cron Jobs에서 정기 실행이 켜져 있는지, `CRON_SECRET`이 있는지 확인한다.
 
+## 화면에서 자주 만나는 문구
+
+| 보이는 문구 | 뜻 | 할 일 |
+| --- | --- | --- |
+| Framework Settings → **"Configuration Settings in the current Production deployment differ from your current Project Settings"** · Production Overrides에 **Astro** | 지금 Production 배포가 `main`(예전 Astro 템플릿)을 빌드한 것이고, 프로젝트 설정(Next.js · Root Directory `miyu`)은 미유 기준이라 서로 다르다는 안내다. **정상이다** | 고치지 않는다. **"Production Overrides"는 켜지 않는다**(켜면 Astro로 고정된다). 3단계로 Production 브랜치를 작업 브랜치로 바꾸고 새로 배포하면 사라진다 |
+| Root Directory 칸이 **비어 있다** | 저장소 맨 위(예전 템플릿)를 빌드한다 | Settings → General → Root Directory에 `miyu`를 넣고 Save |
+| 처음 배포가 빨간색(실패) · 또는 Astro 화면이 보인다 | `main`에는 `miyu/`가 없다 | 아무것도 공개되지 않는다(템플릿뿐). 3 · 6단계로 작업 브랜치를 배포한다 |
+
 ## 알려진 한계 · 결정이 필요한 것
 
 - **정기 점검이 하루 한 번뿐이다(Hobby).** 그래서 "고객이 다시 접속하지 않아도 환불이 반영되는가"는 정기 점검에만 기대지 않는다: **질문을 쓰기 직전에 결제사 기록을 다시 확인한다**(결제사 조회가 실패하면 질문은 막지 않고 운영 기록 · 알림에 남긴다). 5~10분마다 점검이 필요하면 Pro로 올리고 `vercel.json`의 시각을 바꾼다.
