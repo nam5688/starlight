@@ -46,7 +46,7 @@ export async function saveContextAction(assessmentId: string, _prev: ContextForm
     if (isMissingTableError(e as { code?: string })) return { errors: [NOT_READY], values: raw };
     throw e;
   }
-  if (result.kind === "not-found") return { errors: ["결과를 찾을 수 없습니다."], values: null };
+  if (result.kind === "not-found") return { errors: ["결과를 찾을 수 없어요."], values: null };
   if (result.kind === "invalid") return { errors: result.errors, values: raw };
   const q = new URLSearchParams({ saved: result.changed ? "1" : "same" });
   if (result.redactions) q.set("redacted", String(result.redactions));

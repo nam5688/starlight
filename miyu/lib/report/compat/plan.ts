@@ -6,7 +6,7 @@
 // 상대의 응답(기질 · 성격 · 애착)은 쓰지 않는다 — 두 사람이 각자 응답한 내용을 비교하는 것은 별도 상품(리포트 궁합)이다.
 
 export const COMPAT_REPORT_KIND = "compat-saju-v1" as const;
-export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.3";
+export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.4";
 
 /**
  * 두 사람의 시기(대운 · 세운)를 계산하는가 — 계산한다(compat-timing.ts, 각자의 계산 결과를 나란히 놓는 범위). 단 근거 목록에 compat.timing.*이 있을 때만 timing 영역을 쓰고,
@@ -80,7 +80,7 @@ export const COMPAT_SECTIONS: CompatSectionPlan[] = [
 // 사주 궁합과 같은 엔진 · 같은 위쪽 요약(cardOf)을 쓰고, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*, pair-evidence.ts)를 더해 "응답" 영역을 하나 둔다.
 // 저장되는 글에는 이름 · 생년월일 · 응답 원문 · 점수가 없다 — 본문은 "A님 · B님"이고 화면이 읽는 사람에게 누가 누구인지 알려 준다.
 export const PAIR_REPORT_KIND = "compat-pair-v1" as const;
-export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.1";
+export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.2";
 
 const RESPONSE_SECTION: CompatSectionPlan = {
   id: "response",

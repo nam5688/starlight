@@ -12,7 +12,7 @@ export function LockedText({ chars = 24, className = "" }: { chars?: number; cla
       <span aria-hidden="true" className={`select-none blur-[5px] ${className}`}>
         {FILLER.slice(0, chars)}
       </span>
-      <span className="sr-only">구매 후 공개되는 내용입니다</span>
+      <span className="sr-only">구매 후 공개되는 내용이에요</span>
     </>
   );
 }

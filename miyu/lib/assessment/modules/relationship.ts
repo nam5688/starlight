@@ -9,21 +9,21 @@ import type { AssessmentModule } from "../types.ts";
 export const relationshipModule: AssessmentModule = {
   id: "relationship",
   title: "관계(애착)",
-  intro: "가까운 관계에서 느끼는 마음과 평소 행동에 대해 묻습니다.",
+  intro: "가까운 관계에서 느끼는 마음과 평소 행동에 대해 물어요.",
   status: "dev-example",
   version: "dev-0.1",
   dimensions: [
     {
       id: "anxiety",
       label: "관계 불안",
-      lowMeaning: "관계의 작은 신호에 크게 흔들리지 않습니다",
+      lowMeaning: "관계의 작은 신호에 크게 흔들리지 않아요",
       highMeaning: "관계가 불확실하면 상대의 반응을 확인하고 싶어집니다",
     },
     {
       id: "avoidance",
       label: "거리 두기",
-      lowMeaning: "가까워지고 기대는 것이 비교적 편합니다",
-      highMeaning: "가까워질수록 혼자만의 거리가 필요합니다",
+      lowMeaning: "가까워지고 기대는 것이 비교적 편해요",
+      highMeaning: "가까워질수록 혼자만의 거리가 필요해요",
     },
   ],
   items: [

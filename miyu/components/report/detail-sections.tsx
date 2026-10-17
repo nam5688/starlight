@@ -23,7 +23,7 @@ export function DetailSections({ report, showChart = true }: { report: FullRepor
             <dd className="mt-0.5 text-[20px] font-bold tracking-wide">{report.knownMbti ?? "입력 안 함"}</dd>
           </div>
         </dl>
-        <p className="mt-2 text-[13px] text-ink-3">본인이 입력한 값은 참고용이며, 미유의 응답 결과와 비교하거나 유형으로 바꾸지 않고 따로 표시합니다.</p>
+        <p className="mt-2 text-[13px] text-ink-3">본인이 입력한 값은 참고용이며, 미유의 응답 결과와 비교하거나 유형으로 바꾸지 않고 따로 표시해요.</p>
       </Detail>
 
       <Detail title="기질" headline={`두드러진 지표: ${strongest}`} block={details.temperament} />
@@ -82,7 +82,7 @@ function Detail({
 
 export function SajuChart({ saju, showGlossary = true }: { saju: SajuSection; showGlossary?: boolean }) {
   if (saju.status === "not-connected") {
-    return <p className="text-[15px] text-ink-2">만세력 계산 결과가 없는 결과입니다.</p>;
+    return <p className="text-[15px] text-ink-2">만세력 계산 결과가 없는 결과예요.</p>;
   }
   const total = saju.elements.reduce((n, e) => n + e.count, 0);
   return (

@@ -40,7 +40,7 @@ export function BasicInfoStep({
             닉네임 <span className="text-[14px] font-normal text-ink-3">필수</span>
           </label>
           <p id="nickname-help" className="mt-1 text-[14px] text-ink-3">
-            결과 화면에서 부를 이름입니다. 실명이 아니어도 됩니다.
+            결과 화면에서 부를 이름이에요. 실명이 아니어도 돼요.
           </p>
           <input
             id="nickname"
@@ -175,7 +175,7 @@ export function BasicInfoStep({
             출생시간
           </label>
           <p id="birthTime-help" className="mt-1 text-[14px] leading-relaxed text-ink-3">
-            모르면 태어난 시간의 기둥인 시주를 빼고 분석합니다. 임의의 시간을 넣어 계산하지 않습니다.
+            모르면 태어난 시간의 기둥인 시주를 빼고 분석해요. 임의의 시간을 넣어 계산하지 않아요.
           </p>
           <input
             id="birthTime"
@@ -235,7 +235,7 @@ export function BasicInfoStep({
             알고 있는 MBTI <span className="text-[14px] font-normal text-ink-3">선택</span>
           </label>
           <p id="knownMbti-help" className="mt-1 text-[14px] leading-relaxed text-ink-3">
-            참고값으로 따로 표시합니다. 입력해도 이어지는 질문은 그대로 진행합니다.
+            참고값으로 따로 표시해요. 입력해도 이어지는 질문은 그대로 진행해요.
           </p>
           <select
             id="knownMbti"
@@ -260,7 +260,7 @@ export function BasicInfoStep({
             거주·활동 지역 <span className="text-[14px] font-normal text-ink-3">선택</span>
           </legend>
           <p id="region-help" className="mt-1 text-[14px] leading-relaxed text-ink-3">
-            성향 분석에는 사용하지 않습니다. 이후 장소 추천 기능에만 사용할 예정입니다.
+            성향 분석에는 사용하지 않아요. 이후 장소 추천 기능에만 사용할 예정이에요.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <div>

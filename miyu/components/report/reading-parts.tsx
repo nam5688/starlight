@@ -301,7 +301,7 @@ export function LuckTimelineCard({ timeline, reference, className = "mt-5", soft
 /** 접어 둔 "분석 근거" — 사주 계산 결과와 전통 해석 규칙을 나누고, 응답 · 다르게 나온 부분 · 아직 확인되지 않은 것을 칸으로 나누어 적는다 */
 export function BasisList({ basis }: { basis: ReadingBasis }) {
   const groups: { label: string; items: string[]; note?: string }[] = [
-    { label: "사주 계산 결과", items: basis.computed, note: "만세력 엔진이 계산한 값입니다." },
+    { label: "사주 계산 결과", items: basis.computed, note: "만세력 엔진이 계산한 값이에요." },
     { label: "전통 해석 규칙", items: basis.tradition, note: "계산 결과를 읽는 규칙이며 검증된 사실이 아닙니다." },
     { label: "응답 · 본인 입력", items: basis.answers },
     ...(basis.differences?.length ? [{ label: "서로 다르게 나온 부분", items: basis.differences }] : []),

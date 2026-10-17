@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         orderNumber: result.order.orderNumber,
         errorId: newErrorId(),
         dedupeKey: `anomaly:${result.order.orderNumber}:${result.code}`,
-        lines: [result.message, "환불은 토스페이먼츠 관리자에서 직접 실행합니다 (미유는 환불을 실행하지 않습니다)"],
+        lines: [result.message, "환불은 토스페이먼츠 관리자에서 직접 실행해요 (미유는 환불을 실행하지 않아요)"],
       });
     }
     return Response.json({ ok: true, result: result.kind });

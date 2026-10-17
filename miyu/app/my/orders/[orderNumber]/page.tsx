@@ -76,12 +76,12 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
             {trace.entitled
               ? cashOrderKind(trace.cash) !== "legacy"
                 ? cashOrderKind(trace.cash) === "pack"
-                  ? `서버가 결제 승인을 확인해 질문 ${QUESTION_PACK_SIZE}개를 결제 완료로 기록했습니다. 채팅방에서 질문을 보낼 때마다 하나씩 쓰이고, 쓰지 않은 질문은 남아 있다가 이어서 쓸 수 있습니다. 답을 받지 못한 질문은 쓰이지 않습니다.`
-                  : "서버가 결제 승인을 확인해 질문 한 개를 결제 완료로 기록했습니다. 채팅방에서 질문이 쓰이고, 답을 받지 못하면 같은 결제로 다시 물을 수 있습니다."
-                : `서버가 결제 승인을 확인해 지갑에 ${trace.cash.credited}캐시(충전 ${trace.cash.cash}${trace.cash.bonus > 0 ? ` + 보너스 ${trace.cash.bonus}` : ""})가 들어갔습니다.`
+                  ? `서버가 결제 승인을 확인해 질문 ${QUESTION_PACK_SIZE}개를 결제 완료로 기록했어요. 채팅방에서 질문을 보낼 때마다 하나씩 쓰이고, 쓰지 않은 질문은 남아 있다가 이어서 쓸 수 있어요. 답을 받지 못한 질문은 쓰이지 않아요.`
+                  : "서버가 결제 승인을 확인해 질문 한 개를 결제 완료로 기록했어요. 채팅방에서 질문이 쓰이고, 답을 받지 못하면 같은 결제로 다시 물을 수 있어요."
+                : `서버가 결제 승인을 확인해 지갑에 ${trace.cash.credited}캐시(충전 ${trace.cash.cash}${trace.cash.bonus > 0 ? ` + 보너스 ${trace.cash.bonus}` : ""})가 들어갔어요.`
               : trace.cash.credited > 0 && trace.cash.clawedBack > 0
-                ? `결제가 취소되어 이 결제로 들어간 질문 ${trace.cash.credited / MIYU_CASH.perQuestion}개 중 ${trace.cash.clawedBack / MIYU_CASH.perQuestion}개를 회수했습니다.${trace.cash.shortfall > 0 ? ` 이미 사용한 ${trace.cash.shortfall / MIYU_CASH.perQuestion}개는 회수하지 못해 운영자가 확인합니다.` : ""}`
-                : "결제 승인이 확인되지 않아 질문이 결제 완료로 기록되지 않았습니다. 결제 성공 화면으로 이동했더라도 서버 승인 기록이 없으면 결제 완료가 아닙니다."}
+                ? `결제가 취소되어 이 결제로 들어간 질문 ${trace.cash.credited / MIYU_CASH.perQuestion}개 중 ${trace.cash.clawedBack / MIYU_CASH.perQuestion}개를 회수했어요.${trace.cash.shortfall > 0 ? ` 이미 사용한 ${trace.cash.shortfall / MIYU_CASH.perQuestion}개는 회수하지 못해 운영자가 확인해요.` : ""}`
+                : "결제 승인이 확인되지 않아 질문이 결제 완료로 기록되지 않았어요. 결제 성공 화면으로 이동했더라도 서버 승인 기록이 없으면 결제 완료가 아니에요."}
           </p>
           {trace.cash.pack && trace.cash.pack.refundedQuestions > 0 && order.status === "paid" && (
             <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
@@ -101,8 +101,8 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
           </h2>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
             {trace.entitled
-              ? `서버가 결제 승인을 확인해 전체 리포트 열람 권한이 있습니다. 생성 상태: ${GENERATION_LABEL[trace.generation] || "생성 전"}.`
-              : "결제 승인이 확인되지 않아 전체 리포트 열람 권한이 없습니다. 결제 성공 화면으로 이동했거나 리포트가 보였더라도, 서버 승인 기록이 없으면 결제 완료가 아닙니다."}
+              ? `서버가 결제 승인을 확인해 전체 리포트 열람 권한이 있어요. 생성 상태: ${GENERATION_LABEL[trace.generation] || "생성 전"}.`
+              : "결제 승인이 확인되지 않아 전체 리포트 열람 권한이 없어요. 결제 성공 화면으로 이동했거나 리포트가 보였더라도, 서버 승인 기록이 없으면 결제 완료가 아니에요."}
           </p>
           <p className="mt-2 text-[15px]">
             <Link href={trace.pairId ? `/pair/${trace.pairId}` : trace.isCompat ? `/compat/report/${order.orderNumber}` : `/results/${order.assessmentId}`} className={textLink}>
@@ -117,7 +117,7 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
           결제 처리 기록
         </h2>
         {trace.events.length === 0 ? (
-          <p className="mt-2 text-[15px] text-ink-2">기록이 없습니다. 결제창에서 결제를 마치지 않았거나, 승인 요청이 서버에 도착하지 않았습니다.</p>
+          <p className="mt-2 text-[15px] text-ink-2">기록이 없어요. 결제창에서 결제를 마치지 않았거나, 승인 요청이 서버에 도착하지 않았어요.</p>
         ) : (
           <ol className="mt-3 border-t border-line text-[14px]">
             {trace.events.map((e, i) => (

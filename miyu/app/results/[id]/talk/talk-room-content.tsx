@@ -36,8 +36,8 @@ export async function TalkRoomContent({ id, room, paid = null }: { id: string; r
   if (!member) {
     return (
       <div className={`${pageNarrow} py-14 md:py-20`}>
-        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
-        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있습니다. 로그인해 주세요.</p>
+        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요해요</h1>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있어요. 로그인해 주세요.</p>
         <div className="mt-8">
           <LoginOptions next={here} />
         </div>

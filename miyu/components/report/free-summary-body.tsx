@@ -46,7 +46,7 @@ export function FreeSummaryBody({
       </section>
 
       <section aria-labelledby={id("status")}>
-        <SectionTitle id={id("status")} note="네 가지 관점은 각각 따로 계산하며, 사주와 심리검사 점수를 합산하지 않습니다.">
+        <SectionTitle id={id("status")} note="네 가지 관점은 각각 따로 계산하며, 사주와 심리검사 점수를 합산하지 않아요.">
           분석에 사용한 정보
         </SectionTitle>
         <table className="w-full border-collapse text-left text-[15px]">

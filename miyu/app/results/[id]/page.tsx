@@ -100,8 +100,8 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   if (!member) {
     return (
       <div className={`${pageNarrow} py-14 md:py-20`}>
-        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
-        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있습니다. 로그인해 주세요.</p>
+        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요해요</h1>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 결과는 본인만 볼 수 있어요. 로그인해 주세요.</p>
         <div className="mt-8">
           <LoginOptions next={`/results/${id}`} />
         </div>
@@ -176,10 +176,10 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           title={isPersonalV2(content) ? `${assessment.nickname} 님의 개인 종합 사주 리포트` : `${assessment.nickname} 님의 심층 리포트`}
           subtitle={
             isReadingReport(content)
-              ? "사주를 틀로, 성향 응답과 입력한 MBTI를 함께 읽은 하나의 해석입니다."
+              ? "사주를 틀로, 성향 응답과 입력한 MBTI를 함께 읽은 하나의 해석이에요."
               : isPersonalV2(content)
                 ? "사주 원국 · 대운 · 세운 중심, 성향 응답은 보조 근거"
-                : "사주 · MBTI · 기질 · 애착을 한 사람의 해석으로 읽었습니다."
+                : "사주 · MBTI · 기질 · 애착을 한 사람의 해석으로 읽었어요."
           }
           source={content.source}
           meta={`검사일 ${created} · 저장된 리포트${receivedRows.length > 1 ? ` · ${seq}번째로 받은 리포트` : ""}`}
@@ -214,7 +214,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
     <>
       <ClearAnalyzeDraft />
       <Track name="preview_view" />
-      <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위입니다." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위예요." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
       {identity && <IdentityCard identity={identity} showType={PERSONAL_TYPE.visible} showLucky={LUCKY_INDEX.visible} />}
       {/* 분석을 마친 직후의 두 선택 — 미유가 먼저 풀어 주는 길 / 바로 전체 리포트 읽기 (운영자 방향 2026-10-16) */}
       {freeRooms.includes("main") && <MiyuFirst talkHref={talkRoomPath(assessment.id, "main")} reportHref="#r-tendency" />}

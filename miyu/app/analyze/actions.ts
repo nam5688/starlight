@@ -37,7 +37,7 @@ function birthInput(info: BasicInfo) {
 /** 기본 정보 단계: 존재하지 않는 음력 날짜(없는 윤달 · 30일) · 미래 날짜를 미리 알려준다 */
 export async function checkBirthAction(input: unknown): Promise<string | null> {
   const info = parseBasicInfo(input);
-  if (!info) return "입력 형식이 올바르지 않습니다.";
+  if (!info) return "입력 형식이 올바르지 않아요.";
   const basic = Object.values(validateBasicInfo(info, new Date()))[0];
   return basic ?? birthDateError(birthInput(info), new Date());
 }
@@ -48,10 +48,10 @@ export async function checkBirthAction(input: unknown): Promise<string | null> {
 export async function scoreDevAnswers(input: { info: unknown; answers: unknown }): Promise<ScoreResult> {
   const info = parseBasicInfo(input?.info);
   const answers = parseAnswers(input?.answers);
-  if (!info || !answers) return { ok: false, message: "응답 형식이 올바르지 않습니다." };
+  if (!info || !answers) return { ok: false, message: "응답 형식이 올바르지 않아요." };
   const check = validateAnswers(ASSESSMENT_MODULES, answers);
   if (!check.ok) {
-    return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있습니다. 응답을 다시 확인해 주세요." };
+    return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있어요. 응답을 다시 확인해 주세요." };
   }
   const saju = await sajuEngine.calculate(birthInput(info));
   if (saju.status === "invalid") return { ok: false, message: saju.message };
@@ -68,15 +68,15 @@ export type SaveResult = { ok: false; message: string };
  * (로그인 후 /auth/callback 또는 이메일 로그인 동작에서 저장).
  */
 export async function saveResultAndContinue(input: { info: unknown; answers: unknown }, via: "kakao" | "email" = "kakao"): Promise<SaveResult> {
-  if (!isAuthConfigured()) return { ok: false, message: "로그인이 아직 설정되지 않았습니다." };
+  if (!isAuthConfigured()) return { ok: false, message: "로그인이 아직 설정되지 않았어요." };
 
   const info = parseBasicInfo(input?.info);
   const answers: Answers | null = parseAnswers(input?.answers);
-  if (!info || !answers) return { ok: false, message: "입력 형식이 올바르지 않습니다." };
+  if (!info || !answers) return { ok: false, message: "입력 형식이 올바르지 않아요." };
   const infoError = Object.values(validateBasicInfo(info, new Date()))[0];
   if (infoError) return { ok: false, message: infoError };
   if (!validateAnswers(ASSESSMENT_MODULES, answers).ok) {
-    return { ok: false, message: "답하지 않은 문항이 있습니다." };
+    return { ok: false, message: "답하지 않은 문항이 있어요." };
   }
 
   const member = await getMember();
@@ -100,6 +100,6 @@ export async function saveResultAndContinue(input: { info: unknown; answers: unk
   // 이메일로 로그인 · 가입하는 경우 — 같은 보관 쿠키로 로그인을 마친 뒤 저장한다(server/auth-complete.ts)
   if (via === "email") redirect(`/auth/email?mode=signup&next=${encodeURIComponent("/my")}`);
   const url = await kakaoAuthorizeUrl("/my");
-  if (!url) return { ok: false, message: "카카오 로그인을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요." };
+  if (!url) return { ok: false, message: "카카오 로그인을 시작하지 못했어요. 잠시 후 다시 시도해 주세요." };
   redirect(url);
 }

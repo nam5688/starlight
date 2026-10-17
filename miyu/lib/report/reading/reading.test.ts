@@ -116,7 +116,7 @@ test("접어 둔 분석 근거는 AI가 쓰지 않고 근거 목록에서 코드
   // 입력한 MBTI는 참고값이다 — 근거로 달면 접어 둔 분석 근거에 "본인이 알고 있는 값 · 공식 검사 결과가 아님"이 남는다
   const withMbti = basisFor(["saju.daymaster", "self.mbti"], evidence);
   assert.ok(withMbti.answers.some((l) => /본인이 알고 있는 MBTI INFJ/.test(l)));
-  assert.ok(withMbti.unknown.some((l) => /공식 MBTI 검사 결과가 아닙니다/.test(l)));
+  assert.ok(withMbti.unknown.some((l) => /공식 MBTI 검사 결과가 아니에요/.test(l)));
   // 응답 근거를 달지 않은 주제는 응답 없이 사주만으로 읽었다고 밝힌다
   const sajuOnly = basisFor(["saju.daymaster"], evidence);
   assert.deepEqual(sajuOnly.answers, []);

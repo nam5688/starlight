@@ -12,7 +12,7 @@ export function ConcernScrub({ assessmentId, recordId }: { assessmentId: string;
   const [confirm, setConfirm] = useState(false);
   return (
     <div>
-      <p className="text-[14px] leading-relaxed text-ink-2">그때 적은 고민 내용을 지울 수 있어요. 지워도 이 리포트와 주제 · 작성 시점은 남습니다. 리포트에는 알려 주신 내용을 받아 쓴 문장이 있을 수 있고 그 문장은 리포트와 함께 보관됩니다. 지운 내용은 되돌릴 수 없습니다.</p>
+      <p className="text-[14px] leading-relaxed text-ink-2">그때 적은 고민 내용을 지울 수 있어요. 지워도 이 리포트와 주제 · 작성 시점은 남아요. 리포트에는 알려 주신 내용을 받아 쓴 문장이 있을 수 있고 그 문장은 리포트와 함께 보관돼요. 지운 내용은 되돌릴 수 없어요.</p>
       {confirm ? (
         <form action={scrubConcernRecordAction.bind(null, assessmentId, recordId)} className="mt-3 flex flex-wrap gap-2">
           <button type="submit" className={dangerButton}>

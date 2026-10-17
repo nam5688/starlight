@@ -25,12 +25,12 @@ const MAY_BE_CHARGED = new Set(["DUPLICATE_PAYMENT", "PAYMENT_MISMATCH"]);
 
 /** 결제 성공 주소에서 호출: 서버가 주문 금액·소유자를 확인하고 결제사에 승인 요청 */
 export async function confirmPaymentAction(input: { orderId: string; paymentKey: string; amount: number }): Promise<ConfirmOutcome> {
-  if (!paymentConfig().ok) return { kind: "rejected", message: "결제가 아직 설정되지 않았습니다.", assessmentId: null, resultPath: null, orderNumber: null, charged: false };
+  if (!paymentConfig().ok) return { kind: "rejected", message: "결제가 아직 설정되지 않았어요.", assessmentId: null, resultPath: null, orderNumber: null, charged: false };
   const member = await getMember();
   if (!member || member.needsConsent) return { kind: "login" };
   const userId = member.userId;
   if (typeof input?.orderId !== "string" || typeof input?.paymentKey !== "string" || typeof input?.amount !== "number") {
-    return { kind: "rejected", message: "결제 정보가 올바르지 않습니다.", assessmentId: null, resultPath: null, orderNumber: null, charged: false };
+    return { kind: "rejected", message: "결제 정보가 올바르지 않아요.", assessmentId: null, resultPath: null, orderNumber: null, charged: false };
   }
   const orderNumber = input.orderId.slice(0, 64);
 
@@ -56,7 +56,7 @@ export async function confirmPaymentAction(input: { orderId: string; paymentKey:
           await alert({
             kind: "confirm.save_failed",
             severity: "error",
-            title: "결제사는 승인했지만 주문 저장에 실패했습니다 (재확인으로 맞출 예정)",
+            title: "결제사는 승인했지만 주문 저장에 실패했어요 (재확인으로 맞출 예정)",
             orderNumber: result.order.orderNumber,
             errorId,
             dedupeKey: `confirm-save-failed:${result.order.orderNumber}`,
@@ -70,16 +70,16 @@ export async function confirmPaymentAction(input: { orderId: string; paymentKey:
           await alert({
             kind: "confirm.rejected_charged",
             severity: "error",
-            title: `승인된 결제를 주문에 반영하지 못했습니다 (${result.code})`,
+            title: `승인된 결제를 주문에 반영하지 못했어요 (${result.code})`,
             orderNumber: result.order?.orderNumber ?? orderNumber,
             dedupeKey: `confirm-rejected:${orderNumber}:${result.code}`,
-            lines: ["환불은 토스페이먼츠 관리자에서 직접 실행합니다 (미유는 환불을 실행하지 않습니다)"],
+            lines: ["환불은 토스페이먼츠 관리자에서 직접 실행해요 (미유는 환불을 실행하지 않아요)"],
           });
         }
         return { kind: "rejected", message: result.message, assessmentId: result.order?.assessmentId ?? null, resultPath: result.order ? resultPathOf(result.order) : null, orderNumber: result.order?.orderNumber ?? orderNumber, charged };
       }
       case "not-found":
-        return { kind: "rejected", message: "주문을 찾을 수 없습니다.", assessmentId: null, resultPath: null, orderNumber: null, charged: false };
+        return { kind: "rejected", message: "주문을 찾을 수 없어요.", assessmentId: null, resultPath: null, orderNumber: null, charged: false };
     }
   } catch (e) {
     // 예기치 못한 오류: 결제 결과를 모르므로 실패로 단정하지 않고 "확인 중"으로 돌려 준다 (재확인이 결제사 기록으로 맞춘다)

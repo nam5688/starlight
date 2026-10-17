@@ -62,11 +62,11 @@ export function validateBasicInfo(info: BasicInfo, today: Date): BasicInfoErrors
     errors.birthDate = `태어난 해는 1900년부터 ${today.getFullYear()}년 사이로 입력해 주세요.`;
   } else if (info.calendar === "solar") {
     const date = new Date(y, m - 1, d);
-    if (date.getMonth() !== m - 1 || date.getDate() !== d) errors.birthDate = "존재하지 않는 날짜입니다.";
-    else if (date > today) errors.birthDate = "오늘 이후 날짜는 입력할 수 없습니다.";
+    if (date.getMonth() !== m - 1 || date.getDate() !== d) errors.birthDate = "존재하지 않는 날짜예요.";
+    else if (date > today) errors.birthDate = "오늘 이후 날짜는 입력할 수 없어요.";
   } else if (d > 30) {
     // 음력 한 달은 29일 또는 30일. 정확한 달 길이 확인은 만세력 엔진 연결 후 서버에서 한다.
-    errors.birthDate = "음력 날짜는 30일까지 입력할 수 있습니다.";
+    errors.birthDate = "음력 날짜는 30일까지 입력할 수 있어요.";
   }
 
   if (!info.birthTimeUnknown && !/^\d{2}:\d{2}$/.test(info.birthTime)) {

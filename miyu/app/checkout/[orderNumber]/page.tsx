@@ -34,7 +34,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
   if (!config.ok) {
     // 결제 설정 문제는 '없는 페이지'로 숨기지 않고 무엇이 빠졌는지 알린다 (키 값은 보여주지 않음)
     return (
-      <Notice title="결제를 아직 진행할 수 없습니다" badge="결제 설정 전">
+      <Notice title="결제를 아직 진행할 수 없어요" badge="결제 설정 전">
         결제 설정이 끝나지 않았습니다 ({config.reason}). 결제는 진행되지 않았고, 저장된 결과는 그대로 있습니다.
       </Notice>
     );
@@ -69,7 +69,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
     } catch (e) {
       console.error("[checkout] 프로필 보완 실패", e instanceof Error ? e.message : e);
       return (
-        <Notice title="결제 정보를 준비하지 못했습니다" badge="회원 정보 확인 필요">
+        <Notice title="결제 정보를 준비하지 못했어요" badge="회원 정보 확인 필요">
           회원 정보를 불러오지 못해 결제를 시작하지 않았습니다. 잠시 후 다시 시도해 주세요. 계속되면 주문번호 {order.orderNumber}와 함께
           문의해 주세요.
         </Notice>
@@ -92,7 +92,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
       {!config.liveMode && (
         <p className="mt-4 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
           <StatusBadge>테스트 결제</StatusBadge>
-          실제로 돈이 결제되지 않는 테스트 환경입니다.
+          실제로 돈이 결제되지 않는 테스트 환경이에요.
         </p>
       )}
       {LAUNCH_PAYMENT_METHODS.cardOnly && <p className="mt-4 text-[13px] text-ink-3">지금은 카드 결제만 지원해요.</p>}
@@ -108,7 +108,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
       </div>
       {isConcern && (
         <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
-          기존 심층 리포트는 그대로 보관되고, 이 결제로는 지금 적어 둔 고민을 반영한 새 리포트가 따로 만들어집니다. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없습니다.
+          기존 심층 리포트는 그대로 보관되고, 이 결제로는 지금 적어 둔 고민을 반영한 새 리포트가 따로 만들어져요. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없어요.
         </p>
       )}
       {isCompat && (

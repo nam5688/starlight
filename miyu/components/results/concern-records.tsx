@@ -17,7 +17,7 @@ const STATE_LABEL: Record<ConcernEntryState, string> = {
  */
 export function ConcernRecords({ assessmentId, entries }: { assessmentId: string; entries: ConcernEntry[] }) {
   if (entries.length === 0) {
-    return <p className="mt-3 border-y border-line py-6 text-[15px] leading-relaxed text-ink-2">아직 발급한 리포트가 없어요. 고민을 저장한 뒤 ‘이 고민으로 새 리포트 발급’을 누르면 이곳에 한 칸씩 쌓입니다.</p>;
+    return <p className="mt-3 border-y border-line py-6 text-[15px] leading-relaxed text-ink-2">아직 발급한 리포트가 없어요. 고민을 저장한 뒤 ‘이 고민으로 새 리포트 발급’을 누르면 이곳에 한 칸씩 쌓여요.</p>;
   }
   return (
     <ul className="mt-3 border-t border-ink">

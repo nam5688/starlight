@@ -11,9 +11,9 @@ import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styl
 export function ErrorView({ digest, retry }: { digest?: string; retry: () => void }) {
   return (
     <main className={`${pageNarrow} py-16 md:py-24`}>
-      <h1 className="text-[26px] font-bold tracking-tight md:text-[30px]">일시적인 문제가 생겼습니다</h1>
+      <h1 className="text-[26px] font-bold tracking-tight md:text-[30px]">일시적인 문제가 생겼어요</h1>
       <p className="mt-3 text-[16px] leading-relaxed text-ink-2">
-        화면을 불러오는 중 문제가 생겼습니다. 입력하신 정보와 결제 내역은 지워지지 않습니다. 잠시 뒤 다시 시도해 주세요.
+        화면을 불러오는 중 문제가 생겼어요. 입력하신 정보와 결제 내역은 지워지지 않아요. 잠시 뒤 다시 시도해 주세요.
       </p>
       <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
         결제를 진행하던 중이었다면 <span className="font-semibold text-ink">다시 결제하지 마세요.</span> 결제가 승인되었다면 MY의 주문 상세에서 확인하고 반영할 수 있고, 자동으로도 반영됩니다.

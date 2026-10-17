@@ -8,7 +8,7 @@ import { SampleTalk } from "../talk-sample";
 
 export const metadata: Metadata = {
   title: "상담 채팅방 예시 · ME:U 미유",
-  description: "가상 인물의 상담 모드 채팅방(원데이 · 흐름박사 · 연애박사 · 결혼박사 · 진로박사 · 재무박사 · 고민해결소) 예시입니다 (실제 검사 · 만세력 계산 결과가 아닙니다).",
+  description: "가상 인물의 상담 모드 채팅방(원데이 · 흐름박사 · 연애박사 · 결혼박사 · 진로박사 · 재무박사 · 고민해결소) 예시예요 (실제 검사 · 만세력 계산 결과가 아니에요).",
   robots: { index: false },
 };
 

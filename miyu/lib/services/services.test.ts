@@ -127,7 +127,7 @@ test("검사 저장: 기본 정보나 응답이 잘못되면 거부한다", asyn
     answers: answersAll(3),
     today: TODAY,
   });
-  assert.deepEqual(noLeap, { ok: false, message: "2021년에는 음력 윤4월이 없습니다. 윤달이 아니라면 ‘윤달’ 선택을 해제해 주세요." });
+  assert.deepEqual(noLeap, { ok: false, message: "2021년에는 음력 윤4월이 없어요. 윤달이 아니라면 ‘윤달’ 선택을 해제해 주세요." });
   assert.equal(mem.assessments.size, 0);
 });
 

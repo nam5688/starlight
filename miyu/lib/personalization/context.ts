@@ -93,7 +93,7 @@ export function normalizeContextInput(raw: Record<string, unknown>): NormalizedC
   const fields = {} as Record<ContextFieldId, string>;
   for (const f of CONTEXT_FIELDS) {
     const value = clean(raw[f.id]);
-    if (value.length > f.limit) errors.push(`${f.label}은(는) ${f.limit}자까지 적을 수 있습니다 (지금 ${value.length}자).`);
+    if (value.length > f.limit) errors.push(`${f.label}은(는) ${f.limit}자까지 적을 수 있어요 (지금 ${value.length}자).`);
     const r = redactPersonalInfo(value);
     redactions += r.count;
     fields[f.id] = r.text.slice(0, f.limit);

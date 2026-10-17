@@ -6,7 +6,7 @@ import { SampleTalk } from "../talk/talk-sample";
 
 export const metadata: Metadata = {
   title: "무료 맛보기 예시 · ME:U 미유",
-  description: "가상 인물이 무료 분석만 마쳤을 때의 맛보기 대화 예시입니다 (실제 검사 · 만세력 계산 결과가 아닙니다).",
+  description: "가상 인물이 무료 분석만 마쳤을 때의 맛보기 대화 예시예요 (실제 검사 · 만세력 계산 결과가 아니에요).",
   robots: { index: false },
 };
 

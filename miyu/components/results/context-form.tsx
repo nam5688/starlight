@@ -11,7 +11,7 @@ const PLACEHOLDER: Record<(typeof CONTEXT_FIELDS)[number]["id"], string> = {
   situation: "예: 새로운 제안이 오면 처음엔 끌리다가, 결정할 때가 되면 계속 미루게 돼요.",
   matched: "예: 결정 전에 오래 고민한다는 말은 맞았어요.",
   differed: "예: 사람을 대할 때 조심스럽다고 했는데, 친한 사람에게는 오히려 직설적이에요.",
-  excerpt: "필요한 부분만 붙여넣어 주세요. 다른 사람의 이름 · 연락처는 지우고 붙여넣는 것을 권합니다.",
+  excerpt: "필요한 부분만 붙여넣어 주세요. 다른 사람의 이름 · 연락처는 지우고 붙여넣는 것을 권해요.",
 };
 
 const dangerButton =
@@ -80,11 +80,11 @@ export function ContextForm({ assessmentId, initial, cancelHref }: { assessmentI
         <div className="rounded-lg bg-mist px-4 py-4 text-[14px] leading-relaxed text-ink-2">
           <p className="font-semibold text-ink">어떻게 쓰이나요</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>저장만으로는 리포트가 만들어지지 않고, 기존 리포트도 바뀌지 않습니다. 저장한 뒤 &lsquo;이 고민으로 새 리포트 발급&rsquo;을 눌러야 새 리포트가 따로 만들어집니다.</li>
-            <li>해석의 초점과 예시를 고르는 데만 씁니다. 사주 계산은 바뀌지 않고, 알려 주신 이야기를 사주로 알아맞힌 것처럼 쓰지 않습니다.</li>
-            <li>전화번호 · 이메일처럼 보이는 내용은 저장할 때 가립니다. 광고 · 분석 도구로 보내지 않습니다.</li>
+            <li>저장만으로는 리포트가 만들어지지 않고, 기존 리포트도 바뀌지 않아요. 저장한 뒤 &lsquo;이 고민으로 새 리포트 발급&rsquo;을 눌러야 새 리포트가 따로 만들어져요.</li>
+            <li>해석의 초점과 예시를 고르는 데만 써요. 사주 계산은 바뀌지 않고, 알려 주신 이야기를 사주로 알아맞힌 것처럼 쓰지 않아요.</li>
+            <li>전화번호 · 이메일처럼 보이는 내용은 저장할 때 가려요. 광고 · 분석 도구로 보내지 않아요.</li>
             <li>리포트를 AI로 만들 때는 이름 · 생년월일 없이 이 내용을 AI 해석 서비스에 함께 보냅니다.</li>
-            <li>언제든 고치거나 지울 수 있습니다. 새 리포트를 발급하면 그때의 고민이 기록으로 남고, 이후에 고쳐도 이미 발급한 리포트는 바뀌지 않습니다.</li>
+            <li>언제든 고치거나 지울 수 있어요. 새 리포트를 발급하면 그때의 고민이 기록으로 남고, 이후에 고쳐도 이미 발급한 리포트는 바뀌지 않아요.</li>
           </ul>
         </div>
 
@@ -113,7 +113,7 @@ export function ContextForm({ assessmentId, initial, cancelHref }: { assessmentI
             </Link>
           )}
         </div>
-        <p className="text-[13px] text-ink-3">저장해도 리포트는 만들어지지 않습니다. 발급은 저장한 뒤 따로 누릅니다.</p>
+        <p className="text-[13px] text-ink-3">저장해도 리포트는 만들어지지 않아요. 발급은 저장한 뒤 따로 눌러요.</p>
       </form>
     </div>
   );
@@ -127,7 +127,7 @@ export function ContextDelete({ assessmentId }: { assessmentId: string }) {
       <h2 id="ctx-delete" className="text-[16px] font-semibold">
         적은 고민 지우기
       </h2>
-      <p className="mt-1 text-[14px] leading-relaxed text-ink-2">지우면 지금 적어 둔 고민이 삭제되고 되돌릴 수 없습니다. 이미 발급한 리포트와 그때의 고민 기록은 그대로 남습니다.</p>
+      <p className="mt-1 text-[14px] leading-relaxed text-ink-2">지우면 지금 적어 둔 고민이 삭제되고 되돌릴 수 없어요. 이미 발급한 리포트와 그때의 고민 기록은 그대로 남아요.</p>
       {confirmDelete ? (
         <form action={deleteContextAction.bind(null, assessmentId)} className="mt-4 flex flex-wrap gap-2">
           <button type="submit" className={dangerButton}>

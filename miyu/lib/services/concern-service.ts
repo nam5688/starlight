@@ -21,7 +21,7 @@ import { currentPersonalReport } from "./report-service.ts";
 export type IssuingAvailability = { enabled: true } | { enabled: false; reason: "ai-not-connected" };
 
 export const ISSUING_UNAVAILABLE_MESSAGE: Record<Extract<IssuingAvailability, { enabled: false }>["reason"], string> = {
-  "ai-not-connected": "고민을 반영하는 리포트는 AI 연결이 끝난 뒤에 발급할 수 있어요. 지금은 고민을 적고 저장해 둘 수 있습니다.",
+  "ai-not-connected": "고민을 반영하는 리포트는 AI 연결이 끝난 뒤에 발급할 수 있어요. 지금은 고민을 적고 저장해 둘 수 있어요.",
 };
 
 /** 같은 저장본에서 결제 시작을 두 번 눌러도 새 주문을 만들지 않는 시간 (더블 클릭 · 새로고침) */
@@ -205,7 +205,7 @@ export async function startConcernCheckout(
       if (isMissingTable(e)) return { kind: "unavailable", reason: "not-ready" };
       throw e;
     }
-    if (!record) throw new Error("고민 기록을 만들지 못했습니다.");
+    if (!record) throw new Error("고민 기록을 만들지 못했어요.");
     // 동시에 눌러 다른 요청이 먼저 만들고 결제까지 끝냈다면 그 발급을 보여 준다
     const latest = await repo.listOrdersForAssessment(assessment.id);
     const paid = ordersOfRecord(latest, record.id).find((o) => o.status === "paid");
@@ -239,7 +239,7 @@ export async function startConcernCheckout(
   const paid = latest.find((o) => o.status === "paid");
   if (paid) return { kind: "already-issued", order: paid, record };
   const waiting = latest.find((o) => o.status === "pending");
-  if (!waiting) throw new Error("주문을 만들지 못했습니다.");
+  if (!waiting) throw new Error("주문을 만들지 못했어요.");
   return { kind: "order", order: waiting, record };
 }
 

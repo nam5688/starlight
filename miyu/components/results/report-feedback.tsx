@@ -18,10 +18,10 @@ export function ReportFeedback({ reportId, initial }: { reportId: string; initia
         const res = await submitFeedbackAction(reportId, value);
         if (res.ok) {
           setRating(value);
-          setMessage("남겨 주셔서 고맙습니다. 언제든 다시 눌러 바꿀 수 있어요.");
-        } else setMessage("지금은 저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.");
+          setMessage("남겨 주셔서 고마워요. 언제든 다시 눌러 바꿀 수 있어요.");
+        } else setMessage("지금은 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.");
       } catch {
-        setMessage("연결이 불안정해 저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.");
+        setMessage("연결이 불안정해 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.");
       }
     });
 
@@ -55,7 +55,7 @@ export function ReportFeedback({ reportId, initial }: { reportId: string; initia
           {message}
         </p>
       )}
-      <p className="mt-2 text-[13px] leading-relaxed text-ink-3">응답은 리포트 품질을 점검하는 데만 쓰며 광고 · 분석 도구에 보내지 않습니다.</p>
+      <p className="mt-2 text-[13px] leading-relaxed text-ink-3">응답은 리포트 품질을 점검하는 데만 쓰며 광고 · 분석 도구에 보내지 않아요.</p>
     </section>
   );
 }

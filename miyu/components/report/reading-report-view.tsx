@@ -277,14 +277,14 @@ export function ReadingReportView({
                 {chart && (
                   <div>
                     <p className="text-[15px] font-semibold">사주 원국과 오행</p>
-                    <p className="mt-0.5 mb-3 text-[13px] text-ink-3">만세력 엔진이 계산한 결과입니다. 오행 막대는 원국 글자 수 기준 개수이며, 많고 적음이 좋고 나쁨은 아닙니다.</p>
+                    <p className="mt-0.5 mb-3 text-[13px] text-ink-3">만세력 엔진이 계산한 결과예요. 오행 막대는 원국 글자 수 기준 개수이며, 많고 적음이 좋고 나쁨은 아니에요.</p>
                     <SajuChart saju={chart} />
                   </div>
                 )}
                 {scoreGroups.length > 0 && (
                   <div>
                     <p className="text-[15px] font-semibold">응답 환산값</p>
-                    <p className="mt-0.5 text-[13px] text-ink-3">개발용 예시 문항에 답한 값을 0~100으로 옮긴 것입니다. 백분위나 정확도가 아니며, 높고 낮음은 좋고 나쁨이 아닙니다.</p>
+                    <p className="mt-0.5 text-[13px] text-ink-3">개발용 예시 문항에 답한 값을 0~100으로 옮긴 것이에요. 백분위나 정확도가 아니며, 높고 낮음은 좋고 나쁨이 아니에요.</p>
                     {scoreGroups.map((s) => (
                       <div key={s.title} className="mt-3">
                         <p className="text-[13px] font-semibold text-ink-2">{s.title}</p>
@@ -307,8 +307,8 @@ export function ReadingReportView({
             <p className="text-[14px] font-semibold text-ink-2">이어서 살펴볼 수 있는 것</p>
             <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-canvas text-[15px]">
               {[
-                ["상대와의 관계 비교", "상대가 직접 참여해 두 사람의 응답을 함께 비교합니다."],
-                ["AI 고민 상담", "내 분석을 참고해 연애 · 관계 · 돈 · 일 고민을 이어서 상담합니다."],
+                ["상대와의 관계 비교", "상대가 직접 참여해 두 사람의 응답을 함께 비교해요."],
+                ["AI 고민 상담", "내 분석을 참고해 연애 · 관계 · 돈 · 일 고민을 이어서 상담해요."],
               ].map(([name, desc]) => (
                 <li key={name} className="grid gap-0.5 px-4 py-3 md:grid-cols-[170px_minmax(0,1fr)_auto] md:items-baseline md:gap-4">
                   <p className="font-semibold">{name}</p>
@@ -319,7 +319,7 @@ export function ReadingReportView({
             </ul>
           </section>
           <p className="text-[13px] leading-[1.7] text-ink-3">
-            미유는 사주의 전통적 해석과 자기보고식 응답을 활용한 자기이해 서비스입니다. 사주 해석과 미래 전망은 과학적으로 검증된 개인 예측이 아니며, 제시된 가능성은 실제 사건과 결과를 보장하지 않습니다.
+            미유는 사주의 전통적 해석과 자기보고식 응답을 활용한 자기이해 서비스예요. 사주 해석과 미래 전망은 과학적으로 검증된 개인 예측이 아니며, 제시된 가능성은 실제 사건과 결과를 보장하지 않아요.
           </p>
           {footer}
         </div>

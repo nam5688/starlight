@@ -16,7 +16,7 @@ import { sampleReadingReport, TIMELINE_REFERENCE } from "@/lib/samples/sample-re
 export const metadata: Metadata = {
   title: "리포트 예시 · ME:U 미유",
   description:
-    "같은 가상 인물의 무료 리포트와 심층 리포트 예시. 사주에 MBTI · 기질 · 성격 · 가까운 관계 반응을 더해 하나의 해석으로 읽는 형식을 미리 볼 수 있습니다 (실제 검사 · 만세력 계산 결과가 아닙니다).",
+    "같은 가상 인물의 무료 리포트와 심층 리포트 예시. 사주에 MBTI · 기질 · 성격 · 가까운 관계 반응을 더해 하나의 해석으로 읽는 형식을 미리 볼 수 있어요 (실제 검사 · 만세력 계산 결과가 아니에요).",
   alternates: { canonical: "/report/sample" },
 };
 
@@ -80,7 +80,7 @@ export default function SampleReportPage() {
               ]}
               footer={
                 <p className="text-[13px] leading-[1.7] text-ink-3">
-                  이 예시는 미유가 목표로 하는 리포트 형식을 사람이 쓴 것입니다. AI가 연결되면 실제 리포트도 이 형식으로 만들어집니다. AI 연결 전에 만들어지는 개발 단계의 리포트는 구성이 다를 수 있습니다.
+                  이 예시는 미유가 목표로 하는 리포트 형식을 사람이 쓴 것이에요. AI가 연결되면 실제 리포트도 이 형식으로 만들어져요. AI 연결 전에 만들어지는 개발 단계의 리포트는 구성이 다를 수 있어요.
                 </p>
               }
             />

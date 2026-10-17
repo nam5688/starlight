@@ -58,7 +58,7 @@ export function readCompatPartner(raw: unknown, today: Date): { ok: true; partne
 /** 보관해 둔 상대 출생정보로 사주를 계산한다 — 계산하지 못하면 오류(리포트 생성이 실패로 남고 같은 주문으로 다시 만들 수 있다) */
 export function partnerSajuOf(partner: CompatPartner): SajuOk {
   const r = calculateSaju({ year: partner.birthYear, month: partner.birthMonth, day: partner.birthDay, calendar: partner.calendar, isLeapMonth: partner.isLeapMonth, birthTime: partner.birthTime });
-  if (r.status !== "ok") throw new Error("상대의 사주를 계산하지 못했습니다.");
+  if (r.status !== "ok") throw new Error("상대의 사주를 계산하지 못했어요.");
   return r as SajuOk;
 }
 
@@ -142,10 +142,10 @@ export async function compatInputFor(repo: MiyuRepository, order: OrderRecord, a
   const requestId = parseCompatProductId(order.productId);
   if (!requestId) throw new Error("사주 궁합 주문이 아닙니다.");
   const request = await repo.getCompatRequestByOrder(order.id);
-  if (!request || request.userId !== order.userId) throw new Error("사주 궁합 요청을 찾을 수 없습니다.");
-  if (!request.partner || request.scrubbedAt) throw new Error("상대 입력이 지워져 사주 궁합을 만들 수 없습니다.");
+  if (!request || request.userId !== order.userId) throw new Error("사주 궁합 요청을 찾을 수 없어요.");
+  if (!request.partner || request.scrubbedAt) throw new Error("상대 입력이 지워져 사주 궁합을 만들 수 없어요.");
   const a = assessment.saju as { status?: string };
-  if (a?.status !== "ok") throw new Error("내 사주 계산 결과가 없어 사주 궁합을 만들 수 없습니다.");
+  if (a?.status !== "ok") throw new Error("내 사주 계산 결과가 없어 사주 궁합을 만들 수 없어요.");
   return { names: { a: cleanNickname(assessment.nickname, "나"), b: request.partner.nickname }, a: assessment.saju as SajuOk, b: partnerSajuOf(request.partner) };
 }
 

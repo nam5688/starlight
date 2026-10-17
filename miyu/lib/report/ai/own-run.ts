@@ -21,7 +21,8 @@ import { story7DepthSource } from "../reading/story7-assemble.ts";
 import { story7Evidence } from "../reading/story7-evidence.ts";
 import { piecesOfStory7, textRepetition, type Story7Draft } from "../reading/story7-measure.ts";
 import { STORY7_SECTIONS } from "../reading/story7-plan.ts";
-import { STORY7_MOTIF_BLOCKS, story7Paragraphs, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
+import { STORY7_MOTIF_BLOCKS, story7Paragraphs, story7VoiceReport, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
+import { type VoiceReport } from "../style/voice.ts";
 import type { Story7DraftV1, StoryDraftV1 } from "../reading/types.ts";
 import { buildEvidence } from "./generator.ts";
 import { referenceFor, promptsFor } from "./compare-plan.ts";
@@ -244,7 +245,10 @@ export function reviewStory7Draft(raw: unknown, evidence: Evidence[], hasContext
   push(`- 장 사이 낱말 겹침(평균 ${rep.pairOverlapMean.toFixed(2)} · 최대 ${rep.pairOverlapMax.value.toFixed(2)}${rep.pairOverlapMax.a ? ` — ${rep.pairOverlapMax.a} · ${rep.pairOverlapMax.b}` : ""}) · 제목과 본문 겹침 최대 ${rep.headOverlapMax.value.toFixed(2)}${rep.headOverlapMax.block ? ` — ${rep.headOverlapMax.block}` : ""} · 전체 글자 ${rep.chars.toLocaleString("ko-KR")}자`);
   if (rep.topStems.length) push(`- 가장 많은 장에 걸친 낱말(앞 두 글자): ${rep.topStems.map((x) => `${x.stem}… ${x.blocks}곳 ${x.total}번`).join(" · ")}`);
   push();
-  push("## 5. 5번 일과 재물 · 7번 조언");
+  push("## 5. 문체 점검 (미유 말투 — 코드가 센 어림, 읽는 사람의 판단을 대신하지 않음)");
+  voiceLines(story7VoiceReport(draft, evidence)).forEach((l) => push(l));
+  push();
+  push("## 6. 5번 일과 재물 · 7번 조언");
   const five = sections.find((x) => Number(x?.no) === 5);
   const money = five?.parts?.find((p) => p?.title === "재물");
   push(money ? `- 재물 소제목: ${money.paragraphs?.length ?? 0}문단 · ${(money.paragraphs ?? []).join("").length}자 — 돈 이야기가 실제로 있는지 · 근거 없는 습관 단정이 없는지는 읽어서 확인` : "- 재물 소제목이 없습니다.");
@@ -252,4 +256,23 @@ export function reviewStory7Draft(raw: unknown, evidence: Evidence[], hasContext
   push();
   push("※ 반복(말을 바꿔 되풀이한 문장) · 새로 알게 해 주는 정보 · 명리 근거를 제대로 풀었는지 · 성격 · 기질 · 애착이 풀이와 자연스럽게 이어지는지 · 연애 · 일 · 재물이 서로 다른 이야기인지 · 9,900원을 낼 만한지는 낱말로 셀 수 없어 글 전문을 직접 읽고 판단해야 합니다(docs/real-ai-evaluation-rubric.md).");
   return lines.join("\n") + "\n";
+}
+
+/** 문체 점검 결과를 읽기 전 지표에 싣는 줄들 — 실패(저장하지 않음) · 고쳐 쓰기 안내 · 사람이 읽고 판단할 목록 · 센 값 */
+export function voiceLines(r: VoiceReport): string[] {
+  const out: string[] = [];
+  const m = r.metrics;
+  out.push(`- 센 값: ${m.chars.toLocaleString("ko-KR")}자 · ${m.sentences}문장 · 합쇼체 ${m.formal}곳 · 추상어 합계 ${m.abstractTotal}번${Object.keys(m.abstractByWord).length ? `(${Object.entries(m.abstractByWord).map(([w, n]) => `${w} ${n}`).join(" · ")})` : ""} · 대조형 틀 ${Object.keys(m.contrast).length ? Object.entries(m.contrast).map(([k, n]) => `${k} ${n}`).join(" · ") : "없음"} · 가장 많은 마무리 "~${m.topEnding.kind}" ${Math.round(m.topEnding.share * 100)}% · 이름 호칭 ${m.nameCalls}문단`);
+  const group = (level: "fail" | "repair" | "review", label: string) => {
+    const f = r.findings.filter((x) => x.level === level);
+    out.push(f.length === 0 ? `- ${label}: 없음` : `- **${label}**: ${f.length}건`);
+    for (const x of f) {
+      out.push(`  - ${x.message}`);
+      for (const e of x.examples ?? []) out.push(`    · ${e}`);
+    }
+  };
+  group("fail", "저장하지 않는 위반(실패)");
+  group("repair", "고쳐 쓰기를 부탁할 것");
+  group("review", "사람이 읽고 판단할 것");
+  return out;
 }

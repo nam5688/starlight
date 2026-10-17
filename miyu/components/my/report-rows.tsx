@@ -133,7 +133,7 @@ export function ReportRow({ card, paymentsReady }: { card: MyReportCard; payment
         </p>
       )}
       {card.entitlement === "purchased" && card.generation === "failed" && (
-        <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">결제는 정상 처리되었습니다. 다시 결제하지 말고 ‘다시 생성’을 눌러 주세요.</p>
+        <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">결제는 정상 처리되었어요. 다시 결제하지 말고 ‘다시 생성’을 눌러 주세요.</p>
       )}
     </li>
   );

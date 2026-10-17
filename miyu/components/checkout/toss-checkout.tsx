@@ -47,7 +47,7 @@ export function TossCheckout({
         setStatus("ready");
       } catch {
         setStatus("error");
-        setMessage("결제 화면을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        setMessage("결제 화면을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
       }
     })();
   }, [clientKey, customerKey, amount, methodsVariantKey]);
@@ -67,7 +67,7 @@ export function TossCheckout({
     } catch (error) {
       // 약관 미동의, 결제창 닫기 등 — 다시 시도할 수 있게 둔다
       setStatus("ready");
-      setMessage(error instanceof Error && error.message ? error.message : "결제를 진행하지 못했습니다.");
+      setMessage(error instanceof Error && error.message ? error.message : "결제를 진행하지 못했어요.");
     }
   }
 

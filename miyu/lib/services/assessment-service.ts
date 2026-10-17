@@ -24,7 +24,7 @@ export async function submitAssessment(
 
   const answers = pickKnownAnswers(input.answers);
   if (!validateAnswers(ASSESSMENT_MODULES, answers).ok) {
-    return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있습니다." };
+    return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있어요." };
   }
 
   const birthTime = info.birthTimeUnknown ? null : info.birthTime;
@@ -37,14 +37,14 @@ export async function submitAssessment(
   // 하루에 저장할 수 있는 검사 수 제한 (무료 생성 남용 방지) — 한도 안에서는 영향이 없다
   const recent = await deps.repo.countAssessmentsSince(input.userId, new Date(input.today.getTime() - 24 * 3600_000).toISOString());
   if (recent >= ASSESSMENT_DAILY_LIMIT) {
-    return { ok: false, message: `하루에 저장할 수 있는 검사는 ${ASSESSMENT_DAILY_LIMIT}개까지입니다. MY에서 저장한 결과를 확인하거나 내일 다시 시도해 주세요.` };
+    return { ok: false, message: `하루에 저장할 수 있는 검사는 ${ASSESSMENT_DAILY_LIMIT}개까지예요. MY에서 저장한 결과를 확인하거나 내일 다시 시도해 주세요.` };
   }
 
   const summary = buildDevFreeSummary(answers);
   const saju = await deps.saju.calculate({ year, month, day, calendar: info.calendar, isLeapMonth, birthTime, gender: genderOf(info) });
   if (saju.status === "invalid") return { ok: false, message: saju.message };
   if (saju.status === "ok" && toDate(saju.solarDate) > input.today) {
-    return { ok: false, message: "오늘 이후 날짜는 입력할 수 없습니다." };
+    return { ok: false, message: "오늘 이후 날짜는 입력할 수 없어요." };
   }
 
   const assessment = await deps.repo.insertAssessment({

@@ -388,7 +388,7 @@ test("고민 반영 리포트를 만들 수 없는 생성기(개발용)로는 �
   if (paid.kind !== "paid") throw new Error();
   const r = await runReport({ repo: s.mem.repo, generator: devReportGenerator, now: () => s.clock.now }, paid.order);
   assert.equal(r?.status, "failed");
-  assert.match(r?.lastError ?? "", /고민 반영 리포트를 만들 수 없습니다/);
+  assert.match(r?.lastError ?? "", /고민 반영 리포트를 만들 수 없어요/);
   assert.equal((await s.mem.repo.getReportByOrder(base.order.id))?.status, "ready");
 });
 

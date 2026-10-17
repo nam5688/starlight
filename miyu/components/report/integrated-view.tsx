@@ -63,9 +63,9 @@ export function ActionList({ actions }: { actions: FullReport["actions"] }) {
 export function ReportDisclaimer() {
   return (
     <p className="text-[13px] leading-relaxed text-ink-3">
-      이 리포트는 자기 이해를 돕는 참고 자료이며, 의학적·심리학적 진단을 대신하지 않습니다. 대표 경향은 현재
-      응답에서 보이는 경향으로, 시기와 상황에 따라 달라질 수 있습니다. 사주는 전통 해석 체계이며 심리검사 점수와
-      합산하지 않습니다.
+      이 리포트는 자기 이해를 돕는 참고 자료이며, 의학적·심리학적 진단을 대신하지 않아요. 대표 경향은 현재
+      응답에서 보이는 경향으로, 시기와 상황에 따라 달라질 수 있어요. 사주는 전통 해석 체계이며 심리검사 점수와
+      합산하지 않아요.
     </p>
   );
 }

@@ -7,7 +7,7 @@ import type { AssessmentModule } from "../types.ts";
 export const mbtiModule: AssessmentModule = {
   id: "mbti",
   title: "평소 행동 방식",
-  intro: "평소 에너지를 얻는 방식, 정보를 받아들이는 방식, 결정하는 방식, 생활 방식에 대해 묻습니다.",
+  intro: "평소 에너지를 얻는 방식, 정보를 받아들이는 방식, 결정하는 방식, 생활 방식에 대해 물어요.",
   status: "dev-example",
   version: "dev-0.1",
   dimensions: [
@@ -40,8 +40,8 @@ export const mbtiModule: AssessmentModule = {
       label: "생활을 꾸리는 방식",
       lowName: "미리 정해 두기",
       highName: "그때그때 맞추기",
-      lowMeaning: "미리 계획하고 정해 두는 것이 편합니다",
-      highMeaning: "상황에 맞춰 유연하게 움직이는 것이 편합니다",
+      lowMeaning: "미리 계획하고 정해 두는 것이 편해요",
+      highMeaning: "상황에 맞춰 유연하게 움직이는 것이 편해요",
     },
   ],
   items: [

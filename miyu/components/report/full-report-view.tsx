@@ -45,7 +45,7 @@ export function FullReportView({
         <div className="space-y-12">
           {extras?.plain && <PlainReadingSection plain={extras.plain} id={id("plain")} />}
           <section aria-labelledby={id("chart")}>
-            <SectionTitle id={id("chart")} note="태어난 날짜와 시간으로 만세력에서 계산한 결과입니다.">
+            <SectionTitle id={id("chart")} note="태어난 날짜와 시간으로 만세력에서 계산한 결과예요.">
               사주 원국
             </SectionTitle>
             <FoldRow>
@@ -65,7 +65,7 @@ export function FullReportView({
       {extras?.items && <ItemsSection items={extras.items} id={id("items")} />}
 
       <section aria-labelledby={id("integrated")}>
-        <SectionTitle id={id("integrated")} note="모든 결과를 하나로 맞추지 않고, 겹치는 부분과 다른 부분을 나눠 정리합니다.">
+        <SectionTitle id={id("integrated")} note="모든 결과를 하나로 맞추지 않고, 겹치는 부분과 다른 부분을 나눠 정리해요.">
           통합 해석
         </SectionTitle>
         <IntegratedView integrated={report.integrated} />
@@ -77,7 +77,7 @@ export function FullReportView({
       </section>
 
       <section aria-labelledby={id("scores")}>
-        <SectionTitle id={id("scores")} note="점수와 영역별 근거 · 한계는 접어 두었습니다. 눌러서 펼쳐 보세요.">
+        <SectionTitle id={id("scores")} note="점수와 영역별 근거 · 한계는 접어 두었어요. 눌러서 펼쳐 보세요.">
           점수와 상세 분석
         </SectionTitle>
         <FoldRow>

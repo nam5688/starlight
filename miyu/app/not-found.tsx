@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <main className={`${pageNarrow} py-16 md:py-24`}>
-      <h1 className="text-[26px] font-bold tracking-tight md:text-[30px]">찾을 수 없는 페이지입니다</h1>
+      <h1 className="text-[26px] font-bold tracking-tight md:text-[30px]">찾을 수 없는 페이지예요</h1>
       <p className="mt-3 text-[16px] leading-relaxed text-ink-2">
-        주소가 잘못되었거나, 이 계정으로는 볼 수 없는 페이지입니다. 내 결과와 리포트는 MY에서 찾을 수 있습니다.
+        주소가 잘못되었거나, 이 계정으로는 볼 수 없는 페이지예요. 내 결과와 리포트는 MY에서 찾을 수 있어요.
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
         <Link href="/my" className={buttonPrimary}>

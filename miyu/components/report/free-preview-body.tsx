@@ -145,7 +145,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
                 <>
                   <div>
                     <h3 className="text-[15px] font-semibold text-ink-2">사주 원국</h3>
-                    <p className="mt-1 text-[13px] leading-relaxed text-ink-3">태어난 날짜와 시간으로 만세력에서 계산한 결과입니다.</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-ink-3">태어난 날짜와 시간으로 만세력에서 계산한 결과예요.</p>
                     <div className="mt-4">
                       <SajuChart saju={saju.section} showGlossary />
                     </div>
@@ -178,7 +178,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
                           </li>
                         ))}
                       </ul>
-                      <p className="mt-2 text-[13px] leading-relaxed text-ink-3">개수는 원국의 천간 · 지지 글자 기준입니다 (지장간 제외). 많고 적음은 좋고 나쁨이 아니라 방향의 차이입니다.</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-ink-3">개수는 원국의 천간 · 지지 글자 기준이에요 (지장간 제외). 많고 적음은 좋고 나쁨이 아니라 방향의 차이예요.</p>
                     </div>
                   )}
                 </>
@@ -203,7 +203,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
                     평소 행동 방식 문항 {preview.basis.mbtiItems}개 · 기질 문항 {preview.basis.temperamentItems}개 · 관계(애착) 문항 {preview.basis.relationshipItems}개 (모두 개발용 예시 문항)
                     {saju.status === "ok" && saju.chartLine && <> · 사주 {saju.chartLine}</>}
                   </p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-ink-3">사주와 심리검사 점수는 합산하지 않고 각각 따로 계산합니다.</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-ink-3">사주와 심리검사 점수는 합산하지 않고 각각 따로 계산해요.</p>
                   {saju.status === "ok" &&
                     saju.notes.map((n) => (
                       <p key={n} className="mt-2 text-[13px] leading-relaxed text-ink-3">

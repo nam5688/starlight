@@ -57,18 +57,18 @@ export type ItemSuggestions = {
 };
 
 const LIMITS =
-  "전통 오행 연상에 따른 간단한 제안입니다. 효과를 보장하지 않으며, 물건을 새로 사야 한다는 뜻이 아닙니다. 이미 가진 것으로 먼저 해 보세요. 문구는 초안으로 전문가 검토 전입니다.";
+  "전통 오행 연상에 따른 간단한 제안이에요. 효과를 보장하지 않으며, 물건을 새로 사야 한다는 뜻이 아니에요. 이미 가진 것으로 먼저 해 보세요. 문구는 초안으로 전문가 검토 전이에요.";
 
 export function itemSuggestions(saju: SajuOk): ItemSuggestions {
   const counts = FIVE_ELEMENTS.map((e) => [e, saju.elementCounts[e]] as const);
   let target = counts.filter(([, n]) => n <= 1);
   let intro: string;
   if (target.length) {
-    intro = `원국에서 ${target.map(([e]) => `${e}(${ELEMENT_INFO[e].image})`).join("·")} 기운이 ${target.some(([, n]) => n === 0) ? "없거나 적게" : "적게"} 나타났습니다. 이 기운을 일상에서 가볍게 채워 보는 방법입니다.`;
+    intro = `원국에서 ${target.map(([e]) => `${e}(${ELEMENT_INFO[e].image})`).join("·")} 기운이 ${target.some(([, n]) => n === 0) ? "없거나 적게" : "적게"} 나타났어요. 이 기운을 일상에서 가볍게 채워 보는 방법이에요.`;
   } else {
     const min = Math.min(...counts.map(([, n]) => n));
     target = counts.filter(([, n]) => n === min);
-    intro = `다섯 기운이 비교적 고르게 있어 크게 부족한 기운은 없습니다. 그중 상대적으로 적은 ${target.map(([e]) => `${e}(${ELEMENT_INFO[e].image})`).join("·")} 기운을 가볍게 더해 보는 방법입니다.`;
+    intro = `다섯 기운이 비교적 고르게 있어 크게 부족한 기운은 없어요. 그중 상대적으로 적은 ${target.map(([e]) => `${e}(${ELEMENT_INFO[e].image})`).join("·")} 기운을 가볍게 더해 보는 방법이에요.`;
   }
   return {
     intro,

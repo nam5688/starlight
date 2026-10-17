@@ -1,14 +1,19 @@
-// 사주 궁합 리포트를 쓰는 AI 지시문과 자료(compat-v1-prompt-0.3, 비교용 후보 · 실제 AI로는 한 번도 시험하지 못했다).
+// 사주 궁합 리포트를 쓰는 AI 지시문과 자료(compat-v1-prompt-0.4, 비교용 후보 · 실제 AI로는 한 번도 시험하지 못했다).
+// 0.4(2026-10-17, 운영자 문체 지시): 미유의 말투 블록(style/voice-prompt.ts)을 더하고 억지 공감 예시("~했던 때가 있었을 거예요")를 "~할 때는 ~기 쉬워요"로 바꿨다 — 시기 · 영역 · 근거 규칙은 그대로, 리포트 궁합(pair-v1-prompt-0.2)도 같은 말투를 쓴다. 실제 AI로는 아직 시험하지 못했다.
 // 0.3(2026-10-17, 운영자 확정): 운영자가 말한 여덟 가지(잘 맞는 부분 · 부딪히는 부분 · 표현과 행동 방식 · 장기 관계 조건 · A님이 B님에게 · B님이 A님에게 · 함께 조율 · 계산된 범위의 시기)로 영역과 행동을 다시 짰다 —
 //   영역 다섯(overview · fit · friction · express · long) + 근거에 시기(compat.timing.*)가 있을 때만 timing, 행동은 aToB · bToA · together 묶음(각각 title · detail · 건넬 말 say · evidence). 0.2 원문은 docs/samples/prompts/compat-v1-prompt-0.2.txt.
 // 0.2(2026-10-16): 대리 작성기로 0.1을 시험한 뒤 고쳤다(사후 수정 — 새 글이 통과한다는 증거가 아니다). 근거가 목록에 없다는 것의 뜻 · 같은 짝이 합과 형을 함께 가질 때 · 상생의 방향 · 약한 근거를 영역의 중심으로 삼지 않기 · 한 이유를 세 영역 이상에서 되풀이하지 않기 · 용어를 영역마다 한두 개만. 0.1 원문은 docs/samples/prompts/compat-v1-prompt-0.1.txt.
 // 근거는 궁합 엔진(lib/saju/interpret/compat.ts)이 계산한 compat.* 목록이다. 두 사람의 이름 · 생년월일 원문은 보내지 않고 "A님 · B님"으로만 부른다 — 이름은 조립할 때 코드가 바꿔 넣는다.
 // 커플 유형 · 궁합 지수 · 계산 재료 · 안내문은 코드가 같은 결과에서 채우고 AI는 본문만 쓴다 — 무료 간단 궁합에서 본 것과 유료 풀이가 어긋나지 않게 한다.
+import { MIYU_VOICE_PROMPT } from "../style/voice-prompt.ts";
 import type { Evidence } from "../evidence.ts";
 import { COMPAT_LIMITS as L, COMPAT_PROMPT_VERSION, COMPAT_SECTIONS, COMPAT_STEP_GROUPS, PAIR_PROMPT_MARK, PAIR_PROMPT_VERSION, PAIR_SECTIONS, pairSectionsFor, sectionsFor } from "./plan.ts";
 
 export { COMPAT_PROMPT_VERSION, PAIR_PROMPT_MARK, PAIR_PROMPT_VERSION };
 export { buildReadingRepairMessage as buildCompatRepairMessage } from "../reading/prompt.ts";
+
+/** 궁합은 이름을 "A님 · B님"으로만 쓰므로 말투 블록의 호칭 규칙을 궁합에 맞게 바꾼다 */
+const COMPAT_VOICE = MIYU_VOICE_PROMPT.replace(/- 호칭:[^\n]*/, '- 호칭: "당신 · 귀하"는 쓰지 않는다. 이름은 A님 · B님으로만 쓰되 문단마다 되풀이하지 않고 "두 분"을 섞는다.');
 
 /** 가짜 AI 서버가 사주 궁합 요청을 알아보는 표지 */
 export const COMPAT_PROMPT_MARK = "[미유 사주 궁합]";
@@ -79,7 +84,7 @@ ${SLOT.evidenceExtra[mode]}- 목록에 없는 사실 · 사건 · 성격 · 날�
 - 두 일간이 상생(한쪽이 다른 쪽을 키움)이라는 근거에는 누가 누구를 키우는지의 방향이 없다. 오행의 순서(금생수 같은 것)를 직접 풀어 "A님이 B님을 돌봐요"라고 쓰지 않는다. 한쪽이 다른 쪽을 받쳐 주는 방향은 compat.role(A 기준으로 B님의 일간은 ~자리)에 적힌 것만 쓰고, 그것도 weak 근거라 영역 하나에서 한 번만 조건형으로 쓴다.
 - strength가 weak인 근거(compat.role · compat.pace · compat.type · compat.score)는 영역의 headline이나 중심 결론으로 삼지 않는다. 장면을 구체화하는 보조로 한 번만 쓴다. 영역의 중심은 moderate · strong 근거(일간 사이 · 일지 · 다른 자리의 합과 충 · 오행 보완)에서 잡는다. 단 timing 영역은 compat.timing.* 근거(weak)가 중심이다 — 그 영역에서는 두 사람의 시기 주제가 겹치는지 다른지를 중심으로 쓰고 근거가 읽는 범위를 넘어 늘려 쓰지 않는다.
 - 원인을 하나로 좁히지 않는다("~ 때문이에요" 대신 "~일 수 있어요").
-- 공감과 예측은 쓴다. 조건과 이유를 함께: "~했던 때가 있었을 거예요 · ~기 쉬워요". 입력받지 않은 구체적인 사건 · 다툼 · 이별 · 어린 시절을 아는 사실처럼 쓰지 않는다. "~했던 때가 있었을 거예요"는 영역마다 한 번까지.
+- 공감과 예측은 쓴다. 조건과 이유를 함께: "~할 때는 ~기 쉬워요". 입력받지 않은 구체적인 사건 · 다툼 · 이별 · 어린 시절을 아는 사실처럼 쓰지 않는다.
 
 [궁합 지수와 커플 유형을 쓰는 법]
 - 궁합 지수와 커플 유형은 화면 위쪽에 코드가 이미 보여 주고 있다. 본문에 점수 숫자 · 퍼센트 · 확률을 쓰지 않고, 커플 유형 이름을 본문에서 되풀이하지 않는다. 지수가 높다고 "잘 맞는 관계"로, 낮다고 "안 맞는 관계"로 쓰지 않는다 — 지수는 재미로 보는 참고값이고, 본문은 근거가 말하는 장면만 쓴다.
@@ -103,6 +108,8 @@ ${stepLines}
 ${SLOT.noMind[mode]}
 - 운을 바꾼다는 말 · 행운의 숫자 · 부적 · 특정 상품 안내, 궁합 · 구매 · 가격 · 질문권 · 다른 리포트 안내(구매 안내는 화면이 한다). 한계 안내를 문장마다 붙이지 않는다("사주만으로는 알 수 없어요" — 한곳에 코드가 모은다).
 ${SLOT.echo[mode]}
+
+${COMPAT_VOICE}
 
 [말투와 모양]
 - 사주 용어는 영역마다 한두 개만 골라 쓰고, 쉬운 말로 충분하면 쓰지 않는다. 처음 쓸 때 바로 괄호로 풀이를 붙이고("일간(태어난 날의 하늘 글자)") 한 번 풀어 준 용어는 다시 풀지 않는다. 두 사람이 어느 자리끼리 합 · 충인지 근거의 글자를 하나하나 읽어 주지 않고, "몇 곳에서 어떤 모양이 읽히는지"를 장면과 함께 한 번에 말한다.

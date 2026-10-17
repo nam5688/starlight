@@ -34,7 +34,7 @@ test("윤달: 있는 윤달은 계산하고, 없는 윤달 · 없는 날짜는 �
   assert.deepEqual(resolveSolarDate({ year: 2020, month: 4, day: 1, calendar: "lunar", isLeapMonth: true }), { ok: true, date: { year: 2020, month: 5, day: 23 } });
   const noLeap = calculateSaju({ year: 2021, month: 4, day: 1, calendar: "lunar", isLeapMonth: true, birthTime: null });
   assert.equal(noLeap.status, "invalid");
-  assert.match(noLeap.status === "invalid" ? noLeap.message : "", /2021년에는 음력 윤4월이 없습니다/);
+  assert.match(noLeap.status === "invalid" ? noLeap.message : "", /2021년에는 음력 윤4월이 없어요/);
   const day30 = calculateSaju({ year: 2021, month: 4, day: 30, calendar: "lunar", isLeapMonth: false, birthTime: null });
   assert.match(day30.status === "invalid" ? day30.message : "", /음력 2021년 4월은 29일까지/);
   assert.equal(calculateSaju(solar(2023, 2, 29, null)).status, "invalid");
@@ -82,7 +82,7 @@ test("경계 근처: 몇 분 차이로 시주가 바뀌면 안내한다", () => 
   assert.ok(near);
   assert.deepEqual(near.pillars, ["hour"]);
   assert.equal(near.alternative?.hour, "기묘");
-  assert.match(near.message, /시주 기묘가 될 수 있습니다/, "받침 없는 간지 뒤에는 '가'");
+  assert.match(near.message, /시주 기묘가 될 수 있어요/, "받침 없는 간지 뒤에는 '가'");
   const calm = ok(calculateSaju(solar(2000, 6, 1, "08:30")));
   assert.ok(!calm.notes.some((n) => n.kind === "near-boundary"));
 });

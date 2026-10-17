@@ -170,7 +170,7 @@ export const STORY7_SCENE_OWNER: Record<string, number> = Object.fromEntries(STO
 
 export const STORY7_FORMAT = "story-7";
 /** 지시문 버전 — 비교용 지시문(story7-experiment-0.1)과 이름이 다르다. 실제 AI로는 아직 한 번도 시험하지 못했다(검증되지 않음) */
-export const STORY7_PROMPT_VERSION = "story-7-prompt-0.1";
+export const STORY7_PROMPT_VERSION = "story-7-prompt-0.2";
 
 /** 글자 · 문장 수 한도 — 7개 대주제는 장마다 소유한 근거 수에 맞춰 문단 수 상한(`maxParagraphs`)이 달라지고, 나머지 한도는 영역별 이야기(story-v1)와 같은 값이다 */
 export const STORY7_LIMITS = {

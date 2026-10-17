@@ -9,27 +9,27 @@ import type { AssessmentModule } from "../types.ts";
 export const temperamentModule: AssessmentModule = {
   id: "temperament",
   title: "기질",
-  intro: "새로운 일, 불확실한 상황, 다른 사람의 반응, 오래 걸리는 일에 대한 평소 반응을 묻습니다.",
+  intro: "새로운 일, 불확실한 상황, 다른 사람의 반응, 오래 걸리는 일에 대한 평소 반응을 물어요.",
   status: "dev-example",
   version: "dev-0.1",
   dimensions: [
     {
       id: "novelty",
       label: "새로움 추구",
-      lowMeaning: "익숙하고 예측 가능한 방식을 선호합니다",
+      lowMeaning: "익숙하고 예측 가능한 방식을 선호해요",
       highMeaning: "새로운 경험과 변화를 찾아 나섭니다",
     },
     {
       id: "caution",
       label: "신중함",
-      lowMeaning: "일단 해보면서 조정하는 편입니다",
+      lowMeaning: "일단 해보면서 조정하는 편이에요",
       highMeaning: "시작 전에 위험과 변수를 먼저 살핍니다",
     },
     {
       id: "sensitivity",
       label: "타인 반응 민감도",
       lowMeaning: "다른 사람의 반응에 비교적 덜 흔들립니다",
-      highMeaning: "다른 사람의 반응과 인정에 크게 영향을 받습니다",
+      highMeaning: "다른 사람의 반응과 인정에 크게 영향을 받아요",
     },
     {
       id: "persistence",

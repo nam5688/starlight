@@ -194,7 +194,7 @@ export async function startCheckout(
   const latest = await repo.listOrdersForAssessment(assessment.id);
   const same = latest.filter((o) => o.productId === productId);
   const existing = same.find((o) => o.status === "pending") ?? same.find((o) => o.status === "paid");
-  if (!existing) throw new Error("주문을 만들지 못했습니다.");
+  if (!existing) throw new Error("주문을 만들지 못했어요.");
   return existing.status === "paid" ? { kind: "already-paid", order: existing } : { kind: "order", order: existing };
 }
 
@@ -222,10 +222,10 @@ export async function confirmPayment(
   if (order.status === "paid") {
     return order.paymentKey === input.paymentKey
       ? { kind: "paid", order }
-      : { kind: "rejected", code: "ALREADY_PAID", message: "이미 결제가 완료된 주문입니다.", order };
+      : { kind: "rejected", code: "ALREADY_PAID", message: "이미 결제가 완료된 주문이에요.", order };
   }
   if (order.status !== "pending") {
-    return { kind: "rejected", code: "ORDER_NOT_PAYABLE", message: "결제할 수 없는 주문입니다. 다시 결제해 주세요.", order };
+    return { kind: "rejected", code: "ORDER_NOT_PAYABLE", message: "결제할 수 없는 주문이에요. 다시 결제해 주세요.", order };
   }
   // 주소에 담긴 금액이 서버 주문 금액과 다르면 승인하지 않는다 (승인하지 않은 결제는 자동 만료)
   if (!Number.isInteger(input.amount) || input.amount !== order.amount) {
@@ -261,7 +261,7 @@ export async function confirmPayment(
     }
     if (applied.kind === "paid") return applied;
     if (applied.kind === "updated") {
-      return { kind: "rejected", code: `PAYMENT_${result.payment.status}`, message: "결제가 완료되지 않았습니다.", order: applied.order };
+      return { kind: "rejected", code: `PAYMENT_${result.payment.status}`, message: "결제가 완료되지 않았어요.", order: applied.order };
     }
     return { kind: "rejected", code: applied.code, message: applied.message, order: applied.order };
   }
@@ -357,7 +357,7 @@ export function refundAttention(refund: CashRefundResult): { code: string; messa
     case "amount-mismatch":
       return { code: "PARTIAL_REFUND_MISMATCH", message: `결제사에서 취소된 누적 금액이 질문 개수에 맞지 않아 질문을 회수하지 않았습니다. 맞는 누적 취소 금액은 ${won(refund.allowed)}입니다 (이미 취소된 금액은 되돌릴 수 없으니 남은 질문을 어떻게 할지 운영자가 판단해 주세요).` };
     case "invalid-amount":
-      return { code: "PARTIAL_REFUND_INVALID", message: "결제사의 취소 금액이 결제액 범위를 벗어나 반영하지 않았습니다." };
+      return { code: "PARTIAL_REFUND_INVALID", message: "결제사의 취소 금액이 결제액 범위를 벗어나 반영하지 않았어요." };
     case "no-pack":
       return { code: "PARTIAL_REFUND_NO_PACK", message: "이 주문은 묶음 장부가 없는 예전 주문이라 부분 취소를 질문에 반영하지 못했습니다. 남은 질문은 운영자가 직접 판단해 주세요." };
     case "unavailable":
@@ -399,7 +399,7 @@ async function applyPaymentStatus(
   const detail = { method: payment.method, approvedAt: payment.approvedAt, totalAmount: payment.totalAmount, mId: payment.mId };
   if (payment.orderId !== order.orderNumber || payment.totalAmount !== order.amount) {
     await recordPaymentEvent(repo, { orderId: order.id, source, status: "PAYMENT_MISMATCH", detail: { ...detail, status: payment.status } });
-    return { kind: "unchanged", order, code: "PAYMENT_MISMATCH", message: "결제 정보가 주문과 맞지 않습니다. 고객센터로 문의해 주세요." };
+    return { kind: "unchanged", order, code: "PAYMENT_MISMATCH", message: "결제 정보가 주문과 맞지 않아요. 고객센터로 문의해 주세요." };
   }
   await recordPaymentEvent(repo, { orderId: order.id, source, status: payment.status, detail });
 
@@ -409,7 +409,7 @@ async function applyPaymentStatus(
     // 이미 다른 결제키로 결제 완료된 주문에 또 다른 승인이 들어오면 같은 결제로 보지 않고 운영자 확인(환불) 대상으로 올린다
     const duplicate = async (): Promise<ApplyResult> => {
       await recordPaymentEvent(repo, { orderId: order.id, source, status: "DUPLICATE_PAYMENT", detail });
-      return { kind: "unchanged", order, code: "DUPLICATE_PAYMENT", message: "이미 결제된 주문이 있습니다. 고객센터로 문의해 주세요." };
+      return { kind: "unchanged", order, code: "DUPLICATE_PAYMENT", message: "이미 결제된 주문이 있어요. 고객센터로 문의해 주세요." };
     };
     if (order.status === "paid") return order.paymentKey && order.paymentKey !== payment.paymentKey ? duplicate() : { kind: "paid", order };
     let updated: OrderRecord | null;
@@ -434,7 +434,7 @@ async function applyPaymentStatus(
       // 동시에 들어온 다른 요청이 먼저 반영한 경우: 같은 결제키면 같은 결제, 다르면 두 번 승인된 것
       return fresh.paymentKey === payment.paymentKey ? { kind: "paid", order: fresh } : duplicate();
     }
-    return { kind: "unchanged", order: fresh, code: "ORDER_NOT_PAYABLE", message: "결제할 수 없는 주문입니다." };
+    return { kind: "unchanged", order: fresh, code: "ORDER_NOT_PAYABLE", message: "결제할 수 없는 주문이에요." };
   }
   if (target === "refunded") {
     const updated = await repo.updateOrder(order.id, ["paid"], { status: "refunded" });

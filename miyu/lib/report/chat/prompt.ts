@@ -1,12 +1,13 @@
 // 자유 질문에 답하는 AI 지시문과 자료. 개인 통합 리포트(reading/prompt.ts)와 같은 말투 · 같은 금지 규칙을 쓰되, 새 근거를 만들지 않고 저장된 풀이 글 안에서만 답한다.
 // 이름 · 생년월일 원문은 보내지 않는다 (context.ts가 이름을 "이 분"으로 바꾼다).
+import { MIYU_VOICE_SHORT } from "../style/voice-prompt.ts";
 import { CHAT_LIMITS as L } from "./plan.ts";
 import type { ChatAsk } from "./types.ts";
 
 // 0.6(2026-10-16, 운영자 검토 — 비교용 후보, 실제 AI로 아직 시험하지 못했다): 고민 상담의 답을 "사주 해석 → 지금 상황이 뜻하는 것 → 구체적인 추천" 한 흐름으로 쓰되 목차 · 단계 이름을 드러내지 않고,
 //   이유가 있는 추천을 허용하며(중대한 선택의 확정만 막는다), 사주 용어는 쉬운 말이 먼저이되 사용자가 물었거나 구매한 리포트 방이면 설명과 함께 쓸 수 있게 했다 —
 //   사용자가 용어를 물으면 "무엇인지 → 이 분에 대해 읽은 자료가 있는지 구분 → 없으면 미유가 아직 계산하지 않았다고 밝히기"로 답하고 이 분의 격국 · 용신 · 신살을 지어내지 않는다. 가벼운 보완 아이템 제안은 허용한다.
-export const CHAT_PROMPT_VERSION = "chat-v1-prompt-0.6";
+export const CHAT_PROMPT_VERSION = "chat-v1-prompt-0.7";
 
 /** 가짜 AI 서버가 채팅 요청을 알아보는 표지 */
 export const CHAT_PROMPT_MARK = "[미유 채팅 답변]";
@@ -51,6 +52,8 @@ export const CHAT_SYSTEM_PROMPT = `${CHAT_PROMPT_MARK} 너는 ME:U(미유)의 �
 - 문단 ${L.paragraphs.min}~${L.paragraphs.max}개, 문단마다 ${L.paragraph.sentencesMax}문장 이하 · ${L.paragraph.max}자 이하. 첫 문단에서 질문에 바로 답한다. 마지막 문단은 바로 해 볼 수 있는 작은 행동 하나이거나, 사용자가 더 생각해 볼 질문 하나다. 시점 · 기간을 임의로 정하지 않는다.
 - 목록 · 제목 · 굵은 글씨 · 이모지 · 마크다운 · 따옴표로 감싼 JSON을 쓰지 않는다. 문단은 빈 줄로 나눈다.
 - 같은 말을 되풀이하지 않는다. 일반론 대신 reading · profile에서 읽히는 이 사람의 반응과 일상 장면 하나를 쓴다. 근거가 약하면 늘려 쓰지 않는다.
+
+${MIYU_VOICE_SHORT}
 
 [쓰지 않는 것]
 - 상대의 속마음 · 상대가 왜 그랬는지에 대한 단정, 상대의 나이 · 직업 · 만날 날짜. 상대는 알 수 없다는 선을 지키고, 이야기는 사용자의 반응과 선택 쪽으로 돌린다. 상대의 경향을 reading이 이미 조건으로 말하고 있다면 그 글의 범위 안에서만 쓴다.

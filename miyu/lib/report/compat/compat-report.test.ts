@@ -95,7 +95,7 @@ test("지시문: 사주 궁합의 일(풀이 · 장면 · 조율 · 방향)과 �
     assert.ok(COMPAT_SYSTEM_PROMPT.includes(must), must);
   }
   for (const s of COMPAT_SECTIONS) assert.ok(COMPAT_SYSTEM_PROMPT.includes(`- ${s.id} (${s.topic}`), s.id);
-  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.3");
+  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.4");
   assert.equal(COMPAT_TIMING_BUILT, true, "두 사람의 시기(각자의 대운 · 세운을 나란히 놓는 범위)는 계산한다 — 바꾸면 이 시험 · 지시문 · 검사 · 화면 안내를 함께 바꾼다");
 });
 

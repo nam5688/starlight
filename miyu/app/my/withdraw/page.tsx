@@ -22,8 +22,8 @@ export const metadata: Metadata = { title: "회원 탈퇴 · ME:U 미유", robot
 
 const ERRORS: Record<string, string> = {
   confirm: `확인 항목에 체크하고 입력창에 "${WITHDRAWAL_CONFIRM_WORD}"를 정확히 적어 주세요.`,
-  failed: "탈퇴 처리 중 오류가 났습니다. 잠시 뒤 다시 시도해 주세요. 계속되면 문의해 주세요.",
-  auth: "개인정보 삭제는 끝났지만 로그인 연결을 지우는 단계가 끝나지 않았습니다. 같은 화면에서 한 번 더 눌러 마무리해 주세요.",
+  failed: "탈퇴 처리 중 오류가 났어요. 잠시 뒤 다시 시도해 주세요. 계속되면 문의해 주세요.",
+  auth: "개인정보 삭제는 끝났지만 로그인 연결을 지우는 단계가 끝나지 않았어요. 같은 화면에서 한 번 더 눌러 마무리해 주세요.",
   "pending-order": WITHDRAWAL_BLOCKER_TEXT["pending-order"],
   "report-in-progress": WITHDRAWAL_BLOCKER_TEXT["report-in-progress"],
   "cash-balance": WITHDRAWAL_BLOCKER_TEXT["cash-balance"],
@@ -51,7 +51,7 @@ async function WithdrawContent({ searchParams }: Pick<PageProps<"/my/withdraw">,
 
   return (
     <div className="mt-6">
-      <p className="text-[15px] leading-relaxed text-ink-2">탈퇴하면 아래 내용이 바로 삭제되며 되돌릴 수 없습니다. 환불이 필요하다면 탈퇴하기 전에 문의해 주세요.</p>
+      <p className="text-[15px] leading-relaxed text-ink-2">탈퇴하면 아래 내용이 바로 삭제되며 되돌릴 수 없어요. 환불이 필요하다면 탈퇴하기 전에 문의해 주세요.</p>
       <section aria-labelledby="wd-deleted" className="mt-6">
         <h2 id="wd-deleted" className="text-[18px] font-bold">
           바로 삭제되는 것
@@ -93,7 +93,7 @@ async function WithdrawContent({ searchParams }: Pick<PageProps<"/my/withdraw">,
         <form action={withdrawAction} className="mt-6 space-y-4">
           <label className="flex items-start gap-3 text-[15px] leading-relaxed" htmlFor="wd-agree">
             <input id="wd-agree" name="agree" type="checkbox" required className="mt-1 size-5 shrink-0" />
-            <span>위 내용을 확인했고, 삭제된 결과와 리포트는 복구할 수 없다는 것에 동의합니다.</span>
+            <span>위 내용을 확인했고, 삭제된 결과와 리포트는 복구할 수 없다는 것에 동의해요.</span>
           </label>
           <div>
             <label htmlFor="wd-confirm" className="text-[15px] font-medium">

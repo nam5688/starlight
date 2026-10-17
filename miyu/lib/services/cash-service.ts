@@ -97,7 +97,7 @@ export async function startQuestionPayment(
     });
     if (inserted.ok) return { kind: "order", order: await keepNewestPending(repo, assessment.id, inserted.value), quote };
   }
-  throw new Error("질문 결제 주문을 만들지 못했습니다.");
+  throw new Error("질문 결제 주문을 만들지 못했어요.");
 }
 
 /**

@@ -394,12 +394,12 @@ export async function pairInputFor(repo: MiyuRepository, pairs: PairRepository, 
   const pairId = parsePairProductId(order.productId);
   if (!pairId) throw new Error("리포트 궁합 주문이 아닙니다.");
   const pair = await pairs.getPair(pairId);
-  if (!pair) throw new Error("리포트 궁합 쌍을 찾을 수 없습니다.");
+  if (!pair) throw new Error("리포트 궁합 쌍을 찾을 수 없어요.");
   if (order.userId !== pair.aUserId && order.userId !== pair.bUserId) throw new Error("리포트 궁합 쌍의 구성원이 아닙니다.");
-  if (pair.status !== "linked" || !pair.bAssessmentId) throw new Error("연결이 끊겨 리포트 궁합을 만들 수 없습니다.");
-  if (pair.aWithdrawnAt || pair.bWithdrawnAt) throw new Error("동의가 철회돼 리포트 궁합을 만들 수 없습니다.");
+  if (pair.status !== "linked" || !pair.bAssessmentId) throw new Error("연결이 끊겨 리포트 궁합을 만들 수 없어요.");
+  if (pair.aWithdrawnAt || pair.bWithdrawnAt) throw new Error("동의가 철회돼 리포트 궁합을 만들 수 없어요.");
   const [a, b] = await Promise.all([repo.getAssessment(pair.aAssessmentId), repo.getAssessment(pair.bAssessmentId)]);
-  if (!usable(a) || !usable(b)) throw new Error("두 사람의 검사 결과를 쓸 수 없어 리포트 궁합을 만들 수 없습니다.");
+  if (!usable(a) || !usable(b)) throw new Error("두 사람의 검사 결과를 쓸 수 없어 리포트 궁합을 만들 수 없어요.");
   return { a: personOf(a), b: personOf(b), ...(reference ? { reference } : {}) };
 }
 

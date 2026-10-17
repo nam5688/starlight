@@ -80,7 +80,7 @@ export function ConfirmRunner() {
   if (outcome?.kind === "paid") {
     return (
       <p role="status" className="mt-4 text-[16px] leading-relaxed text-ink-2">
-        {cashFlow ? "결제가 확인되었습니다. 곧 채팅방으로 이동해 질문에 이어서 답합니다." : "결제가 확인되었습니다. 곧 리포트 화면으로 이동합니다."}
+        {cashFlow ? "결제가 확인되었어요. 곧 채팅방으로 이동해 질문에 이어서 답해요." : "결제가 확인되었어요. 곧 리포트 화면으로 이동해요."}
       </p>
     );
   }
@@ -90,15 +90,15 @@ export function ConfirmRunner() {
     return (
       <div className="mt-4 space-y-5">
         <p role="status" className="text-[16px] font-semibold leading-relaxed">
-          결제 결과를 확인하고 있습니다
+          결제 결과를 확인하고 있어요
         </p>
         <p className="text-[16px] leading-relaxed text-ink-2">
-          {offline ? "인터넷 연결이 불안정해 결과를 받지 못했습니다. " : "결제사 응답을 아직 받지 못했습니다. "}
-          결제가 승인되었다면 확인되는 대로 자동으로 반영되고, {cashFlow ? "결제한 질문도 반영됩니다" : "리포트도 준비됩니다"}.{" "}
+          {offline ? "인터넷 연결이 불안정해 결과를 받지 못했어요. " : "결제사 응답을 아직 받지 못했어요. "}
+          결제가 승인되었다면 확인되는 대로 자동으로 반영되고, {cashFlow ? "결제한 질문도 반영돼요" : "리포트도 준비돼요"}.{" "}
           <span className="font-semibold text-ink">다시 결제하지 않아도 됩니다.</span>
         </p>
         <p className="text-[14px] leading-relaxed text-ink-3">
-          {gaveUp ? "자동 확인을 멈췄습니다. 아래 버튼으로 다시 확인하거나, MY에서 나중에 확인해 주세요. 결제가 승인된 경우 MY를 열면 자동으로 맞춰집니다." : busy ? "확인하는 중…" : "잠시 후 자동으로 다시 확인합니다."}
+          {gaveUp ? "자동 확인을 멈췄어요. 아래 버튼으로 다시 확인하거나, MY에서 나중에 확인해 주세요. 결제가 승인된 경우 MY를 열면 자동으로 맞춰져요." : busy ? "확인하는 중…" : "잠시 후 자동으로 다시 확인해요."}
         </p>
         {(outcome.orderNumber || outcome.errorId) && (
           <p className="text-[13px] text-ink-3">
@@ -122,7 +122,7 @@ export function ConfirmRunner() {
   if (outcome?.kind === "login") {
     return (
       <div className="mt-4 space-y-5">
-        <p className="text-[16px] leading-relaxed text-ink-2">로그인이 풀렸습니다. MY에서 다시 로그인한 뒤 결과를 확인해 주세요. 결제가 승인된 경우 다시 결제하지 않아도 반영됩니다.</p>
+        <p className="text-[16px] leading-relaxed text-ink-2">로그인이 풀렸어요. MY에서 다시 로그인한 뒤 결과를 확인해 주세요. 결제가 승인된 경우 다시 결제하지 않아도 반영돼요.</p>
         <Link href="/my" className={buttonPrimary}>
           MY로 가기
         </Link>
@@ -134,14 +134,14 @@ export function ConfirmRunner() {
   return (
     <div className="mt-4 space-y-5">
       <p role="alert" className="text-[16px] font-medium leading-relaxed text-danger">
-        {rejected ? rejected.message : "결제를 확인하지 못했습니다."}
+        {rejected ? rejected.message : "결제를 확인하지 못했어요."}
       </p>
       {rejected?.charged ? (
         <p className="text-[14px] leading-relaxed text-ink-2">
           이 결제는 결제사에서 승인되었을 수 있습니다. 중복 결제로 확인되면 운영자가 확인 후 환불을 안내해 드립니다. 문의할 때 주문번호 {rejected.orderNumber ?? ""}를 알려 주세요.
         </p>
       ) : (
-        <p className="text-[14px] text-ink-3">승인되지 않은 결제는 청구되지 않습니다.</p>
+        <p className="text-[14px] text-ink-3">승인되지 않은 결제는 청구되지 않아요.</p>
       )}
       <Link href={rejected?.resultPath ?? "/my"} className={buttonSecondary}>
         돌아가기

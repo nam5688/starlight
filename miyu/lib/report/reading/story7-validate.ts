@@ -4,6 +4,7 @@
 //  · 4번은 입력받지 않은 가족 이야기와 근거 없는 귀인 · 사람복을 쓰지 않는다. 7번의 조언은 2~3가지이고 알려 준 고민이 없으면 고민을 지어내지 않는다.
 // 한계: 낱말 · 길이 · 표지를 세는 검사다 — 같은 결론을 말만 바꿔 되풀이하는 것 · 근거를 제대로 풀었는지 · 9,900원을 낼 만한지는 못 가른다(사람이 읽는 평가가 본다, docs/real-ai-evaluation-rubric.md).
 import type { Evidence } from "../evidence.ts";
+import { checkVoice, voiceErrors, type VoiceReport } from "../style/voice.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
 import { READING_LIMITS as L, TERM_LIMITS } from "./plan.ts";
 import { FIRST_PARAGRAPH_TERMS_MAX, MONEY_WORDS, PERIOD_TALK, PERSONAL_REUSE, PROCESS_TALK, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
@@ -103,6 +104,14 @@ export function normalizeStory7Draft<T>(raw: T): T {
     return Array.isArray(paragraphs) && paragraphs.length <= plan.maxParagraphs ? { ...s, paragraphs } : s;
   });
   return { ...d, sections } as T;
+}
+
+/**
+ * 미유 문체 점검(style/voice.ts) — 글의 합쇼체 · 당신/귀하 · 금지 문구 · AI 어휘 · 억지 공감 · 이모지는 실패(저장하지 않는다)이고, 추상어 예산 · 대조형 틀 · 같은 시작/마무리 · 이름 호칭 · 근거 문구 옮김은 고쳐 쓰기 안내(repair),
+ * 같은 뜻 반복 의심은 사람이 읽고 판단하는 목록(review)이다. 단어 하나로 실패시키지 않고 맥락 · 빈도로 판단한다.
+ */
+export function story7VoiceReport(d: Story7DraftV1, evidence: Evidence[]): VoiceReport {
+  return checkVoice(visibleStory7Texts(d), { evidenceTexts: evidence.filter((e) => !e.uncertain).flatMap((e) => [e.fact, e.cue]), blockOf: story7BlockOf });
 }
 
 export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { hasContext?: boolean } = {}): Story7Validation {
@@ -320,6 +329,8 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   }
   errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext) }));
   for (const { where, text: t } of texts) if (TYPE_CODE.test(t)) errors.push(`${where}: 알파벳 유형 코드("${TYPE_CODE.exec(t)![0]}")를 쓰지 않습니다 — 입력한 MBTI는 "입력해 주신 성향"으로 부릅니다.`);
+  // 미유 문체 — 분명한 위반만 실패로 센다(나머지는 고쳐 쓰기 안내로 생성기가 따로 부탁한다)
+  errors.push(...voiceErrors(checkVoice(texts, { blockOf: story7BlockOf })));
 
   return errors.length ? { ok: false, errors: [...new Set(errors)].slice(0, 30) } : { ok: true, draft: d as Story7DraftV1 };
 }

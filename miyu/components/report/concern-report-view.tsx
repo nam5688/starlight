@@ -42,14 +42,14 @@ export function ConcernReportView({ report, idPrefix = "", footer }: { report: C
       </section>
 
       <section aria-labelledby={id("c-pattern")}>
-        <SectionTitle id={id("c-pattern")} note="원국 · 대운과 응답에서 이 고민이 이 사람에게 왜 이런 모양으로 되풀이되는지 읽었습니다.">
+        <SectionTitle id={id("c-pattern")} note="원국 · 대운과 응답에서 이 고민이 이 사람에게 왜 이런 모양으로 되풀이되는지 읽었어요.">
           이 고민이 반복되는 구조
         </SectionTitle>
         <ParagraphGroup paragraphs={report.pattern} evidence={evidence} />
       </section>
 
       <section aria-labelledby={id("c-situations")}>
-        <SectionTitle id={id("c-situations")} note="알려 주신 상황마다 왜 그렇게 되는지와, 해 볼 수 있는 선택을 따로 적었습니다. 결정을 대신하지 않습니다.">
+        <SectionTitle id={id("c-situations")} note="알려 주신 상황마다 왜 그렇게 되는지와, 해 볼 수 있는 선택을 따로 적었어요. 결정을 대신하지 않아요.">
           상황별 해석과 해 볼 선택
         </SectionTitle>
         <FoldRow>
@@ -73,7 +73,7 @@ export function ConcernReportView({ report, idPrefix = "", footer }: { report: C
 
       {report.timeline.length > 0 && (
         <section aria-labelledby={id("c-timeline")}>
-          <SectionTitle id={id("c-timeline")} note="계산된 대운 · 세운에 전통적으로 두드러지는 주제를 이 고민의 관점에서 읽었습니다. 특정 사건이나 날짜를 예언하지 않습니다.">
+          <SectionTitle id={id("c-timeline")} note="계산된 대운 · 세운에 전통적으로 두드러지는 주제를 이 고민의 관점에서 읽었어요. 특정 사건이나 날짜를 예언하지 않아요.">
             이 고민에서 본 시기의 흐름
           </SectionTitle>
           <FoldRow>
@@ -104,7 +104,7 @@ export function ConcernReportView({ report, idPrefix = "", footer }: { report: C
 
       {report.differences.length > 0 && (
         <section aria-labelledby={id("c-differences")}>
-          <SectionTitle id={id("c-differences")} note="두 결과를 하나로 맞추지 않고, 이 고민에서 다르게 나온 부분을 그대로 적었습니다.">
+          <SectionTitle id={id("c-differences")} note="두 결과를 하나로 맞추지 않고, 이 고민에서 다르게 나온 부분을 그대로 적었어요.">
             사주와 응답이 다른 부분
           </SectionTitle>
           <ParagraphGroup paragraphs={report.differences} evidence={evidence} />
@@ -112,7 +112,7 @@ export function ConcernReportView({ report, idPrefix = "", footer }: { report: C
       )}
 
       <section aria-labelledby={id("c-actions")}>
-        <SectionTitle id={id("c-actions")} note="언제 · 얼마나 · 무엇을 하는지가 보이는 행동으로 적었습니다. 하나씩, 할 수 있는 것부터 해 보세요.">
+        <SectionTitle id={id("c-actions")} note="언제 · 얼마나 · 무엇을 하는지가 보이는 행동으로 적었어요. 하나씩, 할 수 있는 것부터 해 보세요.">
           이 고민을 위한 실천
         </SectionTitle>
         <ol className="space-y-3">
@@ -127,12 +127,12 @@ export function ConcernReportView({ report, idPrefix = "", footer }: { report: C
       </section>
 
       <section aria-labelledby={id("c-basis")}>
-        <SectionTitle id={id("c-basis")} note="반영한 고민 · 용어 · 해석 기준은 접어 두었습니다.">
+        <SectionTitle id={id("c-basis")} note="반영한 고민 · 용어 · 해석 기준은 접어 두었어요.">
           근거와 기준
         </SectionTitle>
         <FoldRow>
           {glossary.length > 0 && (
-            <Fold label="사주 용어 풀이" hint="이 리포트에 나온 용어를 한자 뜻과 쉬운 말로 풀었습니다" wide>
+            <Fold label="사주 용어 풀이" hint="이 리포트에 나온 용어를 한자 뜻과 쉬운 말로 풀었어요" wide>
               <dl className="divide-y divide-line">
                 {glossary.map((g) => (
                   <div key={g.term} className="py-4 first:pt-0 last:pb-0">
@@ -156,7 +156,7 @@ export function ConcernReportView({ report, idPrefix = "", footer }: { report: C
               <p>
                 알려 주신 이야기는 해석의 초점으로만 썼고, 사주로 알아낸 것이 아닙니다. 사주 계산(원국 · 대운 · 세운)은 그대로이며, 응답 때문에 사주 시기 해석을 바꾸지 않습니다. 사주와 응답 점수를 합산하지 않습니다.
               </p>
-              <p>시기 해석은 전통적인 주제이며 미래 예측이 맞는다는 뜻이 아닙니다. 해석 규칙은 초안으로 전문가 검토 전이고, 이 리포트는 자기 이해를 돕는 참고 자료로 의학적 · 심리학적 · 법률적 판단을 대신하지 않습니다.</p>
+              <p>시기 해석은 전통적인 주제이며 미래 예측이 맞는다는 뜻이 아니에요. 해석 규칙은 초안으로 전문가 검토 전이고, 이 리포트는 자기 이해를 돕는 참고 자료로 의학적 · 심리학적 · 법률적 판단을 대신하지 않아요.</p>
               <p className="text-[13px] text-ink-3">규칙 {report.basis.ruleVersions.join(" · ")}</p>
               {report.basis.lines.length > 0 && <p className="text-[13px] text-ink-3">{report.basis.lines.join(" · ")}</p>}
             </div>

@@ -43,7 +43,7 @@ export async function saveContext(
   if (!assessment) return { kind: "not-found" };
   const normalized = normalizeContextInput(input.raw);
   const errors = normalized.ok ? [] : [...normalized.errors];
-  if (!input.agreed) errors.push("리포트 해석에 반영하는 데 동의해야 저장할 수 있습니다.");
+  if (!input.agreed) errors.push("리포트 해석에 반영하는 데 동의해야 저장할 수 있어요.");
   if (!normalized.ok || errors.length) return { kind: "invalid", errors };
   // 같은 내용을 다시 저장하면 저장 시점을 바꾸지 않는다 (고친 것이 없는데 "수정했다"로 보지 않는다)
   const prev = await repo.getContext(assessment.id);

@@ -4,6 +4,7 @@
 import type { Evidence } from "../evidence.ts";
 import { findRepeatedPhrasesIn, repeatMessages, type RepeatedPhrase } from "../reading/repeat.ts";
 import { distinctTerms } from "../reading/terms.ts";
+import { checkVoice, voiceErrors } from "../style/voice.ts";
 import { allowedYearsOf, countSentences, textIssues } from "../reading/validate.ts";
 import { COMPAT_LIMITS as L, COMPAT_STEP_GROUPS, hasTimingEvidence, pairSectionsFor, sectionsFor } from "./plan.ts";
 import type { CompatDraftV1 } from "./types.ts";
@@ -226,6 +227,8 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: Co
   // 글 규칙 — 이전 읽기 구조와 같은 검사 + 궁합에서만 필요한 검사
   const texts = visibleCompatTexts(d as CompatDraftV1);
   errors.push(...textIssues(texts, evidence, { allowedYears: compatAllowedYears(evidence), hasContext: false, ...(pair ? { echo: PAIR_ECHO } : {}) }));
+  // 미유 문체 — 합쇼체 · 당신/귀하 · 금지 문구 · AI 어휘 · 억지 공감 · 이모지는 저장하지 않는다(추상어 예산 · 대조형 틀 같은 것은 고쳐 쓰기 대상이 아니라 읽기 전 지표로만 본다)
+  errors.push(...voiceErrors(checkVoice(texts)));
   for (const { where, text: t } of texts) {
     if (pair && ATTACHMENT_TYPE.test(t)) errors.push(`${where}: 가까운 관계 반응을 애착 유형 이름("${ATTACHMENT_TYPE.exec(t)![0]}")으로 부르지 않습니다 — 어떤 장면에서 어떻게 나타나는지로 쓰세요.`);
     if (BARE_LETTER.test(t)) errors.push(`${where}: 두 사람을 "A님 · B님"으로만 부릅니다("A"나 "B" 한 글자로 부르지 않습니다).`);

@@ -62,19 +62,19 @@ export function PurchasePanel({
     return (
       <section aria-labelledby={purchaseId} className="rounded-xl border border-line-strong px-5 py-6 md:px-7">
         <h2 id={purchaseId} className="text-[20px] font-bold tracking-tight">
-          결제가 완료되었습니다
+          결제가 완료되었어요
         </h2>
         <div className="mt-2">
           {!failed ? (
             <ReportStatusPoller assessmentId={assessment.id} orderNumber={paidOrder?.orderNumber} />
           ) : canRetry ? (
             <p className="text-[15px] leading-relaxed text-ink-2">
-              리포트를 만들지 못했습니다. 결제는 정상 처리되었으니 다시 결제하지 말고 아래 버튼을 눌러 주세요. 계속 실패하면 재처리 또는
-              환불해 드립니다. 다시 만들기는 1분에 한 번만 누를 수 있습니다.
+              리포트를 만들지 못했어요. 결제는 정상 처리되었으니 다시 결제하지 말고 아래 버튼을 눌러 주세요. 계속 실패하면 재처리 또는
+              환불해 드려요. 다시 만들기는 1분에 한 번만 누를 수 있어요.
             </p>
           ) : (
             <p className="text-[15px] leading-relaxed text-ink-2">
-              여러 번 다시 만들어 보았지만 리포트를 만들지 못했습니다. 결제는 정상 처리되어 있으며, 운영자가 확인한 뒤 재처리 또는 환불해
+              여러 번 다시 만들어 보았지만 리포트를 만들지 못했어요. 결제는 정상 처리되어 있으며, 운영자가 확인한 뒤 재처리 또는 환불해
               드립니다. 문의하실 때 아래 주문번호를 알려 주세요.
             </p>
           )}
@@ -108,7 +108,7 @@ export function PurchasePanel({
           내 결과의 나머지와, 왜 그렇게 읽히는지의 근거를 한 번에 확인하세요.
         </p>
         {action.kind === "refund-info" && (
-          <p className="mt-2 text-[15px] text-ink-2">이전 주문은 환불 처리되었습니다.</p>
+          <p className="mt-2 text-[15px] text-ink-2">이전 주문은 환불 처리되었어요.</p>
         )}
         <ul className="mt-4 space-y-2.5">
           {[...included, ALWAYS_INCLUDED].map((item) => (
@@ -118,7 +118,7 @@ export function PurchasePanel({
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[14px] text-ink-3">한 번 구매로 위 내용을 모두 볼 수 있습니다. 일부를 따로 추가 결제하지 않습니다.</p>
+        <p className="mt-3 text-[14px] text-ink-3">한 번 구매로 위 내용을 모두 볼 수 있어요. 일부를 따로 추가 결제하지 않아요.</p>
         {optionsCarryPrice ? null : discount ? (
           <div className="mt-4">
             <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -148,7 +148,7 @@ export function PurchasePanel({
         {salesClosedReason ? (
           <div>
             <button type="button" disabled className={buttonDisabled}>
-              지금은 새 구매를 받지 않습니다
+              지금은 새 구매를 받지 않아요
             </button>
             <p role="status" className="mt-3 text-[14px] leading-relaxed text-ink-2">
               {salesClosedMessage(salesClosedReason.reason)}
@@ -182,7 +182,7 @@ export function PurchasePanel({
           </div>
         )}
         <p className="mt-3 text-[13px] leading-relaxed text-ink-3">
-          결제는 토스페이먼츠로 진행되며, 토스 가입이나 앱 설치 없이 일반 카드로 결제할 수 있습니다.
+          결제는 토스페이먼츠로 진행되며, 토스 가입이나 앱 설치 없이 일반 카드로 결제할 수 있어요.
         </p>
       </div>
     </section>

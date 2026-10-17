@@ -47,7 +47,7 @@ test("지시문: 사주를 읽고 응답으로 나타나는 모습을 구체화�
     assert.ok(TASTE_SYSTEM_PROMPT.includes(must), must);
   }
   for (const id of TASTE_SECTION_IDS) assert.ok(TASTE_SYSTEM_PROMPT.includes(`- ${id} "${TASTE_PLAN.sections[id].label}"`), id);
-  assert.equal(TASTE_PROMPT_VERSION, "taste-v2-prompt-0.1");
+  assert.equal(TASTE_PROMPT_VERSION, "taste-v2-prompt-0.2");
   assert.deepEqual([...TASTE_SECTION_IDS], ["self", "work", "love", "action"]);
   assert.ok(buildTasteRepairMessage(["가", "나"]).includes("- 가") && buildTasteRepairMessage(["가"]).includes("JSON 전체"));
 });

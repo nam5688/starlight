@@ -30,7 +30,7 @@ test("원국 쉬운 풀이: 오행 각각의 뜻 · 많음/없음 풀이가 있�
   assert.ok(p.elements.every((e) => e.force && e.hanja));
   const level = Object.fromEntries(p.elements.map((e) => [e.element, e.level]));
   assert.deepEqual(level, { 목: "many", 화: "few", 토: "many", 금: "few", 수: "none" });
-  assert.match(p.headline, /^촛불처럼 한곳을 오래 비추는 섬세한 사람 — 원국에는 목\(나무\)·토\(흙\) 기운이 많고 수\(물\) 기운이 없는 구성입니다\.$/);
+  assert.match(p.headline, /^촛불처럼 한곳을 오래 비추는 섬세한 사람 — 원국에는 목\(나무\)·토\(흙\) 기운이 많고 수\(물\) 기운이 없는 구성이에요\.$/);
   assert.equal(p.dayMaster.label, "정화(丁)");
   assert.ok(p.everyday.length >= 3 && p.everyday[0].startsWith("수(물) 기운이 없어요"));
   assert.ok(p.elements.find((e) => e.element === "수")!.plain.length > 20);
@@ -71,7 +71,7 @@ test("구성 요소 전체: 금지 표현(정확도 · 단정 · 날짜 예언 �
     const text = allText(e).join("\n");
     assert.doesNotMatch(text, FORBIDDEN);
     assert.doesNotMatch(text, /\d{1,2}\s*(살|세)에|직업은|만나게 될/);
-    assert.match(e.partner!.limits, /나이 · 직업 · 만나는 날짜는 계산하거나 예측하지 않습니다/);
+    assert.match(e.partner!.limits, /나이 · 직업 · 만나는 날짜는 계산하거나 예측하지 않아요/);
     // 색 · 소재를 사야 한다고 권하지 않는다
     assert.doesNotMatch(allText(e.items).join(" "), /구매하|사세요|쇼핑/);
   }
@@ -95,5 +95,5 @@ test("어울리는 관계 조건: 배우자 자리와 응답에서 3가지 편�
   assert.equal(partner.fits.length, 3);
   assert.ok(partner.watch.length >= 1);
   assert.ok(partner.timing.years.every((y) => y.year >= 2026 && y.year <= 2028));
-  assert.match(partner.timing.note, /예언하는 것이 아니라|직접 맞닿는 해는 없습니다/);
+  assert.match(partner.timing.note, /예언하는 것이 아니라|직접 맞닿는 해는 없어요/);
 });

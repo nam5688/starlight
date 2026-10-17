@@ -121,7 +121,7 @@ const listPillars = (alt: Partial<Record<PillarKey, string>>) =>
 export function resolveSolarDate(input: Pick<SajuInput, "year" | "month" | "day" | "calendar" | "isLeapMonth">): { ok: true; date: Ymd } | { ok: false; message: string } {
   const { year, month, day } = input;
   if (input.calendar === "solar") {
-    return isValidSolarDate(year, month, day) ? { ok: true, date: { year, month, day } } : { ok: false, message: "존재하지 않는 날짜입니다." };
+    return isValidSolarDate(year, month, day) ? { ok: true, date: { year, month, day } } : { ok: false, message: "존재하지 않는 날짜예요." };
   }
   const leap = input.isLeapMonth;
   try {
@@ -132,7 +132,7 @@ export function resolveSolarDate(input: Pick<SajuInput, "year" | "month" | "day"
     } catch {
       return {
         ok: false,
-        message: leap ? `${year}년에는 음력 윤${month}월이 없습니다. 윤달이 아니라면 ‘윤달’ 선택을 해제해 주세요.` : "음력 날짜를 확인해 주세요.",
+        message: leap ? `${year}년에는 음력 윤${month}월이 없어요. 윤달이 아니라면 ‘윤달’ 선택을 해제해 주세요.` : "음력 날짜를 확인해 주세요.",
       };
     }
     let last = 29;
@@ -142,7 +142,7 @@ export function resolveSolarDate(input: Pick<SajuInput, "year" | "month" | "day"
     } catch {
       /* 29일까지 있는 달 */
     }
-    return { ok: false, message: `음력 ${year}년 ${leap ? "윤" : ""}${month}월은 ${last}일까지 있습니다.` };
+    return { ok: false, message: `음력 ${year}년 ${leap ? "윤" : ""}${month}월은 ${last}일까지 있어요.` };
   }
 }
 
@@ -195,7 +195,7 @@ export function calculateSaju(input: SajuInput, options: SajuOptions = SAJU_POLI
         notes.push({
           kind: "near-boundary",
           pillars: KEYS.filter((k) => near[k]),
-          message: `${jeolgi ? "절기가 바뀌는 시각" : "시주가 바뀌는 시각"}과 ${BOUNDARY_MARGIN_MINUTES}분 이내라, 출생시간이 조금만 달라도 ${iga(listPillars(near))} 될 수 있습니다.`,
+          message: `${jeolgi ? "절기가 바뀌는 시각" : "시주가 바뀌는 시각"}과 ${BOUNDARY_MARGIN_MINUTES}분 이내라, 출생시간이 조금만 달라도 ${iga(listPillars(near))} 될 수 있어요.`,
           alternative: near,
         });
       }
@@ -208,15 +208,15 @@ export function calculateSaju(input: SajuInput, options: SajuOptions = SAJU_POLI
           pillars: [],
           message:
             offset > 540
-              ? `${solar.year}년 당시 서머타임이 시행돼 시계가 ${offset - 540}분 빨랐던 기간이라, 이를 빼고 계산했습니다.`
-              : `${solar.year}년 당시 한국 표준시가 지금과 달랐던(UTC+${Math.floor(offset / 60)}:${String(offset % 60).padStart(2, "0")}) 기간이라, 이를 반영해 계산했습니다.`,
+              ? `${solar.year}년 당시 서머타임이 시행돼 시계가 ${offset - 540}분 빨랐던 기간이라, 이를 빼고 계산했어요.`
+              : `${solar.year}년 당시 한국 표준시가 지금과 달랐던(UTC+${Math.floor(offset / 60)}:${String(offset % 60).padStart(2, "0")}) 기간이라, 이를 반영해 계산했어요.`,
         });
       }
     } else {
       // 출생시간 모름: 날짜 기준 일주, 시주 없음. 태어난 날에 절기가 바뀌면 연주·월주 후보를 함께 남긴다
       main = compute({ ...solar, hour: 12, minute: 0 }, options, "midnight", gender);
       keys = ["year", "month", "day"];
-      notes.push({ kind: "hour-unknown", pillars: ["hour"], message: "출생시간을 몰라 시주 없이 연주 · 월주 · 일주 세 기둥으로 계산했습니다." });
+      notes.push({ kind: "hour-unknown", pillars: ["hour"], message: "출생시간을 몰라 시주 없이 연주 · 월주 · 일주 세 기둥으로 계산했어요." });
       const early = compute({ ...solar, hour: 0, minute: 0 }, options, "midnight");
       const late = compute({ ...solar, hour: 23, minute: 59 }, options, "midnight");
       const alt = { ...diff(main, early, ["year", "month"]), ...diff(main, late, ["year", "month"]) };
@@ -224,13 +224,13 @@ export function calculateSaju(input: SajuInput, options: SajuOptions = SAJU_POLI
         notes.push({
           kind: "jeolgi-day",
           pillars: KEYS.filter((k) => alt[k]),
-          message: `태어난 날에 절기가 바뀌어, 태어난 시각에 따라 ${listPillars(alt)}일 수 있습니다. 출생시간을 알면 확정할 수 있습니다.`,
+          message: `태어난 날에 절기가 바뀌어, 태어난 시각에 따라 ${listPillars(alt)}일 수 있어요. 출생시간을 알면 확정할 수 있어요.`,
           alternative: alt,
         });
       }
     }
   } catch {
-    return { status: "invalid", message: "계산할 수 없는 날짜입니다. 생년월일을 확인해 주세요." };
+    return { status: "invalid", message: "계산할 수 없는 날짜예요. 생년월일을 확인해 주세요." };
   }
 
   const pillars = keys.map((k) => pillarData(main, k));
@@ -272,5 +272,5 @@ export function birthDateError(input: Pick<SajuInput, "year" | "month" | "day" |
   const resolved = resolveSolarDate(input);
   if (!resolved.ok) return resolved.message;
   const { year, month, day } = resolved.date;
-  return new Date(year, month - 1, day) > today ? "오늘 이후 날짜는 입력할 수 없습니다." : null;
+  return new Date(year, month - 1, day) > today ? "오늘 이후 날짜는 입력할 수 없어요." : null;
 }

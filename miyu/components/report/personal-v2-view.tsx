@@ -93,8 +93,8 @@ export function PersonalV2View({
             id={id("v2-focus")}
             note={
               report.basis.context
-                ? `최근 알려 주신 내용(${report.basis.context.topicLabel}${report.basis.context.fields.length ? ` · ${report.basis.context.fields.join(", ")}` : ""})을 반영해 해석의 초점과 예시를 골랐습니다. 사주 계산은 그대로이며, 알려 주신 이야기를 사주로 알아낸 것이 아닙니다.`
-                : "알려 주신 고민을 반영해 해석의 초점과 예시를 골랐습니다. 사주 계산은 그대로입니다."
+                ? `최근 알려 주신 내용(${report.basis.context.topicLabel}${report.basis.context.fields.length ? ` · ${report.basis.context.fields.join(", ")}` : ""})을 반영해 해석의 초점과 예시를 골랐어요. 사주 계산은 그대로이며, 알려 주신 이야기를 사주로 알아낸 것이 아니에요.`
+                : "알려 주신 고민을 반영해 해석의 초점과 예시를 골랐어요. 사주 계산은 그대로예요."
             }
           >
             알려 주신 고민까지 반영한 해석
@@ -104,7 +104,7 @@ export function PersonalV2View({
       )}
 
       <section aria-labelledby={id("v2-chart")}>
-        <SectionTitle id={id("v2-chart")} note="아래 해석은 모두 이 계산 결과에서 출발합니다.">
+        <SectionTitle id={id("v2-chart")} note="아래 해석은 모두 이 계산 결과에서 출발해요.">
           사주 원국
         </SectionTitle>
         <FoldRow>
@@ -130,7 +130,7 @@ export function PersonalV2View({
         <section aria-labelledby={id("v2-timeline")}>
           <SectionTitle
             id={id("v2-timeline")}
-            note="계산된 대운 · 세운에 전통적으로 두드러지는 주제입니다. 특정 사건이나 날짜를 예언하지 않습니다."
+            note="계산된 대운 · 세운에 전통적으로 두드러지는 주제예요. 특정 사건이나 날짜를 예언하지 않아요."
           >
             시기의 흐름
           </SectionTitle>
@@ -165,7 +165,7 @@ export function PersonalV2View({
 
       {report.differences.length > 0 && (
         <section aria-labelledby={id("v2-differences")}>
-          <SectionTitle id={id("v2-differences")} note="두 결과를 하나로 맞추지 않고, 다르게 나온 부분을 그대로 적었습니다.">
+          <SectionTitle id={id("v2-differences")} note="두 결과를 하나로 맞추지 않고, 다르게 나온 부분을 그대로 적었어요.">
             사주와 응답이 다른 부분
           </SectionTitle>
           <ParagraphGroup paragraphs={report.differences} evidence={evidence} />
@@ -192,7 +192,7 @@ export function PersonalV2View({
       </section>
 
       <section aria-labelledby={id("v2-basis")}>
-        <SectionTitle id={id("v2-basis")} note="점수 · 용어 · 계산 기준은 접어 두었습니다.">
+        <SectionTitle id={id("v2-basis")} note="점수 · 용어 · 계산 기준은 접어 두었어요.">
           근거와 기준
         </SectionTitle>
         <FoldRow>
@@ -203,7 +203,7 @@ export function PersonalV2View({
             </Fold>
           )}
           {glossary.length > 0 && (
-            <Fold label="사주 용어 풀이" hint="원국 · 천간 · 지지 · 일간 · 오행은 원국 표의 ‘표 읽는 법’에 있습니다" wide>
+            <Fold label="사주 용어 풀이" hint="원국 · 천간 · 지지 · 일간 · 오행은 원국 표의 ‘표 읽는 법’에 있어요" wide>
               <dl className="divide-y divide-line">
                 {glossary.map((g) => (
                   <div key={g.term} className="py-4 first:pt-0 last:pb-0">
@@ -224,7 +224,7 @@ export function PersonalV2View({
                 사주는 만세력 계산 결과(원국 · 대운 · 세운)만 쓰고, 성향 응답은 생활 속 모습을 설명하는 보조 근거로만 씁니다. 두 결과의 점수를 합산하지 않으며, 응답 때문에 사주 시기 해석을 바꾸지 않습니다.
               </p>
               <p>
-                만세력 계산이 정확하다는 것이 미래 예측이 맞는다는 뜻은 아닙니다. 시기 해석은 전통적인 주제이며, 해석 규칙은 초안으로 전문가 검토 전입니다. 이 리포트는 자기 이해를 돕는 참고 자료이며 의학적 · 심리학적 진단을 대신하지 않습니다.
+                만세력 계산이 정확하다는 것이 미래 예측이 맞는다는 뜻은 아니에요. 시기 해석은 전통적인 주제이며, 해석 규칙은 초안으로 전문가 검토 전이에요. 이 리포트는 자기 이해를 돕는 참고 자료이며 의학적 · 심리학적 진단을 대신하지 않아요.
               </p>
               <p className="text-[13px] text-ink-3">규칙 {report.basis.ruleVersions.join(" · ")}</p>
               {report.basis.lines.length > 0 && <p className="text-[13px] text-ink-3">{report.basis.lines.join(" · ")}</p>}

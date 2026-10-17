@@ -16,7 +16,7 @@ export function RecheckPayment({ orderNumber }: { orderNumber: string }) {
         setResult(await recheckPaymentAction(orderNumber));
         router.refresh();
       } catch {
-        setResult({ ok: false, message: "인터넷 연결이 불안정해 확인하지 못했습니다. 연결을 확인하고 다시 눌러 주세요. 다시 결제하지는 마세요." });
+        setResult({ ok: false, message: "인터넷 연결이 불안정해 확인하지 못했어요. 연결을 확인하고 다시 눌러 주세요. 다시 결제하지는 마세요." });
       }
     });
 
@@ -31,7 +31,7 @@ export function RecheckPayment({ orderNumber }: { orderNumber: string }) {
       >
         {pending ? "확인 중…" : "결제사에 다시 확인하고 맞추기"}
       </button>
-      <p className="mt-2 text-[13px] leading-relaxed text-ink-3">결제사의 실제 기록만 기준으로 합니다. 결제가 승인되었다면 다시 결제하지 않아도 이 버튼이나 자동 확인으로 반영됩니다.</p>
+      <p className="mt-2 text-[13px] leading-relaxed text-ink-3">결제사의 실제 기록만 기준으로 해요. 결제가 승인되었다면 다시 결제하지 않아도 이 버튼이나 자동 확인으로 반영돼요.</p>
       {result && (
         <p role="status" className={`mt-3 rounded-md bg-mist px-4 py-3 text-[14px] leading-relaxed ${result.ok && !bad ? "" : "text-ink-2"}`}>
           {result.message}

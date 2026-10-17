@@ -7,7 +7,7 @@ import { SectionTitle } from "./summary-blocks";
 export function PlainReadingSection({ plain, id }: { plain: NonNullable<ReportExtras["plain"]>; id: string }) {
   return (
     <section aria-labelledby={id}>
-      <SectionTitle id={id} note="원국 표를 일상의 말로 풀었습니다.">
+      <SectionTitle id={id} note="원국 표를 일상의 말로 풀었어요.">
         그래서 어떤 사람일까요
       </SectionTitle>
       <p className="text-[18px] leading-snug font-semibold md:text-[20px]">{plain.headline}</p>
@@ -36,7 +36,7 @@ export function PlainReadingSection({ plain, id }: { plain: NonNullable<ReportEx
 
       <FoldRow>
         <Fold label="오행별로 풀어 보면" hint="많거나 적은 기운이 관계 · 일 · 선택에서 어떻게 나타날 수 있는지" wide>
-          <p className="mb-4 text-[13px] leading-[1.65] text-ink-3">개수만으로 성격을 정하지 않고, “이런 모습으로 나타날 수 있다”는 전통 해석의 방향입니다.</p>
+          <p className="mb-4 text-[13px] leading-[1.65] text-ink-3">개수만으로 성격을 정하지 않고, “이런 모습으로 나타날 수 있다”는 전통 해석의 방향이에요.</p>
           <ul className="divide-y divide-line">
             {plain.elements.map((e) => (
               <li key={e.element} className="py-5 first:pt-0 last:pb-0">
@@ -68,7 +68,7 @@ export function PlainReadingSection({ plain, id }: { plain: NonNullable<ReportEx
                     ))}
                   </dl>
                 ) : (
-                  <p className="mt-2 text-[14px] text-ink-3">고르게 들어 있어 한쪽으로 크게 치우치지 않은 기운입니다.</p>
+                  <p className="mt-2 text-[14px] text-ink-3">고르게 들어 있어 한쪽으로 크게 치우치지 않은 기운이에요.</p>
                 )}
               </li>
             ))}
@@ -85,7 +85,7 @@ export function QuestionsSection({ questions, id }: { questions: ReportExtras["q
   if (!questions.length) return null;
   return (
     <section aria-labelledby={id}>
-      <SectionTitle id={id} note="내 원국의 계산 결과에서 나온 질문과 쉬운 말 답입니다.">
+      <SectionTitle id={id} note="내 원국의 계산 결과에서 나온 질문과 쉬운 말 답이에요.">
         내 원국이 던지는 질문과 답
       </SectionTitle>
       <ol className="space-y-3">
@@ -108,7 +108,7 @@ export function QuestionsSection({ questions, id }: { questions: ReportExtras["q
 export function SituationsSection({ situations, id }: { situations: ReportExtras["situations"]; id: string }) {
   return (
     <section aria-labelledby={id}>
-      <SectionTitle id={id} note="응답에서 나타난 경향을 일 · 가까운 관계 · 선택 · 갈등의 네 상황으로 풀었습니다. ‘~라면 이 경향 때문일 수 있어요’라는 뜻이며 단정이 아닙니다.">
+      <SectionTitle id={id} note="응답에서 나타난 경향을 일 · 가까운 관계 · 선택 · 갈등의 네 상황으로 풀었어요. ‘~라면 이 경향 때문일 수 있어요’라는 뜻이며 단정이 아니에요.">
         상황별 잘하는 점 · 주의할 점
       </SectionTitle>
       <FoldRow>
@@ -157,7 +157,7 @@ export function PartnerSection({ partner, id }: { partner: NonNullable<ReportExt
         어울리는 관계 조건
       </SectionTitle>
       <p className="mb-5 text-[14px] leading-[1.65] text-ink-2">
-        상대 없이 나만 보는 “잘 맞는 관계 스타일”입니다. 특정한 사람과의 궁합이나 상대의 나이 · 직업 · 만나는 날짜는 이 리포트에 포함되지 않습니다.
+        상대 없이 나만 보는 “잘 맞는 관계 스타일”이에요. 특정한 사람과의 궁합이나 상대의 나이 · 직업 · 만나는 날짜는 이 리포트에 포함되지 않아요.
       </p>
       <div className="grid gap-3 md:grid-cols-2">
         {lists.map((l) => (

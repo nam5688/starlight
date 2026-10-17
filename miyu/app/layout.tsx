@@ -9,7 +9,7 @@ import { miyuFontVariables } from "./fonts/miyu-fonts";
 import "./globals.css";
 
 const TITLE = "ME:U 미유 · 개인 통합 분석 리포트";
-const DESCRIPTION = "사주 · MBTI · 기질 · 애착을 함께 보는 개인 통합 분석 리포트. 무료 미리보기로 먼저 확인하고, 구매하면 저장된 같은 버전으로 다시 볼 수 있습니다.";
+const DESCRIPTION = "사주 · MBTI · 기질 · 애착을 함께 보는 개인 통합 분석 리포트. 무료 미리보기로 먼저 확인하고, 구매하면 저장된 같은 버전으로 다시 볼 수 있어요.";
 
 export const metadata: Metadata = {
   // 공유 주소 · 이미지의 기준 (배포 후에는 SITE_URL의 실제 주소)

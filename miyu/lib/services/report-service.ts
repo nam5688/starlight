@@ -120,7 +120,7 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
     );
   };
   try {
-    if (!assessment) throw new Error("검사 결과를 찾을 수 없습니다.");
+    if (!assessment) throw new Error("검사 결과를 찾을 수 없어요.");
     // 고민 반영 리포트는 발급할 때 저장해 둔 고민 기록으로 쓴다 (지금의 고민이 아니다). 개인 종합은 생성을 시작하는 시점의 고민을 쓴다 (반영하는 생성기일 때만 읽는다)
     const recordId = parseConcernProductId(order.productId);
     const concernInput = recordId ? await concernInputFor(repo, generator, order, assessment, recordId) : null;
@@ -128,18 +128,18 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         // 실패 사유를 먼저 확정하고(경쟁에서 이기도록) 그다음 남은 AI 호출을 멈춘다
-        reject(new Error(`리포트 생성 시간 초과 (제한 ${Math.max(1, Math.round(limit / 1000))}초) — 중단했습니다.`));
+        reject(new Error(`리포트 생성 시간 초과 (제한 ${Math.max(1, Math.round(limit / 1000))}초) — 중단했어요.`));
         controller.abort();
       }, limit);
     });
     // 사주 궁합은 구매할 때 보관한 상대 출생정보로 두 사람의 사주를 계산해 쓴다 (개인 통합 리포트와 입력이 다르다)
     const isCompat = isCompatProduct(order.productId);
-    if (isCompat && !generator.generateCompat) throw new Error("이 리포트 생성기는 사주 궁합을 만들 수 없습니다.");
+    if (isCompat && !generator.generateCompat) throw new Error("이 리포트 생성기는 사주 궁합을 만들 수 없어요.");
     const compatInput = isCompat ? await compatInputFor(repo, order, assessment) : null;
     // 리포트 궁합은 연결된 두 사람의 검사 결과(사주 + 응답 방향)로 쓴다 — 쌍이 끊겼거나 동의가 철회됐으면 여기서 실패한다
     const isPair = isPairProduct(order.productId);
-    if (isPair && !generator.generatePair) throw new Error("이 리포트 생성기는 리포트 궁합을 만들 수 없습니다.");
-    if (isPair && !deps.pairs) throw new Error("리포트 궁합 저장소가 연결되지 않았습니다.");
+    if (isPair && !generator.generatePair) throw new Error("이 리포트 생성기는 리포트 궁합을 만들 수 없어요.");
+    if (isPair && !deps.pairs) throw new Error("리포트 궁합 저장소가 연결되지 않았어요.");
     const pairInput = isPair ? await pairInputFor(repo, deps.pairs!, order) : null;
     const ctxArg = { signal: controller.signal, onUsage };
     const run = pairInput ? generator.generatePair!(pairInput, ctxArg) : compatInput ? generator.generateCompat!(compatInput, ctxArg) : concernInput ? generator.generateConcern!(concernInput, ctxArg) : generator.generate(reportInputOf(assessment, context), ctxArg);
@@ -172,10 +172,10 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
  * 모을 수 없으면(기록이 없거나 지워졌거나, 고민을 반영하지 못하는 생성기) 오류로 실패 처리한다 — 같은 발급 건으로 다시 시도할 수 있다.
  */
 async function concernInputFor(repo: MiyuRepository, generator: ReportGenerator, order: OrderRecord, assessment: AssessmentRecord, recordId: string): Promise<ConcernInput> {
-  if (!generator.generateConcern) throw new Error("이 리포트 생성기는 고민 반영 리포트를 만들 수 없습니다.");
+  if (!generator.generateConcern) throw new Error("이 리포트 생성기는 고민 반영 리포트를 만들 수 없어요.");
   const record = await repo.getConcernRecord(recordId);
-  if (!record || record.userId !== order.userId || record.assessmentId !== order.assessmentId) throw new Error("고민 기록을 찾을 수 없습니다.");
-  if (record.scrubbedAt) throw new Error("고민 기록의 내용이 지워져 리포트를 만들 수 없습니다.");
+  if (!record || record.userId !== order.userId || record.assessmentId !== order.assessmentId) throw new Error("고민 기록을 찾을 수 없어요.");
+  if (record.scrubbedAt) throw new Error("고민 기록의 내용이 지워져 리포트를 만들 수 없어요.");
   const orders = await repo.listOrdersForAssessment(order.assessmentId);
   // 같은 결과로 개인 통합 리포트를 여러 번 받았다면 가장 최근에 완성된 것을 기준으로 삼는다
   let baseReport: ReportRecord | null = null;

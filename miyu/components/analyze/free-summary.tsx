@@ -53,7 +53,7 @@ export function FreeSummaryView({
       <h1 id="step-heading" tabIndex={-1} className="mt-3 text-[26px] font-bold tracking-tight outline-none md:text-[30px]">
         {info.nickname.trim()} 님의 무료 미리보기
       </h1>
-      <p className="mt-2 text-[15px] leading-relaxed text-ink-2">내 결과의 일부를 먼저 보여 드립니다. 결과를 저장하면 결과 화면에서 이어서 볼 수 있고, 심층 리포트는 그곳에서 구매할 수 있습니다.</p>
+      <p className="mt-2 text-[15px] leading-relaxed text-ink-2">내 결과의 일부를 먼저 보여 드려요. 결과를 저장하면 결과 화면에서 이어서 볼 수 있고, 심층 리포트는 그곳에서 구매할 수 있어요.</p>
 
       <div className="mt-10 space-y-16">
         <FreePreviewBody preview={preview} idPrefix="free-" />
@@ -80,7 +80,7 @@ export function FreeSummaryView({
 
           <ol className="divide-y divide-line">
             <li className="grid gap-3 px-5 py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:px-7">
-              <Step index={1} title="로그인하고 결과 저장" detail="이 결과가 회원 정보에 저장됩니다." />
+              <Step index={1} title="로그인하고 결과 저장" detail="이 결과가 회원 정보에 저장돼요." />
               {authReady ? (
                 <div className="flex flex-col items-stretch gap-2 md:items-end">
                   <button type="button" onClick={() => save("kakao")} disabled={pending} aria-busy={pending} className={`${kakaoButtonClass} w-full md:w-auto`}>
@@ -98,7 +98,7 @@ export function FreeSummaryView({
               )}
             </li>
             <li className="px-5 py-5 md:px-7">
-              <Step index={2} title="결과 화면에서 리포트 구매" detail="결제가 서버에서 확인된 뒤에 상세 리포트를 제공합니다." />
+              <Step index={2} title="결과 화면에서 리포트 구매" detail="결제가 서버에서 확인된 뒤에 상세 리포트를 제공해요." />
             </li>
           </ol>
           {error && (
@@ -109,12 +109,12 @@ export function FreeSummaryView({
           <p className="border-t border-line bg-mist px-5 py-4 text-[14px] leading-relaxed text-ink-2 md:px-7">
             {authReady
               ? "로그인하는 동안 검사 결과는 암호화해 30분만 보관하고, 저장이 끝나면 지웁니다. "
-              : "로그인이 아직 설정되지 않아 저장할 수 없습니다. "}
+              : "로그인이 아직 설정되지 않아 저장할 수 없어요. "}
             구매하면 어떤 리포트를 받는지는{" "}
             <Link href="/report/sample" className={textLink}>
               리포트 예시
             </Link>
-            에서 확인할 수 있습니다.
+            에서 확인할 수 있어요.
           </p>
         </section>
 

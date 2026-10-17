@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 /** 화면 맨 위에 항상 보이는 안내 — 저장과 발급이 따로이고, 기존 리포트는 바뀌지 않는다 */
-const SAVE_VS_ISSUE_NOTICE = "고민을 작성하거나 수정해도 기존 리포트는 바뀌지 않습니다. 저장 후 ‘이 고민으로 새 리포트 발급하기’를 누르면 변경한 내용이 반영됩니다.";
+const SAVE_VS_ISSUE_NOTICE = "고민을 작성하거나 수정해도 기존 리포트는 바뀌지 않아요. 저장 후 ‘이 고민으로 새 리포트 발급하기’를 누르면 변경한 내용이 반영돼요.";
 
 export default function ContextPage({ params, searchParams }: PageProps<"/results/[id]/context">) {
   return (
@@ -46,8 +46,8 @@ async function ContextContent({ params, searchParams }: Pick<PageProps<"/results
   if (!member) {
     return (
       <div>
-        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
-        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">적은 내용은 본인만 볼 수 있습니다. 로그인해 주세요.</p>
+        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요해요</h1>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">적은 내용은 본인만 볼 수 있어요. 로그인해 주세요.</p>
         <div className="mt-8">
           <LoginOptions next={`/results/${id}/context`} />
         </div>
@@ -81,17 +81,17 @@ async function ContextContent({ params, searchParams }: Pick<PageProps<"/results
       <div className="mt-4 space-y-3" aria-live="polite">
         {saved && (
           <p role="status" className="rounded-lg bg-accent-soft px-4 py-3 text-[15px] text-accent">
-            저장했습니다. 리포트는 아직 만들어지지 않았어요.{redacted > 0 && ` 연락처 · 이메일처럼 보이는 내용 ${redacted}곳을 가려서 저장했습니다.`}
+            저장했어요. 리포트는 아직 만들어지지 않았어요.{redacted > 0 && ` 연락처 · 이메일처럼 보이는 내용 ${redacted}곳을 가려서 저장했어요.`}
           </p>
         )}
         {same && (
           <p role="status" className="rounded-lg bg-accent-soft px-4 py-3 text-[15px] text-accent">
-            바뀐 내용이 없어 그대로 두었습니다.
+            바뀐 내용이 없어 그대로 두었어요.
           </p>
         )}
         {deleted && (
           <p role="status" className="rounded-lg bg-accent-soft px-4 py-3 text-[15px] text-accent">
-            적어 둔 고민을 지웠습니다. 이미 발급한 리포트와 고민 기록은 그대로 남아 있습니다.
+            적어 둔 고민을 지웠어요. 이미 발급한 리포트와 고민 기록은 그대로 남아 있어요.
           </p>
         )}
         {issueNotice && (
@@ -162,7 +162,7 @@ async function ContextContent({ params, searchParams }: Pick<PageProps<"/results
         <h2 id="ctx-records" className="text-[20px] font-bold tracking-tight">
           고민 기록과 발급한 리포트
         </h2>
-        <p className="mt-1 text-[14px] leading-relaxed text-ink-3">발급할 때마다 그때의 고민이 기록으로 남고, 그 고민을 반영한 리포트가 한 칸씩 쌓입니다. 최근 발급이 위에 있어요.</p>
+        <p className="mt-1 text-[14px] leading-relaxed text-ink-3">발급할 때마다 그때의 고민이 기록으로 남고, 그 고민을 반영한 리포트가 한 칸씩 쌓여요. 최근 발급이 위에 있어요.</p>
         <ConcernRecords assessmentId={id} entries={entries} />
       </section>
 

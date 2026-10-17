@@ -48,8 +48,8 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
   if (!member) {
     return (
       <div className={`${pageNarrow} py-14 md:py-20`}>
-        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요합니다</h1>
-        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 리포트는 본인만 볼 수 있습니다. 로그인해 주세요.</p>
+        <h1 className="text-[24px] font-bold tracking-tight">로그인이 필요해요</h1>
+        <p className="mt-3 text-[16px] leading-relaxed text-ink-2">저장된 리포트는 본인만 볼 수 있어요. 로그인해 주세요.</p>
         <div className="mt-8">
           <LoginOptions next={here} />
         </div>
@@ -68,7 +68,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
   const filled = CONTEXT_FIELDS.filter((f) => record[f.id].length > 0);
   const scrubbedNow = query.scrubbed === "1";
   const scrubBlocked = query.scrub === "blocked";
-  const retryWait = query.retry === "cooldown" ? "방금 다시 시도했어요. 1분 정도 지난 뒤에 다시 눌러 주세요. 결제는 그대로 유효합니다." : query.retry === "capacity" ? "지금 리포트를 준비하는 주문이 많아 순서를 기다리고 있어요. 결제는 그대로 유효합니다." : null;
+  const retryWait = query.retry === "cooldown" ? "방금 다시 시도했어요. 1분 정도 지난 뒤에 다시 눌러 주세요. 결제는 그대로 유효해요." : query.retry === "capacity" ? "지금 리포트를 준비하는 주문이 많아 순서를 기다리고 있어요. 결제는 그대로 유효해요." : null;
 
   const header = (meta: string, source?: "sample" | "dev-scoring") => (
     <ResultHeader
@@ -87,7 +87,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
         {header("결제 전")}
         <div className={`${pageNarrow} space-y-5 py-10`}>
           <p className="text-[16px] leading-relaxed text-ink-2">
-            {refunded ? "이 리포트는 환불 처리되어 열람할 수 없습니다. 고민 기록은 남아 있어요." : "아직 이 고민 리포트의 결제가 확인되지 않았어요. 결제가 끝나면 이곳에서 열 수 있습니다."}
+            {refunded ? "이 리포트는 환불 처리되어 열람할 수 없어요. 고민 기록은 남아 있어요." : "아직 이 고민 리포트의 결제가 확인되지 않았어요. 결제가 끝나면 이곳에서 열 수 있어요."}
           </p>
           <Link href={recordsHref} className={buttonSecondary}>
             나의 고민 기록소로
@@ -151,11 +151,11 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
         <div className="mx-auto w-full max-w-[720px] px-5 pt-2">
           {scrubbedNow && (
             <p role="status" className="rounded-lg bg-accent-soft px-4 py-3 text-[15px] text-accent">
-              그때 적은 고민 내용을 지웠습니다. 리포트는 그대로 남아 있어요.
+              그때 적은 고민 내용을 지웠어요. 리포트는 그대로 남아 있어요.
             </p>
           )}
           <p className="mt-3 rounded-lg border border-line bg-mist px-4 py-3 text-[14px] leading-relaxed text-ink-2">
-            이 리포트는 발급할 때 남긴 고민 기록을 바탕으로 한 별도 리포트입니다. 이후에 고민을 고쳐도 이 리포트는 바뀌지 않고, 기존 개인 통합 리포트도 그대로 있습니다.
+            이 리포트는 발급할 때 남긴 고민 기록을 바탕으로 한 별도 리포트예요. 이후에 고민을 고쳐도 이 리포트는 바뀌지 않고, 기존 개인 통합 리포트도 그대로 있어요.
           </p>
         </div>
         <ConcernReportView report={report.content} idPrefix="cr-" footer={footer} />
@@ -171,7 +171,7 @@ async function Content({ params, searchParams }: Pick<PageProps<"/results/[id]/c
         <div className={`${pageNarrow} space-y-5 py-10`}>
           <p className="text-[18px] font-semibold">리포트를 만들지 못했어요</p>
           <p className="text-[15px] leading-relaxed text-ink-2">
-            결제는 정상 처리되었고, 이 발급 건은 그대로 유지됩니다. 아래 버튼으로 같은 발급 건으로 다시 만들 수 있어요. <span className="font-semibold text-ink">추가 결제는 없습니다.</span>
+            결제는 정상 처리되었고, 이 발급 건은 그대로 유지돼요. 아래 버튼으로 같은 발급 건으로 다시 만들 수 있어요. <span className="font-semibold text-ink">추가 결제는 없어요.</span>
           </p>
           {retryWait && (
             <p role="status" className="rounded-lg border border-line px-4 py-3 text-[15px] leading-relaxed text-ink">

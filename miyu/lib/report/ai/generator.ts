@@ -28,7 +28,8 @@ import { validateStoryDraft, visibleStoryTexts } from "../reading/story-validate
 import { assembleStory7, story7DepthSource } from "../reading/story7-assemble.ts";
 import { STORY7_FORMAT, STORY7_PROMPT_VERSION } from "../reading/story7-plan.ts";
 import { buildStory7RepairMessage, buildStory7UserMessage, STORY7_SYSTEM_PROMPT } from "../reading/story7-prompt.ts";
-import { normalizeStory7Draft, STORY7_MOTIF_BLOCKS, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
+import { normalizeStory7Draft, STORY7_MOTIF_BLOCKS, story7VoiceReport, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
+import { voiceRepairNotes } from "../style/voice.ts";
 import { checkReadingDepth } from "../reading/depth.ts";
 import { buildReadingRepairMessage, buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
 import { findRepeatedPhrases, findRepeatedPhrasesIn, repeatMessages } from "../reading/repeat.ts";
@@ -277,7 +278,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
               },
               repeatNotes: (draft) => {
                 const texts = visibleStory7Texts(draft as Story7DraftV1);
-                return [...repeatMessages(findRepeatedPhrasesIn(texts)), ...motifMessages(findMotifSpread(texts, STORY7_MOTIF_BLOCKS))];
+                return [...repeatMessages(findRepeatedPhrasesIn(texts)), ...motifMessages(findMotifSpread(texts, STORY7_MOTIF_BLOCKS)), ...voiceRepairNotes(story7VoiceReport(draft as Story7DraftV1, evidence))];
               },
               assemble: (draft) => assembleStory7({ draft: draft as Story7DraftV1, evidence, input, reference: ref, promptVersion: STORY7_PROMPT_VERSION, ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, STORY7_PROMPT_VERSION] }),
               promptVersion: STORY7_PROMPT_VERSION,

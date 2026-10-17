@@ -51,11 +51,11 @@ async function MyContent() {
     return (
       <div className="mt-8 border-y border-line py-8">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[17px] font-semibold">로그인이 아직 설정되지 않았습니다</p>
+          <p className="text-[17px] font-semibold">로그인이 아직 설정되지 않았어요</p>
           <StatusBadge>설정 전</StatusBadge>
         </div>
         <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-          Supabase와 카카오 로그인 설정을 마치면 이곳에서 저장한 결과를 볼 수 있습니다.
+          Supabase와 카카오 로그인 설정을 마치면 이곳에서 저장한 결과를 볼 수 있어요.
         </p>
         <Actions />
       </div>
@@ -68,8 +68,8 @@ async function MyContent() {
       <div className="mt-8 border-y border-line py-8">
         <p className="text-[17px] font-semibold">로그인하고 내 결과를 확인하세요</p>
         <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-          카카오 계정으로 가입·로그인합니다. 토스 가입이나 앱 설치는 필요 없습니다. 같은 카카오 계정으로 다시 로그인하면 저장한
-          결과를 그대로 볼 수 있습니다.
+          카카오 계정으로 가입·로그인해요. 토스 가입이나 앱 설치는 필요 없어요. 같은 카카오 계정으로 다시 로그인하면 저장한
+          결과를 그대로 볼 수 있어요.
         </p>
         <div className="mt-6">
           <LoginOptions next="/my" />
@@ -101,9 +101,9 @@ async function MyContent() {
         <h2 id="my-list" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
           내 리포트
         </h2>
-        <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있습니다.</p>
+        <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있어요.</p>
         {cards.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-8 text-[15px] text-ink-2">아직 저장한 결과가 없습니다.</p>
+          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-8 text-[15px] text-ink-2">아직 저장한 결과가 없어요.</p>
         ) : (
           <ul className="mt-3 space-y-3">
             {cards.map((card) => (
@@ -192,7 +192,7 @@ async function MyContent() {
           <h2 id="my-concerns" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
             내 고민 반영 리포트
           </h2>
-          <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">심층 리포트와 별도로 발급한 리포트입니다. 발급일 · 고민 주제로 구분하며, 이전 리포트는 새 리포트가 나와도 그대로 남습니다.</p>
+          <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">심층 리포트와 별도로 발급한 리포트예요. 발급일 · 고민 주제로 구분하며, 이전 리포트는 새 리포트가 나와도 그대로 남아요.</p>
           <ul className="mt-3 space-y-3">
             {concerns.map((c) => (
               <ConcernRow key={c.recordId} card={c} />
@@ -206,7 +206,7 @@ async function MyContent() {
           결제내역
         </h2>
         {orders.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-6 text-[15px] text-ink-2">결제내역이 없습니다.</p>
+          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-6 text-[15px] text-ink-2">결제내역이 없어요.</p>
         ) : (
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-canvas">
             {orders.map((o) => (
@@ -227,7 +227,7 @@ async function MyContent() {
             ))}
           </ul>
         )}
-        <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">주문을 누르면 결제 승인 기록과 리포트 제공 상태를 주문번호 기준으로 볼 수 있습니다.</p>
+        <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">주문을 누르면 결제 승인 기록과 리포트 제공 상태를 주문번호 기준으로 볼 수 있어요.</p>
       </section>
 
       <section aria-labelledby="my-account" className="mt-12">

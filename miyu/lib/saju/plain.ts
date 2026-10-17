@@ -185,12 +185,12 @@ export function plainSajuReading(saju: SajuOk): PlainReading {
   const noneText = none.length ? `${none.map(name).join("·")} 기운이 없는` : "";
   const shape =
     many.length && none.length
-      ? `원국에는 ${manyText} ${noneText} 구성입니다.`
+      ? `원국에는 ${manyText} ${noneText} 구성이에요.`
       : many.length
-        ? `원국에는 ${many.map(name).join("·")} 기운이 많습니다.`
+        ? `원국에는 ${many.map(name).join("·")} 기운이 많아요.`
         : none.length
-          ? `원국에는 ${none.map(name).join("·")} 기운이 없습니다.`
-          : "원국에 다섯 기운이 비교적 고르게 들어 있습니다.";
+          ? `원국에는 ${none.map(name).join("·")} 기운이 없어요.`
+          : "원국에 다섯 기운이 비교적 고르게 들어 있어요.";
 
   const everyday = [
     ...elements.filter((e) => e.level === "none").map((e) => `${name(e.element)} 기운이 없어요 — ${e.plain}`),
@@ -205,6 +205,6 @@ export function plainSajuReading(saju: SajuOk): PlainReading {
     elements,
     everyday,
     limits:
-      "전통 해석을 쉬운 말로 옮긴 것으로, 성격을 확정하지 않습니다. 오행 개수는 해석의 한 요소일 뿐이고(원국의 천간 · 지지 글자 기준, 지장간 제외) 개수만 보고 성격을 정하지 않습니다. 실제 모습은 환경과 시기에 따라 달라지며, 응답이나 알려 주신 고민으로 원국 계산을 바꾸지 않습니다.",
+      "전통 해석을 쉬운 말로 옮긴 것으로, 성격을 확정하지 않아요. 오행 개수는 해석의 한 요소일 뿐이고(원국의 천간 · 지지 글자 기준, 지장간 제외) 개수만 보고 성격을 정하지 않아요. 실제 모습은 환경과 시기에 따라 달라지며, 응답이나 알려 주신 고민으로 원국 계산을 바꾸지 않아요.",
   };
 }

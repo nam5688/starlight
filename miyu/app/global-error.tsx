@@ -11,7 +11,7 @@ export default function GlobalError({ error, retry }: { error: Error & { digest?
       <body className="text-[16px] leading-relaxed">
         <title>일시적인 문제 · ME:U 미유</title>
         <main className="mx-auto w-full max-w-2xl px-5 py-16 md:px-8 md:py-24">
-          <h1 className="text-[26px] font-bold tracking-tight">일시적인 문제가 생겼습니다</h1>
+          <h1 className="text-[26px] font-bold tracking-tight">일시적인 문제가 생겼어요</h1>
           <p className="mt-3 text-[16px] leading-relaxed text-ink-2">
             서비스를 불러오는 중 문제가 생겼습니다. 결제를 진행하던 중이었다면 <strong>다시 결제하지 마세요.</strong> 승인된 결제는 자동으로 반영되며, 잠시 뒤 MY에서 확인할 수 있습니다.
           </p>

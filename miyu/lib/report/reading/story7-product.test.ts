@@ -12,7 +12,7 @@ import { story7Evidence } from "./story7-evidence.ts";
 import { composeMockStory7 } from "./story7-mock-model.ts";
 import { STORY7_FORMAT, STORY7_PROMPT_VERSION, STORY7_SECTIONS } from "./story7-plan.ts";
 import { buildStory7UserMessage, STORY7_SYSTEM_PROMPT } from "./story7-prompt.ts";
-import { normalizeStory7Draft, story7Paragraphs, validateStory7Draft, visibleStory7Texts } from "./story7-validate.ts";
+import { normalizeStory7Draft, story7Paragraphs, story7VoiceReport, validateStory7Draft, visibleStory7Texts } from "./story7-validate.ts";
 import { availableRooms, startRoom } from "./talk-room.ts";
 import { buildTalkModel } from "./talk.ts";
 import { isReadingReport, isStory7Report, isStoryReport, type Story7DraftV1 } from "./types.ts";
@@ -50,7 +50,7 @@ test("지시문: 7개 대주제와 운영자 확정(재물 항상 · 4번 가족
   assert.match(STORY7_SYSTEM_PROMPT, /고민이 없으면.*고민을 지어내지 않고/);
   assert.match(STORY7_SYSTEM_PROMPT, /2~3개/);
   assert.match(STORY7_SYSTEM_PROMPT, /계속 ~라면 ~/);
-  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.1");
+  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.2");
   assert.equal(STORY7_FORMAT, "story-7");
 });
 
@@ -240,10 +240,10 @@ test("조립: 7번 장의 알려 준 고민은 지어내지 않는다 — 고민
 test("생성기: story-7은 같은 흐름(초안 → 형식 검사 → 조립)으로 리포트를 만들고 지시문 버전을 남긴다 · 이전 형식 기본값은 그대로", async () => {
   const model = createMockModel({});
   const gen = createAiReportGenerator({ model, format: "story-7", now: () => NOW });
-  assert.match(gen.version, /story-7-prompt-0\.1/);
+  assert.match(gen.version, /story-7-prompt-0\.2/);
   const report = (await gen.generate(P01.input, {})) as ReturnType<typeof assembleStory7>;
   assert.equal(report.layout, "story7");
-  assert.equal(report.generated?.promptVersion, "story-7-prompt-0.1");
+  assert.equal(report.generated?.promptVersion, "story-7-prompt-0.2");
   assert.equal(model.calls, 1);
   const legacy = createAiReportGenerator({ model: createMockModel({}), now: () => NOW });
   assert.match(legacy.version, /reading-v1-prompt-0\.13/);
@@ -284,4 +284,35 @@ test("내보내기: 번호 붙은 7개 장 · 5번 소제목 · 조언 2~3가지
 test("화면에 보이는 모든 글 조각 위치가 장 번호로 읽힌다(반복 · 모티프 검사가 쓴다)", () => {
   const where = visibleStory7Texts(mockDraft()).map((t) => t.where);
   assert.ok(where.includes("headline") && where.includes("sections.5.parts[1].paragraphs[0]") && where.some((w) => w.startsWith("sections.6.years[")) && where.some((w) => w.startsWith("actions[")));
+});
+
+// ───── 미유 문체(운영자 2026-10-17) ─────
+
+test("지시문에 미유의 말투 블록이 들어 있고, 억지 공감을 허용하던 옛 문장과 맺음 틀을 만들던 예시가 없다", () => {
+  assert.match(STORY7_SYSTEM_PROMPT, /\[미유의 말투 — 글 전체에 적용한다\]/);
+  assert.match(STORY7_SYSTEM_PROMPT, /진단서를 읽어 주는 말투도, 무조건 다정하게 위로만 하는 말투도 아니다/);
+  assert.match(STORY7_SYSTEM_PROMPT, /필요한 말은 분명하게 한다/);
+  assert.match(STORY7_SYSTEM_PROMPT, /그랬죠\?/);
+  for (const old of ['"~한 적 있죠?")은 근거가 있는 반응에만', "있었을 거예요", "편해 보여요. 적고 나서도", "물어볼 시점이에요."]) assert.ok(!STORY7_SYSTEM_PROMPT.includes(old), `옛 문장이 남아 있다: ${old}`);
+  // 검사가 막는 말은 지시문이 같은 목록으로 알려 준다
+  for (const word of ["서사", "본질", "양상", "발현", "입체적", "구조적"]) assert.ok(STORY7_SYSTEM_PROMPT.includes(word), word);
+});
+
+test("문체 검사: 합쇼체 · AI 어휘 · 당신 · 억지 공감은 저장하지 않는 오류이고, 모의 글(해요체)은 통과한다", () => {
+  assert.deepEqual(errorsOf(() => {}), []);
+  assert.ok(errorsOf((d) => setPara(d, 3, `${PAD} 서로 마음을 확인하는 일이 중요합니다.`)).some((e) => /합쇼체/.test(e)));
+  assert.ok(errorsOf((d) => setPara(d, 1, `${PAD} 이 사람의 서사는 천천히 정하는 쪽으로 나타나요.`)).some((e) => /분석 보고서 어휘/.test(e)));
+  assert.ok(errorsOf((d) => setPara(d, 4, `${PAD} 당신은 모임에서 한 발 물러나 있을 때가 편해요.`)).some((e) => /당신 · 귀하/.test(e)));
+  assert.ok(errorsOf((d) => setPara(d, 3, `${PAD} 연락이 뜸할 때 혼자 버텼죠? 그런 적 많았죠?`)).some((e) => /억지 공감|공감 질문/.test(e)));
+});
+
+test("문체 점검은 고쳐 쓰기 안내와 사람 검토 목록을 따로 낸다 — 추상어 · 대조형 틀 · 같은 시작이 많아도 저장 오류가 아니다", () => {
+  const d = mockDraft();
+  setPara(d, 1, `${PAD} 단순히 조용한 게 아니라 생각이 오래 걸리는 거예요. 단순히 느린 게 아니라 확인이 길어지는 거예요. 균형이 흔들리면 균형부터 맞춰요.`, 1);
+  const r = validateStory7Draft(d, P01_EVIDENCE, { hasContext: Boolean(P01.input.context) });
+  assert.ok(r.ok, r.ok ? "" : r.errors.join("\n"));
+  const report = story7VoiceReport(d, P01_EVIDENCE);
+  const repair = report.findings.filter((f) => f.level === "repair").map((f) => f.id);
+  assert.ok(repair.includes("contrast-pattern") && repair.includes("abstract-words"), repair.join(","));
+  assert.equal(report.findings.filter((f) => f.level === "fail").length, 0);
 });

@@ -125,7 +125,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
           relation,
           notes: saju.notes.filter((n) => n.kind !== "hour-unknown").map((n) => n.message),
         }
-      : { status: "not-ready", message: saju.status === "invalid" ? saju.message : "만세력 계산 결과가 없습니다." };
+      : { status: "not-ready", message: saju.status === "invalid" ? saju.message : "만세력 계산 결과가 없어요." };
 
   const locked: LockedFeature[] = [
     // "그렇게 읽은 이유(근거 응답)"는 분석 근거 화면 노출 스위치(lib/config/product.ts)가 켜져 있을 때만 약속한다 — 꺼져 있으면 구매 후에도 보이지 않는다
@@ -137,7 +137,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     ...(qs.length ? [{ id: "questions", title: `내 원국에서 나온 질문 ${qs.length}개의 답`, teaser: "질문마다 쉬운 말로 풀어 드립니다" }] : []),
     ...(extras.partner ? [{ id: "partner", title: "어울리는 관계 조건", teaser: "편안한 상대의 성향과 관계 주제가 두드러지는 해" }] : []),
     ...(extras.items ? [{ id: "items", title: "보완 아이템", teaser: "색 · 소재 · 공간 · 습관" }] : []),
-    { id: "actions", title: "실천 제안 3가지 전체", teaser: "지금은 1가지만 보입니다" },
+    { id: "actions", title: "실천 제안 3가지 전체", teaser: "지금은 1가지만 보여요" },
   ];
 
   const answers: LockedAnswer[] = [
@@ -156,7 +156,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     ? {
         kind: "insight",
         text: insight.text,
-        basisNote: `${insight.basisModule === "relationship" ? "관계(애착)" : "기질"} 문항에 답하신 내용 중 ${insight.basis.length}개가 이 문단의 근거입니다. 모든 사람에게 같은 문장이 나오지 않고, 응답이 뒷받침할 때만 들어갑니다.`,
+        basisNote: `${insight.basisModule === "relationship" ? "관계(애착)" : "기질"} 문항에 답하신 내용 중 ${insight.basis.length}개가 이 문단의 근거예요. 모든 사람에게 같은 문장이 나오지 않고, 응답이 뒷받침할 때만 들어가요.`,
         module: insight.basisModule,
       }
     : { kind: "oneLiner", shown: maskOneLiner(summary.oneLiner) };

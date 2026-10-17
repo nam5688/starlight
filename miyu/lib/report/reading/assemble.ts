@@ -40,10 +40,10 @@ export function basisFor(ids: string[], evidence: Evidence[], extra: { uncertain
   const computed = [...uniq(saju.map((e) => e.fact)), ...gloss];
 
   const unknown: string[] = [RULE_DRAFT_NOTE];
-  if (!answers.some((e) => e.source === "survey")) unknown.push("이 부분은 응답 자료 없이 사주만으로 읽었습니다.");
-  if (answers.some((e) => e.id === "self.mbti")) unknown.push("MBTI는 본인이 입력한 값이며 참고로만 봤습니다. 공식 MBTI 검사 결과가 아닙니다.");
-  if (answers.some((e) => e.source === "survey")) unknown.push("응답 문항은 개발용 예시이며, 미유의 새 성향 질문은 아직 적용하지 않았습니다.");
-  if (extra.uncertain) for (const e of evidence.filter((x) => x.uncertain)) unknown.push(`${e.fact} — 학파 · 경계에 따라 달라질 수 있어 해석에 쓰지 않았습니다.`);
+  if (!answers.some((e) => e.source === "survey")) unknown.push("이 부분은 응답 자료 없이 사주만으로 읽었어요.");
+  if (answers.some((e) => e.id === "self.mbti")) unknown.push("MBTI는 본인이 입력한 값이며 참고로만 봤어요. 공식 MBTI 검사 결과가 아니에요.");
+  if (answers.some((e) => e.source === "survey")) unknown.push("응답 문항은 개발용 예시이며, 미유의 새 성향 질문은 아직 적용하지 않았어요.");
+  if (extra.uncertain) for (const e of evidence.filter((x) => x.uncertain)) unknown.push(`${e.fact} — 학파 · 경계에 따라 달라질 수 있어 해석에 쓰지 않았어요.`);
 
   return {
     computed,
@@ -54,9 +54,9 @@ export function basisFor(ids: string[], evidence: Evidence[], extra: { uncertain
 }
 
 const RESPONSE_GROUPS: { name: string; re: RegExp; note: string }[] = [
-  { name: "기질 · 성격", re: /^survey\.(novelty|caution|sensitivity|persistence)\./, note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다." },
-  { name: "가까운 관계에서의 반응(애착 경향)", re: /^survey\.(anxiety|avoidance|closeness)\./, note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다." },
-  { name: "평소 행동 방식", re: /^survey\.(ei|sn|tf|jp)\./, note: "개발용 예시 문항 응답입니다. 미유의 새 성향 질문은 아직 적용하지 않았습니다." },
+  { name: "기질 · 성격", re: /^survey\.(novelty|caution|sensitivity|persistence)\./, note: "개발용 예시 문항 응답이에요. 미유의 새 성향 질문은 아직 적용하지 않았어요." },
+  { name: "가까운 관계에서의 반응(애착 경향)", re: /^survey\.(anxiety|avoidance|closeness)\./, note: "개발용 예시 문항 응답이에요. 미유의 새 성향 질문은 아직 적용하지 않았어요." },
+  { name: "평소 행동 방식", re: /^survey\.(ei|sn|tf|jp)\./, note: "개발용 예시 문항 응답이에요. 미유의 새 성향 질문은 아직 적용하지 않았어요." },
 ];
 
 /** "참고한 자료" 목록 — 어떤 자료가 있었고 어느 주제에 쓰였는지를 실제로 단 근거에서 센다 (말과 어긋나지 않게) */
@@ -64,24 +64,24 @@ export function buildInputs(args: { knownMbti: string | null; hasContext: boolea
   const usedIn = (re: RegExp) => args.topics.filter((t) => t.evidence.some((id) => re.test(id))).map((t) => t.topic);
   const has = (re: RegExp) => args.allEvidence.some((e) => re.test(e.id));
   const out: ReadingInput[] = [
-    { name: "사주", status: args.hasSaju ? "used" : "none", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운입니다. 해석 규칙은 전문가 검토 전 초안입니다.", usedIn: usedIn(/^saju\./) },
+    { name: "사주", status: args.hasSaju ? "used" : "none", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운이에요. 해석 규칙은 전문가 검토 전 초안이에요.", usedIn: usedIn(/^saju\./) },
     args.knownMbti
       ? { name: "MBTI", status: "used", note: `본인이 입력한 ${args.knownMbti}입니다. 참고값으로만 봤으며 공식 MBTI 검사 결과가 아닙니다.`, usedIn: usedIn(/^self\.mbti$/) }
-      : { name: "MBTI", status: "none", note: "입력하지 않았습니다.", usedIn: [] },
+      : { name: "MBTI", status: "none", note: "입력하지 않았어요.", usedIn: [] },
   ];
   for (const g of RESPONSE_GROUPS) {
     out.push(
       has(g.re)
         ? { name: g.name, status: "dev", note: g.note, usedIn: usedIn(g.re) }
-        : { name: g.name, status: "none", note: "뚜렷한 방향으로 나온 응답이 없어 해석에 쓰지 않았습니다. 만들어 채우지 않았습니다.", usedIn: [] },
+        : { name: g.name, status: "none", note: "뚜렷한 방향으로 나온 응답이 없어 해석에 쓰지 않았어요. 만들어 채우지 않았어요.", usedIn: [] },
     );
   }
   out.push(
     args.hasContext
-      ? { name: "알려 준 고민 · 상황", status: "used", note: "알려 주신 고민은 해석의 초점과 예시를 고르는 데만 썼습니다. 사주 계산은 바꾸지 않았습니다.", usedIn: ["알려 주신 고민"] }
-      : { name: "알려 준 고민 · 상황", status: "none", note: "입력하지 않았습니다. 특정 고민 없이 쓴 종합 해석입니다.", usedIn: [] },
-    { name: "상대 자료", status: "none", note: `없습니다. 관계 부분은 ${args.nickname} 님의 사주와 응답만으로 읽었습니다.`, usedIn: [] },
-    { name: "연구 통계", status: "none", note: "사용하지 않았습니다.", usedIn: [] },
+      ? { name: "알려 준 고민 · 상황", status: "used", note: "알려 주신 고민은 해석의 초점과 예시를 고르는 데만 썼어요. 사주 계산은 바꾸지 않았어요.", usedIn: ["알려 주신 고민"] }
+      : { name: "알려 준 고민 · 상황", status: "none", note: "입력하지 않았어요. 특정 고민 없이 쓴 종합 해석이에요.", usedIn: [] },
+    { name: "상대 자료", status: "none", note: `없어요. 관계 부분은 ${args.nickname} 님의 사주와 응답만으로 읽었어요.`, usedIn: [] },
+    { name: "연구 통계", status: "none", note: "사용하지 않았어요.", usedIn: [] },
   );
   return out;
 }

@@ -27,10 +27,10 @@ export function FailRecorder() {
   return (
     <div className="mt-4 space-y-5">
       <p className="text-[16px] leading-relaxed text-ink-2">
-        {canceled ? "결제를 취소했습니다." : message || "결제를 완료하지 못했습니다."}
+        {canceled ? "결제를 취소했어요." : message || "결제를 완료하지 못했어요."}
       </p>
       {!canceled && code && <p className="text-[13px] text-ink-3">오류 코드 {code}</p>}
-      <p className="text-[14px] text-ink-3">결제가 완료되지 않았으므로 청구되지 않습니다.</p>
+      <p className="text-[14px] text-ink-3">결제가 완료되지 않았으므로 청구되지 않아요.</p>
       <div className="flex flex-col gap-3 sm:flex-row">
         {back.path ? (
           <Link href={back.path} className={buttonPrimary}>

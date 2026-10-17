@@ -41,7 +41,7 @@ export function TendencyBlock({
           <p className="mt-1.5 text-[16px] leading-[1.75]">{insight.text}</p>
           {REPORT_BASIS.visible && (
             <FoldRow>
-              <Fold label="이렇게 읽은 이유 보기" hint="이 문단에는 응답만 쓰였고, 사주와 합산하지 않았습니다." wide>
+              <Fold label="이렇게 읽은 이유 보기" hint="이 문단에는 응답만 쓰였고, 사주와 합산하지 않았어요." wide>
                 <ul className="divide-y divide-line">
                   {insight.basis.map((b) => (
                     <li key={b.itemId} className="grid gap-1 py-3.5 first:pt-0 last:pb-0 md:grid-cols-[minmax(0,1fr)_140px] md:gap-4">
@@ -114,4 +114,4 @@ function ScoreGroup({ title, meta, rows }: { title: string; meta?: string; rows:
 }
 
 export const SCORE_NOTE =
-  "0~100은 응답을 환산한 값이며 백분위나 정확도가 아닙니다. 높고 낮음은 방향의 차이이고, 좋고 나쁨을 뜻하지 않습니다.";
+  "0~100은 응답을 환산한 값이며 백분위나 정확도가 아니에요. 높고 낮음은 방향의 차이이고, 좋고 나쁨을 뜻하지 않아요.";

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { calculateSaju } from "../../saju/manseryeok-engine.ts";
 import { compatOf } from "../../saju/interpret/compat.ts";
 import { compatTimingOf } from "../../saju/interpret/compat-timing.ts";
-import { COMPAT_OPENER_MAX, COMPAT_REPEAT_MAX, repeatedOpeners, TIMING_VERDICT, unfoundedEventIn, validateCompatDraft } from "./validate.ts";
+import { COMPAT_OPENER_MAX, repeatedOpeners, TIMING_VERDICT, unfoundedEventIn, validateCompatDraft } from "./validate.ts";
 
 type Birth = [number, number, number, string | null];
 const PAIRS: Record<string, [Birth, Birth]> = {
@@ -56,6 +56,10 @@ test("저장된 대리 작성기 글(prompt-0.3)에 강화한 검사를 적용�
   assert.equal(c2.ok, false);
   if (!c1.ok) assert.ok(c1.errors.some((e) => e.includes("되풀이")), "C1의 이유는 구절 되풀이");
   if (!c2.ok) assert.ok(c2.errors.some((e) => e.includes("되풀이")), "C2의 이유는 구절 되풀이");
-  assert.equal(c3.ok, true);
-  if (c3.ok) assert.ok(c3.repeats.length <= COMPAT_REPEAT_MAX);
+  // 미유 문체 검사(2026-10-17)를 더한 뒤: C3의 구절 되풀이 검사 결과는 그대로이고, 건넬 말 속의 "당신"(문체 검사의 호칭 규칙) 한 곳에만 걸린다 — 저장된 글은 고치지 않았다
+  assert.equal(c3.ok, false);
+  if (!c3.ok) {
+    assert.ok(c3.errors.every((e) => e.includes("당신 · 귀하")), "C3의 이유는 문체 검사의 호칭 규칙뿐");
+    assert.ok(!c3.errors.some((e) => e.includes("되풀이")));
+  }
 });

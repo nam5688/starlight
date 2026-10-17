@@ -4,6 +4,7 @@
 import { FORBIDDEN, sentences } from "../v2/validate.ts";
 import { AGE_TEXT, CAUSE_NARROWING, CONFIRMED_CHOICE_RULES, GUARANTEE_RULES, JARGON, RAW_THEME_TEXT, SCORE_TEXT } from "../reading/plan.ts";
 import { chatTermIssues } from "../reading/terms.ts";
+import { checkVoice, failsOf } from "../style/voice.ts";
 import { CHAT_LIMITS as L } from "./plan.ts";
 
 export type ChatCheck = { ok: true; paragraphs: string[] } | { ok: false; errors: string[] };
@@ -70,5 +71,7 @@ export function contentIssues(text: string, opts?: ChatValidateOpts): string[] {
   if (AGE_TEXT.test(text)) errors.push("나이를 말하는 표현은 쓰지 않습니다.");
   if (RAW_THEME_TEXT.test(text)) errors.push("시기 해석 키워드를 그대로 옮기지 않고 쉬운 말로 풀어 써 주세요.");
   if (CAUSE_NARROWING.test(text)) errors.push("원인을 하나로 좁히지 않고 \"~일 수 있어요\"로 써 주세요.");
+  // 미유 문체 — 합쇼체 · 이모지는 위 규칙이 이미 막으므로 그 밖의 분명한 위반(당신/귀하 · 해설자 말투 · AI 어휘 · 억지 공감)만 더한다. 추상어 · 대조형 틀은 저장 오류로 세지 않는다
+  for (const f of failsOf(checkVoice([{ where: "answer", text }]))) if (f.id !== "formal" && f.id !== "emoji") errors.push(`쓸 수 없는 표현: ${f.message}`);
   return errors;
 }

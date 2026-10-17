@@ -31,13 +31,13 @@ export const STARTER_ACTIONS: Record<TendencyId, StarterAction[]> = {
     },
     {
       title: "작은 도움 하나를 먼저 부탁해 보기",
-      detail: "기대는 연습을 부담이 적은 일부터 시작합니다.",
+      detail: "기대는 연습을 부담이 적은 일부터 시작해요.",
     },
   ],
   stability: [
     {
       title: "결정이 길어질 때 확인할 항목을 세 가지로 줄이기",
-      detail: "마감 시간을 함께 정하면 준비만 길어지는 것을 막을 수 있습니다.",
+      detail: "마감 시간을 함께 정하면 준비만 길어지는 것을 막을 수 있어요.",
     },
     {
       title: "익숙한 방식 안에서 한 가지만 바꿔 보기",
@@ -45,7 +45,7 @@ export const STARTER_ACTIONS: Record<TendencyId, StarterAction[]> = {
     },
     {
       title: "계획이 바뀔 때의 대안 하나를 미리 적어 두기",
-      detail: "변경이 생겨도 덜 흔들리고 바로 다음 행동을 고를 수 있습니다.",
+      detail: "변경이 생겨도 덜 흔들리고 바로 다음 행동을 고를 수 있어요.",
     },
   ],
   exploration: [
@@ -59,7 +59,7 @@ export const STARTER_ACTIONS: Record<TendencyId, StarterAction[]> = {
     },
     {
       title: "반복되는 일에 작은 변화를 정해 두기",
-      detail: "같은 절차가 길어질 때 지루함을 덜 수 있습니다.",
+      detail: "같은 절차가 길어질 때 지루함을 덜 수 있어요.",
     },
   ],
 };

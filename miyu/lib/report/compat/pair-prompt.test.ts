@@ -6,12 +6,12 @@ import type { Evidence } from "../evidence.ts";
 import { PAIR_PROMPT_VERSION, PAIR_SECTIONS, COMPAT_SECTIONS } from "./plan.ts";
 import { buildCompatUserMessage, buildPairUserMessage, COMPAT_PROMPT_MARK, COMPAT_PROMPT_VERSION, COMPAT_SYSTEM_PROMPT, PAIR_PROMPT_MARK, PAIR_SYSTEM_PROMPT } from "./prompt.ts";
 
-const SAVED = readFileSync(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.3.txt", import.meta.url), "utf8");
+const SAVED = readFileSync(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.4.txt", import.meta.url), "utf8");
 
 const ev = (id: string, fact: string): Evidence => ({ id, source: id.startsWith("pair.") ? "survey" : "saju", topics: ["relationship"], strength: "moderate", fact, cue: "읽는 방식입니다." });
 
-test("사주 궁합 지시문(0.3)은 리포트 궁합을 더하기 전과 글자 하나도 다르지 않다 — 보관본과 같다", () => {
-  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.3");
+test("사주 궁합 지시문(0.4)은 보관본(docs/samples/prompts/compat-v1-prompt-0.4.txt)과 글자 하나도 다르지 않다", () => {
+  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.4");
   assert.equal(COMPAT_SYSTEM_PROMPT, SAVED);
 });
 
