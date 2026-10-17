@@ -5,6 +5,7 @@
 
 import { PARTNER_AGE_DIRECTION } from "../../config/product.ts";
 import { fortuneEvidence } from "../../saju/interpret/fortune.ts";
+import { hourUnknownEvidence } from "../../saju/interpret/hour-unknown.ts";
 import { sajuEvidence, SAJU_RULE_VERSION } from "../../saju/interpret/rules.ts";
 import { filledFields, topicLabel } from "../../personalization/context.ts";
 import { buildReportExtras } from "../extras.ts";
@@ -100,14 +101,14 @@ function seoulYm(d: Date) {
 }
 
 /**
- * 근거 목록. `fortune: true`는 사주 풀이 재료(십성 분포 · 일의 계열 · 재물 · 육친 · 인연의 경향 · 개운)를 더한다 — 7개 대주제(story-7)만 쓴다.
+ * 근거 목록. `fortune: true`는 출생 시각을 모를 때의 근거(saju.hour.unknown, 시각을 알면 없음)와 사주 풀이 재료(십성 분포 · 일의 계열 · 재물 · 육친 · 인연의 경향 · 개운)를 더한다 — 7개 대주제(story-7)만 쓴다.
  * 이전 형식(reading-v1 · story-v1 · 고민 리포트)은 이 근거를 받지 않아 지시문 길이 · 비용 · 검사가 그대로다(운영자 2026-10-17 방향: 사주 중심 풀이).
  */
 export function buildEvidence(input: Pick<ReportInput, "saju" | "gender" | "summary" | "knownMbti">, reference: { year: number; month: number }, o: { fortune?: boolean } = {}): Evidence[] {
   if (input.saju.status !== "ok") throw new Error("사주 계산 결과가 없어 리포트를 만들 수 없습니다.");
   return [
     ...sajuEvidence(input.saju, { reference, gender: input.gender ?? null }),
-    ...(o.fortune ? fortuneEvidence(input.saju, { ageDirection: PARTNER_AGE_DIRECTION.enabled }) : []),
+    ...(o.fortune ? [...hourUnknownEvidence(input.saju), ...fortuneEvidence(input.saju, { ageDirection: PARTNER_AGE_DIRECTION.enabled })] : []),
     ...surveyEvidence(input.summary, input.knownMbti),
   ];
 }

@@ -10,6 +10,7 @@ import { iga, wagwa } from "../josa.ts";
 import { yearGanji } from "../yearly.ts";
 import { periodPlain, yearTitle } from "./period-plain.ts";
 import { branchRelations, stemRelation, type Relation } from "./relations.ts";
+import { hourBasis } from "./hour-unknown.ts";
 
 export const SAJU_RULE_VERSION = "saju-rules-0.1-draft";
 
@@ -198,7 +199,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         source: "saju",
         topics: ["personality"],
         strength: n >= 4 ? "strong" : "moderate",
-        fact: `원국 글자 중 ${el} ${n}개 (지장간 제외)`,
+        fact: saju.hourPillarOmitted ? `세 기둥(시주 제외) 글자 중 ${el} ${n}개 (지장간 제외)` : `원국 글자 중 ${el} ${n}개 (지장간 제외)`,
         cue: `${el} 기운(${ELEMENT_MEANING[el]})이 두드러지는 원국으로 봅니다.`,
       });
     } else if (n === 0) {
@@ -206,9 +207,9 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         id: `saju.element.${el}.none`,
         source: "saju",
         topics: ["personality"],
-        strength: "moderate",
-        fact: `원국 글자에 ${iga(el)} 없음 (지장간 제외)`,
-        cue: `전통 해석에서는 ${el} 기운(${ELEMENT_MEANING[el]}의 주제)이 원국에 없으면 그 기운이 들어오는 시기에 그 주제가 상대적으로 크게 느껴질 수 있다고 보고, 생활에서 의식적으로 채우는 쪽을 권하는 경우가 많습니다. 없다는 것이 결함이거나 그 기능이 부족하다는 뜻은 아닙니다.`,
+        strength: saju.hourPillarOmitted ? "weak" : "moderate",
+        fact: saju.hourPillarOmitted ? `세 기둥(시주 제외) 글자에 ${iga(el)} 없음 (지장간 제외 — 시주에 있을 수 있어 원국 전체에 없다는 뜻이 아님)` : `원국 글자에 ${iga(el)} 없음 (지장간 제외)`,
+        cue: `전통 해석에서는 ${el} 기운(${ELEMENT_MEANING[el]}의 주제)이 원국에 없으면 그 기운이 들어오는 시기에 그 주제가 상대적으로 크게 느껴질 수 있다고 보고, 생활에서 의식적으로 채우는 쪽을 권하는 경우가 많습니다. 없다는 것이 결함이거나 그 기능이 부족하다는 뜻은 아닙니다.${saju.hourPillarOmitted ? " 시주를 몰라 이 \"없음\"은 세 기둥 기준이라 시주에 있을 수 있는 글자는 알 수 없고, 시기에 그 주제가 크게 느껴질 수 있다는 정도로만 읽습니다." : ""}`,
       });
     }
   }
@@ -233,7 +234,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         source: "saju",
         topics: GROUP_RULE[g].topics,
         strength: c.n >= 4 ? "strong" : "moderate",
-        fact: `${g} ${c.n}자리 (${c.names.join(" · ")} — ${c.where.join(", ")})`,
+        fact: `${hourBasis(saju)}${g} ${c.n}자리 (${c.names.join(" · ")} — ${c.where.join(", ")})`,
         cue: GROUP_RULE[g].cue,
       });
     } else if (c.n === 0) {
@@ -242,8 +243,8 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         source: "saju",
         topics: GROUP_RULE[g].topics,
         strength: "weak",
-        fact: `원국에 ${g}이 없음`,
-        cue: `원국에 없는 기운이라, 대운 · 세운에서 ${g}을 만나는 시기에 그 주제가 상대적으로 크게 느껴질 수 있다고 봅니다.`,
+        fact: saju.hourPillarOmitted ? `세 기둥(시주 제외) 기준 ${g}이 없음 (시주에 있을 수 있음)` : `원국에 ${g}이 없음`,
+        cue: `${saju.hourPillarOmitted ? "세 기둥에 보이지 않는 기운이라" : "원국에 없는 기운이라"}, 대운 · 세운에서 ${g}을 만나는 시기에 그 주제가 상대적으로 크게 느껴질 수 있다고 봅니다.${saju.hourPillarOmitted ? " 시주를 몰라 원국 전체에 없다고 읽지 않습니다." : ""}`,
       });
     }
   }
@@ -296,7 +297,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
       source: "saju",
       topics: ["love", "marriage"],
       strength: "weak",
-      fact: `전통 해석의 배우자 별(${input.gender === "female" ? "여성 원국: 관성" : "남성 원국: 재성"}) ${counts[star].n}자리`,
+      fact: `전통 해석의 배우자 별(${input.gender === "female" ? "여성 원국: 관성" : "남성 원국: 재성"}) ${hourBasis(saju)}${counts[star].n}자리`,
       cue: "전통 해석에서 배우자 · 연애와 관련해 보는 기운입니다. 개수만으로 관계의 좋고 나쁨이나 시기를 단정하지 않습니다.",
     });
   }

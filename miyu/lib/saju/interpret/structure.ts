@@ -193,7 +193,7 @@ export function structureEvidence(saju: SajuOk, uncertainPillars: Set<PillarKey>
     source: "saju",
     topics: ["personality"],
     strength: "moderate",
-    fact: `지장간(지지 속에 숨은 글자, 여기 · 중기 · 정기) 일간 기준 십신: ${st.pillars.map((p) => `${POS(p.key)} 지지 ${p.branch.branch}(${p.branch.hanja}) — ${p.branch.hidden.map((h) => `${S(h)} ${h.role} ${h.tenGod}`).join(", ")}`).join(" / ")}`,
+    fact: `지장간(지지 속에 숨은 글자, 여기 · 중기 · 정기) 일간 기준 십신${st.hourKnown ? "" : "(시지 없음 — 년지 · 월지 · 일지 속 글자만)"}: ${st.pillars.map((p) => `${POS(p.key)} 지지 ${p.branch.branch}(${p.branch.hanja}) — ${p.branch.hidden.map((h) => `${S(h)} ${h.role} ${h.tenGod}`).join(", ")}`).join(" / ")}`,
     cue: "지장간은 겉으로 드러나지 않고 지지 안에 숨어 있는 기운으로 봅니다. 정기가 그 지지의 중심 기운이고 여기 · 중기는 보조로 읽습니다. 표는 통용되는 표 하나를 썼고 학파에 따라 일부 달리 쓰는 표기가 있을 수 있습니다.",
   });
 
@@ -219,7 +219,7 @@ export function structureEvidence(saju: SajuOk, uncertainPillars: Set<PillarKey>
     source: "saju",
     topics: ["personality"],
     strength: "moderate",
-    fact: `일간 ${S(st.dayMaster)} ${ELEMENT_NAME[st.dayMaster.element]}의 뿌리(통근): ${rootText}${st.roots.strong.length ? "" : st.roots.all.length ? " — 정기에는 없음" : ""} / 투간(월지 ${st.month.branch} 지장간 ${HIDDEN_STEMS[st.month.branch].map((h) => h.stem).join(" · ")}): ${exposedText}`,
+    fact: `일간 ${S(st.dayMaster)} ${ELEMENT_NAME[st.dayMaster.element]}의 뿌리(통근${st.hourKnown ? "" : ", 시지 제외"}): ${rootText}${st.roots.strong.length ? "" : st.roots.all.length ? " — 정기에는 없음" : ""} / 투간(월지 ${st.month.branch} 지장간 ${HIDDEN_STEMS[st.month.branch].map((h) => h.stem).join(" · ")}): ${exposedText}`,
     cue: "뿌리(통근)는 일간과 같은 오행이 지지의 지장간에 있는지로 보며 정기에 있으면 단단한 뿌리, 중기 · 여기에만 있으면 약한 뿌리로 읽습니다. 투간은 월지 지장간의 글자가 천간에 드러난 것으로, 숨어 있던 기운이 겉으로 쓰이는 정도로 읽습니다.",
     ...(monthUncertain ? { uncertain: true } : {}),
   });
@@ -229,8 +229,8 @@ export function structureEvidence(saju: SajuOk, uncertainPillars: Set<PillarKey>
     id: "saju.structure.strength",
     source: "saju",
     topics: ["personality"],
-    strength: st.strength.candidate === "갈림" ? "weak" : "moderate",
-    fact: `일간 강약 후보(요소 기록, 점수 아님): ${st.strength.factors.map((f, i) => `${"①②③"[i]} ${f.kind} — ${f.text}`).join(" / ")} / 돕는 자리: ${st.power.support.join(", ") || "없음"} / 덜어내는 자리: ${st.power.drain.join(", ") || "없음"} → 후보: ${st.strength.candidate === "갈림" ? "갈림(요소가 한쪽으로 모이지 않음)" : `힘을 ${st.strength.candidate}`}`,
+    strength: st.strength.candidate === "갈림" || !st.hourKnown ? "weak" : "moderate",
+    fact: `일간 강약 후보(요소 기록, 점수 아님): ${st.strength.factors.map((f, i) => `${"①②③"[i]} ${f.kind} — ${f.text}`).join(" / ")} / 돕는 자리: ${st.power.support.join(", ") || "없음"} / 덜어내는 자리: ${st.power.drain.join(", ") || "없음"} → 후보: ${st.strength.candidate === "갈림" ? "갈림(요소가 한쪽으로 모이지 않음)" : `힘을 ${st.strength.candidate}`}${st.hourKnown ? "" : " / 시주를 몰라 세력은 시주 천간 · 지지를 뺀 다섯 자리 기준이고 뿌리도 시지를 뺀 값이라 시주에 따라 달라질 수 있음 — 후보를 확정하지 않고 신강 · 신약으로 부르지 않음"}`,
     cue: "신강 · 신약이라 부르는 판단의 재료입니다. 점수로 환산하지 않고 월령 · 뿌리 · 세력 세 요소가 모인 방향으로 후보만 적었습니다 — 두 요소 이상이 한쪽이고 반대쪽이 없을 때만 한쪽으로, 아니면 갈림으로 두며 갈림이면 강약을 단정하지 않습니다. 이 후보만으로 어떤 기운이 꼭 필요하다고 정하지는 않았습니다.",
     ...(monthUncertain ? { uncertain: true } : {}),
   });
@@ -243,7 +243,7 @@ export function structureEvidence(saju: SajuOk, uncertainPillars: Set<PillarKey>
       source: "saju",
       topics: ["personality"],
       strength: st.johu.visibleCount === 0 ? "moderate" : "weak",
-      fact: `조후(계절의 한열): 월지 ${st.month.branch}(${st.month.hanja}) ${st.johu.season} — ${st.johu.season === "겨울" ? "차갑고 습한 계절" : "덥고 마른 계절"}로 읽음. ${need} 기운은 원국 글자 ${st.johu.visibleCount}개(지장간까지 ${st.johu.withHiddenCount}개)`,
+      fact: `조후(계절의 한열): 월지 ${st.month.branch}(${st.month.hanja}) ${st.johu.season} — ${st.johu.season === "겨울" ? "차갑고 습한 계절" : "덥고 마른 계절"}로 읽음. ${need} 기운은 ${st.hourKnown ? "원국" : "세 기둥(시주 제외)"} 글자 ${st.johu.visibleCount}개(지장간까지 ${st.johu.withHiddenCount}개)`,
       cue: `조후는 계절의 춥고 더움이 치우친 사주에서 계절에 맞는 기운으로 균형을 잡는다는 해석입니다. ${st.johu.season === "겨울" ? "겨울에는 따뜻하게 하는 화(불)" : "여름에는 식히는 수(물)"} 기운을 반긴다고 보는 것이 가장 큰 원칙이며, 일간과 달마다 달라지는 세부 기준(궁통보감 계열)은 아직 적용하지 않았습니다. 봄 · 가을은 한열이 크게 치우치지 않아 조후 후보를 만들지 않습니다.`,
       ...(monthUncertain ? { uncertain: true } : {}),
     });

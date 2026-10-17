@@ -49,7 +49,7 @@ test("지시문: 7개 대주제와 운영자 확정(재물 항상 · 7번 B안 �
   assert.match(STORY7_SYSTEM_PROMPT, /고민이 없으면.*고민을 지어내지 않고/);
   assert.match(STORY7_SYSTEM_PROMPT, /2~3개/);
   assert.match(STORY7_SYSTEM_PROMPT, /계속 ~라면 ~/);
-  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.3");
+  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.4");
   assert.equal(STORY7_FORMAT, "story-7");
   // 사주 중심 방향: 사주풀이가 중심 · 응답이 부족해도 풀이를 비우지 않음 · 전통 개운법 허용 · 반복의 기준 · 계산하지 않은 판정 금지
   assert.match(STORY7_SYSTEM_PROMPT, /\[미유의 방향 — 사주풀이가 중심이고/);
@@ -334,10 +334,10 @@ test("조립: 7번 장의 알려 준 고민은 지어내지 않는다 — 고민
 test("생성기: story-7은 같은 흐름(초안 → 형식 검사 → 조립)으로 리포트를 만들고 지시문 버전을 남긴다 · 이전 형식 기본값은 그대로", async () => {
   const model = createMockModel({});
   const gen = createAiReportGenerator({ model, format: "story-7", now: () => NOW });
-  assert.match(gen.version, /story-7-prompt-0\.3/);
+  assert.match(gen.version, /story-7-prompt-0\.4/);
   const report = (await gen.generate(P01.input, {})) as ReturnType<typeof assembleStory7>;
   assert.equal(report.layout, "story7");
-  assert.equal(report.generated?.promptVersion, "story-7-prompt-0.3");
+  assert.equal(report.generated?.promptVersion, "story-7-prompt-0.4");
   assert.equal(model.calls, 1);
   const legacy = createAiReportGenerator({ model: createMockModel({}), now: () => NOW });
   assert.match(legacy.version, /reading-v1-prompt-0\.13/);

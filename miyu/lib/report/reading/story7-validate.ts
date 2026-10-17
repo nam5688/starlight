@@ -4,12 +4,15 @@
 //  · 4번의 가족 · 인복 · 귀인 이야기는 전통 육친 대응으로 읽는 조건형 풀이까지만 쓴다(운영자 2026-10-17 — 가족 구성 · 있었던 일을 아는 것처럼 쓰지 않는다). 7번의 조언은 2~3가지이고 알려 준 고민이 없으면 고민을 지어내지 않는다.
 //  · 6번은 근거 목록의 개운(`saju.fortify`) 대응 — 방향 · 색 · 숫자 · 장소 — 을 본문이 말해야 하고, 그 기운의 대응과 다르게 쓰면 막는다(개인별 계산 없이 임의로 배정하지 않는다). 전통 개운법 · 재물복 · 연애운은 허용하고 효과를 보장하는 말만 막는다.
 // 반복의 기준(운영자 2026-10-17): 낱말 · 성향 · 명리 요소가 여러 번 나왔다는 이유만으로 막지 않는다. 같은 명리 요소가 다른 장에서 다른 해석 · 새 정보를 주는 것은 허용하고, 앞 장의 결론을 새 정보 없이 되풀이하는지는 사람이 읽고 판단한다(코드가 가르지 못한다).
+//  · 출생 시각을 모르면(근거 목록에 saju.hour.unknown) 오행 · 십성의 "없음"은 세 기둥 기준으로만 말하고 시주 풀이(자녀 · 말년) · 신강/신약 판정은 막는다(hour-scope.ts). 가족에게 있었던 일을 지난 사실처럼 쓰는 것은 시주 유무와 상관없이 막는다.
 // 한계: 낱말 · 길이 · 표지를 세는 검사다 — 같은 결론을 말만 바꿔 되풀이하는 것 · 근거를 제대로 풀었는지 · 9,900원을 낼 만한지는 못 가른다(사람이 읽는 평가가 본다, docs/real-ai-evaluation-rubric.md).
 import type { Evidence } from "../evidence.ts";
 import { checkVoice, voiceErrors, type VoiceReport } from "../style/voice.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
 import { ADVICE_RULES_TRADITIONAL, READING_LIMITS as L } from "./plan.ts";
 import { fortifyPrimaryOf, fortuneMentions, ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
+import { hasHourUnknownEvidence } from "../../saju/interpret/hour-unknown.ts";
+import { familyPastErrors, hourUnknownErrors } from "./hour-scope.ts";
 import { MONEY_WORDS, PERIOD_TALK, PROCESS_TALK, TASK_IMPERATIVE } from "./story-plan.ts";
 import { chunkSizes, splitSentences } from "./story-motif.ts";
 import { absenceErrors } from "./story-validate.ts";
@@ -344,6 +347,9 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
     const fate = WEALTH_FATE.exec(t);
     if (fate) errors.push(`${where}: 재물의 결과를 확정하는 말("${fate[0]}")을 쓰지 않습니다 — 재물복 · 돈이 들어오고 나가는 양상은 근거(saju.wealth)가 읽는 구조까지 조건형으로 쓰고, 부자가 된다 · 평생 가난하다처럼 결과를 정하지 않습니다.`);
   }
+  // 가족에게 있었던 일을 지난 사실로 쓰지 않는다(입력받은 가족 정보 없음) · 출생 시각을 모를 때는 세 기둥 기준 범위 · 시주 풀이 금지 · 신강/신약 금지(hour-scope.ts)
+  errors.push(...familyPastErrors(texts));
+  if (hasHourUnknownEvidence(evidence)) errors.push(...hourUnknownErrors(texts));
   errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext), adviceRules: ADVICE_RULES_TRADITIONAL, perSentenceMax: STORY7_TERMS.perSentenceMax }));
   for (const { where, text: t } of texts) if (TYPE_CODE.test(t)) errors.push(`${where}: 알파벳 유형 코드("${TYPE_CODE.exec(t)![0]}")를 쓰지 않습니다 — 입력한 MBTI는 "입력해 주신 성향"으로 부릅니다.`);
   // 미유 문체 — 분명한 위반만 실패로 센다(나머지는 고쳐 쓰기 안내로 생성기가 따로 부탁한다)

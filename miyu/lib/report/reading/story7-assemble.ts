@@ -3,6 +3,7 @@
 // 그래서 채팅 · 관리자 · 내보내기 · 월 달력이 세 형식을 모두 읽는다. 제목 위 이름표 · 묶음 · 접어 둔 "분석 근거" · 안내 · 큰 흐름 타임라인 · 월별 달력 · 지금 나의 시기 카드 · 참고한 자료 목록은 AI가 쓰지 않고 여기서 근거 목록과 계산 결과로 만든다.
 import { filledFields, topicLabel, type PersonalContextInput } from "../../personalization/context.ts";
 import { sajuSection } from "../../saju/display.ts";
+import { HOUR_UNKNOWN_CAVEAT } from "../../saju/interpret/hour-unknown.ts";
 import { MONTH_RULE_VERSION, monthCalendars } from "../../saju/interpret/months.ts";
 import { periodLine, periodPlain } from "../../saju/interpret/period-plain.ts";
 import { luckTimeline } from "../../saju/interpret/rules.ts";
@@ -45,7 +46,9 @@ export function assembleStory7(o: AssembleStory7Options): IntegratedReadingRepor
     const plan = story7SectionOf(no)!;
     const s = sectionOf(no);
     const paragraphs = story7Paragraphs(s);
-    const caveat = STORY7_CAVEAT[plan.blockId]?.(name);
+    // 출생 시각을 모르면 1번 장 아래에 코드가 세 기둥 기준이라는 안내를 붙인다(AI가 쓰지 않는다)
+    const hourNote = plan.no === 1 && saju.status === "ok" && saju.hourPillarOmitted ? HOUR_UNKNOWN_CAVEAT : null;
+    const caveat = [STORY7_CAVEAT[plan.blockId]?.(name), hourNote].filter(Boolean).join(" ") || undefined;
     const cited = s.evidence.length > 0 ? s.evidence : ownerEvidence;
     return {
       id: plan.blockId,

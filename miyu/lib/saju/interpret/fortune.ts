@@ -149,6 +149,9 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
   const top = ordered[0];
   const none = groups.filter((g) => counts[g].n === 0);
   const month = monthOf(saju);
+  const hu = saju.hourPillarOmitted;
+  /** "없는 쪽"을 말하는 범위 — 시각을 모르면 세 기둥 기준이다(시주에 있을 수 있어 사주 전체에 없다는 뜻이 아니다) */
+  const noneLabel = hu ? "세 기둥(시주 제외) 기준 없는 쪽(시주에 있을 수 있음)" : "원국에 없는 쪽";
   const out: Evidence[] = [];
 
   // 1) 십성 분포 한눈에
@@ -157,8 +160,8 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     source: "saju",
     topics: ["personality", "work"],
     strength: "moderate",
-    fact: `십성 분포(일간 ${dm.stem}${dm.element} 기준, 일간을 뺀 ${total}자리, 지지는 정기 기준): ${groups.map((g) => nameText(g, counts[g])).join(" / ")} / 가장 많은 쪽: ${top} ${counts[top].n}자리 / 원국에 없는 쪽: ${none.length ? none.join(" · ") : "없음"}${month ? ` / ${pillarText(saju, "month")}` : ""}`,
-    cue: "십성은 일간과 다른 글자의 관계를 다섯 갈래로 읽는 전통 방식입니다 — 비겁은 나와 같은 기운(자기 기준 · 독립 · 동료), 식상은 내가 만들어 내는 기운(표현 · 기술 · 결과물), 재성은 내가 다루는 기운(현실 감각 · 돈과 자원), 관성은 나를 다스리는 기운(규칙 · 책임 · 조직), 인성은 나를 돕는 기운(배움 · 보살핌 · 자격)으로 봅니다. 많은 쪽은 이 사람이 힘을 쓰는 방식의 바탕으로, 월주에 놓인 십성은 사회 · 일에서 처음 드러나는 모습으로, 없는 쪽은 그 기운이 들어오는 시기에 그 주제가 크게 느껴지는 것으로 읽습니다. 개수만으로 좋고 나쁨 · 성패를 정하지 않으며, 없는 기운을 이 사람의 능력 부족으로 풀지 않습니다.",
+    fact: `십성 분포(일간 ${dm.stem}${dm.element} 기준, 일간을 뺀 ${total}자리, 지지는 정기 기준${hu ? ", 시주 없음 — 세 기둥 기준" : ""}): ${groups.map((g) => nameText(g, counts[g])).join(" / ")} / 가장 많은 쪽: ${top} ${counts[top].n}자리 / ${noneLabel}: ${none.length ? none.join(" · ") : "없음"}${month ? ` / ${pillarText(saju, "month")}` : ""}`,
+    cue: `십성은 일간과 다른 글자의 관계를 다섯 갈래로 읽는 전통 방식입니다 — 비겁은 나와 같은 기운(자기 기준 · 독립 · 동료), 식상은 내가 만들어 내는 기운(표현 · 기술 · 결과물), 재성은 내가 다루는 기운(현실 감각 · 돈과 자원), 관성은 나를 다스리는 기운(규칙 · 책임 · 조직), 인성은 나를 돕는 기운(배움 · 보살핌 · 자격)으로 봅니다. 많은 쪽은 이 사람이 힘을 쓰는 방식의 바탕으로, 월주에 놓인 십성은 사회 · 일에서 처음 드러나는 모습으로, 없는 쪽은 그 기운이 들어오는 시기에 그 주제가 크게 느껴지는 것으로 읽습니다. 개수만으로 좋고 나쁨 · 성패를 정하지 않으며, 없는 기운을 이 사람의 능력 부족으로 풀지 않습니다.${hu ? " 출생 시각을 몰라 시주를 뺀 세 기둥 기준이므로 없는 쪽을 사주 전체에 없다고 읽지 않습니다." : ""}`,
   });
 
   // 2) 일의 계열
@@ -173,7 +176,7 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     source: "saju",
     topics: ["work"],
     strength: "moderate",
-    fact: `일의 계열 읽기 재료: 가장 두드러진 쪽 ${top}(${counts[top].n}자리) — ${WORK_LINE[top]} / 그다음 ${second}(${counts[second].n}자리) — ${WORK_LINE[second]} / ${month ? `월주(사회 · 일의 자리) 천간 ${month.tenGod.stem} · 지지 ${month.tenGod.branch}` : "월주 없음"} / 조합: ${combos.length ? combos.join(", ") : "눈에 띄는 조합 없음"} / 원국에 없는 쪽: ${none.length ? none.join(" · ") : "없음"}`,
+    fact: `일의 계열 읽기 재료: 가장 두드러진 쪽 ${top}(${counts[top].n}자리) — ${WORK_LINE[top]} / 그다음 ${second}(${counts[second].n}자리) — ${WORK_LINE[second]} / ${month ? `월주(사회 · 일의 자리) 천간 ${month.tenGod.stem} · 지지 ${month.tenGod.branch}` : "월주 없음"} / 조합: ${combos.length ? combos.join(", ") : "눈에 띄는 조합 없음"} / ${noneLabel}: ${none.length ? none.join(" · ") : "없음"}`,
     cue: "전통에서 일의 방향은 십성 분포로 읽습니다 — 식상은 표현 · 기술 · 창작 · 가르침, 관성은 조직 · 공공 · 규칙과 책임, 재성은 현실 실무 · 영업 · 사업 · 자산, 인성은 배움 · 연구 · 자격 · 전문직, 비겁은 독립 · 협업 · 경쟁이 있는 일의 계열로 봅니다. 가장 많은 쪽과 월주의 십성이 일하는 방식의 바탕이고 없는 쪽은 그 기운이 들어오는 시기에 주제로 커진다고 봅니다. 직업 하나를 정하거나 성공을 보장하지 않고, 일의 계열 · 어울리는 환경 · 일하는 방식까지 읽습니다. 응답에서 읽은 평소 행동은 이 계열이 이 사람에게 어떻게 나타나는지 구체화하는 데만 씁니다.",
   });
 
@@ -182,7 +185,7 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
   const support = structure.power.support.length;
   const drain = structure.power.drain.length;
   const wealthReads: string[] = [];
-  if (counts.재성.n === 0) wealthReads.push("재성이 원국에 없음(재성 운이 들어오는 시기에 돈 주제가 크게 느껴질 수 있다고 읽음)");
+  if (counts.재성.n === 0) wealthReads.push(hu ? "세 기둥(시주 제외) 기준 재성이 없음(시주에 있을 수 있어 재성이 없다고 읽지 않고, 재성 운이 들어오는 시기에 돈 주제가 크게 느껴질 수 있다고만 읽음)" : "재성이 원국에 없음(재성 운이 들어오는 시기에 돈 주제가 크게 느껴질 수 있다고 읽음)");
   else {
     if ((jaeNames["정재"] ?? 0) > (jaeNames["편재"] ?? 0)) wealthReads.push("정재가 편재보다 많음(꾸준히 모으고 지키는 쪽으로 읽음)");
     else if ((jaeNames["편재"] ?? 0) > (jaeNames["정재"] ?? 0)) wealthReads.push("편재가 정재보다 많음(여러 갈래로 움직이거나 한 번에 크게 움직이는 돈 · 사람과 얽히는 돈으로 읽음)");
@@ -197,7 +200,7 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     source: "saju",
     topics: ["money", "work"],
     strength: "moderate",
-    fact: `재물 읽기 재료: ${nameText("재성", counts.재성)}(위치: ${counts.재성.where.join(", ") || "없음"}) / ${nameText("식상", counts.식상)} / ${nameText("비겁", counts.비겁)} / ${nameText("관성", counts.관성)} / 일간을 돕는 자리 ${support}곳 · 덜어내는 자리 ${drain}곳 / 읽히는 구조: ${wealthReads.join(", ")}`,
+    fact: `재물 읽기 재료${hu ? "(시주 없음 — 세 기둥 기준)" : ""}: ${nameText("재성", counts.재성)}(위치: ${counts.재성.where.join(", ") || "없음"}) / ${nameText("식상", counts.식상)} / ${nameText("비겁", counts.비겁)} / ${nameText("관성", counts.관성)} / 일간을 돕는 자리 ${support}곳 · 덜어내는 자리 ${drain}곳 / 읽히는 구조: ${wealthReads.join(", ")}`,
     cue: "전통 재물 해석은 재성을 돈의 길로 보고, 정재는 꾸준한 수입 · 모으고 지키는 돈, 편재는 여러 갈래의 돈 · 한 번에 움직이는 큰 돈 · 사람을 통해 생기는 돈으로 읽습니다. 식상이 재성을 이어 주면 만든 결과물이 돈이 되는 흐름, 비겁이 많으면 같이 쓰고 나누는 돈 · 경쟁으로 나가는 돈이 커지기 쉬운 구조, 재성이 많은데 일간을 돕는 쪽이 적으면 들어오는 돈을 감당하기 어려워 나가기 쉬운 구조로 읽습니다. 돈이 들어오고 나가는 양상을 읽을 수 있지만 재성 개수 하나로 부자 · 가난을 정하지 않고, 실제 소득 · 소비 습관 · 저축은 입력받지 않았습니다. 투자 · 대출 · 부동산 같은 금융 결정의 근거로 쓰지 않습니다.",
   });
 
@@ -211,7 +214,7 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     source: "saju",
     topics: ["relationship"],
     strength: "weak",
-    fact: `관계 자리(전통 육친 대응, 일간 기준 십성): 인성 ${counts.인성.n}자리(어머니 · 윗사람 · 스승 — ${nameText("인성", counts.인성)}) / 비겁 ${counts.비겁.n}자리(형제 · 친구 · 동료) / 재성 ${counts.재성.n}자리(아버지 · 현실의 지원 — 편재 ${jaeNames["편재"] ?? 0} · 정재 ${jaeNames["정재"] ?? 0}) / 관성 ${counts.관성.n}자리(직장 상사 · 조직의 윗사람) / 식상 ${counts.식상.n}자리(후배 · 아랫사람) / ${pillarText(saju, "year") ?? "년주 없음"}(조상 · 어린 시절 바깥 환경 자리) / ${pillarText(saju, "month") ?? "월주 없음"}(부모 · 형제 · 성장 환경 자리) / 도움을 주는 쪽(인성 + 비겁) ${helperTop}자리, 천간에 드러난 것 ${exposedHelpers}곳 / 가까이 두면 균형이 맞는 사람의 분위기(보완 후보 ${fortify.primary.element} 기운의 성향): ${ELEMENT_FORTUNE[fortify.primary.element].people}`,
+    fact: `관계 자리(전통 육친 대응, 일간 기준 십성${hu ? ", 시주 없음 — 년주 · 월주 · 일주 기준이며 시주(자녀와 이어지는 자리)는 읽지 않음" : ""}): 인성 ${counts.인성.n}자리(어머니 · 윗사람 · 스승 — ${nameText("인성", counts.인성)}) / 비겁 ${counts.비겁.n}자리(형제 · 친구 · 동료) / 재성 ${counts.재성.n}자리(아버지 · 현실의 지원 — 편재 ${jaeNames["편재"] ?? 0} · 정재 ${jaeNames["정재"] ?? 0}) / 관성 ${counts.관성.n}자리(직장 상사 · 조직의 윗사람) / 식상 ${counts.식상.n}자리(후배 · 아랫사람) / ${pillarText(saju, "year") ?? "년주 없음"}(조상 · 어린 시절 바깥 환경 자리) / ${pillarText(saju, "month") ?? "월주 없음"}(부모 · 형제 · 성장 환경 자리) / 도움을 주는 쪽(인성 + 비겁) ${helperTop}자리, 천간에 드러난 것 ${exposedHelpers}곳 / 가까이 두면 균형이 맞는 사람의 분위기(보완 후보 ${fortify.primary.element} 기운의 성향): ${ELEMENT_FORTUNE[fortify.primary.element].people}`,
     cue: "전통 육친론은 십성을 사람 사이의 관계로도 읽습니다 — 인성은 어머니 · 윗사람 · 스승, 재성(특히 편재)은 아버지 · 현실의 지원, 비겁은 형제 · 친구 · 동료, 관성은 직장 상사 · 조직의 윗사람, 식상은 후배 · 아랫사람으로 대응합니다. 월주를 부모 · 형제와 성장 환경의 자리로, 년주를 조상과 어린 시절 바깥 환경의 자리로 보기도 합니다. 도움을 주는 쪽(인성 · 비겁)이 천간에 드러나거나 자리가 든든하면 도움 받는 인연(인복) 이야기로 읽고, 보완 후보 기운의 성향을 가진 사람을 가까이 두면 균형이 맞는다고 읽습니다. 개수와 자리만으로 가족 관계의 좋고 나쁨 · 실제 있었던 일 · 가족 구성을 정하지 않으며 입력받은 가족 정보는 없습니다. 자녀 · 출산에 관한 이야기는 하지 않습니다.",
     ...(kinUncertain ? { uncertain: true } : {}),
   });
@@ -236,9 +239,9 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     id: "saju.fortify",
     source: "saju",
     topics: ["personality"],
-    strength: "moderate",
-    fact: `오행 개수(원국 글자 기준, 지장간 제외): ${FIVE_ELEMENTS.map((e) => `${e} ${fortify.counts[e]}`).join(" · ")} / 일간 ${dm.stem}${dm.element} / 보완 후보 1순위: ${fortify.primary.element}(${fortify.primary.count === 0 ? "원국에 없음" : `${fortify.primary.count}개로 가장 적음`})${otherText ? ` · 그다음 후보: ${otherText}` : ""} / 보완 후보는 원국 개수와 태어난 계절만으로 정한 단순화이며 이 사람에게 꼭 필요한 기운을 판정한 것이 아님`,
-    cue: `전통 오행 대응에서 ${fortify.primary.element}(${f.image}) 기운은 방향 ${f.direction}, 계절 ${f.season}, 색 ${f.colors.join(" · ")}, 수(數) ${f.numbers.join(" · ")}, 어울리는 장소와 환경 ${f.places.join(" · ")}에 해당한다고 봅니다. 부족한 기운을 생활에서 보태는 상징적인 개운법으로, 색은 옷 · 소품 · 화면 배경으로, 방향은 산책이나 앉는 자리로, 수(數)는 즐겨 쓰는 번호로, 장소는 자주 머무는 환경으로 옮겨 소개하는 경우가 많고 습관으로는 ${f.habits.join(" · ")} 같은 것을 꼽습니다.${fortify.others.map((o) => ` 그다음 후보 ${o.element}(${ELEMENT_FORTUNE[o.element].image}) 기운은 방향 ${ELEMENT_FORTUNE[o.element].direction}, 색 ${ELEMENT_FORTUNE[o.element].colors.join(" · ")}, 수(數) ${ELEMENT_FORTUNE[o.element].numbers.join(" · ")}에 해당합니다.`).join("")} 이 대응은 전통의 상징이며 실제 효과나 재물 · 건강의 변화를 보장하지 않고, 물건을 새로 사야 한다는 뜻도 아닙니다. 이미 가진 것으로 가볍게 먼저 해 볼 수 있습니다.`,
+    strength: hu ? "weak" : "moderate",
+    fact: `오행 개수(${hu ? "세 기둥(시주 제외) 글자 기준" : "원국 글자 기준"}, 지장간 제외): ${FIVE_ELEMENTS.map((e) => `${e} ${fortify.counts[e]}`).join(" · ")} / 일간 ${dm.stem}${dm.element} / 보완 후보 1순위: ${fortify.primary.element}(${fortify.primary.count === 0 ? (hu ? "세 기둥에 없음 — 시주에 있을 수 있음" : "원국에 없음") : `${fortify.primary.count}개로 가장 적음`})${otherText ? ` · 그다음 후보: ${otherText}` : ""} / 보완 후보는 ${hu ? "세 기둥 " : "원국 "}개수와 태어난 계절만으로 정한 단순화이며 이 사람에게 꼭 필요한 기운을 판정한 것이 아님${hu ? " / 시주를 몰라 시주를 알면 후보가 달라질 수 있음 — 후보로 가볍게 곁들임" : ""}`,
+    cue: `전통 오행 대응에서 ${fortify.primary.element}(${f.image}) 기운은 방향 ${f.direction}, 계절 ${f.season}, 색 ${f.colors.join(" · ")}, 수(數) ${f.numbers.join(" · ")}, 어울리는 장소와 환경 ${f.places.join(" · ")}에 해당한다고 봅니다. 부족한 기운을 생활에서 보태는 상징적인 개운법으로, 색은 옷 · 소품 · 화면 배경으로, 방향은 산책이나 앉는 자리로, 수(數)는 즐겨 쓰는 번호로, 장소는 자주 머무는 환경으로 옮겨 소개하는 경우가 많고 습관으로는 ${f.habits.join(" · ")} 같은 것을 꼽습니다.${fortify.others.map((o) => ` 그다음 후보 ${o.element}(${ELEMENT_FORTUNE[o.element].image}) 기운은 방향 ${ELEMENT_FORTUNE[o.element].direction}, 색 ${ELEMENT_FORTUNE[o.element].colors.join(" · ")}, 수(數) ${ELEMENT_FORTUNE[o.element].numbers.join(" · ")}에 해당합니다.`).join("")} 이 대응은 전통의 상징이며 실제 효과나 재물 · 건강의 변화를 보장하지 않고, 물건을 새로 사야 한다는 뜻도 아닙니다. 이미 가진 것으로 가볍게 먼저 해 볼 수 있습니다.${hu ? " 출생 시각을 모르는 사람의 보완 후보는 세 기둥 기준이라 시주에 따라 달라질 수 있어 확정하지 않고 가볍게 곁들입니다." : ""}`,
   });
 
   return out;

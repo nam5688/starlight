@@ -11,6 +11,7 @@
 //   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2839            # 드라이런(호출 없음): 입력 확인 파일 만들기 + 비용 · 승인 범위 점검 (기본: --variant story-7)
 //   node scripts/run-own-story.ts --rehearsal --already-spent-krw 2839                      # 리허설(모의 글 · 키 · 비용 없음): 같은 흐름 · 파일 · 화면을 끝까지 시험
 //   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2839 --execute --approved-cap-krw 6000 --approved-on 2026-10-17   # 실제 호출 1회
+//   --birth-time-unknown  같은 입력에서 출생 시각만 비워 시주 없이 읽는 경우(세 기둥)로 실행 — 드라이런 · 리허설 · 실행 모두 같은 옵션(입력 파일은 바뀌지 않는다)
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AI_CANDIDATES, COMPARE_STAGES } from "../lib/config/ai-candidates.ts";
@@ -54,8 +55,11 @@ try {
 } catch {
   stop(`입력 파일(${inputPath})을 읽지 못했습니다. 먼저 .env.local에 MIYU_OWN_INPUT_CAPTURE=yes를 적고 npm.cmd run dev로 http://localhost:3000/analyze 에서 22문항에 끝까지 답해 결과(무료 요약) 화면까지 가야 파일이 만들어집니다.`);
 }
-const capture = parseOwnCapture(raw);
-if (!capture) stop("입력 파일의 모양이 올바르지 않습니다(기본 정보 · 22개 응답). /analyze에서 다시 끝까지 답해 주세요.");
+const capture0 = parseOwnCapture(raw);
+if (!capture0) stop("입력 파일의 모양이 올바르지 않습니다(기본 정보 · 22개 응답). /analyze에서 다시 끝까지 답해 주세요.");
+// --birth-time-unknown: 같은 입력에서 출생 시각만 비워 시주 없이(세 기둥으로) 읽는 경우를 시험한다 — 입력 파일은 바꾸지 않고 이 실행에서만 비운다(2026-10-17, 출생시간 미상 처리 확인용)
+const birthTimeUnknown = args.includes("--birth-time-unknown");
+const capture = birthTimeUnknown ? { ...capture0, info: { ...capture0.info, birthTimeUnknown: true, birthTime: "" } } : capture0;
 const built = await ownReportInput(capture, now);
 if (!built.ok) stop(built.message);
 const persona = ownPersona(built.input);
