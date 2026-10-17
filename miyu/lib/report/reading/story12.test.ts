@@ -5,13 +5,15 @@ import { join } from "node:path";
 import test from "node:test";
 import { buildPersonas } from "../ai/compare-personas.ts";
 import { buildEvidence } from "../ai/generator.ts";
-import { assignPersonal, measureLayout, owners12, piecesOfStory12, piecesOfStoryV1, sajuCoverage, slotsOf12, slotsOfAreas, textRepetition, type Story12Draft } from "./story12-measure.ts";
+import { assignPersonal, checkStory12Format, measureLayout, owners12, piecesOfStory12, piecesOfStoryV1, sajuCoverage, slotsOf12, slotsOfAreas, textRepetition, type Story12Draft } from "./story12-measure.ts";
+import { validateStoryDraft } from "./story-validate.ts";
 import { STORY12_SYSTEM_PROMPT, buildStory12UserMessage } from "./story12-prompt.ts";
 import { STORY12_SCENE_OWNER, STORY12_SECTIONS } from "./story12-plan.ts";
 import { personalEvidenceFor } from "./story-prompt.ts";
 import type { StoryDraftV1 } from "./types.ts";
 
 const REF = { year: 2026, month: 10, iso: "2026-10-17" };
+const proxy = (file: string): unknown => JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "..", "docs", "samples", "story12-proxy", file), "utf8"));
 const PERSONAS = buildPersonas(10);
 const EVIDENCE = PERSONAS.map((p) => buildEvidence(p.input, REF));
 
@@ -132,6 +134,31 @@ test("story-v1 글 조각은 고민(focus)을 비교에서 뺀다 — 12개 장�
   const pieces = piecesOfStoryV1(d);
   assert.ok(!pieces.some((p) => p.where.startsWith("focus")));
   assert.deepEqual([...new Set(pieces.map((p) => p.block))], ["head", "core", "flow"]);
+});
+
+test("저장된 비교 글 4편: 문서(story-12-sections-review.md 3장)에 적은 수치가 지금 코드로 다시 세어도 같다 — 지표 코드가 바뀌면 문서를 고쳐야 한다", () => {
+  const rows = (["P01", "P03"] as const).map((id) => {
+    const ev = EVIDENCE[PERSONAS.findIndex((p) => p.id === id)];
+    const v1 = proxy(`${id}-v1.json`) as StoryDraftV1;
+    const s12 = proxy(`${id}-s12.json`) as Story12Draft;
+    return { id, ev, v1, s12, mv1: textRepetition(piecesOfStoryV1(v1)), m12: textRepetition(piecesOfStory12(s12)) };
+  });
+  const [p01, p03] = rows;
+  assert.deepEqual([p01.mv1.repeatedPhrases, p01.m12.repeatedPhrases, p03.mv1.repeatedPhrases, p03.m12.repeatedPhrases], [1, 6, 4, 4]);
+  assert.deepEqual([p01.mv1.pairOverlapMean, p01.m12.pairOverlapMean, p03.mv1.pairOverlapMean, p03.m12.pairOverlapMean].map((x) => Number(x.toFixed(2))), [0.2, 0.14, 0.22, 0.13]);
+  assert.deepEqual([p01.mv1.chars, p01.m12.chars, p03.mv1.chars, p03.m12.chars], [3763, 5329, 4052, 4876]);
+  // 형식: 지금 구조의 P01은 제품 검사 통과, P03은 용어 두 건 불통과 · 12개 장 두 편은 최소 점검 통과
+  assert.equal(validateStoryDraft(p01.v1, p01.ev, { hasContext: false }).ok, true);
+  const v03 = validateStoryDraft(p03.v1, p03.ev, { hasContext: false });
+  assert.ok(!v03.ok && v03.errors.length === 2);
+  for (const r of rows) assert.deepEqual(checkStory12Format(r.s12, r.ev), [], r.id);
+  // 04는 소유 근거가 없어 다른 장이 소유한 응답 근거 하나만 인용했다 — 근거 없는 "겉과 속이 같다"는 결론의 재료
+  for (const r of rows) {
+    const cited = r.s12.sections.find((s) => s.no === 4)!.evidence.filter((id) => id.startsWith("survey."));
+    const owned = assignPersonal(r.ev, slotsOf12()).owned;
+    assert.equal(cited.length, 1, r.id);
+    assert.ok(Object.entries(owned).some(([key, ids]) => key !== "04" && ids.includes(cited[0])), `${r.id}: 04가 인용한 ${cited[0]}는 다른 장이 소유한 근거`);
+  }
 });
 
 test("연결하지 않았다: 화면 · 서버 · 서비스 · 리포트 생성 어디에서도 12개 장 초안을 불러오지 않는다(예외는 story12-* 파일과 측정 스크립트뿐)", () => {
