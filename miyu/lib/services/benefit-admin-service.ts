@@ -299,7 +299,7 @@ export async function getFinanceMonthView(deps: BenefitDeps, input: { month: str
   let ledger: LedgerTotals | null = null;
   if (ready) {
     expenses = (await benefits.listExpenses(500)).filter((e) => e.month === input.month);
-    ledger = await benefits.ledgerTotals(since);
+    ledger = await benefits.ledgerTotals(since, until);
   }
   const sum = (kind: ExpenseRecord["kind"]) => expenses.filter((e) => e.kind === kind).reduce((n, e) => n + e.amountKrw, 0);
   const rewardCost = ledger ? ledger.pointsEarned * costPerIssuedPointKrw(assumptions) + ledger.creditsGranted * assumptions.aiQuestionCostKrw * assumptions.creditUsageRate : 0;

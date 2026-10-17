@@ -437,3 +437,14 @@ export function buildQuote(input: QuoteInput): CheckoutQuote {
 export function pickOption(quote: CheckoutQuote, kind: PriceOptionKind): PriceOption | null {
   return quote.options.find((o) => o.kind === kind) ?? null;
 }
+
+/**
+ * 쿠폰 기간(시작 · 끝) 읽기 — 시간대 없는 값("2026-11-01T00:00")은 한국 시간으로 본다(서버는 UTC라 그대로 저장하면 9시간 어긋난다).
+ * 비어 있으면 null(제한 없음), 날짜로 읽을 수 없으면 undefined(오류).
+ */
+export function couponTimeOf(raw: string): string | null | undefined {
+  if (!raw) return null;
+  const withZone = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(raw) ? `${raw.length === 16 ? `${raw}:00` : raw}+09:00` : raw;
+  const t = new Date(withZone);
+  return Number.isNaN(t.getTime()) ? undefined : t.toISOString();
+}

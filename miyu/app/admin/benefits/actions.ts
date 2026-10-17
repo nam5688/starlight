@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { SETTING_FIELDS } from "@/lib/commerce/benefits";
+import { couponTimeOf, SETTING_FIELDS } from "@/lib/commerce/benefits";
 import { decideReferral, revokeReferral } from "@/lib/services/benefit-admin-service";
 import { changeBenefitSetting, createCouponByAdmin, setCouponStatusByAdmin, type CouponDraft } from "@/lib/services/benefit-service";
 import type { CouponStatus, ExpenseKind } from "@/lib/services/benefit-ports";
@@ -13,7 +13,7 @@ import { benefitRepository, now, writeRepository } from "@/server/services";
 // 혜택 관리자 동작 — 모두 서버에서 관리자 여부를 다시 확인하고 운영 기록(ops_events)에 남긴다.
 // 기록에는 항목 이름 · 회원번호 앞 8자 · 결과만 담는다(이름 · 생년월일 · 응답 · 고민 없음). 실제 지급은 서버 설정이 켜져 있을 때만 일어난다.
 
-const page = (note: string, tab = "") => redirect(`/admin/benefits?${tab ? `tab=${encodeURIComponent(tab)}&` : ""}note=${encodeURIComponent(note)}`);
+const page = (note: string, tab = "", extra = "") => redirect(`/admin/benefits?${tab ? `tab=${encodeURIComponent(tab)}&` : ""}note=${encodeURIComponent(note)}${extra}`);
 
 async function admin() {
   const a = await getAdminMember();
@@ -60,6 +60,9 @@ export async function createCouponAction(formData: FormData) {
     const v = clip(formData.get(k), 20);
     return v === "" ? null : Number(v);
   };
+  const startsAt = couponTimeOf(clip(formData.get("startsAt"), 40));
+  const endsAt = couponTimeOf(clip(formData.get("endsAt"), 40));
+  if (startsAt === undefined || endsAt === undefined) page("쿠폰 시작 · 끝 시각을 확인해 주세요.", "coupons");
   const draft: CouponDraft = {
     code: clip(formData.get("code"), 40),
     name: clip(formData.get("name"), 80),
@@ -68,8 +71,8 @@ export async function createCouponAction(formData: FormData) {
     value: num("value") ?? 0,
     perUserLimit: num("perUserLimit") ?? 1,
     issueLimit: num("issueLimit"),
-    startsAt: clip(formData.get("startsAt"), 40) || null,
-    endsAt: clip(formData.get("endsAt"), 40) || null,
+    startsAt: startsAt ?? null,
+    endsAt: endsAt ?? null,
     purpose: clip(formData.get("purpose"), 20) || "promo",
     targetUserId: /^[0-9a-f-]{36}$/.test(clip(formData.get("targetUserId"), 40)) ? clip(formData.get("targetUserId"), 40) : null,
     reviewRewardEligible: formData.get("reviewRewardEligible") === "on",
@@ -153,11 +156,11 @@ export async function addExpenseAction(formData: FormData) {
   try {
     await benefitRepository().addExpense({ month, kind, amountKrw: amount, memo: clip(formData.get("memo"), 100) || null, by: a.userId });
     revalidatePath("/admin/benefits");
-    page("비용을 기록했어요.", "finance");
+    page("비용을 기록했어요.", "finance", `&month=${month}`);
   } catch (e) {
     if ((e as { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) throw e;
     logError("admin.expense", e);
-    page("기록하지 못했어요.", "finance");
+    page("기록하지 못했어요.", "finance", `&month=${month}`);
   }
 }
 

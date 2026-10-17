@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_BENEFIT_SETTINGS } from "../commerce/benefits.ts";
 import { DEFAULT_ASSUMPTIONS } from "../commerce/profit.ts";
-import { assumptionsFromSettings, decideReferral, getBenefitAdminOverview, PAUSABLE_FEATURES, referralHealth, revokeReferral, summarizeAiQuestionCosts } from "./benefit-admin-service.ts";
+import { assumptionsFromSettings, decideReferral, getBenefitAdminOverview, getFinanceMonthView, PAUSABLE_FEATURES, referralHealth, revokeReferral, summarizeAiQuestionCosts } from "./benefit-admin-service.ts";
 import { changeBenefitSetting, type BenefitDeps } from "./benefit-service.ts";
 import type { AiQuestionCostRow } from "./benefit-ports.ts";
 import type { AssessmentRecord, MiyuRepository } from "./ports.ts";
@@ -159,4 +159,14 @@ test("보상 일시 중지: 적립률 · 가입 보상 · 구매 보상 · 후�
   const history = await deps.benefits.listSettingHistory(20);
   assert.ok(history.length >= PAUSABLE_FEATURES.length * 2);
   assert.ok(history.every((h) => h.reason.length > 0 && h.changedBy === "admin-1"));
+});
+
+test("월 손익: 보상 비용 추정은 그 달에 지급한 포인트 · 질문권만 센다(지난 달을 봐도 이후 지급분이 섞이지 않는다)", async () => {
+  const { deps, ben } = await setup();
+  const far = new Date(Date.UTC(2027, 9, 1)).toISOString();
+  assert.equal((await ben.repo.grantPoints({ userId: "11111111-1111-4111-8111-111111111111", amount: 100000, sourceKind: "admin", sourceRef: "t", opKey: "month-view-1", expiresAt: far })).status, "granted");
+  const thisMonth = await getFinanceMonthView(deps, { month: "2026-10" });
+  const lastMonth = await getFinanceMonthView(deps, { month: "2026-09" });
+  assert.ok(thisMonth.rewardCostEstimateKrw > 0, "이번 달에 지급했으니 보상 비용이 잡힌다");
+  assert.equal(lastMonth.rewardCostEstimateKrw, 0, "지난 달에는 지급이 없었으니 0이다");
 });

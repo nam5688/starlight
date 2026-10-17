@@ -206,7 +206,8 @@ export interface BenefitRepository {
   runMaintenance(): Promise<BenefitMaintenanceResult>;
 
   // 관리자 집계
-  ledgerTotals(since: string): Promise<LedgerTotals>;
+  /** since 이상 · until 미만의 장부 합계(until이 없으면 지금까지). 남은 양(outstanding · 묶음 검사)은 기간과 관계없는 현재 값이다 */
+  ledgerTotals(since: string, until?: string): Promise<LedgerTotals>;
   listExpenses(limit: number): Promise<ExpenseRecord[]>;
   addExpense(input: { month: string; kind: ExpenseKind; amountKrw: number; memo: string | null; by: string | null }): Promise<void>;
   deleteExpense(id: number): Promise<void>;

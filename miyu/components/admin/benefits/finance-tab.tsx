@@ -89,11 +89,6 @@ export function FinanceTab({ month, currentMonth, view, overview, assumptions, s
               가격표에 없는 모델의 호출이 {view.aiUnpricedCalls}건 있어서 AI 비용이 실제보다 낮게 잡혔을 수 있어요.
             </Notice>
           )}
-          {month < currentMonth && (
-            <Notice tone="info" label="지난 달을 보고 있어요">
-              &lsquo;보상 비용&rsquo; 추정에는 그 달 이후에 지급한 포인트 · 질문권도 섞여 들어가요(서버가 그 달 시작부터 지금까지를 합산해요). 나머지 숫자는 그 달만이에요.
-            </Notice>
-          )}
           <ul className="list-disc space-y-1 pl-5 text-[13px] leading-snug text-ink-3">
             {view.caveats.map((c) => (
               <li key={c}>{c}</li>

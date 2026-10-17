@@ -414,10 +414,12 @@ export function createSupabaseBenefitRepository(db: SupabaseClient): BenefitRepo
     },
 
     // ── 관리자 집계 ──
-    async ledgerTotals(since): Promise<LedgerTotals> {
-      const pl = await db.from("point_ledger").select("kind, amount, shortfall, lot_id").gte("created_at", since).limit(PAGE * 20);
+    async ledgerTotals(since, until): Promise<LedgerTotals> {
+      const pq = db.from("point_ledger").select("kind, amount, shortfall, lot_id").gte("created_at", since);
+      const pl = await (until ? pq.lt("created_at", until) : pq).limit(PAGE * 20);
       if (pl.error) fail("포인트 장부 집계", pl.error, pl.status);
-      const cl = await db.from("credit_ledger").select("kind, qty, shortfall").gte("created_at", since).limit(PAGE * 20);
+      const cq = db.from("credit_ledger").select("kind, qty, shortfall").gte("created_at", since);
+      const cl = await (until ? cq.lt("created_at", until) : cq).limit(PAGE * 20);
       if (cl.error) fail("질문권 장부 집계", cl.error, cl.status);
       const lots = await db.from("point_lots").select("id, amount, remaining, expires_at, source_kind").limit(PAGE * 20);
       if (lots.error) fail("포인트 로트 집계", lots.error, lots.status);

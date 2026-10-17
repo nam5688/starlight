@@ -51,3 +51,16 @@ test("할인 선택지가 있는지는 추천 가격 · 쿠폰만 센다(정가 
   assert.equal(hasDiscountOptions(view({ ...list, coupon: { code: "ABCD", check: okCoupon } })), true);
   assert.equal(hasDiscountOptions(view({ ...list, coupon: { code: "ABCD", check: { ok: false, reason: "ended" } } })), false);
 });
+
+test("쿠폰 기간: 시간대 없는 값은 한국 시간으로 읽고, 비면 제한 없음, 읽을 수 없으면 오류", async () => {
+  const { couponTimeOf } = await import("./benefits.ts");
+  assert.equal(couponTimeOf(""), null);
+  // 한국 시간 2026-11-01 00:00 = UTC 2026-10-31 15:00
+  assert.equal(couponTimeOf("2026-11-01T00:00"), "2026-10-31T15:00:00.000Z");
+  assert.equal(couponTimeOf("2026-11-01T00:00:30"), "2026-10-31T15:00:30.000Z");
+  // 시간대가 이미 있으면 그대로
+  assert.equal(couponTimeOf("2026-11-01T00:00:00+09:00"), "2026-10-31T15:00:00.000Z");
+  assert.equal(couponTimeOf("2026-11-01T00:00:00Z"), "2026-11-01T00:00:00.000Z");
+  assert.equal(couponTimeOf("내일"), undefined);
+  assert.equal(couponTimeOf("2026-13-45T00:00"), undefined);
+});

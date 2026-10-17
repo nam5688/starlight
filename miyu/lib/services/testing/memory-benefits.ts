@@ -744,9 +744,9 @@ export function createMemoryBenefits(mem: Mem, now: () => Date = () => new Date(
       return { expiredPointLots, expiredCreditLots, earnedBackfill, partialRefundAdjusted: 0, referralEvaluated, referralConfirmed, referralPurchaseRewards, visitsPurged: 0, purge: "off" };
     },
 
-    async ledgerTotals(since): Promise<LedgerTotals> {
+    async ledgerTotals(since, until): Promise<LedgerTotals> {
       const t: LedgerTotals = { pointsEarned: 0, pointsSpent: 0, pointsExpired: 0, pointsClawed: 0, pointsShortfall: 0, pointsOutstanding: 0, creditsGranted: 0, creditsSpent: 0, creditsExpired: 0, creditsRevoked: 0, creditsShortfall: 0, creditsOutstanding: 0, pointsBySource: {}, creditsByKind: {}, lotMismatches: 0 };
-      for (const l of pointLedger.filter((x) => x.createdAt >= since)) {
+      for (const l of pointLedger.filter((x) => x.createdAt >= since && (!until || x.createdAt < until))) {
         if (l.kind === "earn") t.pointsEarned += l.amount;
         else if (l.kind === "spend") t.pointsSpent += -l.amount;
         else if (l.kind === "spend_restore") t.pointsSpent -= l.amount;
@@ -754,7 +754,7 @@ export function createMemoryBenefits(mem: Mem, now: () => Date = () => new Date(
         else if (l.kind === "clawback") t.pointsClawed += -l.amount;
         t.pointsShortfall += l.shortfall;
       }
-      for (const l of creditLedger.filter((x) => x.createdAt >= since)) {
+      for (const l of creditLedger.filter((x) => x.createdAt >= since && (!until || x.createdAt < until))) {
         if (l.kind === "grant") t.creditsGranted += l.qty;
         else if (l.kind === "spend") t.creditsSpent += -l.qty;
         else if (l.kind === "restore") t.creditsSpent -= l.qty;
