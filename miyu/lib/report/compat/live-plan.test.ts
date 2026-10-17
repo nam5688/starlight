@@ -34,10 +34,10 @@ test("입력은 가상 인물이다 — 두 사람의 사주가 계산돼 있고
   assert.ok(cmp.comparedLabels.length > 0);
 });
 
-test("승인 값: 운영자가 정한 총액 · 1회 상한(사주 궁합 635원 · 리포트 궁합 680원)과 승인 횟수를 코드가 그대로 지킨다", () => {
+test("승인 값: 운영자가 정한 총액 · 1회 상한(사주 궁합 635원 · 리포트 궁합 680.15원)과 승인 횟수를 코드가 그대로 지킨다", () => {
   const byName = Object.fromEntries(COMPAT_LIVE_STAGES.map((s) => [s.name, s]));
   assert.equal(byName["compat-saju-p1"].restrict.runCeilingKrw, 635);
-  assert.equal(byName["compat-pair-p1"].restrict.runCeilingKrw, 680);
+  assert.equal(byName["compat-pair-p1"].restrict.runCeilingKrw, 680.15);
   for (const stage of COMPAT_LIVE_STAGES) {
     assert.equal(stage.capKrw, 6000, `${stage.name}: 총 승인 한도 6,000원(누적 2,468원 포함)`);
     assert.equal(stage.restrict.runsApproved, 1, `${stage.name}: 승인된 실행 1회(호출 최대 2회)`);

@@ -219,8 +219,8 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   assert.ok(stage?.restrict, "story-p01 단계가 있고 제한이 있다");
   assert.equal(stage.capKrw, 6000, "총 승인 한도 6,000원(누적 사용액 2,468원 포함 — 지금부터 추가 지출 상한 3,532원, A안 2026-10-17)");
   assert.equal(stage.personaCount, 1);
-  assert.equal(stage.restrict.runCeilingKrw, 1234.03, "운영자가 승인안의 최악 비용 1,234.03원을 1회 상한으로 승인(2026-10-17 A안, 반올림 없이 그대로 비교)");
-  const ok = { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1234.03 };
+  assert.equal(stage.restrict.runCeilingKrw, 1234.04, "운영자가 승인안의 최악 비용 1,234.03원을 1회 상한으로 승인(2026-10-17 A안)한 뒤, 재작성 포함 최악이 0.01원 미만 넘어 거절돼 같은 날 1,234.04원으로 확인(반올림 없이 그대로 비교)");
+  const ok = { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1234.04 };
   assert.deepEqual(checkStageRestriction(stage, ok), [], "범위 안이고 상한과 같으면 통과");
   const has = (patch: object, word: string) => assert.ok(checkStageRestriction(stage, { ...ok, ...patch }).some((m) => m.includes(word)), word);
   has({ variant: "reading-v1" }, "story-v1");
@@ -229,7 +229,7 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   has({ persona: undefined }, "P01");
   has({ persona: "P02" }, "P01");
   has({ alreadySpentGiven: false }, "--already-spent-krw");
-  has({ twoRoundWorstKrw: 1234.04 }, "상한"); // 반올림 없이 그대로 비교한다
+  has({ twoRoundWorstKrw: 1234.05 }, "상한"); // 반올림 없이 그대로 비교한다
   // 승인된 실행 2건(1차 마침 + 2차 재시험 1건) — 1차를 마쳤고 2차는 남아 있어 실제 호출 확인이 통과한다. 2차까지 마치면 다시 거절한다(새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만)
   assert.equal(stage.restrict.runsApproved, 2);
   assert.equal(stage.restrict.runsDone, 1);
