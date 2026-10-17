@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronIcon, InfoIcon } from "@/components/ui/icons";
+import { renderCompatCardPng } from "@/components/talk/card-image";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonDisabled, buttonSecondary } from "@/components/ui/styles";
 import { shareTextOf, type SimpleCompatCard } from "@/lib/compat/simple";
@@ -12,6 +13,33 @@ import { shareTextOf, type SimpleCompatCard } from "@/lib/compat/simple";
  */
 export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onReset: () => void }) {
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
+  const [imageState, setImageState] = useState<"idle" | "busy" | "saved" | "failed">("idle");
+
+  // 공유 이미지(생년월일 없음) — 이 기기 안에서 만들고 서버로 보내지 않는다. 파일 공유를 지원하면 공유 창을, 아니면 저장한다
+  const shareImage = async () => {
+    setImageState("busy");
+    try {
+      const blob = await renderCompatCardPng(card);
+      const file = new File([blob], "miyu-compat-card.png", { type: "image/png" });
+      if (typeof navigator !== "undefined" && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `${card.typeName} · 미유 궁합` });
+        setImageState("idle");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "miyu-compat-card.png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      setImageState("saved");
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return setImageState("idle");
+      setImageState("failed");
+    }
+  };
 
   const share = async () => {
     const text = shareTextOf(card);
@@ -56,11 +84,24 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
         </p>
 
         <div className="mt-6 flex flex-col items-center gap-2">
-          <button type="button" onClick={share} className={`${buttonSecondary} w-full sm:w-auto`}>
-            결과 공유하기
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button type="button" onClick={shareImage} disabled={imageState === "busy"} className={`${buttonSecondary} w-full sm:w-auto`}>
+              {imageState === "busy" ? "이미지 만드는 중…" : "이미지로 공유하기"}
+            </button>
+            <button type="button" onClick={share} className={`${buttonSecondary} w-full sm:w-auto`}>
+              글로 공유하기
+            </button>
+          </div>
           <p role="status" className="min-h-5 text-[13px] text-ink-3">
-            {shareState === "copied" ? "공유할 글을 복사했어요. 붙여넣어 보내 주세요." : shareState === "failed" ? "공유하지 못했어요. 화면을 캡처해서 보내 주세요." : "이름 · 커플 유형 · 지수만 담겨요. 생년월일은 담기지 않아요."}
+            {imageState === "saved"
+              ? "이미지를 저장했어요. 사진첩(또는 다운로드 폴더)을 확인해 보세요."
+              : imageState === "failed"
+                ? "이미지를 만들지 못했어요. 글로 공유하거나 화면을 캡처해 주세요."
+                : shareState === "copied"
+                  ? "공유할 글을 복사했어요. 붙여넣어 보내 주세요."
+                  : shareState === "failed"
+                    ? "공유하지 못했어요. 화면을 캡처해서 보내 주세요."
+                    : "이름 · 커플 유형 · 지수만 담겨요. 생년월일은 담기지 않아요."}
           </p>
         </div>
       </div>

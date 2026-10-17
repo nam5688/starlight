@@ -1,31 +1,48 @@
 // 분석 카드를 PNG 이미지로 그린다 — 브라우저(Canvas)에서만 쓴다. 배치는 lib/report/reading/talk-card.ts가 정하고 여기서는 그리기만 한다.
 // 이미지는 이 기기 안에서 만들어지며 서버로 보내지 않는다 (카드의 글은 이미 이 화면에 보이던 리포트 문장이다).
+import { layoutCompatCard } from "@/lib/compat/share-card";
+import type { SimpleCompatCard } from "@/lib/compat/simple";
 import { layoutCard, type CardLayoutOptions } from "@/lib/report/reading/talk-card";
 import type { TalkCard } from "@/lib/report/reading/talk";
 import { MIYU_IMAGES } from "./miyu-moods";
 
 type Options = Omit<CardLayoutOptions, "measure" | "width">;
 
-export async function renderCardPng(card: TalkCard, options: Options): Promise<Blob> {
+/** 화면에 쓰는 글꼴 · 색 · 캐릭터 그림으로 그릴 준비를 한다 */
+async function prepare() {
   // 화면에 쓰는 글꼴과 같은 글꼴로 그린다 (아직 받는 중이면 기다린다)
   await document.fonts.ready;
   const root = getComputedStyle(document.documentElement);
   const family = getComputedStyle(document.body).fontFamily || "sans-serif";
   const colorOf = (name: string) => root.getPropertyValue(`--color-${name}`).trim() || "#30313b";
   const font = (size: number, weight: number) => `${weight} ${size}px ${family}`;
-
   // 캐릭터 그림 파일이 정해져 있으면 먼저 불러온다 — 못 불러오면 기본 조약돌 그림으로 그린다
   const character = await loadImage(MIYU_IMAGES.happy);
   const probe = document.createElement("canvas").getContext("2d");
   if (!probe) throw new Error("이 브라우저에서는 이미지를 만들 수 없어요.");
-  const layout = layoutCard(card, {
-    ...options,
-    measure: (text, size, weight) => {
-      probe.font = font(size, weight);
-      return probe.measureText(text).width;
-    },
-  });
+  const measure = (text: string, size: number, weight: number) => {
+    probe.font = font(size, weight);
+    return probe.measureText(text).width;
+  };
+  return { colorOf, font, character, measure };
+}
 
+export async function renderCardPng(card: TalkCard, options: Options): Promise<Blob> {
+  const { colorOf, font, character, measure } = await prepare();
+  return await drawLayoutPng(layoutCard(card, { ...options, measure }), { colorOf, font, character });
+}
+
+/** 간단 궁합 공유 카드 — 이름 · 커플 유형 · 궁합 지수 · 핵심 한 줄만 담긴다(생년월일 없음). 이 기기 안에서 만들어지며 서버로 보내지 않는다 */
+export async function renderCompatCardPng(card: SimpleCompatCard): Promise<Blob> {
+  const { colorOf, font, character, measure } = await prepare();
+  return await drawLayoutPng(layoutCompatCard(card, { measure }), { colorOf, font, character });
+}
+
+type Layout = { width: number; height: number; ops: ReturnType<typeof layoutCard>["ops"] };
+type DrawEnv = { colorOf: (name: string) => string; font: (size: number, weight: number) => string; character: HTMLImageElement | null };
+
+/** 정해진 배치(layoutCard · layoutCompatCard의 결과)를 PNG로 그린다 — 그림 그리기만 하고 배치는 하지 않는다 */
+async function drawLayoutPng(layout: Layout, { colorOf, font, character }: DrawEnv): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = layout.width;
   canvas.height = layout.height;
