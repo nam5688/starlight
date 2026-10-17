@@ -7,7 +7,7 @@ import {
   CLOSENESS_LABEL, IPIP_FACETS, IPIP_REFERENCE, IPIP_REVIEW_VERSION, ITEM_FINDINGS, PERSPECTIVE_COMPARISON, PROPOSAL_VERSION, PROPOSED_ITEMS, READING_LIMITS,
 } from "../lib/assessment/drafts/ipip-review.ts";
 import { DRAFT_CONTENT_VERSION, DRAFT_ITEMS, PERSPECTIVES, type DraftItem, type PerspectiveId } from "../lib/assessment/drafts/situational-draft.ts";
-import { COMPAT_RULE_META, DAY_RULE_META, LUCKY_RULE_META, MONTH_RULE_META, PAIR_RULE_META, PARTNER_RULE_META, PERSONAL_TYPE_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { COMPAT_RULE_META, DAY_RULE_META, LUCKY_RULE_META, MONTH_RULE_META, PAIR_RULE_META, PAIR_SCENE_RULE_META, PARTNER_RULE_META, PERSONAL_TYPE_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
 import { PERSONAL_TYPE_VERSION } from "../lib/assessment/personal-type.ts";
 import { COMPAT_RULE_VERSION } from "../lib/saju/interpret/compat.ts";
 import { LUCKY_VERSION } from "../lib/saju/interpret/lucky.ts";
@@ -82,6 +82,12 @@ ${COMPAT_RULE_META.map(block).join("\n\n")}
 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교하는 규칙이다. **리포트 궁합은 아직 만들지 않았고** 이 규칙은 근거 빌더(순수 계산)로만 있다. 설계 가설이며 실제 사람의 응답 · 전문가 검토로 확인하지 못했다.
 
 ${PAIR_RULE_META.map(block).join("\n\n")}
+
+## 리포트 궁합 — 장면 질문 두 사람 비교 규칙 (${PAIR_SCENE_RULE_META.length}개, \`compat/pair-scene-evidence.ts\`)
+
+두 사람이 각자 직접 고른 장면 답(\`docs/couple-scenes-v1.md\`)을 영역별로 비교하는 규칙이다. **리포트 궁합은 아직 만들지 않았고** 이 규칙은 근거 빌더(순수 계산)로만 있으며, 실제 사람의 응답 · 전문가 검토로 확인하지 않았다.
+
+${PAIR_SCENE_RULE_META.map(block).join("\n\n")}
 
 ## 개인 유형명 규칙 (${PERSONAL_TYPE_RULE_META.length}개, \`assessment/personal-type.ts\` · 규칙 ${PERSONAL_TYPE_VERSION})
 
