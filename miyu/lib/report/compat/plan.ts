@@ -1,20 +1,22 @@
-// 사주 궁합 리포트(유료, 아직 판매하지 않음)의 고정 구성 — 지시문(prompt.ts) · 형식 검사(validate.ts) · 모의 작성기 · 조립(assemble.ts) · 화면이 같은 값을 쓴다.
+// 사주 궁합 · 리포트 궁합(유료, 아직 판매하지 않음)의 고정 구성 — 지시문(prompt.ts) · 형식 검사(validate.ts) · 모의 작성기 · 조립(assemble.ts) · 화면이 같은 값을 쓴다.
 // 간단 궁합(무료, /compat)과 같은 엔진 결과(lib/saju/interpret/compat.ts)를 풀어 쓴다 — 커플 유형 · 궁합 지수 · 계산 재료는 코드가 같은 결과에서 채우고 AI는 본문만 쓴다.
-// 0.3(운영자 확정 2026-10-17, 순서 6): 담을 것을 운영자가 말한 여덟 가지로 맞췄다 — ① 자연스럽게 잘 맞는 부분 ② 반복해서 부딪히기 쉬운 부분 ③ 서로 다른 표현과 행동 방식 ④ 장기 관계에서 필요한 조건
-// ⑤ A님이 B님에게 해 볼 행동 ⑥ B님이 A님에게 해 볼 행동 ⑦ 함께 조율할 방법 ⑧ 실제 계산된 범위의 관계 시기 해석(두 사람 각자의 대운 · 세운 계산 결과를 나란히 놓은 것, compat-timing.ts — 근거가 있을 때만).
-// 0.2 구성(영역 다섯 + 행동 3~4개)은 docs/samples/prompts/에 지시문 원문만 남아 있다. 저장되거나 판매된 글은 없다(판매하지 않음).
-// 상대의 응답(기질 · 성격 · 애착)은 쓰지 않는다 — 두 사람이 각자 응답한 내용을 비교하는 것은 별도 상품(리포트 궁합)이다.
+// 0.5 / 0.3(운영자 확정 2026-10-17, 유료 궁합 구성 최종 정리): **7개 대주제** — 1 우리의 궁합 한눈에 보기 · 2 두 사람의 사주와 오행 조화 · 3 우리가 잘 맞는 부분 · 4 우리가 부딪히는 부분 · 5 연애와 결혼 궁합 ·
+//   6 서로에게 어떤 사람일까?(리포트 궁합만 — 두 사람이 각자 직접 답한 응답 비교) · 7 오래 잘 만나기 위한 조언(전통 개운법 + A님 → B님 · B님 → A님 · 함께 정할 약속 + 서로에게 물어볼 추천 질문).
+//   사주 궁합은 6번을 뺀 여섯 장이고 리포트 궁합은 같은 여섯 장에 6번을 더한 일곱 장이다(리포트 궁합 = 사주 궁합 풀이 + 응답 비교). 응답은 사주 풀이를 대체하지 않고 그 읽기를 구체화하는 보조다.
+//   이전 구성(overview · fit · friction · express · long · timing · response)은 지시문 원문만 남아 있다(docs/samples/prompts/). 저장되거나 판매된 글은 없다(판매하지 않음).
+//   시기(compat.timing.*)는 5번 장의 한 문단으로 들어갔다 — 계산된 대운 · 세운 범위 안에서만. **가족 · 자녀 인연의 풀이는 계산하지 않았다**(시주 · 자녀 자리의 궁합 규칙이 엔진에 없고 출산 · 자녀 예언은 기존 금지 규칙이다 — 운영자 결정 항목, docs/compat-composition-v2.md).
+// 상대의 응답(기질 · 성격 · 애착)은 사주 궁합에 쓰지 않는다 — 두 사람이 각자 응답한 내용을 비교하는 것은 별도 상품(리포트 궁합)이다.
 
 export const COMPAT_REPORT_KIND = "compat-saju-v1" as const;
-export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.4";
+export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.5";
 
 /**
- * 두 사람의 시기(대운 · 세운)를 계산하는가 — 계산한다(compat-timing.ts, 각자의 계산 결과를 나란히 놓는 범위). 단 근거 목록에 compat.timing.*이 있을 때만 timing 영역을 쓰고,
- * 그 밖의 영역에서는 시기 이야기(올해 · 대운 · 세운 · 연도)를 막는다. 관계가 좋아지거나 나빠지는 해 · 달 · 추천 날짜 · 두 시기가 맞물리는 해는 계산하지 않았으므로 쓰지 않는다.
+ * 두 사람의 시기(대운 · 세운)를 계산하는가 — 계산한다(compat-timing.ts, 각자의 계산 결과를 나란히 놓는 범위). 근거 목록에 compat.timing.*이 있으면 5번 장(연애와 결혼 궁합)이 한 문단으로 쓰고,
+ * 그 밖의 장에서는 시기 이야기(올해 · 대운 · 세운 · 연도)를 막는다. 관계가 좋아지거나 나빠지는 해 · 달 · 추천 날짜 · 두 시기가 맞물리는 해는 계산하지 않았으므로 쓰지 않는다.
  */
 export const COMPAT_TIMING_BUILT = true;
 
-export type CompatSectionId = "overview" | "fit" | "friction" | "express" | "long" | "timing" | "response";
+export type CompatSectionId = "overview" | "harmony" | "fit" | "friction" | "love" | "view" | "advice";
 
 export type CompatSectionPlan = {
   id: CompatSectionId;
@@ -26,80 +28,83 @@ export type CompatSectionPlan = {
   sources: string;
   /** 문단 수 */
   paragraphs: { min: number; max: number };
-  /** 근거 목록에 compat.timing.*이 있을 때만 쓰는 영역 */
+  /** 근거 목록에 해당 근거가 있을 때만 쓰는 장(지금은 없다 — 시기는 5번 장 안의 한 문단이다) */
   optional?: boolean;
+  /** 리포트 궁합에만 있는 장 */
+  pairOnly?: boolean;
 };
 
-export const COMPAT_SECTIONS: CompatSectionPlan[] = [
+const ALL_SECTIONS: CompatSectionPlan[] = [
   {
     id: "overview",
-    topic: "두 사람의 기본 조합",
-    ask: "두 사람이 가까이 있을 때 어떤 분위기가 만들어지는가 — 타고난 중심 성향 사이의 관계와 움직이는 속도의 조합. 커플 유형(compat.type)은 이 분위기를 요약한 이름일 뿐 풀이의 근거가 아니다",
-    sources: "compat.day-stem · compat.role · compat.pace · compat.type",
+    topic: "우리의 궁합 한눈에 보기",
+    ask: "두 사람이 가까이 있을 때 만들어지는 분위기를 한눈에 — 타고난 중심 성향(일간) 사이의 관계 · 배우자 자리(일지) 사이 · 움직이는 속도의 조합에서 가장 두드러지는 연결 하나를 headline으로 잡아 풀어 쓴다. 커플 유형 이름 · 지수는 화면이 이미 보여 주므로 되풀이하지 않는다",
+    sources: "compat.day-stem · compat.day-branch · compat.pace · compat.type",
     paragraphs: { min: 2, max: 3 },
   },
   {
+    id: "harmony",
+    topic: "두 사람의 사주와 오행 조화",
+    ask: "각자의 일간과 오행 분포(compat.chart)가 어떻게 생겼는지, 서로 비어 있는 기운을 채우는지 · 같은 기운이 둘 다 두드러지는지 · 두 일간의 오행 관계(같은 기운 · 상생 · 상극 · 합)가 어떤 조화를 만드는지를 명리 용어를 풀이와 함께 써서 설명한다(사주를 읽는 재미가 있는 장). 오행 개수는 천간 · 지지 글자 기준이고 시주를 모르는 사람은 세 기둥 기준임을 밝힌다. 개운(색 · 방향)은 7번 장의 몫이다",
+    sources: "compat.chart · compat.day-stem · compat.element.fill · compat.element.overlap",
+    paragraphs: { min: 2, max: 4 },
+  },
+  {
     id: "fit",
-    topic: "자연스럽게 잘 맞는 부분",
+    topic: "우리가 잘 맞는 부분",
     ask: "어떤 때 두 사람이 서로를 편하게 받쳐 주는가 — 근거에서 읽히는 합 · 상생 · 비어 있는 기운을 채우는 조합을 장면으로 쓴다. 근거가 약하면 늘려 쓰지 않는다",
     sources: "compat.day-stem · compat.day-branch · compat.cross.pull · compat.element.fill",
     paragraphs: { min: 2, max: 3 },
   },
   {
     id: "friction",
-    topic: "반복해서 부딪히기 쉬운 부분",
+    topic: "우리가 부딪히는 부분",
     ask: "어떤 때 방식이 부딪히기 쉬운가와 그 순간에 도움이 되는 조율 — 누구 탓으로 쓰지 않고 \"이런 때 이렇게 달라요\"로 쓴다. 충 · 형 · 상극 같은 근거가 없으면 차이가 크지 않다고 쓰고 부딪힘을 지어내지 않는다(속도 차이처럼 근거에 있는 차이만)",
     sources: "compat.day-branch · compat.cross.clash · compat.element.overlap · compat.pace",
     paragraphs: { min: 2, max: 3 },
   },
   {
-    id: "express",
-    topic: "서로 다른 표현과 행동 방식",
-    ask: "가까워지는 속도 · 마음을 건네고 일을 움직이는 방식 · 서로에게 맡기 쉬운 역할이 두 사주의 관계에서 어떻게 다르게 읽히는가 — \"A님 쪽이 먼저 움직이는 쪽으로 읽혀요\"처럼 읽는 방식으로 쓰고 두 사람의 속마음 · 감정은 쓰지 않는다. 조건형(\"~하기 쉬워요\")으로만 쓴다",
-    sources: "compat.pace · compat.role · compat.day-branch",
-    paragraphs: { min: 2, max: 3 },
+    id: "love",
+    topic: "연애와 결혼 궁합",
+    ask: "애정 표현과 연애 관계(일지끼리의 합 · 충과 일간 사이의 관계가 만드는 가까운 사이의 분위기, compat.role이 읽는 서로의 자리) · 오래 함께할 때의 생활 방식과 조건(함께 사는 생활 · 결혼생활을 포함해, 월지 · 년지끼리의 합 · 충을 \"가족 · 생활 환경 쪽 기준이 맞닿는지 부딪히는지\"로 전통 해석을 조건형으로 읽는다) · 근거에 compat.timing.*이 있으면 지금 각자 지나는 시기의 주제가 겹치는지 다른지를 마지막 한 문단으로. 결혼을 하게 된다 · 언제 한다 · 헤어진다 · 자녀 · 출산 이야기는 쓰지 않는다(계산하지 않았다)",
+    sources: "compat.day-branch · compat.day-stem · compat.role · compat.cross.pull · compat.cross.clash · compat.pace · compat.timing.*",
+    paragraphs: { min: 3, max: 4 },
   },
   {
-    id: "long",
-    topic: "오래 가려면 필요한 조건",
-    ask: "함께 지내는 시간이 길어졌을 때(함께 사는 생활 · 결혼생활을 포함해) 중요해질 조건과 지치기 쉬운 지점. 결혼을 하게 된다 · 언제 한다 · 헤어진다는 예언은 쓰지 않고, 조건과 조율의 방법까지 쓴다",
-    sources: "compat.day-branch · compat.element.fill · compat.element.overlap · compat.pace",
+    id: "view",
+    topic: "서로에게 어떤 사람일까?",
+    ask: "한 사람이 상대에게 어떤 모습으로 느껴지기 쉬운지를 사주(compat.role — A 기준 B의 자리 · compat.pace)와 두 사람이 각자 직접 답한 응답(pair.*)이 같은 쪽 · 다른 쪽인 영역으로 풀어 쓴다. 응답은 사주 풀이를 대체하지 않고 그 읽기가 두 사람에게 어떤 장면으로 나타나는지 구체화하며, 사주와 다르면 차이를 지우지 않고 상황별 차이로 설명한다. 상대의 속마음 · 생각 단정 · 애착 유형 이름 · 원래 답 · 점수 · 문항을 쓰지 않는다. 비교한 응답이 없으면 사주만으로 쓴다",
+    sources: "compat.role · compat.pace · pair.*",
     paragraphs: { min: 2, max: 3 },
+    pairOnly: true,
   },
   {
-    id: "timing",
-    topic: "지금 두 사람이 지나는 시기",
-    ask: "두 사람이 지금 각자 어떤 주제가 중요한 시기를 지나는지를 나란히 놓고, 주제가 겹치면 같은 이야기를 함께 하기 쉽고 다르면 서로 신경 쓰는 일이 다를 수 있다는 것까지 쓴다 — 근거(compat.timing.*)에 적힌 시기와 연도 안에서만 쓰고, 관계가 좋아지거나 나빠지는 해 · 달, 인연이 깊어지는 때, 추천 날짜, 두 시기가 맞물리는 해는 계산하지 않았으므로 쓰지 않는다",
-    sources: "compat.timing.luck · compat.timing.year",
+    id: "advice",
+    topic: "오래 잘 만나기 위한 조언",
+    ask: "① 두 사람이 함께 쓸 수 있는 전통 개운법 — compat.fortify에 적힌 보완 후보 기운의 방향 · 색 · 숫자 · 장소를 함께 머무는 공간 · 만나는 장소 · 소품 · 산책 방향으로 옮겨 쓴다(임의로 다른 기운을 쓰지 않는다) ② 이유 있는 방향 한 문단. A님이 B님에게 · B님이 A님에게 · 함께 정할 약속은 steps에, 서로에게 물어보면 좋은 추천 질문은 questions에 쓴다",
+    sources: "compat.fortify · compat.pace · compat.day-branch",
     paragraphs: { min: 1, max: 2 },
-    optional: true,
   },
 ];
 
+/** 사주 궁합의 장 — 6번(서로에게 어떤 사람일까?)을 뺀 여섯 장 */
+export const COMPAT_SECTIONS: CompatSectionPlan[] = ALL_SECTIONS.filter((s) => !s.pairOnly);
+
 // ─── 리포트 궁합(유료 2, 2026-10-17 구현 · 판매 스위치 꺼짐) ───
-// 사주 궁합과 같은 엔진 · 같은 위쪽 요약(cardOf)을 쓰고, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*, pair-evidence.ts)를 더해 "응답" 영역을 하나 둔다.
+// 사주 궁합과 같은 엔진 · 같은 위쪽 요약(cardOf) · 같은 여섯 장에, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*, pair-evidence.ts)로 6번 "서로에게 어떤 사람일까?"를 더한다.
 // 저장되는 글에는 이름 · 생년월일 · 응답 원문 · 점수가 없다 — 본문은 "A님 · B님"이고 화면이 읽는 사람에게 누가 누구인지 알려 준다.
 export const PAIR_REPORT_KIND = "compat-pair-v1" as const;
-export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.2";
+export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.3";
 
-const RESPONSE_SECTION: CompatSectionPlan = {
-  id: "response",
-  topic: "각자 답한 내용으로 본 두 사람",
-  ask: "두 사람이 각자 직접 답한 응답의 방향이 같은 쪽인 영역에서는 어떤 장면에서 닮게 반응하기 쉬운지, 서로 다른 쪽인 영역에서는 어떤 장면에서 어긋나기 쉽고 어떻게 서로 보완할 수 있는지를 사주에서 읽은 관계와 이어서 쓴다. 근거(pair.*)에 적힌 영역만 쓰고 점수 · 문항 문장 · 원래 답을 옮기지 않으며 애착 유형 이름으로 부르지 않는다. 응답이 사주와 다르면 차이를 지우지 않고 상황별 차이로 설명한다",
-  sources: "pair.*",
-  paragraphs: { min: 2, max: 3 },
-  optional: true,
-};
+/** 리포트 궁합의 장 — 일곱 장 모두 항상 쓴다(비교한 응답이 없으면 6번은 사주만으로, 응답을 지어내지 않는다) */
+export const PAIR_SECTIONS: CompatSectionPlan[] = ALL_SECTIONS;
 
-/** 리포트 궁합의 영역 순서 — 사주 궁합의 영역에 응답 영역(근거가 있을 때만)을 "서로 다른 표현과 행동 방식" 다음에 끼운다 */
-export const PAIR_SECTIONS: CompatSectionPlan[] = [...COMPAT_SECTIONS.slice(0, 4), RESPONSE_SECTION, ...COMPAT_SECTIONS.slice(4)];
-
-/** 응답 영역을 쓸 만한 비교 근거가 있는가 — 비교한 응답(pair.mbti가 아닌 pair.*)이 하나 이상. 입력한 MBTI 비교만으로는 영역을 만들지 않는다 */
+/** 응답 근거가 6번 장에 쓸 만한 비교(pair.mbti가 아닌 pair.*)가 하나 이상 있는가. 입력한 MBTI 비교만으로는 응답 풀이를 만들지 않는다 */
 export const hasPairResponseEvidence = (evidence: { id: string; uncertain?: boolean }[]): boolean => evidence.some((e) => e.id.startsWith("pair.") && e.id !== "pair.mbti" && !e.uncertain);
 
-/** 이번 근거로 써야 하는 리포트 궁합의 영역 — 응답 근거가 없으면 response를, 시기 근거가 없으면 timing을 뺀다 */
-export const pairSectionsFor = (evidence: { id: string; uncertain?: boolean }[]): CompatSectionPlan[] =>
-  PAIR_SECTIONS.filter((s) => (s.id === "response" ? hasPairResponseEvidence(evidence) : !s.optional || hasTimingEvidence(evidence)));
+/** 이번 근거로 써야 하는 리포트 궁합의 장 — 일곱 장 모두(근거가 있고 없음은 6번 장이 무엇을 인용해야 하는지만 바꾼다) */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 이전 구성과 같은 호출 모양을 유지한다(근거에 따라 장이 바뀌지 않는다)
+export const pairSectionsFor = (_evidence: { id: string; uncertain?: boolean }[] = []): CompatSectionPlan[] => PAIR_SECTIONS;
 
 /** 가짜 AI 서버 · 모의 작성기가 리포트 궁합 요청을 알아보는 표지 */
 export const PAIR_PROMPT_MARK = "[미유 리포트 궁합]";
@@ -111,36 +116,40 @@ export const PAIR_NOTES = {
   /** 한쪽만 뚜렷하게 답해 비교하지 않은 영역이 있을 때 */
   skipped: "한쪽만 뚜렷하게 답한 영역은 비교하지 않았어요. 없는 응답을 짐작해 채우지 않았어요.",
   /** 비교할 영역이 하나도 없을 때 */
-  noCompared: "두 사람이 모두 뚜렷하게 답한 영역이 없어서 이번 풀이는 사주 궁합과 같은 사주 중심으로만 썼어요.",
+  noCompared: "두 사람이 모두 뚜렷하게 답한 영역이 없어서 이번 풀이의 6번은 사주 궁합과 같은 사주 중심으로만 썼어요.",
 } as const;
 
-/** 행동 묶음 셋 — 운영자가 말한 "A가 B에게 해 볼 행동 · B가 A에게 해 볼 행동 · 함께 조율할 방법" */
+/** 행동 묶음 셋 — 운영자가 말한 "A가 B에게 해 볼 행동 · B가 A에게 해 볼 행동 · 함께 정할 약속" */
 export type CompatStepGroupId = "aToB" | "bToA" | "together";
 
 export const COMPAT_STEP_GROUPS: { id: CompatStepGroupId; label: string; ask: string }[] = [
   { id: "aToB", label: "A님이 B님에게 해 볼 행동", ask: "근거에서 읽히는 B님 쪽의 방식(예: 확인하고 움직이는 쪽)에 맞춰 A님이 먼저 바꿔 볼 수 있는 작은 행동 — B님을 고치라는 말이 아니라 A님이 해 볼 수 있는 것" },
   { id: "bToA", label: "B님이 A님에게 해 볼 행동", ask: "근거에서 읽히는 A님 쪽의 방식에 맞춰 B님이 먼저 바꿔 볼 수 있는 작은 행동 — A님을 고치라는 말이 아니라 B님이 해 볼 수 있는 것" },
-  { id: "together", label: "함께 조율할 방법", ask: "두 사람이 같이 정해 두면 좋은 약속 · 순서 · 신호 — 한쪽이 아니라 둘이 함께 하는 것" },
+  { id: "together", label: "함께 정할 약속", ask: "두 사람이 같이 정해 두면 좋은 약속 · 순서 · 신호 — 한쪽이 아니라 둘이 함께 하는 것" },
 ];
 
 /** 글자 · 문장 · 개수 한도 — 지시문 · 검사 · 모의 작성기가 모두 이 값을 쓴다 */
 export const COMPAT_LIMITS = {
-  headline: { min: 10, max: 40 },
-  sectionHeadline: { min: 8, max: 30 },
-  paragraph: { min: 60, max: 300, sentencesMax: 3 },
+  headline: { min: 10, max: 46 },
+  sectionHeadline: { min: 8, max: 38 },
+  /** 명리 풀이를 충분히 쓰도록 문단을 조금 넓혔다(한 문단 4문장 · 360자) */
+  paragraph: { min: 60, max: 360, sentencesMax: 4 },
   /** 행동 묶음마다 개수 · 글자 수 — say는 서로에게 건넬 짧은 말 한 문장 */
   steps: { perGroup: { min: 1, max: 2 }, titleMin: 6, titleMax: 30, detailMin: 20, detailMax: 220, sayMin: 8, sayMax: 50 },
-  /** 같은 근거 ID를 쓸 수 있는 영역 수 — 한 근거가 모든 영역을 끌고 가지 않게 */
-  evidenceReuseMax: 3,
-  /** 한 문단에 쓸 수 있는 서로 다른 사주 용어 수 */
-  termsPerParagraphMax: 2,
+  /** 7번 장의 추천 질문 — 서로에게 물어보면 좋은 질문(상대의 속마음을 단정하지 않는다) */
+  questions: { min: 2, max: 3, textMin: 12, textMax: 60 },
+  /** 같은 근거 ID를 쓸 수 있는 장 수 — 장이 일곱이라 넓혔다(한 근거가 거의 모든 장을 끌고 가는 경우만 걸러낸다). 같은 명리 근거가 여러 장에서 쓰여도 장마다 새로운 해석이면 허용하고(운영자 2026-10-17), 새 정보 없이 되풀이하는지는 사람이 읽고 판단한다 */
+  evidenceReuseMax: 5,
+  /** 사주 용어 한도 — 명리 풀이가 이 상품의 내용이라 사주 중심 개인 리포트(story-7)와 같은 한도로 넓혔다(설명 없는 용어 · 근거 없는 판정은 그대로 막는다, terms.ts) */
+  terms: { perSentenceMax: 3, perParagraphMax: 4, firstParagraphMax: 2 },
 } as const;
 
-/** 근거 목록에 두 사람의 시기(compat.timing.*)가 있는가 — 있으면 timing 영역을 써야 하고 없으면 쓰지 않는다 */
+/** 근거 목록에 두 사람의 시기(compat.timing.*)가 있는가 — 있으면 5번 장이 한 문단으로 쓰고 없으면 시기를 말하지 않는다 */
 export const hasTimingEvidence = (evidence: { id: string; uncertain?: boolean }[]): boolean => evidence.some((e) => e.id.startsWith("compat.timing.") && !e.uncertain);
 
-/** 이번 근거로 써야 하는 영역 — 시기 근거가 없으면 timing을 뺀 다섯 개 */
-export const sectionsFor = (evidence: { id: string; uncertain?: boolean }[]): CompatSectionPlan[] => COMPAT_SECTIONS.filter((s) => !s.optional || hasTimingEvidence(evidence));
+/** 이번 근거로 써야 하는 사주 궁합의 장 — 근거와 상관없이 여섯 장 */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 이전 구성과 같은 호출 모양을 유지한다(근거에 따라 장이 바뀌지 않는다)
+export const sectionsFor = (_evidence: { id: string; uncertain?: boolean }[] = []): CompatSectionPlan[] => COMPAT_SECTIONS;
 
 /** 코드가 채우는 고정 안내 — AI가 쓰지 않는다 */
 export const COMPAT_NOTES = {
@@ -148,9 +157,11 @@ export const COMPAT_NOTES = {
   page: "사주 궁합은 두 사람의 출생정보에서 전통 사주 해석을 단순화한 규칙으로 읽은 참고 콘텐츠입니다. 두 사람의 실제 성격이나 마음, 관계의 결과를 알려 주지 않으며 어떤 일이 일어난다는 예측이 아닙니다.",
   rule: "궁합 규칙은 전통 해석을 단순화한 초안이며 전문가 검토 전입니다. 일상에서 실제로 어떻게 나타나는지는 확인하지 못했습니다.",
   noResponses: "이 풀이는 두 사람의 사주만 봤어요. 두 사람이 각자 답한 성격 · 기질 · 애착은 쓰지 않았어요(그 비교는 리포트 궁합이 맡아요).",
-  /** 시기 영역을 쓴 경우 */
+  /** 시기 문단을 쓴 경우 */
   timingUsed: "시기 풀이는 두 사람 각자의 대운 · 세운 계산 결과를 일간 기준으로 읽어 나란히 놓은 것이에요. 관계가 좋아지거나 나빠지는 때, 추천 날짜, 두 시기가 맞물리는 해는 계산하지 않았어요.",
   /** 시기 근거를 만들지 못한 경우(성별 입력이 없는 등) */
   timingMissing: "두 사람의 시기(대운)는 성별 입력이 없는 등의 이유로 계산하지 못해 이번 풀이에서 뺐어요.",
   noInnerMind: "상대가 무슨 마음인지, 두 사람의 관계가 어떻게 될지는 이 풀이로 알 수 없어요.",
+  /** 가족 · 자녀 인연은 계산하지 않았다 — 7개 대주제 구성에 있는 항목이지만 근거 없이 쓰지 않았다는 것을 밝힌다(5번 장 아래) */
+  noFamilyChild: "가족 · 자녀 인연은 계산하지 않았어요. 월지 · 년지 사이의 합 · 충을 가족 · 생활 환경 쪽 기준이 맞닿는지 부딪히는지로만 읽었어요.",
 } as const;

@@ -23,6 +23,7 @@ import type { CompatReport, PairReport } from "../compat/types.ts";
 import { createCompatWriter } from "../compat/writer.ts";
 import { compatOf } from "../../saju/interpret/compat.ts";
 import { compatTimingOf } from "../../saju/interpret/compat-timing.ts";
+import { compatExtraEvidence } from "../../saju/interpret/compat-extra.ts";
 import { assembleReading } from "../reading/assemble.ts";
 import { assembleStory, storyDepthSource } from "../reading/story-assemble.ts";
 import { STORY_FORMAT } from "../reading/story-plan.ts";
@@ -168,7 +169,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
     async generateCompat(input: CompatInput, ctx: GenerateContext = {}): Promise<CompatReport> {
       const ref = input.reference ?? seoulYm(now());
       const result = compatOf(input.a, input.b);
-      const evidence = [...result.evidence, ...compatTimingOf(input.a, input.b, { year: ref.year, month: ref.month }).evidence];
+      const evidence = [...result.evidence, ...compatExtraEvidence(input.a, input.b, result), ...compatTimingOf(input.a, input.b, { year: ref.year, month: ref.month }).evidence];
       const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep });
       const draft = await writer.write({ evidence, cautions: result.cautions }, ctx);
       return assembleCompatReport(draft, result, input.names, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" });
@@ -181,7 +182,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const ref = input.reference ?? seoulYm(now());
       const result = compatOf(input.a.saju, input.b.saju);
       const pairs = pairEvidenceOf({ summary: input.a.summary, mbti: input.a.knownMbti }, { summary: input.b.summary, mbti: input.b.knownMbti });
-      const evidence = [...result.evidence, ...compatTimingOf(input.a.saju, input.b.saju, { year: ref.year, month: ref.month }).evidence, ...pairs.evidence];
+      const evidence = [...result.evidence, ...compatExtraEvidence(input.a.saju, input.b.saju, result), ...compatTimingOf(input.a.saju, input.b.saju, { year: ref.year, month: ref.month }).evidence, ...pairs.evidence];
       const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep, mode: "pair" });
       const draft = await writer.write({ evidence, cautions: result.cautions }, ctx);
       return assemblePairReport(draft, result, { labels: pairs.comparedLabels, skipped: pairs.unclear.length }, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" });

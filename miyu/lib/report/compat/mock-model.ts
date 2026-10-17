@@ -1,10 +1,12 @@
 // 사주 궁합 리포트의 모의 작성기 — 실제 AI를 부르지 않고, 받은 근거 목록의 ID로 형식 검사를 통과하는 초안을 만든다.
 // 단위 테스트와 개발용 화면(/dev/compat)에서만 쓴다. 문장은 근거를 풀어 쓴 글이 아니라 자리 표시이며 "[모의 생성]"이 붙는다 — 판매할 수 없는 글이다.
-// 근거 목록에 compat.timing.*이 있으면 timing 영역까지, 없으면 다섯 영역만 만든다(검사와 같은 규칙). 리포트 궁합(payload.mode가 pair)은 비교한 응답 근거(pair.*)가 있을 때 응답 영역을 더한다.
+// 사주 궁합은 6번(view)을 뺀 여섯 장, 리포트 궁합(payload.mode가 pair)은 일곱 장을 모두 만든다(검사와 같은 규칙). 근거 목록에 compat.timing.* · compat.fortify · compat.chart · pair.*가 있으면 맡은 장이 그 근거를 단다.
+import { compatFortifyElementsOf } from "../../saju/interpret/compat-extra.ts";
+import { ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
 import { COMPAT_STEP_GROUPS, pairSectionsFor, sectionsFor } from "./plan.ts";
 import type { CompatDraftV1, CompatStepDraft } from "./types.ts";
 
-type MockPayload = { mode?: string; evidence: { id: string; uncertain?: boolean }[] };
+type MockPayload = { mode?: string; evidence: { id: string; fact: string; uncertain?: boolean }[] };
 
 const M = "[모의 생성]";
 
@@ -52,16 +54,27 @@ export function composeMockCompat(userMessage: string): CompatDraftV1 {
   const pair = payload.mode === "pair";
   const timingIds = usable.filter((id) => id.startsWith("compat.timing."));
   const pairIds = usable.filter((id) => id.startsWith("pair.") && id !== "pair.mbti");
-  const baseIds = usable.filter((id) => !id.startsWith("compat.timing.") && !id.startsWith("pair."));
+  const baseIds = usable.filter((id) => !id.startsWith("compat.timing.") && !id.startsWith("pair.") && id !== "compat.chart" && id !== "compat.fortify");
+  const hasChart = usable.includes("compat.chart");
+  const hasFortify = usable.includes("compat.fortify");
   const pick = (i: number, n = 2) => Array.from({ length: n }, (_, k) => baseIds[(i + k) % baseIds.length]);
 
   let next = 0; // 문단마다 서로 다른 자리 표시 문장 둘을 이어 쓴다(풀이 34문장 = 문단 17개까지 겹치지 않는다)
+  // 개운 문단 자리 — 근거(compat.fortify)에 적힌 보완 후보 기운의 대응(방향 · 색 · 숫자 · 장소)을 그대로 옮긴 자리 표시(실제 AI가 이 자리를 풀어 쓴다)
+  const fortuneElement = compatFortifyElementsOf(payload.evidence.map((e) => ({ id: e.id, fact: e.fact, uncertain: e.uncertain })))[0];
+  const ff = fortuneElement ? ELEMENT_FORTUNE[fortuneElement] : null;
+  const fortuneText = ff ? `${M} 개운 문단 자리예요. 방향은 ${ff.direction}, 색은 ${ff.colors[0]}, 숫자는 ${ff.numbers[0]}과 ${ff.numbers[1]}, 장소는 ${ff.places[0]}처럼 실제 AI가 근거를 읽고 풀어 써요.` : null;
   const sections = (pair ? pairSectionsFor(payload.evidence) : sectionsFor(payload.evidence)).map((plan, i) => ({
     id: plan.id,
     headline: `모의 결론 ${i + 1}번째 자리예요`,
-    // 자리 표시 글이라도 같은 문장 틀이 영역마다 되풀이되지 않게(검사의 구절 되풀이 · 같은 말로 여는 문단) 문단마다 서로 다른 자리 표시 문장을 쓴다
-    paragraphs: Array.from({ length: plan.paragraphs.min }, () => `${filler(next++)} ${filler(next++)} ${M}`),
-    evidence: plan.id === "timing" ? timingIds : plan.id === "response" ? pairIds : pick(i),
+    // 자리 표시 글이라도 같은 문장 틀이 영역마다 되풀이되지 않게 문단마다 서로 다른 자리 표시 문장을 쓴다
+    paragraphs: plan.id === "advice" && fortuneText ? [fortuneText] : Array.from({ length: plan.paragraphs.min }, () => `${filler(next++)} ${filler(next++)} ${M}`),
+    evidence:
+      plan.id === "harmony" ? [...(hasChart ? ["compat.chart"] : []), ...pick(i, 1)]
+      : plan.id === "love" ? [...pick(i, 1), ...timingIds.slice(0, 1)]
+      : plan.id === "view" ? [...(pairIds.length ? pairIds : []), ...pick(i, 1)]
+      : plan.id === "advice" ? [...(hasFortify ? ["compat.fortify"] : []), ...pick(i, 1)]
+      : pick(i),
   }));
 
   const stepBodies: Record<string, { title: string; detail: string; say: string }> = {
@@ -77,5 +90,6 @@ export function composeMockCompat(userMessage: string): CompatDraftV1 {
     headline: `${M} 두 사람의 근거 안에서 쓴 풀이 초안`,
     sections,
     steps,
+    questions: [`${M} 요즘 어떤 방식이 서로에게 편한지 물어봐 줄래요?`, `${M} 함께 정해 두면 좋을 약속이 있을까요?`],
   };
 }

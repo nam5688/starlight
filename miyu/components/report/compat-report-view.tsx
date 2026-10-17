@@ -26,7 +26,7 @@ function stepOwner(id: CompatStepGroupId, viewer: "a" | "b" | null | undefined):
 }
 
 /**
- * 사주 궁합 리포트(유료 · 아직 판매하지 않음) 화면 — 위쪽의 커플 유형 · 궁합 지수 · 핵심 한 줄은 무료 간단 궁합과 같은 엔진 결과(코드가 채움)이고, 아래 풀이만 AI가 쓴 본문이다.
+ * 사주 궁합 리포트(유료 · 아직 판매하지 않음) 화면 — 위쪽의 커플 유형 · 궁합 지수 · 핵심 한 줄은 무료 간단 궁합과 같은 엔진 결과(코드가 채움)이고, 아래 풀이(7개 대주제 — 사주 궁합은 6번을 뺀 여섯 장)와 추천 질문만 AI가 쓴 본문이다.
  * 지금은 개발용 화면(/dev/compat)에서만 쓴다. 모의 작성기의 자리 표시 글(report.placeholder)이면 그렇다고 표시한다.
  */
 export function CompatReportView({ report, viewer }: { report: CompatReport | PairReport; viewer?: "a" | "b" | null }) {
@@ -116,6 +116,18 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
             </div>
           ))}
         </div>
+        {report.questions && report.questions.length > 0 && (
+          <div className="mt-5 border-t border-line pt-5">
+            <p className="text-[13px] font-semibold text-accent">서로에게 물어보면 좋은 질문</p>
+            <ul className="mt-2 space-y-2 text-[15px] leading-[1.7] text-ink-2">
+              {report.questions.map((q) => (
+                <li key={q} className="rounded-xl bg-accent-soft px-3 py-2 text-accent-strong">
+                  {q}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">

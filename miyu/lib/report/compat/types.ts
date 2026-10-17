@@ -7,9 +7,11 @@ export type CompatStepDraft = { title: string; detail: string; say: string; evid
 /** AI가 쓰는 본문 — 근거 ID는 compat.* 목록 안에서만 고른다. 두 사람은 "A님" · "B님"으로만 부른다(이름은 조립할 때 코드가 바꿔 넣는다) */
 export type CompatDraftV1 = {
   headline: string;
-  /** 영역 다섯 개 + 근거에 시기(compat.timing.*)가 있으면 timing — 정해진 순서 */
+  /** 7개 대주제 — 사주 궁합은 6번(view)을 뺀 여섯 장, 리포트 궁합은 일곱 장, 정해진 순서 */
   sections: { id: CompatSectionId; headline: string; paragraphs: string[]; evidence: string[] }[];
   steps: Record<CompatStepGroupId, CompatStepDraft[]>;
+  /** 7번 장의 추천 질문 — 서로에게 물어보면 좋은 질문 2~3개 */
+  questions: string[];
 };
 
 export type CompatStep = { title: string; detail: string; say: string };
@@ -34,6 +36,8 @@ export type CompatReport = {
   headline: string;
   sections: { id: CompatSectionId; topic: string; headline: string; paragraphs: string[] }[];
   steps: Record<CompatStepGroupId, CompatStep[]>;
+  /** 서로에게 물어보면 좋은 추천 질문(7번 장) — 2026-10-17 구성 이전에 저장된 글에는 없을 수 있다 */
+  questions?: string[];
   /** 계산 · 안내 — 코드가 채운다 */
   notes: { cautions: string[]; items: string[]; page: string };
   /** 모의 작성기의 자리 표시 글이면 true — 판매할 수 없다 */

@@ -1,10 +1,11 @@
 // 개발용 — 사주 궁합 리포트(compat-v1)를 가상 인물 세 쌍으로 읽는다. 공개 배포에서는 쓰지 않는다(화면이 production에서 notFound).
-// 글은 두 가지다: ① docs/samples/compat-v1-proxy/prompt-0.3/<쌍>-first-response.json — 시험용 대리 작성기(AI 하위 작업자)가 지시문 0.3과 근거만으로 쓴 글. 읽을 때마다 제품 검사를 다시 거쳐 통과하지 못하면 보여 주지 않고 이유를 알린다.
+// 글은 두 가지다: ① docs/samples/compat-v1-proxy/prompt-0.5/<쌍>-first-response.json — 시험용 대리 작성기(AI 하위 작업자)가 지시문 0.5(7개 대주제 중 6번을 뺀 여섯 장)와 근거만으로 쓴 글(아직 없다 — 이전 구성의 0.3 · 0.4 글은 새 구성의 검사를 통과하지 못해 보관만 한다). 읽을 때마다 제품 검사를 다시 거쳐 통과하지 못하면 보여 주지 않고 이유를 알린다.
 // ② 저장된 글이 없으면 모의 작성기의 자리 표시 글("판매할 수 없는 글"). 실제 서비스 AI는 한 번도 부르지 않았다. 입력은 가상 인물이며 아무것도 저장하지 않는다.
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { calculateSaju } from "@/lib/saju/manseryeok-engine";
 import { compatOf } from "@/lib/saju/interpret/compat";
+import { compatExtraEvidence } from "@/lib/saju/interpret/compat-extra";
 import { compatTimingOf } from "@/lib/saju/interpret/compat-timing";
 import type { SajuOk } from "@/lib/saju/engine";
 import { assembleCompatReport } from "@/lib/report/compat/assemble";
@@ -39,12 +40,12 @@ export async function devCompatView(id: string): Promise<DevCompatView | null> {
   const sa = sajuOf(pair.a);
   const sb = sajuOf(pair.b);
   const result = compatOf(sa, sb);
-  // 두 사람의 시기 근거(compat-timing.ts)까지 더한 목록이 AI에게 가는 근거다
-  const evidence = [...result.evidence, ...compatTimingOf(sa, sb, DEV_REFERENCE).evidence];
+  // 두 사람의 오행 분포 · 개운(compat-extra.ts)과 시기 근거(compat-timing.ts)까지 더한 목록이 AI에게 가는 근거다
+  const evidence = [...result.evidence, ...compatExtraEvidence(sa, sb, result), ...compatTimingOf(sa, sb, DEV_REFERENCE).evidence];
   const at = new Date().toISOString();
   let raw: unknown = null;
   try {
-    raw = JSON.parse(await readFile(join(process.cwd(), "docs", "samples", "compat-v1-proxy", "prompt-0.3", `${id}-first-response.json`), "utf8"));
+    raw = JSON.parse(await readFile(join(process.cwd(), "docs", "samples", "compat-v1-proxy", "prompt-0.5", `${id}-first-response.json`), "utf8"));
   } catch {
     raw = null;
   }

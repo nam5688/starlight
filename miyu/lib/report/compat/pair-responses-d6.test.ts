@@ -9,6 +9,7 @@ import { createAiReportGenerator } from "../ai/generator.ts";
 import { createMockModel } from "../ai/mock-model.ts";
 import type { ModelRequest, ModelResult, TextModel } from "../ai/model.ts";
 import { compatOf } from "../../saju/interpret/compat.ts";
+import { compatExtraEvidence } from "../../saju/interpret/compat-extra.ts";
 import { compatTimingOf } from "../../saju/interpret/compat-timing.ts";
 import type { SajuOk } from "../../saju/engine.ts";
 import type { PairInput, PairPerson } from "../generator.ts";
@@ -25,7 +26,8 @@ const REF = { year: 2026, month: 10 };
 const responses = (p: PairPerson) => ({ summary: p.summary, mbti: p.knownMbti });
 const evidenceOf = (a: PairPerson, b: PairPerson) => {
   const pairs = pairEvidenceOf(responses(a), responses(b));
-  return { pairs, all: [...compatOf(a.saju, b.saju).evidence, ...compatTimingOf(a.saju, b.saju, REF).evidence, ...pairs.evidence] };
+  const r = compatOf(a.saju, b.saju);
+  return { pairs, all: [...r.evidence, ...compatExtraEvidence(a.saju, b.saju, r), ...compatTimingOf(a.saju, b.saju, REF).evidence, ...pairs.evidence] };
 };
 
 /** 생성기에 실제로 가는 요청과 모델이 돌려준 글을 그대로 받아 두는 모델 */
@@ -60,8 +62,9 @@ test("D6: 저장된 두 사람의 응답에서 읽힌 영역이 AI 요청에 그
     assert.match(e.fact, /A님의 응답에서 나타난 경향은 "[^"]+", B님은 "[^"]+"/, e.id);
     assert.match(e.fact, /같은 쪽|서로 다른 쪽/, `${e.id}: 공통점 · 차이가 분명하다`);
   }
-  // 글 쪽: 응답 영역 · A님→B님 · B님→A님 · 함께 세 묶음이 만들어진다
-  assert.ok(report.sections.some((s) => s.id === "response"), "응답 영역이 있다");
+  // 글 쪽: 6번 장(서로에게 어떤 사람일까?) · A님→B님 · B님→A님 · 함께 세 묶음이 만들어진다
+  assert.equal(report.sections.length, 7, "일곱 장");
+  assert.ok(report.sections.some((s) => s.id === "view"), "6번 장이 있다");
   assert.deepEqual(Object.keys(report.steps).sort(), ["aToB", "bToA", "together"]);
   // 이름 · 생년월일 · 점수 숫자는 AI에 가지 않는다
   assert.ok(!/\d+\s*점/.test(seen[0]!.user), "요청에 점수 숫자가 없다");
@@ -88,7 +91,7 @@ test("D6: 답이 달라지면 근거가 달라지고(같은 쪽 ↔ 서로 다�
   for (const other of before.compared.filter((x) => x !== id)) assert.equal(pick(after, other).fact, pick(before, other).fact, `${other}: 바꾸지 않은 영역의 근거는 그대로다`);
 });
 
-test("D6: 뚜렷하게 답하지 않은 영역은 비교하지도 지어내지도 않고, 비교할 영역이 하나도 없으면 응답 영역을 요청하지 않는다", async () => {
+test("D6: 뚜렷하게 답하지 않은 영역은 비교하지도 지어내지도 않고, 비교할 영역이 하나도 없으면 6번 장은 사주만으로 쓴다(응답 근거를 요구하지 않는다)", async () => {
   const a = person(0);
   const b = person(1);
   const base = pairEvidenceOf(responses(a), responses(b));
@@ -100,15 +103,16 @@ test("D6: 뚜렷하게 답하지 않은 영역은 비교하지도 지어내지�
   assert.ok(!partial.compared.includes(target), "가운데로 답한 영역은 비교하지 않는다");
   assert.ok(partial.unclear.includes(target), "한쪽만 뚜렷하면 '비교하지 않은 영역'으로 센다");
   assert.ok(!partial.evidence.some((e) => e.id === `pair.${target}`));
-  // 한 사람의 모든 응답이 뚜렷하지 않다면 응답 근거는 없고(입력한 MBTI 비교만 남을 수 있다) 응답 영역은 요청하지 않는다
+  // 한 사람의 모든 응답이 뚜렷하지 않다면 응답 근거는 없고(입력한 MBTI 비교만 남을 수 있다) 6번 장은 응답 근거를 요구받지 않는다
   for (const r of rowsB) r.score = 50;
   const none = pairEvidenceOf(responses(a), responses(b));
   assert.deepEqual(none.compared, []);
   assert.ok(!none.evidence.some((e) => e.id.startsWith("pair.") && e.id !== "pair.mbti"));
-  assert.ok(!pairSectionsFor(evidenceOf(a, b).all.filter((e) => !e.id.startsWith("pair.") || e.id === "pair.mbti")).some((s) => s.id === "response"), "비교할 응답이 없으면 응답 영역은 없다");
-  // 그래도 생성은 사주 중심으로 끝까지 되고, 안내문은 코드가 채운다
+  const noPair = evidenceOf(a, b).all.filter((e) => !e.id.startsWith("pair.") || e.id === "pair.mbti");
+  assert.equal(pairSectionsFor(noPair).length, 7, "장은 늘 일곱 개 — 6번은 비교한 응답이 없으면 사주만으로 쓴다");
+  // 그래도 생성은 사주 중심으로 끝까지 되고(6번 장 포함), 안내문은 코드가 채운다
   const { report } = await generateRecorded({ a, b, reference: REF });
-  assert.ok(!report.sections.some((s) => s.id === "response"));
+  assert.ok(report.sections.some((s) => s.id === "view"));
 });
 
 test("D6: 두 사람이 모두 뚜렷하게 답한 영역이 같은 쪽이 하나도 없으면 공통점 근거도 없다 — 공통점은 같은 쪽 영역에서만 말할 수 있다", () => {
@@ -127,14 +131,14 @@ test("D6: 응답 풀이 문구를 그대로 옮긴 글(재진술)은 한도를 �
   const b = person(1);
   const { all } = evidenceOf(a, b);
   const copied = [
-    { where: "sections.response.paragraphs[0]", text: "A님은 다른 사람의 반응과 인정에 크게 영향을 받습니다, 두 분은 서로 달라요." },
-    { where: "sections.response.paragraphs[1]", text: "B님은 가까워지고 기대는 것이 비교적 편합니다, 그래서 거리 두는 날에 놀라요." },
+    { where: "sections.view.paragraphs[0]", text: "A님은 다른 사람의 반응과 인정에 크게 영향을 받습니다, 두 분은 서로 달라요." },
+    { where: "sections.view.paragraphs[1]", text: "B님은 가까워지고 기대는 것이 비교적 편합니다, 그래서 거리 두는 날에 놀라요." },
   ];
   assert.equal(echoedMeaningsIn(copied, all).length, 2);
   assert.ok(echoedMeaningsIn(copied, all).length > PAIR_MEANING_ECHO_MAX);
   const rewritten = [
-    { where: "sections.response.paragraphs[0]", text: "A님은 칭찬이든 무반응이든 상대의 한마디가 하루 기분을 크게 바꾸기 쉬운 쪽이고, B님은 같은 말에도 한 발 떨어져 듣는 편이에요." },
-    { where: "sections.response.paragraphs[1]", text: "연락이 뜸한 날 A님은 혼자 시간을 더 챙기고 싶고, B님은 오히려 가까이 붙어 있고 싶어지는 방향으로 움직이기 쉬워요." },
+    { where: "sections.view.paragraphs[0]", text: "A님은 칭찬이든 무반응이든 상대의 한마디가 하루 기분을 크게 바꾸기 쉬운 쪽이고, B님은 같은 말에도 한 발 떨어져 듣는 편이에요." },
+    { where: "sections.view.paragraphs[1]", text: "연락이 뜸한 날 A님은 혼자 시간을 더 챙기고 싶고, B님은 오히려 가까이 붙어 있고 싶어지는 방향으로 움직이기 쉬워요." },
   ];
   assert.equal(echoedMeaningsIn(rewritten, all).length, 0);
   // 한 번쯤은 허용한다
@@ -156,7 +160,7 @@ test("D6: 모의 글에서 시작해, 응답 재진술 · 애착 유형 이름 �
     return r.ok ? [] : r.errors;
   };
   const has = (errors: string[], word: string) => assert.ok(errors.some((e) => e.includes(word)), `${word} ← ${errors.slice(0, 2).join(" | ")}`);
-  const response = (d: typeof raw) => d.sections.find((s: { id: string }) => s.id === "response");
+  const response = (d: typeof raw) => d.sections.find((s: { id: string }) => s.id === "view");
   // 1) 응답을 읽어 주는 말투
   has(mutate((d) => (response(d).paragraphs[0] += " A님은 불안이 높다고 답하셨어요.")), "답");
   // 2) 애착 유형 이름
@@ -167,6 +171,6 @@ test("D6: 모의 글에서 시작해, 응답 재진술 · 애착 유형 이름 �
   has(mutate((d) => response(d).evidence.push(`pair.${unanswered}`)), "없는 근거 ID");
   // 4) 입력받지 않은 사건 단정
   has(mutate((d) => (response(d).paragraphs[1] += " 두 분은 지난달에 크게 다퉜어요.")), "사건");
-  // 5) 응답 영역이 입력한 MBTI 비교만 근거로 삼음
-  has(mutate((d) => (response(d).evidence = ["pair.mbti"])), "응답 영역");
+  // 5) 6번 장이 입력한 MBTI 비교만 근거로 삼음
+  has(mutate((d) => (response(d).evidence = ["pair.mbti"])), "6번 장");
 });

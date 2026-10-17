@@ -6,7 +6,9 @@ import { test } from "node:test";
 import { calculateSaju } from "../../saju/manseryeok-engine.ts";
 import { compatOf } from "../../saju/interpret/compat.ts";
 import { compatTimingOf } from "../../saju/interpret/compat-timing.ts";
-import { COMPAT_OPENER_MAX, repeatedOpeners, TIMING_VERDICT, unfoundedEventIn, validateCompatDraft } from "./validate.ts";
+import { findRepeatedPhrasesIn } from "../reading/repeat.ts";
+import type { CompatDraftV1 } from "./types.ts";
+import { COMPAT_OPENER_MAX, COMPAT_REPEAT_MAX, repeatedOpeners, TIMING_VERDICT, unfoundedEventIn, validateCompatDraft, visibleCompatTexts } from "./validate.ts";
 
 type Birth = [number, number, number, string | null];
 const PAIRS: Record<string, [Birth, Birth]> = {
@@ -38,7 +40,7 @@ test("시기에 좋고 나쁨을 매기거나 한쪽 시기가 더 낫다고 쓴
   for (const t of ["두 분이 지나는 시기의 주제가 서로 달라서 같은 일을 다르게 느낄 수 있어요.", "A님은 관계를 정리하는 쪽, B님은 새로 시작하는 쪽 주제가 겹쳐 읽혀요."]) assert.ok(!TIMING_VERDICT.test(t), t);
 });
 
-test("같은 다섯 글자로 여는 문단이 한도를 넘으면 걸린다", () => {
+test("같은 다섯 글자로 여는 문단이 지표 한도를 넘으면 세어진다(저장을 막지는 않는다)", () => {
   const same = Array.from({ length: COMPAT_OPENER_MAX + 1 }, (_, i) => ({ where: `sections.fit.paragraphs[${i}]`, text: `두 분이 함께 있을 때 ${i}번째 장면이에요.` }));
   assert.equal(repeatedOpeners(same).length, 1);
   assert.equal(repeatedOpeners(same.slice(0, COMPAT_OPENER_MAX)).length, 0);
@@ -48,18 +50,17 @@ test("같은 다섯 글자로 여는 문단이 한도를 넘으면 걸린다", (
   assert.equal(repeatedOpeners(same.map((x) => ({ ...x, where: "headline" }))).length, 0);
 });
 
-test("저장된 대리 작성기 글(prompt-0.3)에 강화한 검사를 적용하면 C1 · C2는 구절 되풀이로 걸리고 C3만 통과한다 — 사후 수정의 기록", () => {
-  const c1 = check("C1");
-  const c2 = check("C2");
-  const c3 = check("C3");
-  assert.equal(c1.ok, false);
-  assert.equal(c2.ok, false);
-  if (!c1.ok) assert.ok(c1.errors.some((e) => e.includes("되풀이")), "C1의 이유는 구절 되풀이");
-  if (!c2.ok) assert.ok(c2.errors.some((e) => e.includes("되풀이")), "C2의 이유는 구절 되풀이");
-  // 미유 문체 검사(2026-10-17)를 더한 뒤: C3의 구절 되풀이 검사 결과는 그대로이고, 건넬 말 속의 "당신"(문체 검사의 호칭 규칙) 한 곳에만 걸린다 — 저장된 글은 고치지 않았다
-  assert.equal(c3.ok, false);
-  if (!c3.ok) {
-    assert.ok(c3.errors.every((e) => e.includes("당신 · 귀하")), "C3의 이유는 문체 검사의 호칭 규칙뿐");
-    assert.ok(!c3.errors.some((e) => e.includes("되풀이")));
+test("저장된 대리 작성기 글(prompt-0.3)은 새 구성(7개 대주제)에서는 저장하지 않지만 — 구절 되풀이는 이제 저장을 막지 않고 지표로만 센다(운영자 2026-10-17)", () => {
+  // 0.3의 글은 영역 id가 달라(express · long · timing) 새 구성의 검사를 통과하지 않는다 — 저장된 적 없는 대리 작성기 글이라 호환할 것이 없다
+  for (const id of ["C1", "C2", "C3"] as const) {
+    const v = check(id);
+    assert.equal(v.ok, false, id);
+    if (!v.ok) assert.ok(v.errors.some((e) => e.includes("순서로 6개")), `${id}: 구성이 달라 걸린다`);
+    assert.ok(!(!v.ok && v.errors.some((e) => e.includes("되풀이돼요"))), `${id}: 구절 되풀이는 오류가 아니다`);
   }
+  // 12자 이상의 같은 구절이 되풀이된 정도는 읽기 전 지표로 남는다(C1 · C2는 한도를 넘고 C3는 넘지 않는다 — 측정한 사실)
+  const repeats = (id: keyof typeof PAIRS) => findRepeatedPhrasesIn(visibleCompatTexts(JSON.parse(readFileSync(new URL(`../../../docs/samples/compat-v1-proxy/prompt-0.3/${id}-first-response.json`, import.meta.url), "utf8")) as CompatDraftV1)).length;
+  assert.ok(repeats("C1") > COMPAT_REPEAT_MAX);
+  assert.ok(repeats("C2") > COMPAT_REPEAT_MAX);
+  assert.ok(repeats("C3") <= COMPAT_REPEAT_MAX);
 });

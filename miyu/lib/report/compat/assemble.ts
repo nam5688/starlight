@@ -1,7 +1,7 @@
 // 사주 궁합 리포트 조립 — AI가 쓴 본문(CompatDraftV1)에 코드가 계산한 부분(커플 유형 · 궁합 지수 · 계산 재료 · 안내)을 더해 저장 형식(CompatReport)으로 만든다.
 // 요약은 무료 간단 궁합이 쓰는 같은 함수(cardOf)로 같은 결과에서 만들어, 무료에서 본 커플 유형 · 지수와 유료 풀이의 위쪽이 어긋나지 않는다.
 // 본문의 "A님 · B님"은 이때 실제 이름(또는 "나 · 상대")으로 바꿔 넣는다. 이름 · 생년월일 원문은 AI에 보내지 않았다.
-// 시기 영역(timing)은 초안에 있을 때만 조립하고, 안내는 시기를 쓴 경우 / 쓰지 못한 경우를 나눠 코드가 채운다.
+// 시기는 5번 장(love)이 시기 근거(compat.timing.*)를 인용했을 때만 쓴 것으로 보고, 안내는 시기를 쓴 경우 / 쓰지 못한 경우를 나눠 코드가 채운다. 가족 · 자녀 인연은 계산하지 않았다는 안내도 코드가 붙인다.
 import { cardOf } from "../../compat/simple.ts";
 import type { CompatResult } from "../../saju/interpret/compat.ts";
 import { COMPAT_NOTES, COMPAT_PROMPT_VERSION, COMPAT_REPORT_KIND, COMPAT_SECTIONS, COMPAT_STEP_GROUPS, PAIR_NOTES, PAIR_PROMPT_VERSION, PAIR_REPORT_KIND, PAIR_SECTIONS } from "./plan.ts";
@@ -14,6 +14,9 @@ export function nameText(text: string, names: { a: string; b: string }): string 
   return text.replace(/A님/g, `${names.a} 님`).replace(/B님/g, `${names.b} 님`);
 }
 
+/** 5번 장(연애와 결혼 궁합)이 시기 근거(compat.timing.*)를 인용했는가 — 시기 문단을 쓴 것으로 본다 */
+const usedTiming = (draft: CompatDraftV1): boolean => draft.sections.some((s) => s.id === "love" && s.evidence.some((id) => id.startsWith("compat.timing.")));
+
 export function assembleCompatReport(draft: CompatDraftV1, result: CompatResult, names: { a: string; b: string }, meta: CompatAssembleMeta): CompatReport {
   const card = cardOf(result, names);
   const n = (t: string) => nameText(t, names);
@@ -21,7 +24,7 @@ export function assembleCompatReport(draft: CompatDraftV1, result: CompatResult,
     const s = draft.sections.find((x) => x.id === plan.id);
     return s ? [{ id: plan.id, topic: plan.topic, headline: n(s.headline), paragraphs: s.paragraphs.map(n) }] : [];
   });
-  const hasTiming = sections.some((s) => s.id === "timing");
+  const hasTiming = usedTiming(draft);
   const steps = Object.fromEntries(
     COMPAT_STEP_GROUPS.map((g) => [g.id, draft.steps[g.id].map((a): CompatStep => ({ title: n(a.title), detail: n(a.detail), say: n(a.say) }))]),
   ) as CompatReport["steps"];
@@ -43,9 +46,10 @@ export function assembleCompatReport(draft: CompatDraftV1, result: CompatResult,
     headline: n(draft.headline),
     sections,
     steps,
+    questions: draft.questions.map(n),
     notes: {
       cautions: card.cautions,
-      items: [COMPAT_NOTES.noResponses, hasTiming ? COMPAT_NOTES.timingUsed : COMPAT_NOTES.timingMissing, COMPAT_NOTES.noInnerMind, COMPAT_NOTES.rule],
+      items: [COMPAT_NOTES.noResponses, hasTiming ? COMPAT_NOTES.timingUsed : COMPAT_NOTES.timingMissing, COMPAT_NOTES.noFamilyChild, COMPAT_NOTES.noInnerMind, COMPAT_NOTES.rule],
       page: COMPAT_NOTES.page,
     },
     ...(meta.placeholder ? { placeholder: true as const } : {}),
@@ -64,7 +68,7 @@ export function assemblePairReport(draft: CompatDraftV1, result: CompatResult, c
     const s = draft.sections.find((x) => x.id === plan.id);
     return s ? [{ id: plan.id, topic: plan.topic, headline: s.headline, paragraphs: [...s.paragraphs] }] : [];
   });
-  const hasTiming = sections.some((s) => s.id === "timing");
+  const hasTiming = usedTiming(draft);
   const steps = Object.fromEntries(COMPAT_STEP_GROUPS.map((g) => [g.id, draft.steps[g.id].map((a): CompatStep => ({ title: a.title, detail: a.detail, say: a.say }))])) as PairReport["steps"];
   return {
     kind: PAIR_REPORT_KIND,
@@ -83,6 +87,7 @@ export function assemblePairReport(draft: CompatDraftV1, result: CompatResult, c
     headline: draft.headline,
     sections,
     steps,
+    questions: [...draft.questions],
     response: { comparedLabels: [...compared.labels], skipped: compared.skipped },
     notes: {
       cautions: card.cautions,
@@ -90,6 +95,7 @@ export function assemblePairReport(draft: CompatDraftV1, result: CompatResult, c
         PAIR_NOTES.privacy,
         compared.labels.length === 0 ? PAIR_NOTES.noCompared : compared.skipped > 0 ? PAIR_NOTES.skipped : "",
         hasTiming ? COMPAT_NOTES.timingUsed : COMPAT_NOTES.timingMissing,
+        COMPAT_NOTES.noFamilyChild,
         COMPAT_NOTES.noInnerMind,
         COMPAT_NOTES.rule,
       ].filter((t) => t.length > 0),
