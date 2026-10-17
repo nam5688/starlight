@@ -1,15 +1,16 @@
-// 운영자 본인 입력 실제 AI 시험(story-v1, 2026-10-17) — 이 PC의 22문항 화면(/analyze)에서 운영자가 직접 답한 입력으로 실제 Claude(claude-sonnet-5-5)를 **한 번만** 부른다.
+// 운영자 본인 입력 실제 AI 시험 — 이 PC의 22문항 화면(/analyze)에서 운영자가 직접 답한 입력으로 실제 Claude(claude-sonnet-5-5)를 **한 번만** 부른다.
+// 지시문(--variant): story-7(7개 고정 대주제, 기본 — 승인 단계 story7-own) 또는 story-v1(영역별 이야기 — 승인 단계 story-own, 이미 마침).
 //
 // 지키는 것(코드가 확인하고 어기면 호출하지 않는다):
 //  · 호출은 첫 응답 1회뿐 — 형식 검사에 걸려도 자동으로 고쳐 쓰지 않고(maxRepairs 0), 제공사 일시 오류도 다시 시도하지 않는다(maxRetries 0). 걸린 글은 그대로 저장한다.
-//  · 승인 범위(lib/config/ai-candidates.ts의 story-own): story-v1 지시문 · claude-sonnet-5-5 · 누적 6,000원(--already-spent-krw를 반드시 적는다) · 1회 상한 1,234.04원(재작성까지 가는 최악 비용을 반올림 없이 비교).
-//  · 입력은 이 PC의 pilot-data/own-input 파일뿐 — 운영 DB에 저장하지 않고, 결과 폴더(pilot-data/ai-compare/story-own-…)도 저장소에 올라가지 않는다.
+//  · 승인 범위(lib/config/ai-candidates.ts의 story7-own · story-own): 해당 지시문 · claude-sonnet-5-5 · 누적 6,000원(--already-spent-krw를 반드시 적는다) · 1회 상한 1,234.04원(재작성까지 가는 최악 비용을 반올림 없이 비교).
+//  · 입력은 이 PC의 pilot-data/own-input 파일뿐 — 운영 DB에 저장하지 않고, 결과 폴더(pilot-data/ai-compare/story7-own-… · story-own-…)도 저장소에 올라가지 않는다.
 //  · 키는 .env.local의 ANTHROPIC_API_KEY — 이 스크립트는 값을 출력하지 않는다.
 //
 // 사용 (miyu 폴더, PowerShell):
-//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2468            # 드라이런(호출 없음): 입력 확인 파일 만들기 + 비용 · 승인 범위 점검
-//   node scripts/run-own-story.ts --rehearsal --already-spent-krw 2468                      # 리허설(모의 글 · 키 · 비용 없음): 같은 흐름 · 파일 · 화면을 끝까지 시험
-//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2468 --execute --approved-cap-krw 6000 --approved-on 2026-10-17   # 실제 호출 1회
+//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2636.26            # 드라이런(호출 없음): 입력 확인 파일 만들기 + 비용 · 승인 범위 점검 (기본: --variant story-7)
+//   node scripts/run-own-story.ts --rehearsal --already-spent-krw 2636.26                      # 리허설(모의 글 · 키 · 비용 없음): 같은 흐름 · 파일 · 화면을 끝까지 시험
+//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2636.26 --execute --approved-cap-krw 6000 --approved-on 2026-10-17   # 실제 호출 1회
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AI_CANDIDATES, COMPARE_STAGES } from "../lib/config/ai-candidates.ts";
@@ -19,9 +20,9 @@ import { checkStageRestriction, planStage, runStage } from "../lib/report/ai/com
 import { describeOwnInput, ownPersona, ownReportInput, parseOwnCapture, reviewOwnDraft } from "../lib/report/ai/own-run.ts";
 import { createMockModel } from "../lib/report/ai/mock-model.ts";
 import { isReadingReport } from "../lib/report/generator.ts";
-import { renderStoryDraftMarkdown } from "../lib/report/reading/render-draft.ts";
+import { renderStory7DraftMarkdown, renderStoryDraftMarkdown } from "../lib/report/reading/render-draft.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
-import type { StoryDraftV1 } from "../lib/report/reading/types.ts";
+import type { Story7DraftV1, StoryDraftV1 } from "../lib/report/reading/types.ts";
 import { extractJson } from "../lib/report/ai/generator.ts";
 
 const args = process.argv.slice(2);
@@ -29,7 +30,12 @@ const arg = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1
 const won = (x: number) => `${Math.round(x).toLocaleString("ko-KR")}원`;
 const rehearsal = args.includes("--rehearsal");
 const execute = args.includes("--execute");
-const stage = COMPARE_STAGES.find((s) => s.name === "story-own")!;
+const variant = (arg("--variant") ?? "story-7") as "story-v1" | "story-7";
+if (variant !== "story-v1" && variant !== "story-7") {
+  console.error(`\n중단: --variant 는 story-7 또는 story-v1 이어야 합니다(지금 ${String(variant)}).\n아무것도 호출하지 않았습니다.`);
+  process.exit(1);
+}
+const stage = COMPARE_STAGES.find((s) => s.name === (variant === "story-7" ? "story7-own" : "story-own"))!;
 const candidate = AI_CANDIDATES.find((c) => c.key === "A")!;
 const now = new Date();
 const settings = { fxKrwPerUsd: DEFAULT_FX_KRW_PER_USD, surcharge: DEFAULT_SURCHARGE };
@@ -58,21 +64,21 @@ const persona = ownPersona(built.input);
 const alreadySpent = Number(arg("--already-spent-krw") ?? 0);
 if (!Number.isFinite(alreadySpent) || alreadySpent < 0 || alreadySpent >= stage.capKrw) stop(`--already-spent-krw 는 0 이상, ${stage.capKrw}원 미만의 숫자여야 합니다.`);
 const remainingCap = stage.capKrw - alreadySpent;
-const plan = planStage({ stage: stage.name, capKrw: remainingCap, personas: [persona], candidates: [{ key: candidate.key, price: candidate.price }], settings, now, variant: "story-v1" });
+const plan = planStage({ stage: stage.name, capKrw: remainingCap, personas: [persona], candidates: [{ key: candidate.key, price: candidate.price }], settings, now, variant });
 // 이 시험은 호출을 한 번만 하므로(재작성 · 재시도 없음) 이 실행이 쓸 수 있는 최악 비용은 "첫 호출의 최악"이다 — 승인의 1회 상한(1,234.04원, 재작성까지 가는 최악 기준)보다 작은 값이라 승인 범위 안이다.
 // 참고로 재작성까지 가는 최악도 아래에 함께 보여 준다(운영자가 읽은 뒤 두 번째 호출을 따로 정할 때의 기준).
-const issues = checkStageRestriction(stage, { variant: "story-v1", only: "A", persona: "OWN", alreadySpentGiven: arg("--already-spent-krw") !== undefined, twoRoundWorstKrw: plan.firstCallWorstKrw, execute });
+const issues = checkStageRestriction(stage, { variant, only: "A", persona: "OWN", alreadySpentGiven: arg("--already-spent-krw") !== undefined, twoRoundWorstKrw: plan.firstCallWorstKrw, execute });
 
 // 3) 입력 확인 파일 — 호출 전에 항상 만든다(드라이런에서도). 이 파일의 내용이 AI에 가는 것과 같은 함수로 만들어진다
-const described = describeOwnInput({ input: built.input, capture, now });
+const described = describeOwnInput({ input: built.input, capture, now, variant });
 const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\..*/, "").replace("T", "-");
 const dir = join("pilot-data", "ai-compare", `${rehearsal ? "rehearsal-" : ""}${stage.name}-${stamp}`);
 const checkFile = join("pilot-data", "own-input", "input-check.md");
 mkdirSync(join("pilot-data", "own-input"), { recursive: true });
 writeFileSync(checkFile, described.markdown);
 
-console.log("# story-v1 운영자 본인 입력 실제 AI 시험 (호출 1회 · 재작성 자동 실행 없음)");
-console.log(`- 모델: ${candidate.company} ${candidate.modelId}(후보 A, 생각 강도 중간) · 지시문: story-v1`);
+console.log(`# ${variant} 운영자 본인 입력 실제 AI 시험 (호출 1회 · 재작성 자동 실행 없음)`);
+console.log(`- 모델: ${candidate.company} ${candidate.modelId}(후보 A, 생각 강도 중간) · 지시문: ${variant}${variant === "story-7" ? "(7개 고정 대주제)" : "(영역별 이야기)"}`);
 console.log(`- 입력: ${inputPath}${capture.capturedAt ? ` (${capture.capturedAt}에 푼 응답)` : ""} · 근거 ${described.evidence.length}개 · 입력 ≈ ${described.estInputTokens.toLocaleString("ko-KR")}토큰(어림)`);
 console.log(`- 입력 확인 파일: ${checkFile} ← **AI에 가는 근거를 한 개씩 볼 수 있습니다. 실행 전에 열어서 확인해 주세요.**`);
 console.log(`- 예상 비용(평소 수준, 재지 않은 어림): ${won(plan.expectedKrw)} · 호출 1회 최악: ${won(plan.firstCallWorstKrw)} · (참고) 재작성까지 가는 최악 ${won(plan.twoRoundWorstKrw)} — 이 시험은 재작성을 하지 않습니다`);
@@ -117,7 +123,7 @@ try {
     guard,
     approval: { stage: stage.name, approvedCapKrw: approvedCap, approvedOn },
     now,
-    variant: "story-v1",
+    variant,
     blindSeed: 1,
     callTimeoutMs: 300_000,
     repairRepeats: false,
@@ -140,7 +146,7 @@ writeFileSync(
   JSON.stringify(
     {
       stage: stage.name,
-      variant: "story-v1",
+      variant,
       model: candidate.modelId,
       rehearsal,
       calls: run.calls,
@@ -177,6 +183,7 @@ try {
 }
 safely("읽는 순서로 풀어 쓴 글", () => {
   if (run.report && isReadingReport(run.report)) writeFileSync(join(dir, "readable.md"), renderReadingMarkdown(run.report));
+  else if (draft && Array.isArray((draft as { sections?: unknown }).sections)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStory7DraftMarkdown(draft as Story7DraftV1)}`);
   else if (draft && Array.isArray((draft as { areas?: unknown }).areas)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStoryDraftMarkdown(draft as StoryDraftV1)}`);
   else writeFileSync(join(dir, "readable.md"), `> 모델이 돌려준 글을 읽는 순서로 풀어 쓰지 못했습니다(JSON 모양이 아님). attempts/round1.txt 원문을 직접 읽어 주세요.\n\n${lastText ?? ""}`);
 });

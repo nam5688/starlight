@@ -12,6 +12,8 @@ import { buildEvidence } from "./generator.ts";
 import { checkStageRestriction, planStage, promptsFor, referenceFor, runStage } from "./compare-plan.ts";
 import { createMockModel } from "./mock-model.ts";
 import { ModelCallError, type ModelResult, type TextModel } from "./model.ts";
+import { composeMockStory7 } from "../reading/story7-mock-model.ts";
+import { buildStory7UserMessage } from "../reading/story7-prompt.ts";
 import { describeOwnInput, ownPersona, ownReportInput, parseOwnCapture, reviewOwnDraft } from "./own-run.ts";
 
 const NOW = new Date("2026-10-17T03:00:00Z");
@@ -185,4 +187,84 @@ test("본인 입력 내보내기는 켠 사람이 직접 적고 개발 서버일
   assert.equal(ownInputCaptureEnabled({ MIYU_OWN_INPUT_CAPTURE: "yes", NODE_ENV: "production" }), false);
   assert.equal(ownInputCaptureEnabled({ MIYU_OWN_INPUT_CAPTURE: "yes", NODE_ENV: "development", VERCEL: "1" }), false);
   assert.equal(ownInputCaptureEnabled({ MIYU_OWN_INPUT_CAPTURE: "yes", NODE_ENV: "development", VERCEL_ENV: "preview" }), false);
+});
+
+// ───── 7개 대주제(story-7) 본인 입력 시험 — 승인 범위 · 입력 확인 · 호출 한 번 · 읽기 전 지표 ─────
+
+test("승인 범위: story7-own은 story-7 · 본인 입력 한 건 · 후보 A · 기존 상한(1,234.04원) 그대로 · 아직 실행하지 않았다 — 호출 1회의 최악은 상한 안이다", async () => {
+  const own = COMPARE_STAGES.find((s) => s.name === "story7-own")!;
+  assert.equal(own.capKrw, 6000, "기존 승인 총액 그대로");
+  assert.equal(own.restrict?.runCeilingKrw, 1234.04, "기존 1회 상한 그대로(올리지 않았다)");
+  assert.equal(own.restrict?.variant, "story-7");
+  assert.equal(own.restrict?.persona, "OWN");
+  assert.equal(own.restrict?.runsApproved, 1);
+  assert.equal(own.restrict?.runsDone, 0, "실제 호출은 운영자 PC에서 한다 — 클라우드에서는 하지 않았다");
+  const built = await ownReportInput(CAPTURE, NOW);
+  assert.ok(built.ok);
+  if (!built.ok) return;
+  const A = AI_CANDIDATES.find((c) => c.key === "A")!;
+  const plan = planStage({ stage: "story7-own", capKrw: 6000 - 2636.26, personas: [ownPersona(built.input)], candidates: [{ key: "A", price: A.price }], settings: SETTINGS, now: NOW, variant: "story-7" });
+  const ok = { variant: "story-7", only: "A", persona: "OWN", alreadySpentGiven: true, twoRoundWorstKrw: plan.firstCallWorstKrw, execute: true } as const;
+  assert.ok(plan.firstCallWorstKrw < 1234.04, `호출 1회의 최악 ${plan.firstCallWorstKrw}`);
+  assert.deepEqual(checkStageRestriction(own, ok), [], "승인 범위 안이면 통과한다");
+  assert.ok(checkStageRestriction(own, { ...ok, variant: "story-v1" }).length > 0, "다른 지시문은 안 된다");
+  assert.ok(checkStageRestriction(own, { ...ok, persona: "P01" }).length > 0, "다른 인물은 안 된다");
+  assert.ok(checkStageRestriction(own, { ...ok, only: "B" }).length > 0);
+  assert.ok(checkStageRestriction(own, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 막힌다");
+  assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 1234.05 }).length > 0, "상한을 넘으면 막힌다");
+  // 승인된 한 건을 쓰고 나면 새 실행은 막힌다(운영자가 다시 승인해 runsApproved를 올린 뒤에만)
+  assert.ok(checkStageRestriction({ restrict: { ...own.restrict!, runsDone: 1 } }, ok).some((m) => /이미 실행/.test(m)));
+});
+
+test("입력 확인 글(story-7): 같은 근거 · 지시문으로 만들고 어떤 지시문인지 밝힌다", async () => {
+  const built = await ownReportInput(CAPTURE, NOW);
+  assert.ok(built.ok);
+  if (!built.ok) return;
+  const d = describeOwnInput({ input: built.input, capture: CAPTURE, now: NOW, variant: "story-7" });
+  assert.match(d.markdown, /story-7\(7개 고정 대주제/);
+  const [system, user] = promptsFor("story-7", d.evidence, referenceFor(NOW).iso, built.input.context);
+  assert.equal(d.systemChars, system.length);
+  assert.equal(d.userChars, user.length);
+  for (const e of d.evidence) assert.ok(user.includes(e.id), e.id);
+  const old = describeOwnInput({ input: built.input, capture: CAPTURE, now: NOW });
+  assert.match(old.markdown, /story-v1\(영역별 이야기\)/);
+});
+
+test("호출 한 번(story-7): 통과한 글은 7개 대주제로 조립되고, 걸린 글은 다시 쓰지 않고 원문 전문을 남긴다", async () => {
+  const built = await ownReportInput(CAPTURE, NOW);
+  assert.ok(built.ok);
+  if (!built.ok) return;
+  const ok = createMockModel();
+  const a = guardAndCandidate(ok);
+  const r1 = await runStage({ stage: { name: "story7-own", capKrw: 6000 }, personas: [ownPersona(built.input)], candidates: a.candidates, guard: a.guard, approval: { stage: "story7-own", approvedCapKrw: 6000, approvedOn: "2026-10-17" }, now: NOW, variant: "story-7", blindSeed: 1, maxRepairs: 0, maxRetries: 0, sleep: async () => {} });
+  assert.equal(ok.calls, 1);
+  const run = r1.runs[0]!;
+  assert.equal(run.status, "ok");
+  assert.equal((run.report as { layout?: string } | null)?.layout, "story7");
+  assert.equal(run.attempts.at(-1)?.accepted, true);
+
+  const bad = createMockModel({ invalidTimes: 5 });
+  const b = guardAndCandidate(bad);
+  const r2 = await runStage({ stage: { name: "story7-own", capKrw: 6000 }, personas: [ownPersona(built.input)], candidates: b.candidates, guard: b.guard, approval: { stage: "story7-own", approvedCapKrw: 6000, approvedOn: "2026-10-17" }, now: NOW, variant: "story-7", blindSeed: 1, maxRepairs: 0, maxRetries: 0, sleep: async () => {} });
+  assert.equal(bad.calls, 1, "자동 재작성 없음 — 호출은 한 번뿐");
+  assert.equal(r2.runs[0]!.status, "failed");
+  assert.equal(r2.runs[0]!.attempts[0].text, '{"headline": "짧음"}', "걸린 글의 원문이 그대로 남는다");
+});
+
+test("읽기 전 지표(story-7): sections 모양이면 7개 대주제 지표를 만들고 합격 판정이라 하지 않는다 — 걸린 글에도 만들어진다", async () => {
+  const built = await ownReportInput(CAPTURE, NOW);
+  assert.ok(built.ok);
+  if (!built.ok) return;
+  const evidence = buildEvidence(built.input, referenceFor(NOW));
+  const draft = composeMockStory7(buildStory7UserMessage(evidence, "2026-10-17", null));
+  const m = reviewOwnDraft(draft, evidence);
+  assert.match(m, /7개 대주제 \(코드 · 합격 판정 아님\)/);
+  assert.match(m, /\| 5 일과 재물 \| 근거를 소유 \|/);
+  assert.match(m, /같은 응답 근거를 두 장 이상이 인용한 곳/);
+  assert.match(m, /재물 소제목: /);
+  assert.match(m, /글 전문을 직접 읽고 판단/);
+  // 형식이 어긋난 글(장이 하나뿐)도 지표를 만들고 이유를 알려 준다
+  const broken = reviewOwnDraft({ headline: "h", sections: [draft.sections[0]], actions: [] }, evidence);
+  assert.match(broken, /형식 · 근거 검사/);
+  assert.match(broken, /\(없음\)/);
 });

@@ -88,7 +88,7 @@ async function Run({ params }: Pick<PageProps<"/dev/live/[run]">, "params">) {
 }
 
 /**
- * 운영자 본인 입력 시험(story-v1) — 같은 입력으로 만든 무료 리포트와 심층 리포트를 나란히 읽고, 검사에 걸려 저장되지 않았어도 모델의 원문 전문을 읽는다.
+ * 운영자 본인 입력 시험(story-v1 · story-7) — 같은 입력으로 만든 무료 리포트와 심층 리포트를 나란히 읽고, 검사에 걸려 저장되지 않았어도 모델의 원문 전문을 읽는다.
  * 읽기 전 지표는 코드가 센 보조 값이며 합격 판정이 아니다.
  */
 function OwnRun({ run, detail }: { run: string; detail: LiveRunDetail }) {
@@ -107,7 +107,7 @@ function OwnRun({ run, detail }: { run: string; detail: LiveRunDetail }) {
     <div className={`${pageNarrow} pt-5 md:pt-10`}>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge>{detail.rehearsal ? "리허설 · 모의 글(실제 AI 아님)" : "실제 AI 시험 결과"}</StatusBadge>
-        <StatusBadge>개인 심층 story-v1 · 운영자 본인 입력</StatusBadge>
+        <StatusBadge>{detail.stage === "story7-own" ? "개인 심층 7개 대주제(story-7)" : "개인 심층 story-v1"} · 운영자 본인 입력</StatusBadge>
       </div>
       <p className="mt-3 text-[14px] leading-[1.7] text-ink-3">
         {run} · 호출 {String(c?.calls ?? "?")}회 · 비용 {typeof c?.spentKrw === "number" ? `${c.spentKrw.toLocaleString("ko-KR")}원` : "?"} · 누적 {typeof c?.cumulativeSpentKrw === "number" ? `${c.cumulativeSpentKrw.toLocaleString("ko-KR")}원` : "?"} · {own.reading ? "형식 검사를 통과한 글" : "형식 검사를 통과하지 못한 결과(저장되지 않음 — 원문 전문은 아래에서 읽을 수 있어요)"}.{" "}

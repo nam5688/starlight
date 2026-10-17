@@ -207,8 +207,8 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
     }
     sectionTexts.set(plan.no, paragraphs.join("\n"));
 
-    // 첫 문단은 이 사람이 어떤 사람인지 일상의 말로 — 사주 용어는 둘째 문단부터
-    if (isString(paragraphs[0])) {
+    // 첫 문단은 이 사람이 어떤 사람인지 일상의 말로 — 사주 용어는 둘째 문단부터(6번 시기 장은 대운 · 세운을 풀이와 함께 써야 하므로 제외)
+    if (plan.no !== 6 && isString(paragraphs[0])) {
       const firstTerms = distinctTerms(paragraphs[0]);
       if (firstTerms.length > FIRST_PARAGRAPH_TERMS_MAX) errors.push(`${w}: 첫 문단에 사주 용어(${firstTerms.join(" · ")})를 쓰지 않습니다 — 이 장의 모습을 일상의 말로 먼저 쓰고, 그렇게 읽은 이유(사주)는 둘째 문단부터 쓰세요.`);
     }

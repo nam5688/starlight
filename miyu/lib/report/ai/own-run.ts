@@ -17,7 +17,12 @@ import { storyDepthSource } from "../reading/story-assemble.ts";
 import { findMotifSpread } from "../reading/story-motif.ts";
 import { STORY_AREAS } from "../reading/story-plan.ts";
 import { validateStoryDraft, visibleStoryTexts } from "../reading/story-validate.ts";
-import type { StoryDraftV1 } from "../reading/types.ts";
+import { story7DepthSource } from "../reading/story7-assemble.ts";
+import { story7Evidence } from "../reading/story7-evidence.ts";
+import { piecesOfStory7, textRepetition, type Story7Draft } from "../reading/story7-measure.ts";
+import { STORY7_SECTIONS } from "../reading/story7-plan.ts";
+import { STORY7_MOTIF_BLOCKS, story7Paragraphs, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
+import type { Story7DraftV1, StoryDraftV1 } from "../reading/types.ts";
 import { buildEvidence } from "./generator.ts";
 import { referenceFor, promptsFor } from "./compare-plan.ts";
 import type { Persona } from "./compare-personas.ts";
@@ -54,10 +59,11 @@ const answerLabel = (v: number | undefined) => LIKERT_OPTIONS.find((o) => o.valu
  * "AI에 무엇이 가는가"를 사람이 읽는 글로 만든다 — 실제 요청과 같은 근거 목록 · 지시문을 같은 함수로 만들어 센다.
  * 이 글은 운영자 PC의 로컬 파일에만 두고(생년월일 · 응답이 있다) 저장소에 올리지 않는다.
  */
-export function describeOwnInput(opts: { input: ReportInput; capture: OwnCapture; now: Date }): { markdown: string; evidence: Evidence[]; systemChars: number; userChars: number; estInputTokens: number } {
+export function describeOwnInput(opts: { input: ReportInput; capture: OwnCapture; now: Date; /** 어떤 지시문으로 보내는가(기본 story-v1) */ variant?: "story-v1" | "story-7" }): { markdown: string; evidence: Evidence[]; systemChars: number; userChars: number; estInputTokens: number } {
   const ref = referenceFor(opts.now);
   const evidence = buildEvidence(opts.input, ref);
-  const [system, user] = promptsFor("story-v1", evidence, ref.iso, opts.input.context);
+  const variant = opts.variant ?? "story-v1";
+  const [system, user] = promptsFor(variant, evidence, ref.iso, opts.input.context);
   const estInputTokens = estimateInputTokens([system, user]);
   const info = opts.capture.info;
   const lines: string[] = [];
@@ -67,6 +73,7 @@ export function describeOwnInput(opts: { input: ReportInput; capture: OwnCapture
   push("> 이 파일은 이 PC에만 있습니다(저장소 · 운영 DB에 올라가지 않는 `pilot-data` 폴더). 실제 호출 전에 이 내용이 맞는지 확인해 주세요.");
   push();
   push("## 1. AI에 가는 것 · 가지 않는 것");
+  push(`- **지시문**: ${variant === "story-7" ? "story-7(7개 고정 대주제 — 나는 어떤 사람일까? · 나의 강점과 약점 · 연애와 애착 · 인간관계와 인연 · 일과 재물 · 앞으로의 운과 변화 · 미유의 종합 조언)" : "story-v1(영역별 이야기)"}`);
   push(`- **가는 것**: 지시문 1개 + 아래 5번의 근거 문장 ${evidence.length}개 + 기준 날짜(${ref.iso}). 근거 문장에는 **사주 원국 여덟 글자와 계산 결과**, 응답에서 계산한 **경향 문장**, 입력한 **MBTI**가 들어 있습니다.`);
   push("- **가지 않는 것**: 닉네임 · 생년월일 원문 · 지역 · 22개 문항의 문장과 고른 선택지 · 점수 숫자. 응답은 \"이런 경향이 있다\"는 문장으로만 갑니다.");
   push("- 이 정보는 Anthropic(실제 AI 제공사)으로 전송됩니다. 이름 · 생년월일 원문이 없어도 원국 여덟 글자와 응답 경향은 본인 정보이므로, 보내도 되는지 확인한 뒤에만 `--execute`를 실행하세요.");
@@ -118,6 +125,8 @@ export function describeOwnInput(opts: { input: ReportInput; capture: OwnCapture
  * 반복 · 새 정보량 · 사주 근거 · 성격 · 기질 · 애착 반영을 코드가 셀 수 있는 만큼만 센다. 말을 바꿔 되풀이한 문장 · 근거를 제대로 풀었는지는 사람이 읽어야 한다.
  */
 export function reviewOwnDraft(raw: unknown, evidence: Evidence[], hasContext = false): string {
+  // 7개 대주제(story-7) 모양이면 그 검사 · 지표로 읽는다
+  if (typeof raw === "object" && raw !== null && Array.isArray((raw as { sections?: unknown }).sections)) return reviewStory7Draft(raw, evidence, hasContext);
   const lines: string[] = [];
   const push = (s = "") => lines.push(s);
   push("# 읽기 전 보조 지표 (코드 · 합격 판정 아님)");
@@ -166,5 +175,81 @@ export function reviewOwnDraft(raw: unknown, evidence: Evidence[], hasContext = 
   push(`- 응답 근거 ${allSurvey.length}개 가운데 영역에 연결된 것 ${used.size}개 (연결하지 않은 응답 근거 = 글에 반영되지 않은 응답)`);
   push();
   push("※ 반복 · 새 정보량 · 근거를 제대로 풀었는지 · 연애 · 일 · 재물 해석이 서로 다른 이야기인지 · 9,900원을 낼 만한지는 낱말로 셀 수 없어 글 전문을 직접 읽고 판단해야 합니다(docs/real-ai-evaluation-rubric.md).");
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * 7개 대주제(story-7) 글의 읽기 전 보조 지표 — 코드가 셀 수 있는 것만 센다(합격 판정이 아니다). 형식 · 근거 검사 · 장마다 분량 · 반복(같은 구절 · 한 낱말이 여러 장으로 번진 곳 · 장 사이 낱말 겹침) ·
+ * 장마다 연결한 근거(사주 · 응답 · MBTI)와 같은 응답이 몇 장에 쓰였는지 · 재물 소제목 · 조언 개수. 말을 바꿔 되풀이한 문장 · 근거를 제대로 풀었는지 · 새로 알게 해 주는가 ·
+ * 연애 · 일 · 재물이 서로 다른 이야기인지 · 9,900원을 낼 만한지는 낱말로 셀 수 없어 글 전문을 직접 읽어야 한다.
+ */
+export function reviewStory7Draft(raw: unknown, evidence: Evidence[], hasContext = false): string {
+  const lines: string[] = [];
+  const push = (s = "") => lines.push(s);
+  push("# 읽기 전 보조 지표 — 7개 대주제 (코드 · 합격 판정 아님)");
+  push();
+  const draft = raw as Story7DraftV1;
+  const byId = new Map(evidence.map((e) => [e.id, e]));
+  const v = validateStory7Draft(raw, evidence, { hasContext });
+  push("## 1. 형식 · 근거 검사");
+  if (v.ok) push("- 통과");
+  else {
+    const g = groupReadingIssues(v.errors);
+    for (const k of Object.keys(g) as IssueClass[]) {
+      push(`- **${ISSUE_CLASS_LABEL[k]}**: ${g[k].length}건`);
+      for (const e of g[k]) push(`  - ${e}`);
+    }
+  }
+  push();
+  push("## 2. 장마다 분량과 연결한 근거");
+  push("| 장 | 종류 | 문단 | 글자 | 사주 근거 | 응답 근거 | 입력한 MBTI |");
+  push("| --- | --- | --- | --- | --- | --- | --- |");
+  const sections = Array.isArray(draft.sections) ? draft.sections : [];
+  const usedBy = new Map<string, number[]>();
+  for (const plan of STORY7_SECTIONS) {
+    const s = sections.find((x) => Number(x?.no) === plan.no);
+    if (!s) {
+      push(`| ${plan.no} ${plan.title} | ${plan.kind === "owner" ? "근거를 소유" : "앞 장을 엮음"} | (없음) | | | | |`);
+      continue;
+    }
+    const ps = story7Paragraphs(s);
+    const ids = Array.isArray(s.evidence) ? s.evidence : [];
+    const of = (src: Evidence["source"]) => ids.filter((id) => byId.get(id)?.source === src);
+    for (const id of of("survey")) usedBy.set(id, [...(usedBy.get(id) ?? []), plan.no]);
+    push(`| ${plan.no} ${plan.title} | ${plan.kind === "owner" ? "근거를 소유" : "앞 장을 엮음"} | ${ps.length} | ${ps.join("").length} | ${of("saju").length} | ${of("survey").length}${of("survey").length ? `(${of("survey").join(", ")})` : ""} | ${of("self").length ? "연결" : "-"} |`);
+  }
+  push();
+  const surveyAll = evidence.filter((e) => e.source === "survey" && !e.uncertain);
+  const cited = new Set(usedBy.keys());
+  push(`- 응답 근거 ${surveyAll.length}개 가운데 7개 장에 연결된 것 ${cited.size}개(연결하지 않은 응답 근거 = 글에 반영되지 않은 응답)`);
+  const multi = [...usedBy].filter(([, nos]) => nos.length >= 2);
+  push(multi.length === 0 ? "- 같은 응답 근거를 두 장 이상이 인용한 곳: 없음" : `- 같은 응답 근거를 두 장 이상이 인용한 곳 ${multi.length}개: ${multi.map(([id, nos]) => `${id} → ${nos.join("·")}번`).join(" / ")}`);
+  const mine = story7Evidence(evidence);
+  push(`- 배정(코드가 장마다 나눠 건넨 근거): ${STORY7_SECTIONS.filter((p) => p.kind === "owner").map((p) => `${p.no}번 사주 ${mine.saju[p.no].length} · 응답 ${mine.personal[p.no].filter((id) => id !== "self.mbti").length}`).join(" / ")}`);
+  push();
+  push("## 3. 내용 검사 (어림 — 좋은 글의 보증이 아님)");
+  const depth = checkReadingDepth({ draft: story7DepthSource(draft) });
+  push(`- 통과: ${depth.pass ? "예" : "아니오"}`);
+  for (const f of depth.flags) push(`  - [${f.severity}] ${f.id}: ${f.message}`);
+  push();
+  push("## 4. 반복");
+  const texts = visibleStory7Texts(draft);
+  const reps = findRepeatedPhrasesIn(texts);
+  push(reps.length === 0 ? "- 12자 이상 같은 구절이 두 칸에 있는 곳: 없음" : `- 12자 이상 같은 구절이 두 칸에 있는 곳 ${reps.length}개`);
+  for (const r of reps) push(`  - "${r.phrase}" (${r.where[0]} · ${r.where[1]})`);
+  const motifs = findMotifSpread(texts, STORY7_MOTIF_BLOCKS);
+  push(motifs.length === 0 ? "- 한 낱말이 제목 · 카드와 여러 장으로 번진 곳: 없음(어림)" : `- 한 낱말이 제목 · 카드와 여러 장으로 번진 곳 ${motifs.length}개(어림 — 일관된 이야기인지 되풀이인지는 읽어서 판단)`);
+  for (const m of motifs) push(`  - ${JSON.stringify(m)}`);
+  const rep = textRepetition(piecesOfStory7(draft as unknown as Story7Draft));
+  push(`- 장 사이 낱말 겹침(평균 ${rep.pairOverlapMean.toFixed(2)} · 최대 ${rep.pairOverlapMax.value.toFixed(2)}${rep.pairOverlapMax.a ? ` — ${rep.pairOverlapMax.a} · ${rep.pairOverlapMax.b}` : ""}) · 제목과 본문 겹침 최대 ${rep.headOverlapMax.value.toFixed(2)}${rep.headOverlapMax.block ? ` — ${rep.headOverlapMax.block}` : ""} · 전체 글자 ${rep.chars.toLocaleString("ko-KR")}자`);
+  if (rep.topStems.length) push(`- 가장 많은 장에 걸친 낱말(앞 두 글자): ${rep.topStems.map((x) => `${x.stem}… ${x.blocks}곳 ${x.total}번`).join(" · ")}`);
+  push();
+  push("## 5. 5번 일과 재물 · 7번 조언");
+  const five = sections.find((x) => Number(x?.no) === 5);
+  const money = five?.parts?.find((p) => p?.title === "재물");
+  push(money ? `- 재물 소제목: ${money.paragraphs?.length ?? 0}문단 · ${(money.paragraphs ?? []).join("").length}자 — 돈 이야기가 실제로 있는지 · 근거 없는 습관 단정이 없는지는 읽어서 확인` : "- 재물 소제목이 없습니다.");
+  push(`- 7번 조언(actions): ${Array.isArray(draft.actions) ? draft.actions.length : 0}개 — 앞 장의 다른 결론에서 나온 서로 다른 행동인지는 읽어서 확인`);
+  push();
+  push("※ 반복(말을 바꿔 되풀이한 문장) · 새로 알게 해 주는 정보 · 명리 근거를 제대로 풀었는지 · 성격 · 기질 · 애착이 풀이와 자연스럽게 이어지는지 · 연애 · 일 · 재물이 서로 다른 이야기인지 · 9,900원을 낼 만한지는 낱말로 셀 수 없어 글 전문을 직접 읽고 판단해야 합니다(docs/real-ai-evaluation-rubric.md).");
   return lines.join("\n") + "\n";
 }

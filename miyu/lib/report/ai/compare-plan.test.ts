@@ -240,5 +240,5 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   // 제한이 없는 단계는 이 확인을 하지 않는다
   assert.deepEqual(checkStageRestriction({}, { variant: "x", only: undefined, persona: undefined, alreadySpentGiven: false, twoRoundWorstKrw: 99999 }), []);
   // 기존 1 · 2단계는 제한이 없어 지금까지의 동작이 그대로다
-  assert.ok(COMPARE_STAGES.filter((s) => s.name !== "story-p01" && s.name !== "story-own").every((s) => s.restrict === undefined));
+  assert.ok(COMPARE_STAGES.filter((s) => s.name !== "story-p01" && s.name !== "story-own" && s.name !== "story7-own").every((s) => s.restrict === undefined));
 });

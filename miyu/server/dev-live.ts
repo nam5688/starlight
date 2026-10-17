@@ -10,7 +10,7 @@ import { seoulReference } from "@/lib/report/reference";
 import type { IntegratedReadingReport } from "@/lib/report/reading/types";
 
 const ROOT = join(process.cwd(), "pilot-data", "ai-compare");
-const RUN = /^(?:rehearsal-)?(?:compat-saju-p1|compat-pair-p1|story-own)-\d{8}-\d{6}$/;
+const RUN = /^(?:rehearsal-)?(?:compat-saju-p1|compat-pair-p1|story-own|story7-own)-\d{8}-\d{6}$/;
 
 export type LiveRunSummary = { id: string; stage: string; rehearsal: boolean; calls: number | null; spentKrw: number | null; result: string | null; hasReport: boolean };
 export type LiveRunDetail = {
@@ -23,7 +23,7 @@ export type LiveRunDetail = {
   report: CompatReport | PairReport | null;
   /** 모델이 돌려준 원문 — 검사에 걸린 글 포함 */
   attempts: { round: number; text: string }[];
-  /** 운영자 본인 입력 시험(story-own)에서만 — 같은 입력으로 만든 무료 리포트 · 심층 리포트 · 입력 확인 · 읽는 순서 글 · 읽기 전 지표 */
+  /** 운영자 본인 입력 시험(story-own · story7-own)에서만 — 같은 입력으로 만든 무료 리포트 · 심층 리포트 · 입력 확인 · 읽는 순서 글 · 읽기 전 지표 */
   own: OwnRunDetail | null;
 };
 export type OwnRunDetail = {
@@ -52,7 +52,9 @@ const json = async (path: string) => {
     return null;
   }
 };
-const stageOf = (id: string) => (id.includes("story-own") ? "story-own" : id.includes("compat-saju-p1") ? "compat-saju-p1" : "compat-pair-p1");
+const stageOf = (id: string) => (id.includes("story7-own") ? "story7-own" : id.includes("story-own") ? "story-own" : id.includes("compat-saju-p1") ? "compat-saju-p1" : "compat-pair-p1");
+/** 운영자 본인 입력 시험 단계(story-v1 · story-7) — 무료 · 심층 리포트를 나란히 읽는다 */
+const isOwnStage = (stage: string) => stage === "story-own" || stage === "story7-own";
 
 export async function listLiveRuns(): Promise<LiveRunSummary[]> {
   let names: string[];
@@ -95,7 +97,7 @@ export async function readLiveRun(id: string): Promise<LiveRunDetail | null> {
   const attempts = (await Promise.all(files.map(async (f) => ({ round: Number(f.slice(5, -4)), text: (await read(join(ROOT, id, "attempts", f))) ?? "" })))).filter((a) => a.text.length > 0);
   if (!costAndChecks && !report && attempts.length === 0) return null;
   const stage = stageOf(id);
-  return { id, stage, rehearsal: id.startsWith("rehearsal-"), costAndChecks, report: stage === "story-own" ? null : report, attempts, own: stage === "story-own" ? await readOwn(id) : null };
+  return { id, stage, rehearsal: id.startsWith("rehearsal-"), costAndChecks, report: isOwnStage(stage) ? null : report, attempts, own: isOwnStage(stage) ? await readOwn(id) : null };
 }
 
 /** 본인 입력 시험의 읽기 자료 — 무료 리포트는 저장해 둔 입력(input.json, 이 PC의 파일)에서 제품과 같은 코드로 다시 만든다(저장 · 외부 전송 없음) */
