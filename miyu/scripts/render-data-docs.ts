@@ -7,8 +7,10 @@ import {
   CLOSENESS_LABEL, IPIP_FACETS, IPIP_REFERENCE, IPIP_REVIEW_VERSION, ITEM_FINDINGS, PERSPECTIVE_COMPARISON, PROPOSAL_VERSION, PROPOSED_ITEMS, READING_LIMITS,
 } from "../lib/assessment/drafts/ipip-review.ts";
 import { DRAFT_CONTENT_VERSION, DRAFT_ITEMS, PERSPECTIVES, type DraftItem, type PerspectiveId } from "../lib/assessment/drafts/situational-draft.ts";
-import { COMPAT_RULE_META, DAY_RULE_META, MONTH_RULE_META, PAIR_RULE_META, PARTNER_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { COMPAT_RULE_META, DAY_RULE_META, LUCKY_RULE_META, MONTH_RULE_META, PAIR_RULE_META, PARTNER_RULE_META, PERSONAL_TYPE_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { PERSONAL_TYPE_VERSION } from "../lib/assessment/personal-type.ts";
 import { COMPAT_RULE_VERSION } from "../lib/saju/interpret/compat.ts";
+import { LUCKY_VERSION } from "../lib/saju/interpret/lucky.ts";
 import { PAIR_RULE_VERSION } from "../lib/report/compat/pair-evidence.ts";
 import { PARTNER_RULE_VERSION } from "../lib/saju/interpret/partner.ts";
 import { DAY_RULE_VERSION } from "../lib/saju/interpret/day-plain.ts";
@@ -80,6 +82,18 @@ ${COMPAT_RULE_META.map(block).join("\n\n")}
 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교하는 규칙이다. **리포트 궁합은 아직 만들지 않았고** 이 규칙은 근거 빌더(순수 계산)로만 있다. 설계 가설이며 실제 사람의 응답 · 전문가 검토로 확인하지 못했다.
 
 ${PAIR_RULE_META.map(block).join("\n\n")}
+
+## 개인 유형명 규칙 (${PERSONAL_TYPE_RULE_META.length}개, \`assessment/personal-type.ts\` · 규칙 ${PERSONAL_TYPE_VERSION})
+
+사주 갈래 + 응답으로 코드가 고정된 이름 10개 가운데 하나를 정하는 규칙이다(운영자 확정 2026-10-17). 진단이 아니고 사주와 응답을 합산하지 않으며 근거가 부족하면 "혼합 경향"으로 둔다. **화면에는 아직 켜지 않았다.** 설계 · 분포 측정 · 한계는 \`docs/personal-type-v1.md\`.
+
+${PERSONAL_TYPE_RULE_META.map(block).join("\n\n")}
+
+## 럭키 지수 규칙 (${LUCKY_RULE_META.length}개, \`lucky.ts\` · 규칙 ${LUCKY_VERSION})
+
+사주 원국만으로 계산하는 고정 콘텐츠 지수다(운영자 확정 2026-10-17). 성공 확률 · 정확도 · 사람의 가치가 아니고 낮은 점수는 "운이 나쁘다"가 아니다. **화면에는 아직 켜지 않았다.** 점수표 · 분포 · 한계는 \`docs/lucky-index-v1.md\`.
+
+${LUCKY_RULE_META.map(block).join("\n\n")}
 `;
 writeFileSync(new URL("../docs/saju-rules.md", import.meta.url), sajuDoc);
 

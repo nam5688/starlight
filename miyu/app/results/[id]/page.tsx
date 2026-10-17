@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ReportFeedback } from "@/components/results/report-feedback";
+import { IdentityCard } from "@/components/results/identity-card";
 import { MiyuFirst } from "@/components/results/miyu-first";
 import { TalkEntry } from "@/components/results/talk-entry";
 import { talkRoomPath } from "@/components/talk/room-paths";
@@ -29,9 +30,10 @@ import { ReceivedReports, RepurchasePanel } from "@/components/results/received-
 import { ReadingNav } from "@/components/report/reading-nav";
 import { ResultHeader } from "@/components/report/result-header";
 import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
-import { CONCERN_RECORDS, REPORT_BASIS } from "@/lib/config/product";
+import { CONCERN_RECORDS, LUCKY_INDEX, PERSONAL_TYPE, REPORT_BASIS } from "@/lib/config/product";
 import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
+import { buildIdentity } from "@/lib/report/identity";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import { getInviteView, quoteInviteDiscount } from "@/lib/services/invite-service";
@@ -174,6 +176,8 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   const inviteQuote = view.paidOrder ? null : await quoteInviteDiscount(writeRepository(), { token: await peekInviteToken(), userId: member.userId });
   // 잠긴 내용은 서버에서 아예 만들지 않는다 — 전체 요약 · 점수는 구매 후 리포트에만
   const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
+  // 개인 유형명 · 럭키 지수 카드 — 운영자가 기준을 확정하기 전에는 스위치가 꺼져 있어 만들지도 보이지도 않는다(lib/config/product.ts). 저장하지 않고 열 때마다 계산한다.
+  const identity = PERSONAL_TYPE.visible || LUCKY_INDEX.visible ? buildIdentity({ saju: assessment.saju, summary: assessment.summary }) : null;
   const freeRooms = availableRooms(
     buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" }, taste: view.taste?.kind === "ready" ? view.taste.report : null }),
   );
@@ -182,6 +186,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
       <ClearAnalyzeDraft />
       <Track name="preview_view" />
       <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위입니다." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
+      {identity && <IdentityCard identity={identity} showType={PERSONAL_TYPE.visible} showLucky={LUCKY_INDEX.visible} />}
       {/* 분석을 마친 직후의 두 선택 — 미유가 먼저 풀어 주는 길 / 바로 전체 리포트 읽기 (운영자 방향 2026-10-16) */}
       {freeRooms.includes("main") && <MiyuFirst talkHref={talkRoomPath(assessment.id, "main")} reportHref="#r-tendency" />}
       <ReadingNav

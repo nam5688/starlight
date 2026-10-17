@@ -91,6 +91,14 @@ export const CONCERN_RECORDS = { visible: false } as const;
 export const REPORT_BASIS = { visible: false } as const;
 
 /**
+ * 개인 유형명 · ME:U 럭키 지수 노출 스위치(운영자 확정 2026-10-17: D1 고정 유형명 8~12개 · D2 럭키 지수 — 단 "계산 기준(규칙 · 분포)을 운영자가 확정하기 전에는 임의 점수를 화면에 표시하지 않는다").
+ * 계산 코드(lib/assessment/personal-type.ts · lib/saju/interpret/lucky.ts) · 규칙 이력 · 분포 측정 · 개발용 확인 화면(/dev/identity, 이 PC에서만)은 만들어 두었고 **실제 화면은 둘 다 꺼 둔다.**
+ * 운영자가 유형 목록 · 분류 규칙 · 점수표 · 분포를 확인한 뒤 한 줄로 켠다(`docs/personal-type-v1.md` · `docs/lucky-index-v1.md`). 켜면 무료 결과 화면의 맨 위에 카드가 한 장 더 보인다 — 저장된 결과는 바뀌지 않는다(저장하지 않고 열 때마다 계산한다).
+ */
+export const PERSONAL_TYPE = { visible: false } as const;
+export const LUCKY_INDEX = { visible: false } as const;
+
+/**
  * 출시 초기 결제수단(운영자 방향 2026-10-16: "출시 초기에는 카드만 운영해 복잡함을 줄인다").
  * 카드 취소는 기한 제한이 따로 없다(카드사 데이터 보관 기간에 따라 1년을 넘기면 안 될 수 있다). 반면 계좌이체는 180일, 가상계좌는 보통 365일, 휴대폰 결제는 결제한 달에만 취소할 수 있어
  * 결제수단마다 환불 절차가 달라진다(토스페이먼츠 결제 취소 가이드, 2026-10-16 확인).

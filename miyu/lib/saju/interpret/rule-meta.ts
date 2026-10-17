@@ -296,6 +296,59 @@ export const PAIR_RULE_META: RuleMeta[] = [
   },
 ];
 
+// ───────────── 개인 유형 · 럭키 지수 (운영자 확정 2026-10-17, D1 · D2 — 화면 스위치는 꺼 둔 상태) ─────────────
+// 근거 목록(Evidence)을 만드는 규칙이 아니라 코드가 직접 계산하는 규칙이라 따로 적는다(match는 이 규칙의 가상 id). 모두 미유가 정한 설계 가설이며 전문가 검토 전이다.
+const PERSONAL_EXCEPTIONS = [
+  "진단이나 평생 유형이 아니다 — 지금의 사주 구조와 응답에서 가장 두드러진 경향에 붙인 이름이다",
+  "사주와 응답을 하나의 점수로 합산하지 않는다 — 사주가 갈래를, 응답이 그 안의 모습을 따로 정한다",
+  "근거가 부족하면(사주 갈래가 정해지지 않거나 응답이 한쪽으로 기울지 않으면) 이름을 붙이지 않고 \"혼합 경향\"으로 둔다",
+  "입력한 MBTI는 쓰지 않는다(선택 입력이고 자기 인식 참고값이다)",
+  "출생 시각을 모르면 다섯 자리로 센다. 월주가 절기 경계에 걸려 달라질 수 있으면 월지 가중치를 넣었을 때와 뺐을 때 후보가 같을 때만 정한다",
+];
+
+export const PERSONAL_TYPE_RULE_META: RuleMeta[] = [
+  {
+    id: "personal-type-tilt", title: "사주에서 큰 방향(갈래) 정하기", match: /^personal-type\.tilt$/, kind: "saju",
+    calculation: "원국 일곱 자리(시각을 모르면 다섯 자리, 천간은 일간 제외 · 지지는 정기 십신)의 십신을 다섯 갈래(비겁 · 식상 · 재성 · 관성 · 인성)로 세고 월지는 한 자리를 더 센다. 가장 많은 갈래(2 이상)가 후보다. 단위 테스트(personal-type.test.ts)로 확인한다.",
+    interpretation: "가장 많은 갈래를 그 사람 사주의 큰 방향으로 읽고 갈래마다 두 가지 모습(총 10유형) 가운데 응답이 고르게 한다. 갈래 → 유형 이름 표는 rules.ts의 GROUP_RULE 문장(배움 · 표현 · 현실 · 책임 · 독립과 협력)을 이름으로 옮긴 설계 가설이다.",
+    source: "미유가 정한 규칙이다. 월지를 한 자리 더 세는 것은 전통 해석에서 태어난 달의 자리를 가장 무겁게 본다는 일반적인 서술에서 가져온 단순화이며 문헌에서 확인하지 못했다. 십신을 성격 유형으로 옮기는 표는 학파의 표준이 아니다.",
+    conditions: ["만세력이 계산한 원국이 있을 때(not-connected · invalid에는 쓰지 않는다)", "가장 많은 갈래가 2자리 이상일 때"], exceptions: PERSONAL_EXCEPTIONS, review: "unreviewed", version: "0.1",
+  },
+  {
+    id: "personal-type-flavor", title: "응답으로 갈래 안의 두 모습 가르기", match: /^personal-type\.flavor$/, kind: "survey",
+    calculation: "기질 4 · 가까운 관계 2 · 평소 행동 방식 4가지 응답(0~100 환산값) 가운데 가운데(50)에서 15 이상 벗어난 뚜렷한 응답만 골라, 갈래마다 정한 두 모습의 구성 응답이 각 모습 쪽으로 기운 정도의 평균을 비교한다. 두 모습의 차이가 20 이상이어야 한쪽으로 정한다(후보 갈래가 둘 이상이면 가장 또렷한 갈래가 둘째보다 10 이상 앞서야 한다). 단위 테스트로 확인한다.",
+    interpretation: "뚜렷한 응답이 한쪽 모습으로 기울면 그 모습의 이름을 붙이고, 뚜렷한 응답이 없거나 기울기가 작으면 정하지 않는다.",
+    source: "뚜렷함 15 · 차이 20 · 후보 간격 10은 임의로 정한 값이며 검증되지 않았다(15는 survey-evidence.ts의 65 · 35 기준과 같다). 응답 문항 자체가 개발용 예시(dev-example)다.",
+    conditions: ["갈래 후보가 정해졌을 때", "그 갈래의 두 모습을 가르는 응답 가운데 뚜렷한 것이 하나 이상일 때"], exceptions: PERSONAL_EXCEPTIONS, review: "unreviewed", version: "0.1",
+  },
+];
+
+const LUCKY_EXCEPTIONS = [
+  "성공 확률 · 정확도 · 사람의 가치가 아니다. 낮은 점수는 \"운이 나쁘다\"가 아니라 \"운이 먼저 굴러오기보다 행동으로 흐름을 만드는 힘이 중요한 타입\"이다",
+  "사주 원국에서만 계산한다 — 응답 · MBTI · 성향 점수 · 대운 · 세운과 합산하지 않는다(시기에 따라 바뀌는 \"올해의 럭키 흐름\"은 v1 이후)",
+  "신살(천을귀인 등) · 격국 · 용신은 쓰지 않는다 — 계산하지 않았다",
+  "AI가 쓰는 리포트 본문에는 숫자를 쓰지 않고 코드가 그리는 카드에만 보인다. 지금 화면 스위치(LUCKY_INDEX.visible)는 꺼 둔 상태다",
+  "출생 시각을 모르면 다섯 자리를 일곱 자리로 환산해 센다(시각을 알면 달라질 수 있다고 안내). 절기 · 자시 경계에 걸려 달라질 수 있으면 그렇다고 안내한다",
+  "\"예측이 아니며 보장하지 않는다\"와 \"전문가 검토 전 초안 · 검증되지 않았다\"를 지수 옆에 적는다",
+];
+const lucky = (m: { id: string; title: string; match: RegExp; interpretation: string; conditions: string[] }): RuleMeta => ({
+  kind: "saju",
+  calculation: "만세력 엔진이 계산한 원국의 십신 · 지지 관계(합 · 충) · 지장간 구조(structure.ts)를 점수표(lucky.ts의 LUCKY_RULES)로 센 뒤 눈금(LUCKY_SCALE)으로 0~100에 옮긴다. 단위 테스트(lucky.test.ts)와 무작위 원국 분포 측정(scripts/measure-lucky.ts)으로 확인한다.",
+  source: "미유가 정한 점수표다. 전통 해석의 서술(인성 = 돕는 기운 · 식상 = 표현 · 재성 = 현실과 재물 · 관성 = 책임 · 합 = 맞춰 감 · 충 = 움직임)에서 방향만 가져왔고, 어떤 원국에 몇 점을 주는지는 문헌에서 확인한 것이 아니다. 눈금과 구간 경계는 무작위 원국의 분포를 센 뒤 정했다.",
+  exceptions: LUCKY_EXCEPTIONS,
+  review: "unreviewed",
+  version: "0.1",
+  ...m,
+});
+
+export const LUCKY_RULE_META: RuleMeta[] = [
+  lucky({ id: "lucky-people", title: "귀인 · 사람복", match: /^lucky\.people$/, interpretation: "나를 돕는 기운(인성) · 안정적인 책임의 기운(정관) · 동료의 기운(비겁)이 있고 가까운 자리(일지)가 다른 자리와 합을 이루면 도움이 되는 사람과 이어지기 쉽다고 읽고, 일지가 충을 이루면 가까운 자리가 부딪히는 구조로 보아 한 점 덜어 낸다.", conditions: ["항상 계산한다"] }),
+  lucky({ id: "lucky-chance", title: "기회 연결", match: /^lucky\.chance$/, interpretation: "표현하는 기운(식상) · 현실을 다루는 기운(재성)이 있고 지지끼리 합(연결) · 충(움직임)을 이루며 월지 속 숨은 기운이 천간에 드러나면(투간) 기회가 이어지기 쉽다고 읽는다.", conditions: ["항상 계산한다"] }),
+  lucky({ id: "lucky-wealth", title: "재물 흐름", match: /^lucky\.wealth$/, interpretation: "재성이 있고 식상이 재성으로 이어지며 태어난 달 자리가 재성이고 일간이 받는 쪽이면 재물이 현실로 이어지기 쉽다고 읽고, 비겁이 많은데 재성이 적으면 부담으로 보아 덜어 낸다.", conditions: ["항상 계산한다"] }),
+  lucky({ id: "lucky-recovery", title: "회복 · 반전", match: /^lucky\.recovery$/, interpretation: "인성 · 비겁 · 일간의 뿌리(통근) · 태어난 달의 도움(득령)이 있으면 회복하는 바탕이 단단하다고 읽고, 지지의 충을 반전의 계기로 보며, 관성이 많은데 인성이 없으면 압박에 비해 받쳐 줄 기운이 적다고 보아 덜어 낸다.", conditions: ["항상 계산한다"] }),
+  lucky({ id: "lucky-total", title: "총점과 가장 강한 럭키 포인트", match: /^lucky\.total$/, interpretation: "총점은 네 지수의 평균을 눈금으로 늘린 값이고, 가장 강한 포인트는 하위 지수 가운데 가장 높은 것(최고 65점 이상 · 둘째와 5점 이상 차이)의 고정 문구다. 뚜렷하지 않으면 \"고른 구조\"라고 한다.", conditions: ["항상 계산한다"] }),
+];
+
 /** 근거 ID가 나온 규칙 (없으면 null — 새 근거를 만들면서 이 기록을 빠뜨리지 않았는지 테스트가 확인한다) */
 export function ruleFor(evidenceId: string): RuleMeta | null {
   return RULE_META.find((r) => r.match.test(evidenceId)) ?? null;
