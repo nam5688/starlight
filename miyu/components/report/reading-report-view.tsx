@@ -67,7 +67,8 @@ export function ReadingReportView({
   const id = (name: string) => `${idPrefix}${name}`;
   const chart = saju ?? report.saju;
   const scoreGroups = scores ?? (report.base ? [{ title: "기질 · 성격", rows: report.base.temperament }, { title: "가까운 관계 반응(애착 경향)", rows: report.base.relationship }] : []);
-  const tendency = tendencyPhrase(tendencyName ?? report.base?.tendency.name);
+  const tendencyTitle = tendencyName ?? report.base?.tendency.name ?? null;
+  const tendency = tendencyPhrase(tendencyTitle);
   // 큰 주제에 붙이는 번호 — 주제 5개 다음이 "앞으로의 시기"
   const numberOf = new Map(report.blocks.map((b, i) => [b.id, i + 1]));
   const flowNumber = report.blocks.length + 1;
@@ -98,11 +99,13 @@ export function ReadingReportView({
           <h2 id={id("headline")} className="text-[13px] font-semibold text-accent">
             핵심 해석
           </h2>
-          {tendency && (
-            <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-[15px] font-bold text-accent-strong">{tendency}</span>
-              <span className="text-[13px] text-ink-3">나의 대표 경향</span>
-            </p>
+          {tendency && tendencyTitle && (
+            <div className="mt-2.5">
+              <p className="text-[13px] text-ink-3">나의 대표 경향</p>
+              {/* 무료 리포트(FreePreviewBody)와 같이 후보 이름(~형)을 크게 보인다 — 심층에서 빠지면 무료에만 있는 이름이 된다 */}
+              <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-accent-strong md:text-[32px]">{tendencyTitle}</p>
+              <p className="mt-2 inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-[14px] font-semibold text-accent-strong">{tendency}</p>
+            </div>
           )}
           <p className="mt-2 text-[22px] leading-[1.4] font-bold tracking-tight md:text-[28px]">{report.headline}</p>
           {tendency && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아닙니다.</p>}

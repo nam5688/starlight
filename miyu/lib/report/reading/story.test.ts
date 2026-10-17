@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildEvidence, createAiReportGenerator } from "../ai/generator.ts";
 import { buildPersonas } from "../ai/compare-personas.ts";
+import { tendencyPhrase } from "../../assessment/dev-rules.ts";
 import { createMockModel } from "../ai/mock-model.ts";
 import { mbtiDirections, surveyEvidence } from "../survey-evidence.ts";
 import { sampleReport } from "../../samples/sample-report.ts";
@@ -260,6 +261,15 @@ test("조립: 영역의 첫 문단은 summary, 나머지는 details — 같은 �
   for (const n of ["MBTI", "기질 · 성격", "가까운 관계에서의 반응(애착 경향)", "평소 행동 방식"]) assert.ok(names.includes(n), n);
   // 이전 형식(layout 없음)은 story가 아니다
   assert.ok(!isStoryReport({ ...report, layout: undefined }));
+});
+
+test("조립: 심층(story-v1) 리포트도 대표 경향 이름(~형)을 저장하고 화면이 그 이름으로 풀어 쓴다 — 무료에만 있지 않다", () => {
+  const report = assembleStory({ draft: mockDraft(), evidence: P01_EVIDENCE, input: P01.input, reference: { ...REF, iso: "2026-10-16" }, promptVersion: "x", ruleVersions: [] });
+  const name = report.base?.tendency.name;
+  assert.ok(name, "저장된 심층 리포트에 대표 경향 이름이 있어야 한다");
+  // 리포트 화면(ReadingReportView)은 이 이름(~형)을 핵심 해석 위에 크게 보이고, 풀어 쓴 한 줄(tendencyPhrase)을 함께 붙인다 — 풀리지 않는 이름은 화면에서 빠진다
+  assert.ok(/형$/.test(name), `대표 경향 이름 "${name}"은 ~형이다`);
+  assert.ok(tendencyPhrase(name), `대표 경향 이름 "${name}"이 화면 문구로 풀리지 않는다`);
 });
 
 test("생성기: story-v1은 같은 흐름(초안 → 형식 검사 → 조립)으로 리포트를 만들고 지시문 버전을 남긴다 — 이전 형식 기본값은 그대로", async () => {
