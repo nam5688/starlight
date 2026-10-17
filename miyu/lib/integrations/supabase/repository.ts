@@ -159,6 +159,12 @@ function toOrder(r: Row): OrderRecord {
     // 4번째 마이그레이션 전의 DB에서도 읽을 수 있게 기본값을 둔다
     paymentEnv: ((r.payment_env as string | undefined) ?? "test") as OrderRecord["paymentEnv"],
     acquisition: toAcquisition(r),
+    // 20번 마이그레이션 전의 DB에는 열이 없다 — 없으면 결제사 주문으로 본다
+    provider: ((r.provider as string | undefined) === "benefit" ? "benefit" : "tosspayments") as "tosspayments" | "benefit",
+    listAmount: (r.list_amount as number | null | undefined) ?? null,
+    discountKrw: (r.discount_krw as number | null | undefined) ?? null,
+    discountKind: (r.discount_kind as OrderRecord["discountKind"] | undefined) ?? null,
+    discountRef: (r.discount_ref as string | null | undefined) ?? null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -421,7 +427,12 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       };
       const acq = o.acquisition;
       const withAcq = acq && (acq.source || acq.medium || acq.campaign) ? { ...base, acq_source: acq.source, acq_medium: acq.medium, acq_campaign: acq.campaign } : base;
-      let { data, error } = await db.from("orders").insert(withAcq).select().single();
+      // 20번 마이그레이션 이후에만 정가 · 할인 기록 열이 있다 — 없는 DB에서는 이 열 없이 만든다(가격 자체는 amount가 정한다)
+      const priced = o.pricing ? { ...withAcq, list_amount: o.pricing.listAmount, discount_krw: o.pricing.discountKrw, discount_kind: o.pricing.discountKind, discount_ref: o.pricing.discountRef } : withAcq;
+      let { data, error } = await db.from("orders").insert(priced).select().single();
+      if (error && priced !== withAcq && (error.code === "42703" || error.code === "PGRST204" || /list_amount|discount_/.test(error.message ?? ""))) {
+        ({ data, error } = await db.from("orders").insert(withAcq).select().single());
+      }
       // 8번 마이그레이션 전의 DB(출처 열 없음)에서도 결제는 막히지 않게, 출처만 빼고 다시 만든다
       if (error && withAcq !== base && (error.code === "42703" || error.code === "PGRST204" || /acq_(source|medium|campaign)/.test(error.message ?? ""))) {
         ({ data, error } = await db.from("orders").insert(base).select().single());
@@ -487,7 +498,7 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       const data = await fetchPages("주문 집계 조회", limit, (from, to) => db.from("orders").select().gte("created_at", since).order("created_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
       return data.map((r) => {
         const o = toOrder(r);
-        return { id: o.id, userId: o.userId, assessmentId: o.assessmentId, productId: o.productId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null };
+        return { id: o.id, userId: o.userId, assessmentId: o.assessmentId, productId: o.productId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null, provider: o.provider, discountKind: o.discountKind ?? null, listAmount: o.listAmount ?? null, discountKrw: o.discountKrw ?? null };
       });
     },
 
@@ -528,7 +539,7 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
     },
 
     async addAiUsage(u) {
-      const { error } = await db.from("ai_usage").insert({
+      const base = {
         report_id: u.reportId,
         provider: u.provider.slice(0, 60),
         model: u.model.slice(0, 100),
@@ -539,7 +550,13 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         latency_ms: Math.max(0, Math.round(u.latencyMs)),
         outcome: u.outcome,
         error_code: u.errorCode?.slice(0, 60) ?? null,
-      });
+      };
+      // DB 변경 22번 이후에만 원가 측정용 분류 열이 있다 — 없는 DB에서는 이 열 없이 기록한다
+      const tagged = u.purpose ? { ...base, purpose: u.purpose, credit_source: u.creditSource ?? null, room_key: u.roomKey?.slice(0, 40) ?? null, request_key: u.requestKey?.slice(0, 80) ?? null } : base;
+      let { error } = await db.from("ai_usage").insert(tagged);
+      if (error && tagged !== base && (error.code === "42703" || error.code === "PGRST204" || /purpose|credit_source|room_key|request_key/.test(error.message ?? ""))) {
+        ({ error } = await db.from("ai_usage").insert(base));
+      }
       if (error && !isMissingTableError(error)) fail("AI 사용 기록 저장", error);
     },
 
@@ -620,8 +637,9 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
 
     async listOrdersForReconcile(opts) {
       const [pending, paid] = await Promise.all([
-        db.from("orders").select().eq("status", "pending").lt("created_at", opts.pendingCreatedBefore).order("created_at", { ascending: true }).limit(opts.limit),
-        db.from("orders").select().eq("status", "paid").gte("approved_at", opts.paidSince).order("approved_at", { ascending: false }).limit(opts.limit),
+        db.from("orders").select().eq("status", "pending").neq("provider", "benefit").lt("created_at", opts.pendingCreatedBefore).order("created_at", { ascending: true }).limit(opts.limit),
+        // 혜택 주문(0원)은 결제사 기록이 없으므로 결제 대조에서 뺀다
+        db.from("orders").select().eq("status", "paid").neq("provider", "benefit").gte("approved_at", opts.paidSince).order("approved_at", { ascending: false }).limit(opts.limit),
       ]);
       if (pending.error) fail("재확인 대상 조회", pending.error);
       if (paid.error) fail("재확인 대상 조회", paid.error);

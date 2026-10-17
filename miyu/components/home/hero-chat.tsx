@@ -5,14 +5,12 @@ import { sampleReadingReport } from "@/lib/samples/sample-reading-report";
 import { sampleReport } from "@/lib/samples/sample-report";
 
 /**
- * 홈 첫 화면의 미유 대화창(운영자 방향 2026-10-16: 미유 캐릭터 · 말풍선을 첫 화면에 살리고, 인사와 실제 풀이 예시를 한 덩어리로).
- * 인사말은 화면 안내 문구이고, 나머지는 **대화 엔진이 만든 말**(가상 인물 서윤의 예시 리포트에 저장된 글 + 고정 문구)을 그대로 보여 준다 —
+ * 홈의 미유 예시 대화창(운영자 방향 2026-10-16: 미유 캐릭터 · 말풍선을 살리고, 인사와 실제 풀이 예시를 한 덩어리로. 2026-10-17부터는 첫 화면 바로 아래 "미유가 이렇게 풀어줘요" 구역에 둔다 — `sample-chat-section.tsx`).
+ * 말풍선은 **대화 엔진이 만든 말**(가상 인물 서윤의 예시 리포트에 저장된 글 + 고정 문구)을 그대로 보여 준다 —
  * 미유가 먼저 분석을 풀어 주고(핵심 한 줄) → 궁금한 묶음을 고르면(연애 · 관계) → 그 풀이를 이어 준다. 새로 쓴 글이나 실제 이용 후기가 아니다.
  * 자유 질문에 AI가 답한 글은 실제 AI의 답이 아니면 지어 쓰지 않으므로 이 예시에 넣지 않았다(자유 질문은 채팅방에서 이어진다).
  * 아래 답장 모양은 누르는 버튼이 아니라 "이런 묶음을 고를 수 있다"는 그림이다.
  */
-const GREETING = "안녕하세요, 미유예요. 어려운 사주 용어를 혼자 읽지 않아도 괜찮아요. 제가 먼저 하나씩 풀어드릴게요. 궁금한 건 편하게 물어보세요.";
-
 type Bubble = { from: "me"; text: string } | { from: "miyu"; mood: TalkMood; headline?: string; paragraphs: string[] };
 
 function exampleBubbles(): { bubbles: Bubble[]; chips: string[] } {
@@ -20,7 +18,8 @@ function exampleBubbles(): { bubbles: Bubble[]; chips: string[] } {
   const start = startRoom(model, "main");
   const intro = start.lines.find((l) => l.from === "miyu" && l.say.kind === "text");
   const picked = applyAction(model, "main", start, { t: "group", id: "relation" });
-  const bubbles: Bubble[] = [{ from: "miyu", mood: "wave", paragraphs: [GREETING] }];
+  // 인사는 첫 화면(hero-start.tsx)에 이미 있으므로 이 예시는 분석을 풀어 주는 말에서 시작한다
+  const bubbles: Bubble[] = [];
   if (intro && intro.from === "miyu" && intro.say.kind === "text") {
     bubbles.push({ from: "miyu", mood: "happy", paragraphs: [intro.say.text] });
     bubbles.push({ from: "miyu", mood: "happy", headline: sampleReadingReport.headline, paragraphs: [] });

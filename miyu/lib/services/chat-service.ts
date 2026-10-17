@@ -13,6 +13,7 @@ import { roomPolicy } from "../report/chat/quota.ts";
 import { QUESTION_MAX } from "../report/reading/talk.ts";
 import type { RoomAction } from "../report/reading/talk-room.ts";
 import { estimateCostKrw, seoulDayStart, type CapacityConfig } from "./capacity-service.ts";
+import type { BenefitRepository } from "./benefit-ports.ts";
 import type { ChatReservation, MiyuRepository } from "./ports.ts";
 import { memoryFor } from "./summary-service.ts";
 import { loadTalkRoom, owns, TALK_ROOM_KEY } from "./talk-service.ts";
@@ -73,12 +74,35 @@ export type AskResult =
   | { ok: false; reason: AskReason; message: string };
 
 const fail = (reason: AskReason): AskResult => ({ ok: false, reason, message: ASK_MESSAGES[reason] });
+
+/**
+ * 답 뒤에 화면에 보일 "남은 질문" — 결제한 질문(장부 잔액)과 보상 질문권을 합쳐 같은 단위(질문 1개 = MIYU_CASH.perQuestion)로 돌려준다.
+ * 결제한 질문 · 보상 질문권 어느 쪽으로도 묻지 않았다면(무료 질문) 생략한다.
+ */
+async function ticketBalance(deps: AskDeps, userId: string, cashBalance: number | null, usedCredit: boolean): Promise<{ cash?: { balance: number } }> {
+  if (cashBalance === null && !usedCredit) return {};
+  let credits = 0;
+  if (deps.benefits) {
+    try {
+      credits = await deps.benefits.getCreditBalance(userId);
+    } catch {
+      credits = 0;
+    }
+  }
+  const cash = cashBalance ?? (await deps.repo.getCashBalance(userId).catch(() => 0));
+  return { cash: { balance: cash + credits * MIYU_CASH.perQuestion } };
+}
 const missingTable = (e: unknown) => (e as { code?: string } | null)?.code === "42P01";
 /** 질문 한 번을 가리키는 참조번호 — 결제한 질문의 사용과 되돌림이 같은 번호를 쓴다 */
 const defaultRef = () => `q-${globalThis.crypto.randomUUID()}`;
 
 export type AskDeps = {
   repo: MiyuRepository;
+  /**
+   * 보상 질문권(프로모션 · 후기 · 추천 · 이벤트) 저장소 — 있으면 무료 질문을 다 쓴 뒤 **결제한 질문보다 먼저** 쓴다(사용 순서: 기본 무료 → 만료가 빠른 보상 질문권 → 유료).
+   * 없거나 혜택 표가 아직 없는 DB(19번 전)면 건너뛴다. 사용 · 되돌림은 DB가 같은 참조번호로 한 번만 한다.
+   */
+  benefits?: BenefitRepository;
   /** 연결된 AI가 없으면 null (자유 질문은 닫힘) */
   answerer: ChatAnswerer | null;
   now: () => Date;
@@ -288,7 +312,10 @@ async function askFreeQuestionNow(deps: AskDeps, input: AskInput): Promise<AskRe
 
   // 무료 질문을 다 썼으면 결제한 질문으로 이어 간다 — 질문 한 번에 MIYU_CASH.perQuestion 단위. 사용은 AI를 부르기 전에 한 번에(원자적으로) 하고,
   // 답을 받지 못하면 같은 참조번호로 되돌린다 (보이지 않은 답에 결제한 질문을 쓰게 하지 않는다). 결제한 질문이 없으면 결제부터 해야 한다(need-payment)
+  // 한 질문의 모든 AI 호출(첫 호출 + 고쳐 쓰기)을 묶는 번호 — 질문 한 번의 원가를 읽는 데 쓴다. 보상 · 결제한 질문의 사용 참조번호도 같은 번호다
+  const requestRef = (deps.newRef ?? defaultRef)();
   let cashRef: string | null = null;
+  let creditRef: string | null = null;
   let balance: number | null = null;
   if (!useFree) {
     // 결제사에서 이미 환불된 질문을 쓰지 않도록 쓰기 직전에 결제사 기록을 다시 확인한다(고객이 화면을 다시 열지 않았거나 정기 점검이 아직 오지 않았어도 반영된다).
@@ -298,18 +325,34 @@ async function askFreeQuestionNow(deps: AskDeps, input: AskInput): Promise<AskRe
     } catch {
       // 확인 실패는 부르는 쪽이 기록한다
     }
-    const ref = (deps.newRef ?? defaultRef)();
-    try {
-      balance = await repo.spendCash({ userId: input.userId, amount: MIYU_CASH.perQuestion, ref });
-    } catch (e) {
-      // 13번 DB 변경 전 — 결제한 질문을 쓸 수 없으면 무료 질문이 끝난 것으로만 안내한다
-      if (missingTable(e)) return fail(free ? "free-used" : "limit");
-      throw e;
+    const ref = requestRef;
+    // 보상 질문권이 있으면 먼저 쓴다(만료가 빠른 것부터). 혜택 표가 없으면 건너뛴다
+    if (deps.benefits) {
+      try {
+        const spent = await deps.benefits.spendCredit({ userId: input.userId, ref });
+        if (spent.status === "spent" || spent.status === "already") creditRef = ref;
+      } catch (e) {
+        if (!missingTable(e)) throw e;
+      }
     }
-    if (balance === null) return fail("need-payment");
-    cashRef = ref;
+    if (!creditRef) {
+      try {
+        balance = await repo.spendCash({ userId: input.userId, amount: MIYU_CASH.perQuestion, ref });
+      } catch (e) {
+        // 13번 DB 변경 전 — 결제한 질문을 쓸 수 없으면 무료 질문이 끝난 것으로만 안내한다
+        if (missingTable(e)) return fail(free ? "free-used" : "limit");
+        throw e;
+      }
+      if (balance === null) return fail("need-payment");
+      cashRef = ref;
+    }
   }
+  const restoreCredit = async () => {
+    if (!creditRef || !deps.benefits) return;
+    await deps.benefits.restoreCreditSpend({ userId: input.userId, ref: creditRef });
+  };
   const restoreCash = async () => {
+    await restoreCredit();
     if (!cashRef) return;
     // 되돌리기에 실패해도 오류를 감추지 않는다 — 호출한 쪽이 운영 기록에 남긴다 (결제한 질문이 사라지지 않게 check-cash.sql이 이상 징후를 찾는다)
     await repo.restoreCashSpend({ userId: input.userId, ref: cashRef });
@@ -344,7 +387,22 @@ async function askFreeQuestionNow(deps: AskDeps, input: AskInput): Promise<AskRe
     onUsage: (u) =>
       pending.push(
         repo
-          .addAiUsage({ reportId: null, provider: u.provider, model: u.model, promptVersion: u.promptVersion, inputTokens: u.inputTokens, outputTokens: u.outputTokens, estCostKrw: deps.capacity ? estimateCostKrw(deps.capacity, u) : null, latencyMs: u.latencyMs, outcome: u.outcome, errorCode: u.errorCode })
+          .addAiUsage({
+            reportId: null,
+            provider: u.provider,
+            model: u.model,
+            promptVersion: u.promptVersion,
+            inputTokens: u.inputTokens,
+            outputTokens: u.outputTokens,
+            estCostKrw: deps.capacity ? estimateCostKrw(deps.capacity, u) : null,
+            latencyMs: u.latencyMs,
+            outcome: u.outcome,
+            errorCode: u.errorCode,
+            purpose: "chat",
+            creditSource: useFree ? "free" : creditRef ? "reward" : "paid",
+            roomKey,
+            requestKey: requestRef,
+          })
           .catch(() => {}),
       ),
   };
@@ -362,7 +420,7 @@ async function askFreeQuestionNow(deps: AskDeps, input: AskInput): Promise<AskRe
       question: q.text,
       paragraphs,
       remaining: useFree ? Math.max(0, policy.freeQuestions - used - 1) : 0,
-      ...(balance !== null ? { cash: { balance } } : {}),
+      ...(await ticketBalance(deps, input.userId, balance, creditRef !== null)),
     };
   } catch (e) {
     await restoreCash();

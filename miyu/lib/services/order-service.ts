@@ -12,7 +12,7 @@ import {
 import { isInviteToken } from "../commerce/invite.ts";
 import { INVITE_DISCOUNT, isCashProduct, isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
 import { salesClosedMessage, type GateReason, type SaleGate } from "./capacity-service.ts";
-import type { Acquisition, CashRefundResult, MiyuRepository, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
+import type { Acquisition, CashRefundResult, MiyuRepository, OrderDiscountKind, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
 import { nextPersonalSeq, paidPersonalOrders } from "./purchases.ts";
 
 /** 새 구매를 받아도 되는지 확인하는 함수 (용량 · 예산). 확인 자체가 실패하면 판매를 막지 않는다 */
@@ -28,9 +28,30 @@ async function gateOpen(gate: SaleGateCheck | undefined, stage: "start" | "confi
   }
 }
 
+/**
+ * 혜택 시스템(benefit-service)이 서버에서 다시 계산한 견적으로 만든 가격 계획. 브라우저가 보낸 금액 · 종류는 쓰지 않는다.
+ * - pay: 결제사를 거치는 주문(정가 · 추천 가격 · 쿠폰 할인가). 주문을 만든 뒤 claim이 추천 가격 · 쿠폰 자리를 DB에서 확정하고, 확정하지 못하면 그 주문을 취소한다(정가로 조용히 이어 가지 않는다 — 고객이 사유 · 정가를 보고 다시 확인한다)
+ * - free: 결제사를 거치지 않는 0원 혜택 주문(100% 쿠폰 · 포인트 전액 교환). grant가 DB 함수 한 번으로 근거 확정 + 주문 생성을 한다
+ */
+export type CheckoutPlan =
+  | {
+      mode: "pay";
+      amountKrw: number;
+      listKrw: number;
+      /** 정가 그대로면 null */
+      discountKind: OrderDiscountKind | null;
+      discountRef: string | null;
+      claim?: (order: OrderRecord) => Promise<{ ok: true } | { ok: false; reason: string }>;
+    }
+  | { mode: "free"; listKrw: number; grant: (productId: string, orderNumber: string) => Promise<{ ok: true } | { ok: false; reason: string }> };
+
 export type StartCheckoutResult =
-  /** discounted: 초대 할인(5,900원)이 확정된 주문 */
+  /** discounted: 초대 할인(5,900원) 또는 새 가격 계획의 할인이 확정된 주문 */
   | { kind: "order"; order: OrderRecord; discounted?: boolean }
+  /** 0원 혜택 주문이 만들어졌다(구매 권한은 있고 결제는 없다) — 호출한 쪽이 리포트 생성을 예약한다 */
+  | { kind: "granted"; order: OrderRecord }
+  /** 요청한 할인 · 혜택을 확정하지 못했다(reason: 서버가 확인한 이유, "error"는 서버 오류). 결제는 시작하지 않았다 */
+  | { kind: "discount-denied"; reason: string }
   | { kind: "already-paid"; order: OrderRecord }
   /** 다시 받기를 눌렀지만 가장 최근에 받은 리포트가 아직 완성되지 않았다(만드는 중이거나 실패) — 새로 결제하지 않고 그 리포트의 상태를 안내한다 */
   | { kind: "report-not-ready"; order: OrderRecord }
@@ -48,7 +69,7 @@ export type StartCheckoutResult =
  */
 export async function startCheckout(
   deps: { repo: MiyuRepository; now: () => Date; newOrderNumber?: (now: Date) => string; gate?: SaleGateCheck },
-  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null; again?: boolean; inviteToken?: string | null },
+  input: { userId: string; assessmentId: string; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null; again?: boolean; inviteToken?: string | null; plan?: CheckoutPlan },
 ): Promise<StartCheckoutResult> {
   const { repo } = deps;
   const assessment = await repo.getAssessment(input.assessmentId);
@@ -89,6 +110,50 @@ export async function startCheckout(
     paymentEnv: input.paymentEnv ?? "test",
     acquisition: input.acquisition ?? null,
   });
+
+  // 새 가격 계획(운영자 2026-10-17 혜택 시스템): 서버가 다시 계산한 견적대로만 주문을 만든다. 계획이 있으면 예전 초대 할인 경로는 쓰지 않는다
+  if (input.plan) {
+    const plan = input.plan;
+    if (plan.mode === "free") {
+      const orderNumber = makeNumber(deps.now());
+      let granted: { ok: true } | { ok: false; reason: string };
+      try {
+        granted = await plan.grant(productId, orderNumber);
+      } catch {
+        granted = { ok: false, reason: "error" };
+      }
+      if (!granted.ok) return { kind: "discount-denied", reason: granted.reason };
+      const order = await repo.getOrderByNumber(orderNumber);
+      if (!order) return { kind: "discount-denied", reason: "error" };
+      return { kind: "granted", order };
+    }
+    const planned = await repo.insertOrder({
+      ...newOrder(plan.amountKrw),
+      ...(plan.discountKind ? { pricing: { listAmount: plan.listKrw, discountKrw: Math.max(0, plan.listKrw - plan.amountKrw), discountKind: plan.discountKind, discountRef: plan.discountRef } } : {}),
+    });
+    if (!planned.ok) {
+      // 같은 검사에 이미 대기 주문이 있어 만들지 못함(동시에 두 번 누름): 같은 금액이면 그 주문을 쓰고, 다르면 다시 시도하게 한다
+      const latest = (await repo.listOrdersForAssessment(assessment.id)).find((o) => o.productId === productId && o.status === "pending");
+      return latest && latest.amount === plan.amountKrw ? { kind: "order", order: latest, discounted: plan.amountKrw < plan.listKrw } : { kind: "discount-denied", reason: "busy" };
+    }
+    if (plan.claim) {
+      let claimed: { ok: true } | { ok: false; reason: string };
+      try {
+        claimed = await plan.claim(planned.value);
+      } catch {
+        claimed = { ok: false, reason: "error" };
+      }
+      if (!claimed.ok) {
+        const canceled = await repo.updateOrder(planned.value.id, ["pending"], { status: "canceled", failureCode: "DISCOUNT_DENIED", failureMessage: "할인을 확정하지 못해 취소됨" });
+        if (canceled) await repo.addPaymentEvent({ orderId: planned.value.id, source: "checkout", status: "DISCOUNT_DENIED", detail: { reason: claimed.reason } }).catch(() => {});
+        return { kind: "discount-denied", reason: claimed.reason };
+      }
+    }
+    if (plan.discountKind && plan.amountKrw < plan.listKrw) {
+      await repo.addPaymentEvent({ orderId: planned.value.id, source: "checkout", status: `DISCOUNT_${plan.discountKind.toUpperCase()}`, detail: {} }).catch(() => {});
+    }
+    return { kind: "order", order: planned.value, discounted: plan.amountKrw < plan.listKrw };
+  }
 
   // 초대 할인(운영자 2026-10-16): 첫 구매이고 초대 링크로 들어왔으며 서버가 할인 대상이라고 확인했을 때만 5,900원 주문을 만들고, 만든 뒤 DB에서 한도 · 첫 구매를 한 번 더 확정한다.
   // 할인은 편의다 — 확인 · 확정이 어떤 이유로든 실패하면 정가 주문으로 이어 가고 구매를 막지 않는다.

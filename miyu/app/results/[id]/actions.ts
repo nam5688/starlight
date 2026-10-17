@@ -25,6 +25,8 @@ async function checkout(assessmentId: string, again: boolean) {
   if (result.kind === "already-paid" || result.kind === "sales-closed") redirect(`/results/${assessmentId}`);
   // 가장 최근에 받은 리포트가 아직 완성되지 않았다면 새로 결제하지 않고 그 리포트의 상태(만드는 중 · 실패 · 다시 만들기)를 보여 준다
   if (result.kind === "report-not-ready") redirect(`/results/${assessmentId}?r=${encodeURIComponent(result.order.orderNumber)}`);
+  // 이 경로는 가격 계획(할인 · 혜택)을 넘기지 않으므로 아래 두 경우는 오지 않지만, 오면 결제로 보내지 않고 결과 화면으로 돌려보낸다
+  if (result.kind === "discount-denied" || result.kind === "granted") redirect(`/results/${assessmentId}`);
   redirect(`/checkout/${result.order.orderNumber}`);
 }
 

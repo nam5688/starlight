@@ -34,6 +34,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const regions = new Map<string, { province: string; district: string }>();
   const assessments = new Map<string, AssessmentRecord>();
   const orders = new Map<string, OrderRecord>();
+  /** 주문 상태가 바뀔 때 부르는 훅(테스트용 혜택 저장소가 DB 트리거 대신 등록한다) */
+  const orderHooks: ((before: OrderRecord, after: OrderRecord) => void)[] = [];
   const reports = new Map<string, ReportRecord>();
   const events: { orderId: string; source: PaymentEventSource; status: string | null; detail: Record<string, unknown>; createdAt: string }[] = [];
   const consents = new Map<string, ConsentRecord[]>();
@@ -258,10 +260,16 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         all.some((x) => x.orderNumber === o.orderNumber) ||
         all.some((x) => x.assessmentId === o.assessmentId && x.productId === o.productId && x.status === "pending");
       if (conflict) return { ok: false, reason: "conflict" };
+      const { pricing, ...rest } = o;
       const record: OrderRecord = {
-        ...o,
+        ...rest,
         id: id(),
         status: "pending",
+        provider: "tosspayments",
+        listAmount: pricing?.listAmount ?? null,
+        discountKrw: pricing?.discountKrw ?? null,
+        discountKind: pricing?.discountKind ?? null,
+        discountRef: pricing?.discountRef ?? null,
         paymentKey: null,
         method: null,
         approvedAt: null,
@@ -290,6 +298,14 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const next = { ...current, ...patch, updatedAt: iso() };
       orders.set(orderId, next);
       onOrderChange(current, next);
+      // 혜택 저장소 등이 주문 상태 변화에 반응한다(DB의 orders 트리거와 같은 자리) — 훅의 오류는 주문 상태 반영을 막지 않는다
+      for (const hook of orderHooks) {
+        try {
+          hook(current, next);
+        } catch {
+          // DB 트리거와 같이 보상 처리 오류가 결제 확정을 막지 않는다
+        }
+      }
       return next;
     },
     async addPaymentEvent(event) {
@@ -306,7 +322,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         .filter((o) => o.createdAt >= since)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, limit)
-        .map((o) => ({ id: o.id, userId: o.userId, assessmentId: o.assessmentId, productId: o.productId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null }));
+        .map((o) => ({ id: o.id, userId: o.userId, assessmentId: o.assessmentId, productId: o.productId, status: o.status, amount: o.amount, paymentEnv: o.paymentEnv, createdAt: o.createdAt, approvedAt: o.approvedAt, acquisition: o.acquisition ?? null, provider: o.provider, discountKind: o.discountKind ?? null, listAmount: o.listAmount ?? null, discountKrw: o.discountKrw ?? null }));
     },
     async listReportsForMetrics(since, limit) {
       return [...reports.values()]
@@ -373,8 +389,9 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async listOrdersForReconcile(o) {
       const all = [...orders.values()];
-      const pending = all.filter((x) => x.status === "pending" && x.createdAt < o.pendingCreatedBefore).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-      const paid = all.filter((x) => x.status === "paid" && (x.approvedAt ?? x.createdAt) >= o.paidSince);
+      // 혜택 주문(0원)은 결제사 기록이 없어 결제 대조에서 뺀다(DB 저장소와 같다)
+      const pending = all.filter((x) => x.provider !== "benefit" && x.status === "pending" && x.createdAt < o.pendingCreatedBefore).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const paid = all.filter((x) => x.provider !== "benefit" && x.status === "paid" && (x.approvedAt ?? x.createdAt) >= o.paidSince);
       return [...pending, ...paid].slice(0, o.limit);
     },
     async listRecentOrders(limit) {
@@ -747,5 +764,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
+  return { repo, newId: id, orderHooks, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
 }

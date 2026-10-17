@@ -84,6 +84,27 @@ export function FlowIcon({ className = "size-4" }: { className?: string }) {
   );
 }
 
+/** 한 사람 — 머리와 어깨 (홈 첫 화면의 "내 사주 보기") */
+export function PersonIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <circle cx="10" cy="6.8" r="3" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3.8 16.5c.5-3.2 2.7-5 6.2-5s5.7 1.8 6.2 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** 두 사람 — 나란히 선 머리와 어깨 (홈 첫 화면의 "우리 궁합 보기") */
+export function PairIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <circle cx="6.2" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="13.8" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M1.8 16c.4-2.7 1.9-4.2 4.4-4.2s4 1.5 4.4 4.2M9.4 16c.4-2.7 1.9-4.2 4.4-4.2s4 1.5 4.4 4.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** 읽을 때 알아 둘 조건 */
 export function InfoIcon({ className = "size-4" }: { className?: string }) {
   return (

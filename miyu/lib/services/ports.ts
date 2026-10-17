@@ -60,9 +60,23 @@ export type OrderRecord = {
   paymentEnv: PaymentEnv;
   /** 결제를 시작할 때의 유입 출처 (7번 이후 마이그레이션 전에 만든 주문에는 없다) */
   acquisition?: Acquisition | null;
+  /**
+   * 결제 경로(DB 변경 20번 이후) — tosspayments: 결제사를 거친 현금 주문(기본) · benefit: 쿠폰 · 포인트로 받은 0원 혜택 주문.
+   * 혜택 주문은 구매 권한(paid)은 같지만 "결제 완료"가 아니라 "혜택으로 받음"이며, 매출 · 결제 수 · 결제 대조에는 들어가지 않는다. 20번 전에 만든 주문에는 없다(= tosspayments)
+   */
+  provider?: OrderProvider;
+  /** 가격이 어떻게 정해졌는지(정가 · 할인액 · 할인 종류) — 20번 이후 주문에만 있다 */
+  listAmount?: number | null;
+  discountKrw?: number | null;
+  discountKind?: OrderDiscountKind | null;
+  discountRef?: string | null;
   createdAt: string;
   updatedAt: string;
 };
+export type OrderProvider = "tosspayments" | "benefit";
+export type OrderDiscountKind = "referral" | "coupon" | "points" | "admin";
+/** 혜택 주문이면 true (provider가 없는 예전 주문은 결제사 주문이다) */
+export const isBenefitOrder = (o: Pick<OrderRecord, "provider">): boolean => o.provider === "benefit";
 export type PaymentEnv = "test" | "test-docs" | "live";
 /** 처음 들어온 출처 (광고 · 채널 비교용). 값이 없으면 null */
 export type Acquisition = { source: string | null; medium: string | null; campaign: string | null };
@@ -71,7 +85,11 @@ export type WithdrawDataResult =
   /** cash-balance: 결제해 두고 쓰지 않은 질문(장부 잔액)이 남아 있다 (다 쓰거나 환불 문의를 마친 뒤에 탈퇴) */
   | { ok: false; reason: "pending-order" | "report-in-progress" | "cash-balance" | "not-found" };
 
-export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv"> & { acquisition?: Acquisition | null };
+export type NewOrder = Pick<OrderRecord, "orderNumber" | "userId" | "assessmentId" | "productId" | "amount" | "paymentEnv"> & {
+  acquisition?: Acquisition | null;
+  /** 정가 · 할인 기록(20번 이후 DB에만 저장한다 — 없으면 건너뛴다) */
+  pricing?: { listAmount: number; discountKrw: number; discountKind: OrderDiscountKind; discountRef: string | null };
+};
 export type OrderPatch = Partial<
   Pick<OrderRecord, "status" | "paymentKey" | "method" | "approvedAt" | "failureCode" | "failureMessage">
 >;
@@ -112,6 +130,14 @@ export type AiUsageInput = {
   latencyMs: number;
   outcome: "ok" | "invalid" | "timeout" | "error";
   errorCode: string | null;
+  /**
+   * 원가 측정용 분류(DB 변경 22번 이후 열이 있다 — 없으면 건너뛴다). purpose: 어느 기능의 호출인가 · creditSource: 어떤 질문권으로 물었나(free 기본 무료 · reward 보상 질문권 · paid 결제한 질문) ·
+   * roomKey: 상담방 · requestKey: 한 질문(첫 호출 + 고쳐 쓰기 호출)을 묶는 번호. 질문 · 답 내용은 담지 않는다
+   */
+  purpose?: "report" | "chat" | "taste" | "compat" | "other";
+  creditSource?: "free" | "reward" | "paid";
+  roomKey?: string | null;
+  requestKey?: string | null;
 };
 export type AiUsageRecord = AiUsageInput & { id: number; createdAt: string };
 
@@ -123,7 +149,14 @@ export type FunnelEventInput = { anonId: string; name: FunnelEventName; path: st
 export type FunnelEventRecord = FunnelEventInput & { id: number; createdAt: string };
 
 /** 지표 집계용 — 개인을 구분하는 값은 회원번호뿐이며 화면에는 합계만 보인다 */
-export type MetricsOrder = Pick<OrderRecord, "id" | "userId" | "assessmentId" | "productId" | "status" | "amount" | "paymentEnv" | "createdAt" | "approvedAt"> & { acquisition: Acquisition | null };
+export type MetricsOrder = Pick<OrderRecord, "id" | "userId" | "assessmentId" | "productId" | "status" | "amount" | "paymentEnv" | "createdAt" | "approvedAt"> & {
+  acquisition: Acquisition | null;
+  /** 혜택 주문(0원)은 매출 · 결제 전환에 넣지 않는다 */
+  provider?: OrderProvider;
+  discountKind?: OrderDiscountKind | null;
+  listAmount?: number | null;
+  discountKrw?: number | null;
+};
 export type MetricsReport = Pick<ReportRecord, "id" | "orderId" | "status" | "createdAt" | "readyAt">;
 export type FeedbackRecord = { reportId: string; userId: string; rating: number; createdAt: string; updatedAt: string };
 
