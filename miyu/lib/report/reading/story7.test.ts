@@ -146,6 +146,38 @@ test("story-v1 글 조각은 고민(focus)을 비교에서 뺀다 — 7개 대�
   assert.equal(validateStoryDraft(d, EVIDENCE[0], { hasContext: false }).ok, false); // 간이 입력은 제품 검사를 통과하지 못한다(검사가 살아 있다는 확인)
 });
 
+test("저장된 비교 글 4편: 문서(story-7-sections-review.md 3장)에 적은 수치가 지금 코드로 다시 세어도 같다 — 지표 코드가 바뀌면 문서를 고쳐야 한다", () => {
+  const rows = (["P01", "P03"] as const).map((id) => {
+    const ev = EVIDENCE[PERSONAS.findIndex((p) => p.id === id)];
+    const v1 = proxy(`${id}-v1.json`) as StoryDraftV1;
+    const s7 = proxy(`${id}-s7.json`) as Story7Draft;
+    const cites = (blocks: [string, string[]][]) => {
+      const m = new Map<string, Set<string>>();
+      for (const [b, ids] of blocks) for (const i of ids) (m.get(i) ?? m.set(i, new Set()).get(i)!).add(b);
+      return { distinct: m.size, multi: [...m.values()].filter((x) => x.size >= 2).length };
+    };
+    return {
+      id, ev, v1, s7,
+      mv1: textRepetition(piecesOfStoryV1(v1)),
+      m7: textRepetition(piecesOfStory7(s7)),
+      c1: cites([...v1.areas.map((a) => [a.id, a.evidence] as [string, string[]]), ["flow", v1.flow.evidence]]),
+      c7: cites(s7.sections.map((sec) => [`s${sec.no}`, sec.evidence])),
+    };
+  });
+  const [p01, p03] = rows;
+  assert.deepEqual([p01.mv1.repeatedPhrases, p01.m7.repeatedPhrases, p03.mv1.repeatedPhrases, p03.m7.repeatedPhrases], [1, 0, 4, 3]);
+  assert.deepEqual([p01.mv1.pairOverlapMean, p01.m7.pairOverlapMean, p03.mv1.pairOverlapMean, p03.m7.pairOverlapMean].map((x) => Number(x.toFixed(2))), [0.2, 0.16, 0.2, 0.18]);
+  assert.deepEqual([p01.mv1.chars, p01.m7.chars, p03.mv1.chars, p03.m7.chars], [3763, 4559, 4052, 4453]);
+  assert.deepEqual([p01.c1, p01.c7, p03.c1, p03.c7], [{ distinct: 32, multi: 2 }, { distinct: 38, multi: 4 }, { distinct: 17, multi: 5 }, { distinct: 22, multi: 4 }]);
+  // 형식: 지금 구조의 P01은 제품 검사 통과, P03은 용어 두 건 불통과 · 7개 대주제 두 편은 최소 점검 통과
+  assert.equal(validateStoryDraft(p01.v1, p01.ev, { hasContext: false }).ok, true);
+  const v03 = validateStoryDraft(p03.v1, p03.ev, { hasContext: false });
+  assert.ok(!v03.ok && v03.errors.length === 2);
+  for (const r of rows) assert.deepEqual(checkStory7Format(r.s7, r.ev), [], r.id);
+  // 2번 · 7번(엮는 장)은 응답 근거를 인용하지 않았고, 7번에는 알려 준 고민이 없어 고민을 반영한 조언이 아니다
+  for (const r of rows) for (const no of [2, 7]) assert.deepEqual(r.s7.sections.find((s) => s.no === no)!.evidence, [], `${r.id} ${no}`);
+});
+
 test("연결하지 않았다: 화면 · 서버 · 서비스 · 리포트 생성 어디에서도 7개 대주제 초안을 불러오지 않는다(예외는 story7-* 파일과 측정 스크립트뿐)", () => {
   const root = join(import.meta.dirname, "..", "..", "..");
   const hits: string[] = [];

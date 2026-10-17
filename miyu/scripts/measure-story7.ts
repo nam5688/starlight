@@ -172,8 +172,8 @@ if (cases.length > 0) {
   push();
   push("> **실제 서비스 AI의 글이 아니다.** 같은 계열 모델(AI 하위 작업자)이 같은 날 같은 입력으로 구조만 달리해 한 번씩 쓴 글이다(고쳐 쓰기 없음, 고민(context) 없음). 지금 구조 글(`*-v1.json`)은 `story-v1-prompt-0.3`, 7개 대주제 글(`*-s7.json`)은 같은 지시문의 규칙 + 7개 대주제 규칙을 더한 비교용 지시문이다. 사람이 쓴 글이 아니고 표본이 인물 2명 × 구조 2개뿐이라 **줄었다는 증거가 아니라 방향을 보는 참고**이며 가려 읽는 사람의 평가를 대신하지 않는다.");
   push();
-  push("| 인물 · 구조 | 형식 점검(걸린 수) | 단위 수 | 글자 수 | 인용한 서로 다른 근거 | 두 단위 이상에 인용된 근거 | 12자 이상 같은 토막 | 낱말이 가장 많이 번진 것(블록 수 · 횟수) | 단위 쌍 낱말 겹침 평균 · 최대 |");
-  push("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  push("| 인물 · 구조 | 형식 점검(걸린 수) | 단위 수 | 글자 수 | 인용한 서로 다른 근거 | 두 단위 이상에 인용된 근거 | 12자 이상 같은 토막 | 낱말이 가장 많이 번진 것(블록 수 · 횟수) | 장 쌍 낱말 겹침 평균 · 최대(제목 · 카드 제외) | 제목 · 카드와 본문의 겹침 최대 |");
+  push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const c of cases) {
     const raw = JSON.parse(readFileSync(c.path, "utf8"));
     const ev = buildEvidence(personas.find((x) => x.id === c.id)!.input, ref);
@@ -196,7 +196,7 @@ if (cases.length > 0) {
     const m = textRepetition(pieces);
     const multiCount = [...cites].filter(([, b]) => b.size >= 2).length;
     const stems = m.topStems.slice(0, 3).map((t) => `‘${t.stem}…’ ${t.blocks}블록·${t.total}번`).join(", ");
-    push(`| ${c.id} · ${c.tag === "v1" ? "지금 story-v1(영역 3 + 시기)" : "7개 대주제"} | ${format} | ${m.blocks} | ${m.chars.toLocaleString("ko-KR")} | ${cites.size} | ${multiCount} | ${m.repeatedPhrases} | ${stems || "—"} | ${m.pairOverlapMean.toFixed(2)} · ${m.pairOverlapMax.value.toFixed(2)}(${m.pairOverlapMax.a}↔${m.pairOverlapMax.b}) |`);
+    push(`| ${c.id} · ${c.tag === "v1" ? "지금 story-v1(영역 3 + 시기)" : "7개 대주제"} | ${format} | ${m.blocks} | ${m.chars.toLocaleString("ko-KR")} | ${cites.size} | ${multiCount} | ${m.repeatedPhrases} | ${stems || "—"} | ${m.pairOverlapMean.toFixed(2)} · ${m.pairOverlapMax.value.toFixed(2)}(${m.pairOverlapMax.a}↔${m.pairOverlapMax.b}) | ${m.headOverlapMax.value.toFixed(2)}(${m.headOverlapMax.block}) |`);
   }
   push();
   push("- 단위 수: story-v1은 제목+카드(head) · 영역 3 · 시기 · 행동(최대 6~7), 7개 대주제는 head + 7장. 낱말 겹침 · 인용 중복은 단위가 많을수록 쌍과 기회가 늘어 수치가 커지기 쉬워 평균과 함께 본다. 형식 점검은 두 구조가 서로 다른 검사(story-v1은 제품 검사, 7개 대주제는 지시문 한도만 본 최소 점검)라 숫자를 맞비교하지 않는다. \"인용한 서로 다른 근거\"는 정보량의 어림이다 — 근거를 많이 인용했다고 새로 알게 되는 것이 많다는 뜻은 아니다.");

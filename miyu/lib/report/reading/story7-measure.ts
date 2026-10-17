@@ -153,6 +153,8 @@ export type TextRepetition = {
   /** 블록 쌍마다 낱말 겹침(더 작은 쪽 낱말 중 다른 쪽에도 있는 몫)의 평균과 최대 — 말을 바꿔 되풀이한 글도 어느 정도 잡히지만 같은 주제를 쓰면 높아지기도 하는 어림 */
   pairOverlapMean: number;
   pairOverlapMax: { a: string; b: string; value: number };
+  /** 제목 · 카드(head)와 본문 단위 사이의 낱말 겹침 최대 — 제목이 본문을 요약하므로 높은 것이 당연해 장 쌍과 따로 센다 */
+  headOverlapMax: { block: string; value: number };
 };
 
 export function textRepetition(pieces: TextPiece[]): TextRepetition {
@@ -174,12 +176,18 @@ export function textRepetition(pieces: TextPiece[]): TextRepetition {
   let sum = 0;
   let n = 0;
   let max = { a: "", b: "", value: 0 };
+  let headMax = { block: "", value: 0 };
   for (let i = 0; i < blocks.length; i++) {
     for (let j = i + 1; j < blocks.length; j++) {
       const small = sets[i].size <= sets[j].size ? sets[i] : sets[j];
       const large = small === sets[i] ? sets[j] : sets[i];
       if (small.size < 8) continue;
       const v = [...small].filter((s) => large.has(s)).length / small.size;
+      if (blocks[i] === "head" || blocks[j] === "head") {
+        const other = blocks[i] === "head" ? blocks[j] : blocks[i];
+        if (v > headMax.value) headMax = { block: other, value: v };
+        continue;
+      }
       sum += v;
       n++;
       if (v > max.value) max = { a: blocks[i], b: blocks[j], value: v };
@@ -192,6 +200,7 @@ export function textRepetition(pieces: TextPiece[]): TextRepetition {
     topStems,
     pairOverlapMean: n ? sum / n : 0,
     pairOverlapMax: max,
+    headOverlapMax: headMax,
   };
 }
 
