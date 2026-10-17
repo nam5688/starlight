@@ -987,7 +987,7 @@ function MeBubble({ text }: { text: string }) {
   );
 }
 
-/** 모드 접속 안내 — 가운데에 작게 (예: 연애박사 미유 모드로 접속합니다) */
+/** 상담 시작 안내 — 가운데에 작게 (예: 연애 상담을 시작할게요) */
 function System({ text, sub }: { text: string; sub?: string }) {
   return (
     <div className="py-1 text-center">

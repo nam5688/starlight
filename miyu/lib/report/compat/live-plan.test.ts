@@ -34,10 +34,10 @@ test("입력은 가상 인물이다 — 두 사람의 사주가 계산돼 있고
   assert.ok(cmp.comparedLabels.length > 0);
 });
 
-test("승인 값: 운영자가 정한 총액 · 1회 상한(사주 궁합 635원 · 리포트 궁합 680.15원)과 승인 횟수를 코드가 그대로 지킨다", () => {
+test("승인 값: 운영자가 정한 총액 · 1회 상한(사주 궁합 656.30원 · 리포트 궁합 701.40원)과 승인 횟수를 코드가 그대로 지킨다", () => {
   const byName = Object.fromEntries(COMPAT_LIVE_STAGES.map((s) => [s.name, s]));
-  assert.equal(byName["compat-saju-p1"].restrict.runCeilingKrw, 635);
-  assert.equal(byName["compat-pair-p1"].restrict.runCeilingKrw, 680.15);
+  assert.equal(byName["compat-saju-p1"].restrict.runCeilingKrw, 656.3);
+  assert.equal(byName["compat-pair-p1"].restrict.runCeilingKrw, 701.4);
   for (const stage of COMPAT_LIVE_STAGES) {
     assert.equal(stage.capKrw, 6000, `${stage.name}: 총 승인 한도 6,000원(누적 2,468원 포함)`);
     assert.equal(stage.restrict.runsApproved, 1, `${stage.name}: 승인된 실행 1회(호출 최대 2회)`);
@@ -61,10 +61,10 @@ test("승인이 없는 단계(승인 0회 · 상한 0원)는 --execute를 거절
 
 test("승인된 단계: 상한을 넘는 최악 비용 · 이미 쓴 금액 누락 · 승인된 횟수를 모두 마친 경우를 거절하고, 모두 맞으면 통과한다", () => {
   const stage: CompatLiveStageDef = { ...COMPAT_LIVE_STAGES[0], restrict: { runCeilingKrw: 700, runsApproved: 1, runsDone: 0 } };
-  assert.deepEqual(checkCompatLiveRestriction(stage, { alreadySpentGiven: true, twoRoundWorstKrw: 635, execute: true }), []);
+  assert.deepEqual(checkCompatLiveRestriction(stage, { alreadySpentGiven: true, twoRoundWorstKrw: 656.3, execute: true }), []);
   assert.ok(checkCompatLiveRestriction(stage, { alreadySpentGiven: true, twoRoundWorstKrw: 700.01, execute: true }).some((i) => i.includes("넘습니다")), "상한은 반올림 없이 그대로 비교한다");
   assert.deepEqual(checkCompatLiveRestriction(stage, { alreadySpentGiven: true, twoRoundWorstKrw: 700, execute: true }), [], "상한과 같으면 통과");
-  assert.ok(checkCompatLiveRestriction(stage, { alreadySpentGiven: false, twoRoundWorstKrw: 635, execute: true }).some((i) => i.includes("--already-spent-krw")));
+  assert.ok(checkCompatLiveRestriction(stage, { alreadySpentGiven: false, twoRoundWorstKrw: 656.3, execute: true }).some((i) => i.includes("--already-spent-krw")));
   const done: CompatLiveStageDef = { ...stage, restrict: { ...stage.restrict, runsDone: 1, lastRun: "2026-10-20 · 호출 1회 · 130원" } };
-  assert.ok(checkCompatLiveRestriction(done, { alreadySpentGiven: true, twoRoundWorstKrw: 635, execute: true }).some((i) => i.includes("다시 승인")));
+  assert.ok(checkCompatLiveRestriction(done, { alreadySpentGiven: true, twoRoundWorstKrw: 656.3, execute: true }).some((i) => i.includes("다시 승인")));
 });

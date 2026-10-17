@@ -52,7 +52,7 @@ const fixedCopy = (): string[] =>
     }),
   ].filter(Boolean);
 
-test("방 정의: 여덟 곳이고 이름은 운영자가 정한 대로이며, 모드 방은 '○○ 미유 모드로 접속합니다'로 들어가고 먼저 묻는 질문이 있다", () => {
+test("방 정의: 여덟 곳이고 이름은 운영자가 정한 대로이며, 모드 방은 '○○ 상담을 시작할게요'로 들어가고 먼저 묻는 질문이 있다", () => {
   assert.deepEqual([...ROOM_ORDER], ["main", "daily", "year", "love", "marriage", "career", "money", "concern"]);
   assert.deepEqual(
     ROOM_ORDER.map((id) => ROOMS[id].mode),
@@ -63,9 +63,10 @@ test("방 정의: 여덟 곳이고 이름은 운영자가 정한 대로이며, �
     ["나를 알아보기", "오늘의 운세", "올해의 흐름", "연애", "결혼", "일 · 진로", "돈 · 재무", "고민 상담"],
   );
   assert.equal(ROOMS.main.connect, null);
+  const START_NOTICE: Record<string, string> = { daily: "오늘의 운세를 시작할게요", year: "올해의 흐름 이야기를 시작할게요", love: "연애 상담을 시작할게요", marriage: "결혼 상담을 시작할게요", career: "일 · 진로 상담을 시작할게요", money: "돈 · 재무 상담을 시작할게요", concern: "고민 상담을 시작할게요" };
   for (const id of ROOM_ORDER.filter((r) => r !== "main")) {
     const r = ROOMS[id];
-    assert.equal(r.connect, `${r.mode} 모드로 접속합니다`);
+    assert.equal(r.connect, START_NOTICE[id], `${id}: 시작 알림`);
     assert.ok(r.intake && r.intake.options.length >= 3, `${id}: 먼저 묻는 질문`);
     assert.equal(new Set(r.intake!.options.map((o) => o.id)).size, r.intake!.options.length, `${id}: 답 번호가 겹치지 않는다`);
     for (const o of [...r.intake!.options, ...(r.intake!.legacySkip ? [r.intake!.legacySkip] : [])]) assert.ok(TALK_MOODS.includes(o.mood), `${id}/${o.id}: 알 수 없는 표정`);
@@ -120,7 +121,7 @@ test("연애 방: 모드 접속 안내 → 인사 → 먼저 묻는 질문으로
   assert.equal(s.phase, "intake");
   assert.deepEqual(kinds(s.lines), ["system", "text", "text"]);
   const sys = s.lines[0];
-  assert.ok(sys.from === "miyu" && sys.say.kind === "system" && sys.say.text === "연애박사 미유 모드로 접속합니다");
+  assert.ok(sys.from === "miyu" && sys.say.kind === "system" && sys.say.text === "연애 상담을 시작할게요");
   assert.equal(miyuText(s.lines)[0], ROOMS.love.greeting("서윤"));
   assert.equal(miyuText(s.lines)[1], ROOMS.love.intake!.question);
   const r = replyOptions(m, "love", s);
@@ -495,8 +496,8 @@ test("질문 구매 버튼(운영자 2026-10-16): 이름은 '질문 3개 구매�
   for (const gone of ["chatPayNote", "chatFreeNote"]) assert.ok(!Object.keys(ROOM_COPY).includes(gone), `${gone}는 없어졌다`);
 });
 
-test("채팅 하단 안내문(운영자 2026-10-16): 한 줄만 — '답변은 입력해 주신 정보를 기반으로 해석한 내용이며 정확한 예측이나 진단이 아닙니다.' 가격 · 글자 수 · 남은 횟수 · AI가 쓴 글이라는 긴 설명은 붙이지 않는다", () => {
-  assert.equal(ROOM_COPY.chatAiNote, "답변은 입력해 주신 정보를 기반으로 해석한 내용이며 정확한 예측이나 진단이 아닙니다.");
+test("채팅 하단 안내문(운영자 2026-10-16): 한 줄만 — '답변은 입력해 주신 정보를 기반으로 해석한 내용이에요. 정확한 예측이나 진단은 아니에요.' 가격 · 글자 수 · 남은 횟수 · AI가 쓴 글이라는 긴 설명은 붙이지 않는다", () => {
+  assert.equal(ROOM_COPY.chatAiNote, "답변은 입력해 주신 정보를 기반으로 해석한 내용이에요. 정확한 예측이나 진단은 아니에요.");
   assert.ok(!/\d|원|자까지|남았|쓰이지|AI가/.test(ROOM_COPY.chatAiNote), "숫자 · 가격 · 횟수 · 긴 설명이 없다");
   assert.ok(ROOM_COPY.chatAiNote.length < 60, "한 줄이다");
 });

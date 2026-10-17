@@ -158,10 +158,10 @@ export type CompatLiveStageDef = {
 };
 
 // 운영자 승인 2026-10-17(A안): 총 6,000원(누적 2,468원 포함 → 추가 지출 상한 3,532원), 모델 claude-sonnet-5-5, 각 시험 호출 최대 2회(생성 + 고쳐 쓰기).
-// 1회 상한은 운영자가 정한 최악 비용이다 — 사주 궁합 635원(지금 최악 634.99원) · 리포트 궁합 680원이었으나 지금 입력으로 센 최악이 680.15원이라 거절돼 **운영자가 같은 날 680.15원으로 확인했다**(반올림 없이 그대로 비교).
+// 1회 상한은 운영자가 정한 최악 비용이다 — 사주 궁합 635원 · 리포트 궁합 680원으로 시작해 680.15원으로 한 번 확인했고, 2026-10-17 문체 통일로 지시문이 길어져(최악 656.29 · 701.37원) 거절돼 **운영자가 같은 날 사주 궁합 656.30원 · 리포트 궁합 701.40원으로 다시 승인했다**(총 6,000원 · 호출 최대 2회 · 범위는 그대로, 반올림 없이 그대로 비교).
 export const COMPAT_LIVE_STAGES: CompatLiveStageDef[] = [
-  { name: "compat-saju-p1", label: "사주 궁합 실제 AI 1건 (가상 쌍 C1) — 운영자 승인 2026-10-17 A안(총 6,000원, 누적 2,468원 포함)", kind: "saju", capKrw: 6000, restrict: { runCeilingKrw: 635, runsApproved: 1, runsDone: 0 } },
-  { name: "compat-pair-p1", label: "리포트 궁합 실제 AI 1건 (가상 인물 P01 · P02) — 운영자 승인 2026-10-17 A안(총 6,000원, 누적 2,468원 포함)", kind: "pair", capKrw: 6000, restrict: { runCeilingKrw: 680.15, runsApproved: 1, runsDone: 0 } },
+  { name: "compat-saju-p1", label: "사주 궁합 실제 AI 1건 (가상 쌍 C1) — 운영자 승인 2026-10-17 A안(총 6,000원, 누적 2,468원 포함)", kind: "saju", capKrw: 6000, restrict: { runCeilingKrw: 656.3, runsApproved: 1, runsDone: 0 } },
+  { name: "compat-pair-p1", label: "리포트 궁합 실제 AI 1건 (가상 인물 P01 · P02) — 운영자 승인 2026-10-17 A안(총 6,000원, 누적 2,468원 포함)", kind: "pair", capKrw: 6000, restrict: { runCeilingKrw: 701.4, runsApproved: 1, runsDone: 0 } },
 ];
 
 /**
