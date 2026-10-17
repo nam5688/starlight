@@ -118,7 +118,9 @@ export const COMPARE_STAGES: CompareStageDef[] = [
       runCeilingKrw: 1234.04,
       requireAlreadySpent: true,
       runsApproved: 1,
-      runsDone: 0,
+      // 2026-10-17 운영자 PC에서 실행했다(호출 1회 · 재작성 없음 · 실제 168원 · 누적 2,636원). 같은 승인으로는 --execute를 거절한다 — 재작성 · 다음 시험은 운영자가 글을 읽고 정한 뒤 새로 확인한다.
+      runsDone: 1,
+      lastRun: "2026-10-17 · 호출 1회(재작성 없음) · 168원 · 형식 검사 불통과(문단 문장 수 3 · 용어 수 2 · 같은 응답 근거 3개 영역 1) · 저장되지 않음, 원문 저장",
     },
   },
 ];

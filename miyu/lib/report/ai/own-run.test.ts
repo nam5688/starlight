@@ -90,14 +90,17 @@ test("승인 범위: story-own은 본인 입력 한 건 · story-v1 · 후보 A 
   const A = AI_CANDIDATES.find((c) => c.key === "A")!;
   const plan = planStage({ stage: "story-own", capKrw: 3532, personas: [ownPersona(built.input)], candidates: [{ key: "A", price: A.price }], settings: SETTINGS, now: NOW, variant: "story-v1" });
   const ok = { variant: "story-v1", only: "A", persona: "OWN", alreadySpentGiven: true, twoRoundWorstKrw: plan.firstCallWorstKrw, execute: true } as const;
-  assert.deepEqual(checkStageRestriction(own, ok), []);
+  assert.deepEqual(checkStageRestriction(own, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
   assert.ok(plan.firstCallWorstKrw < 700, `한 번 호출의 최악 ${plan.firstCallWorstKrw}`);
   assert.ok(checkStageRestriction(own, { ...ok, persona: "P01" }).length > 0, "다른 인물은 안 된다");
   assert.ok(checkStageRestriction(own, { ...ok, variant: "reading-v1" }).length > 0);
   assert.ok(checkStageRestriction(own, { ...ok, only: "B" }).length > 0);
   assert.ok(checkStageRestriction(own, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 막힌다");
   assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 1234.05 }).length > 0, "상한을 넘으면 막힌다");
-  assert.ok(checkStageRestriction({ restrict: { ...own.restrict!, runsDone: 1 } }, ok).length > 0, "승인된 한 건을 쓰고 나면 새 실행은 막힌다");
+  // 2026-10-17 운영자 PC에서 승인된 한 건을 실행했다 — 같은 승인으로는 실제 호출을 거절한다(새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만)
+  assert.equal(own.restrict?.runsDone, 1);
+  assert.ok(checkStageRestriction(own, ok).some((m) => /이미 실행/.test(m)), "승인된 한 건을 쓰고 나면 새 실행은 막힌다");
+  assert.deepEqual(checkStageRestriction({ restrict: { ...own.restrict!, runsDone: 0 } }, ok), [], "승인된 실행이 남아 있으면 통과한다");
   // 같은 승인 한 건을 본인 입력으로 옮겼으므로 P01 재시험은 더 하지 못한다
   assert.ok(checkStageRestriction(p01, { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1000, execute: true }).some((m) => /이미 실행/.test(m)));
 });
