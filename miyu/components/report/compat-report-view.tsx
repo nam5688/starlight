@@ -1,9 +1,14 @@
 import { ChevronIcon, InfoIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
-import { COMPAT_SECTIONS } from "@/lib/report/compat/plan";
+import { COMPAT_STEP_GROUPS, type CompatStepGroupId } from "@/lib/report/compat/plan";
 import type { CompatReport } from "@/lib/report/compat/types";
 
-const AREA_LABEL = Object.fromEntries(COMPAT_SECTIONS.map((s) => [s.id, s.topic]));
+/** 행동 묶음 이름 — 실제 이름이 있으면 이름으로 쓴다("A님이 B님에게 해 볼 행동" → "슬기 님이 남수 님에게 해 볼 행동") */
+function stepLabel(id: CompatStepGroupId, names: { a: string; b: string }): string {
+  if (id === "aToB") return `${names.a} 님이 ${names.b} 님에게 해 볼 행동`;
+  if (id === "bToA") return `${names.b} 님이 ${names.a} 님에게 해 볼 행동`;
+  return "함께 조율할 방법";
+}
 
 /**
  * 사주 궁합 리포트(유료 · 아직 판매하지 않음) 화면 — 위쪽의 커플 유형 · 궁합 지수 · 핵심 한 줄은 무료 간단 궁합과 같은 엔진 결과(코드가 채움)이고, 아래 풀이만 AI가 쓴 본문이다.
@@ -60,19 +65,28 @@ export function CompatReportView({ report }: { report: CompatReport }) {
         </section>
       ))}
 
-      <section aria-labelledby="compat-actions" className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
-        <h3 id="compat-actions" className="text-[18px] font-bold">
+      <section aria-labelledby="compat-steps" className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
+        <h3 id="compat-steps" className="text-[18px] font-bold">
           두 분이 해 볼 수 있는 것
         </h3>
-        <ul className="mt-3 space-y-4">
-          {report.actions.map((a) => (
-            <li key={a.title}>
-              <p className="text-[13px] font-semibold text-ink-3">{AREA_LABEL[a.area]}</p>
-              <p className="mt-0.5 text-[16px] font-semibold">{a.title}</p>
-              <p className="mt-1 text-[15px] leading-[1.75] text-ink-2">{a.detail}</p>
-            </li>
+        <div className="mt-3 space-y-5">
+          {COMPAT_STEP_GROUPS.map((g) => (
+            <div key={g.id}>
+              <p className="text-[13px] font-semibold text-accent">{stepLabel(g.id, report.names)}</p>
+              <ul className="mt-2 space-y-4">
+                {report.steps[g.id].map((a) => (
+                  <li key={a.title}>
+                    <p className="text-[16px] font-semibold">{a.title}</p>
+                    <p className="mt-1 text-[15px] leading-[1.75] text-ink-2">{a.detail}</p>
+                    <p className="mt-2 rounded-xl bg-accent-soft px-3 py-2 text-[15px] leading-[1.65] text-accent-strong">
+                      <span className="block text-[12px] font-semibold text-accent">건네 볼 수 있는 말</span>“{a.say}”
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       </section>
 
       <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">

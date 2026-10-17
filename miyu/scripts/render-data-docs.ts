@@ -7,7 +7,7 @@ import {
   CLOSENESS_LABEL, IPIP_FACETS, IPIP_REFERENCE, IPIP_REVIEW_VERSION, ITEM_FINDINGS, PERSPECTIVE_COMPARISON, PROPOSAL_VERSION, PROPOSED_ITEMS, READING_LIMITS,
 } from "../lib/assessment/drafts/ipip-review.ts";
 import { DRAFT_CONTENT_VERSION, DRAFT_ITEMS, PERSPECTIVES, type DraftItem, type PerspectiveId } from "../lib/assessment/drafts/situational-draft.ts";
-import { COMPAT_RULE_META, DAY_RULE_META, LUCKY_RULE_META, MONTH_RULE_META, PAIR_RULE_META, PAIR_SCENE_RULE_META, PARTNER_RULE_META, PERSONAL_TYPE_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
+import { COMPAT_RULE_META, DAY_RULE_META, LUCKY_RULE_META, MONTH_RULE_META, COMPAT_TIMING_RULE_META, PAIR_RULE_META, PAIR_SCENE_RULE_META, PARTNER_RULE_META, PERSONAL_TYPE_RULE_META, RULE_META, RULE_META_VERSION, type RuleMeta } from "../lib/saju/interpret/rule-meta.ts";
 import { PERSONAL_TYPE_VERSION } from "../lib/assessment/personal-type.ts";
 import { COMPAT_RULE_VERSION } from "../lib/saju/interpret/compat.ts";
 import { LUCKY_VERSION } from "../lib/saju/interpret/lucky.ts";
@@ -76,6 +76,12 @@ ${DAY_RULE_META.map(block).join("\n\n")}
 두 사람의 사주 원국만으로 관계를 읽는 규칙이다. 간단 궁합(무료)과 사주 궁합(유료)이 같은 규칙 · 같은 결과를 쓴다. 총점 · 커플 유형은 재미와 공유를 위한 정리이며 관계의 성공 확률 · 궁합의 정확도가 아니다. 같은 출처 · 같은 검토 상태(전문가 검토 전)다. 설계 · 분포 측정 · 한계는 \`docs/compat-engine.md\`.
 
 ${COMPAT_RULE_META.map(block).join("\n\n")}
+
+## 사주 궁합 — 두 사람의 시기 근거 규칙 (${COMPAT_TIMING_RULE_META.length}개, \`compat-timing.ts\`)
+
+사주 궁합(유료)의 "지금 두 사람이 지나는 시기" 영역에 쓰는 근거다. 두 사람 각자의 **이미 계산된** 대운 · 세운을 일간 기준 십신 그룹으로 읽어 나란히 놓는 범위뿐이며, 관계가 좋아지거나 나빠지는 해 · 달, 인연이 깊어지는 때, 추천 날짜, 두 시기가 맞물리는 해는 계산하지 않았다. 같은 출처 · 같은 검토 상태(전문가 검토 전)다.
+
+${COMPAT_TIMING_RULE_META.map(block).join("\n\n")}
 
 ## 리포트 궁합 — 두 사람 응답 비교 규칙 (${PAIR_RULE_META.length}개, \`compat/pair-evidence.ts\` · 규칙 ${PAIR_RULE_VERSION})
 
