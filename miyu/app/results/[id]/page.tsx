@@ -31,11 +31,14 @@ import { ReadingNav } from "@/components/report/reading-nav";
 import { ResultHeader } from "@/components/report/result-header";
 import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { CONCERN_RECORDS, LUCKY_INDEX, PERSONAL_TYPE, REPORT_BASIS } from "@/lib/config/product";
+import { type BenefitNotice, type PriceQuoteView, readBenefitQuery } from "@/lib/commerce/benefit-query";
 import { isConcernReport } from "@/lib/report/concern/types";
+import { isCompatReport } from "@/lib/report/compat/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { buildIdentity } from "@/lib/report/identity";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
+import { quoteForCheckout } from "@/lib/services/benefit-service";
 import { getInviteView, quoteInviteDiscount } from "@/lib/services/invite-service";
 import { receivedRowOf } from "@/lib/services/my-service";
 import { getResultView } from "@/lib/services/report-service";
@@ -44,7 +47,7 @@ import { currentSaleGate } from "@/server/capacity";
 import { peekInviteToken } from "@/server/invite";
 import { logError } from "@/server/ops";
 import { getSiteUrl } from "@/server/session";
-import { now, readRepository, reportGenerator, writeRepository } from "@/server/services";
+import { benefitRepository, now, readRepository, reportGenerator, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 import { reconcileUserInBackground } from "@/server/reconcile";
 import { PageFallback } from "@/components/ui/page-fallback";
@@ -66,6 +69,25 @@ export default function ResultPage({ params, searchParams }: PageProps<"/results
 
 /** 같은 결과로 여러 번 받은 리포트 중 하나를 고르는 주문번호 (?r=) — 형식이 맞지 않으면 무시하고 기본(가장 최근에 완성된 리포트)으로 연다 */
 const ORDER_NUMBER = /^[A-Za-z0-9_-]{6,64}$/;
+
+/**
+ * 결제 전 견적(정가 · 적격 할인 선택지 · 거절 사유 · 포인트 교환)을 서버에서 만든다.
+ * 확인 중 서버 오류는 "할인을 쓸 수 없다"가 아니라 오류 알림으로 돌려주고(구매는 막지 않는다), 정가 주문은 만들지 않는다.
+ */
+async function loadPurchaseQuote(input: { userId: string; assessmentId: string; couponCode: string | null; again: boolean }): Promise<{ quote: PriceQuoteView | null; failed: boolean }> {
+  try {
+    const r = await quoteForCheckout({ repo: writeRepository(), benefits: benefitRepository(), now }, input);
+    if (r.kind === "error") {
+      logError("benefit.quote", new Error(r.message));
+      return { quote: null, failed: true };
+    }
+    if (r.kind !== "quote") return { quote: null, failed: false };
+    return { quote: { quote: r.quote, couponCode: r.couponCode, pointBalance: r.pointBalance, couponsEnabled: r.settings.features.coupons }, failed: false };
+  } catch (e) {
+    logError("benefit.quote", e);
+    return { quote: null, failed: true };
+  }
+}
 
 async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/[id]">, "params" | "searchParams">) {
   const { id } = await params;
@@ -107,7 +129,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
 
   if (view.paidOrder && report?.status === "ready" && report.content) {
     const content = report.content;
-    if (isConcernReport(content)) notFound(); // 개인 통합 리포트 주문에는 고민 반영 리포트가 붙지 않는다
+    if (isConcernReport(content) || isCompatReport(content)) notFound(); // 개인 통합 리포트 주문에는 고민 반영 · 사주 궁합 리포트가 붙지 않는다
     const feedback = await (await readRepository()).getFeedback(report.id);
     // 친구 초대(심층 리포트를 받은 분만) — 확인에 실패하면 이 구역만 보이지 않는다
     const inviteView = await getInviteView(writeRepository(), { userId: member.userId, assessmentId: assessment.id }).catch((e) => {
@@ -174,6 +196,10 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
 
   // 초대 링크로 들어온 사람의 가격(운영자 예외 2026-10-16) — 서버가 대상인지 확인한 뒤에만 초대 가격을 함께 보인다
   const inviteQuote = view.paidOrder ? null : await quoteInviteDiscount(writeRepository(), { token: await peekInviteToken(), userId: member.userId });
+  // 결제 전 견적(혜택) — 아직 구매 전이고 지금 새 구매를 받는 중일 때만. 견적을 만들지 못하면 오류 알림만 더하고 정가 구매 버튼은 그대로 둔다
+  const benefitQuery = readBenefitQuery(query);
+  const purchaseQuote = !view.paidOrder && !(gate && !gate.open) ? await loadPurchaseQuote({ userId: member.userId, assessmentId: assessment.id, couponCode: benefitQuery.couponCode, again: benefitQuery.again }) : null;
+  const benefitNotice: BenefitNotice | null = purchaseQuote?.failed ? { kind: "error" } : benefitQuery.notice;
   // 잠긴 내용은 서버에서 아예 만들지 않는다 — 전체 요약 · 점수는 구매 후 리포트에만
   const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
   // 개인 유형명 · 럭키 지수 카드 — 운영자가 기준을 확정하기 전에는 스위치가 꺼져 있어 만들지도 보이지도 않는다(lib/config/product.ts). 저장하지 않고 열 때마다 계산한다.
@@ -232,7 +258,17 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
             <ReceivedReports rows={receivedRows} current={view.paidOrder?.orderNumber} />
           </section>
         )}
-        <PurchasePanel view={view} included={preview.locked.map((l) => l.title)} paymentsReady={payment.ok} paymentsNote={payment.ok ? null : payment.reason} salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null} invite={inviteQuote} />
+        <PurchasePanel
+          view={view}
+          included={preview.locked.map((l) => l.title)}
+          paymentsReady={payment.ok}
+          paymentsNote={payment.ok ? null : payment.reason}
+          salesClosedReason={gate && !gate.open ? { reason: gate.reason } : null}
+          invite={inviteQuote}
+          quote={purchaseQuote?.quote ?? null}
+          benefitNotice={benefitNotice}
+          again={benefitQuery.again}
+        />
       </div>
     </>
   );

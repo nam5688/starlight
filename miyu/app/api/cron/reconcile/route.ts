@@ -4,7 +4,7 @@ import { logError, recordOps } from "@/server/ops";
 import { reconcileAllNow } from "@/server/reconcile";
 import { drainQueuedReports, sweepReports } from "@/server/report-sweep";
 import { purgeExpiredReferenceRecords } from "@/lib/services/summary-service";
-import { now as clock, writeRepository } from "@/server/services";
+import { benefitRepository, now as clock, writeRepository } from "@/server/services";
 
 /**
  * 정기 실행 주소 — 결제 재확인(결제한 지 오래돼도 남은 질문이 있는 묶음 포함) + 리포트 지연 · 실패 점검 + 보관 기간이 지난 채팅 참고 기록 정리.
@@ -36,6 +36,13 @@ async function run(request: Request) {
     } catch (e) {
       logError("cron.purge-reference", e);
     }
+    // 혜택 정기 점검 — 만료 포인트 · 질문권 정리, 추천 가입 확정 조건 확인, 구매 적립 누락 보정, 오래된 추천 방문 기록 정리. 혜택 표가 아직 없는 DB(19~22번 전)에서는 건너뛰고 결제 점검을 막지 않는다
+    let benefitMaintenance: Record<string, number | string> | null = null;
+    try {
+      benefitMaintenance = { ...(await benefitRepository().runMaintenance()) };
+    } catch (e) {
+      if ((e as { code?: string } | null)?.code !== "42P01") logError("cron.benefits", e);
+    }
     // 정기 점검이 실제로 돌았다는 흔적 — /admin이 "마지막 실행"으로 보여 준다(개수만, 고객 정보 없음). 5분마다 도는 곳에서는 운영 기록이 쌓이지 않게 50분에 한 번만 남긴다
     try {
       const heartbeatCutoff = new Date(clock().getTime() - 50 * 60_000).toISOString();
@@ -46,7 +53,7 @@ async function run(request: Request) {
     } catch (e) {
       logError("cron.heartbeat", e);
     }
-    return Response.json({ ok: true, checked: summary.checked, counts: summary.counts, drained: drained.attempted, reports, purgedReferenceRecords });
+    return Response.json({ ok: true, checked: summary.checked, counts: summary.counts, drained: drained.attempted, reports, purgedReferenceRecords, benefits: benefitMaintenance });
   } catch (e) {
     logError("cron.reconcile", e);
     return new Response("error", { status: 500 });

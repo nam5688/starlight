@@ -36,7 +36,7 @@ export function HeroChat() {
   return (
     <div className="rounded-3xl bg-mist p-4 shadow-soft md:p-5" role="group" aria-label="미유와 나누는 대화 예시">
       <div className="mb-3 flex items-center gap-3">
-        <MiyuAvatar className="size-12" mood="wave" />
+        <MiyuAvatar className="size-12" />
         <div>
           <p className="text-[16px] leading-tight font-bold">미유</p>
           <p className="text-[12px] leading-[1.5] text-ink-3">가상 인물 서윤의 서비스 예시</p>
@@ -55,7 +55,7 @@ export function HeroChat() {
           const first = !(prev && prev.from === "miyu");
           return (
             <li key={i} className="flex items-end gap-2">
-              {first ? <MiyuAvatar className="size-8" mood={b.mood} /> : <span aria-hidden="true" className="size-8 shrink-0" />}
+              {first ? <MiyuAvatar className="size-8" /> : <span aria-hidden="true" className="size-8 shrink-0" />}
               <div className="max-w-[88%] rounded-2xl rounded-bl-md bg-canvas px-3.5 py-2.5 shadow-soft">
                 {b.headline && <p className="text-[15px] leading-[1.55] font-bold">{b.headline}</p>}
                 {b.paragraphs.map((t) => (

@@ -10,7 +10,7 @@ import {
   type OrderStatus,
 } from "../commerce/order.ts";
 import { isInviteToken } from "../commerce/invite.ts";
-import { INVITE_DISCOUNT, isCashProduct, isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
+import { INVITE_DISCOUNT, isCashProduct, isCompatProduct, isPersonalProduct, PERSONAL_REPORT, personalProductId } from "../config/product.ts";
 import { salesClosedMessage, type GateReason, type SaleGate } from "./capacity-service.ts";
 import type { Acquisition, CashRefundResult, MiyuRepository, OrderDiscountKind, OrderRecord, PaymentEnv, PaymentEventSource, PaymentGateway } from "./ports.ts";
 import { nextPersonalSeq, paidPersonalOrders } from "./purchases.ts";
@@ -18,7 +18,7 @@ import { nextPersonalSeq, paidPersonalOrders } from "./purchases.ts";
 /** 새 구매를 받아도 되는지 확인하는 함수 (용량 · 예산). 확인 자체가 실패하면 판매를 막지 않는다 */
 export type SaleGateCheck = (stage: "start" | "confirm") => Promise<SaleGate>;
 
-async function gateOpen(gate: SaleGateCheck | undefined, stage: "start" | "confirm"): Promise<{ open: true } | { open: false; reason: GateReason | null }> {
+export async function gateOpen(gate: SaleGateCheck | undefined, stage: "start" | "confirm"): Promise<{ open: true } | { open: false; reason: GateReason | null }> {
   if (!gate) return { open: true };
   try {
     const g = await gate(stage);
@@ -43,7 +43,7 @@ export type CheckoutPlan =
       discountRef: string | null;
       claim?: (order: OrderRecord) => Promise<{ ok: true } | { ok: false; reason: string }>;
     }
-  | { mode: "free"; listKrw: number; grant: (productId: string, orderNumber: string) => Promise<{ ok: true } | { ok: false; reason: string }> };
+  | { mode: "free"; listKrw: number; grant: (productId: string, orderNumber: string, paymentEnv: PaymentEnv) => Promise<{ ok: true } | { ok: false; reason: string }> };
 
 export type StartCheckoutResult =
   /** discounted: 초대 할인(5,900원) 또는 새 가격 계획의 할인이 확정된 주문 */
@@ -118,7 +118,7 @@ export async function startCheckout(
       const orderNumber = makeNumber(deps.now());
       let granted: { ok: true } | { ok: false; reason: string };
       try {
-        granted = await plan.grant(productId, orderNumber);
+        granted = await plan.grant(productId, orderNumber, input.paymentEnv ?? "test");
       } catch {
         granted = { ok: false, reason: "error" };
       }
@@ -438,10 +438,13 @@ async function applyPaymentStatus(
   }
   if (target === "refunded") {
     const updated = await repo.updateOrder(order.id, ["paid"], { status: "refunded" });
+    // 사주 궁합은 환불되면 보관해 둔 상대 출생정보를 더 두지 않는다
+    if (updated && isCompatProduct(updated.productId)) await repo.scrubCompatRequest(updated.id).catch(() => false);
     return updated ? { kind: "updated", order: updated, to: "refunded" } : { kind: "unchanged", order, code: "NO_CHANGE", message: "" };
   }
   if (target === "failed") {
     const updated = await repo.updateOrder(order.id, ["pending"], { status: "failed", failureCode: payment.status });
+    if (updated && isCompatProduct(updated.productId)) await repo.scrubCompatRequest(updated.id).catch(() => false);
     return updated ? { kind: "updated", order: updated, to: "failed" } : { kind: "unchanged", order, code: "NO_CHANGE", message: "" };
   }
   return { kind: "unchanged", order, code: "NO_CHANGE", message: "" };

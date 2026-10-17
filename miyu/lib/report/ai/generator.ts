@@ -13,7 +13,12 @@ import { checkConcernDepth } from "../concern/depth.ts";
 import { alreadyProvidedOf, buildConcernRepairMessage, buildConcernUserMessage, CONCERN_PROMPT_VERSION, CONCERN_SYSTEM_PROMPT } from "../concern/prompt.ts";
 import type { ConcernDraftV1, ConcernReportV1 } from "../concern/types.ts";
 import { validateConcernDraft } from "../concern/validate.ts";
-import type { ConcernInput, GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
+import type { CompatInput, ConcernInput, GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
+import { assembleCompatReport } from "../compat/assemble.ts";
+import type { CompatReport } from "../compat/types.ts";
+import { createCompatWriter } from "../compat/writer.ts";
+import { compatOf } from "../../saju/interpret/compat.ts";
+import { compatTimingOf } from "../../saju/interpret/compat-timing.ts";
 import { assembleReading } from "../reading/assemble.ts";
 import { assembleStory, storyDepthSource } from "../reading/story-assemble.ts";
 import { STORY_FORMAT } from "../reading/story-plan.ts";
@@ -139,6 +144,15 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
     name: `ai:${model.provider}`,
     version: `${model.model}|${spec.promptVersion}|${SAJU_RULE_VERSION}`,
     usesContext: true,
+    /** 사주 궁합(유료) — 두 사람의 사주에서 같은 엔진(compatOf)으로 근거를 만들고(시기 근거 포함) AI가 풀어 쓴 글을 검사해 조립한다. 이름 · 생년월일 원문은 AI에 보내지 않는다 */
+    async generateCompat(input: CompatInput, ctx: GenerateContext = {}): Promise<CompatReport> {
+      const ref = input.reference ?? seoulYm(now());
+      const result = compatOf(input.a, input.b);
+      const evidence = [...result.evidence, ...compatTimingOf(input.a, input.b, { year: ref.year, month: ref.month }).evidence];
+      const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep });
+      const draft = await writer.write({ evidence, cautions: result.cautions }, ctx);
+      return assembleCompatReport(draft, result, input.names, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" });
+    },
     async generateConcern(input: ConcernInput, ctx: GenerateContext = {}): Promise<ConcernReportV1> {
       const ref = input.reference ? { ...input.reference, iso: seoulYm(now()).iso } : seoulYm(now());
       const evidence = buildEvidence(input, ref);

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after, connection } from "next/server";
 import { Suspense } from "react";
+import { CompatReportView } from "@/components/report/compat-report-view";
 import { ConcernReportView } from "@/components/report/concern-report-view";
 import { FullReportView } from "@/components/report/full-report-view";
 import { PersonalV2View } from "@/components/report/personal-v2-view";
@@ -10,6 +11,7 @@ import { ReadingReportView } from "@/components/report/reading-report-view";
 import { ResultHeader } from "@/components/report/result-header";
 import { PageFallback } from "@/components/ui/page-fallback";
 import { pageWide, textLink } from "@/components/ui/styles";
+import { isCompatReport } from "@/lib/report/compat/types";
 import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { adminReportView } from "@/lib/services/admin-support-service";
@@ -83,8 +85,19 @@ async function Content({ params }: Pick<PageProps<"/admin/report/[orderNumber]">
           )}
         </section>
       </div>
-      <ResultHeader title={`${view.nickname} 님의 ${isPersonalV2(content) ? "개인 종합 사주 리포트" : "심층 리포트"}`} subtitle="운영자 확인용 보기" source={content.source} meta={`검사일 ${created} · 저장된 리포트${view.generator ? ` · 생성 ${view.generator}` : ""}`} />
-      {isReadingReport(content) ? <ReadingReportView report={content} idPrefix="adm-" /> : isPersonalV2(content) ? <PersonalV2View report={content} idPrefix="adm-" /> : isConcernReport(content) ? <ConcernReportView report={content} idPrefix="adm-" /> : <FullReportView report={content} idPrefix="adm-" />}
+      {isCompatReport(content) ? (
+        <>
+          <ResultHeader title={`${content.names.a} × ${content.names.b} 사주 궁합`} subtitle="운영자 확인용 보기" source={content.placeholder ? "dev-scoring" : undefined} meta={`검사일 ${created} · 저장된 리포트${view.generator ? ` · 생성 ${view.generator}` : ""}`} />
+          <div className={`${pageWide} pb-10`}>
+            <CompatReportView report={content} />
+          </div>
+        </>
+      ) : (
+        <>
+          <ResultHeader title={`${view.nickname} 님의 ${isPersonalV2(content) ? "개인 종합 사주 리포트" : "심층 리포트"}`} subtitle="운영자 확인용 보기" source={content.source} meta={`검사일 ${created} · 저장된 리포트${view.generator ? ` · 생성 ${view.generator}` : ""}`} />
+          {isReadingReport(content) ? <ReadingReportView report={content} idPrefix="adm-" /> : isPersonalV2(content) ? <PersonalV2View report={content} idPrefix="adm-" /> : isConcernReport(content) ? <ConcernReportView report={content} idPrefix="adm-" /> : <FullReportView report={content} idPrefix="adm-" />}
+        </>
+      )}
     </>
   );
 }

@@ -68,7 +68,8 @@ export async function TalkRoomContent({ id, room, paid = null }: { id: string; r
   const { model } = roomModelFor(view, { paid: chat, free: chat }, room);
   if (tier === "paid") {
     if (!roomAvailable(model, room)) notFound();
-    const sample = view.report?.content?.source === "sample";
+    const reportContent = view.report?.content;
+    const sample = !!reportContent && "source" in reportContent && reportContent.source === "sample";
     return (
       <TalkView
         key={paid ?? "-"}

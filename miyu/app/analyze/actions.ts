@@ -13,6 +13,7 @@ import { submitAssessment } from "@/lib/services/assessment-service";
 import { isAuthConfigured } from "@/server/env";
 import { kakaoAuthorizeUrl } from "@/server/kakao";
 import { savePendingSubmission } from "@/server/pending-submission";
+import { evaluateReferralSignup, registerReferralSignup } from "@/server/referral";
 import { pathAfterSave } from "@/server/room-choice";
 import { sajuEngine, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
@@ -87,6 +88,8 @@ export async function saveResultAndContinue(input: { info: unknown; answers: unk
       { userId: member.userId, channel: "web", info, answers, today: new Date() },
     );
     if (!saved.ok) return { ok: false, message: saved.message };
+    await registerReferralSignup(member.userId);
+    await evaluateReferralSignup(member.userId);
     redirect(await pathAfterSave(saved.assessment.id));
   }
 

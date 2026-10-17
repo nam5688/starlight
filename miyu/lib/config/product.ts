@@ -48,6 +48,23 @@ export const CONCERN_REPORT = {
 } as const;
 
 /**
+ * 사주 궁합(유료 1) — 내 사주(구매한 사람의 검사 결과)와 상대의 생년월일로 두 사주를 자세히 풀어 읽는 궁합. 무료 간단 궁합과 **같은 엔진 · 같은 결과**(lib/saju/interpret/compat.ts)를 풀어 쓴다.
+ * - **가격 4,900원은 출시 검토용이며 운영자가 확정하기 전까지 판매하지 않는다**(운영자 2026-10-17). 바꿀 때는 여기서만 바꾼다.
+ * - **saleOpen이 false인 동안 결제를 시작하지 않는다**(화면은 "준비 중"). 켜는 조건: 결과물을 실제 AI로 읽어 확인하고 계산 규칙을 확인한 뒤 운영자가 true로 바꾼다(docs/compat-engine.md).
+ * - 상대 생년월일은 리포트를 만드는 동안에만 따로 보관하고(compat_requests, 서버만 읽는다) 리포트가 완성되면 지운다. 상대의 출생정보 처리 근거 · 보관은 법률 검토 대상이다.
+ * - 상대의 응답(기질 · 성격 · 애착)은 쓰지 않는다 — 두 사람의 응답을 비교하는 것은 별도 상품(리포트 궁합)이다.
+ */
+export const SAJU_COMPAT = {
+  id: "saju-compat",
+  name: "사주 궁합",
+  /** 출시 검토 가격(부가세 포함, 원) — 운영자 확정 전 */
+  priceKrw: 4900,
+  priceNote: "출시 검토 가격 · 확정 전",
+  /** 판매 스위치 — 운영자가 결과물 확인 · 가격 확정 뒤 true로 바꾼다 */
+  saleOpen: false,
+} as const;
+
+/**
  * 무료 분석(검사)에 걸리는 시간 안내 — 운영자 요청(2026-10-15). **직접 재서 얻은 값이 아니라 어림**이다(기본 정보 + 문항 약 22개를 한 문항 10초 안팎으로 읽고 고르는 것으로 셈).
  * 시범 응답으로 실제 시간을 재면 여기서만 고친다.
  */
@@ -167,6 +184,22 @@ export function parseConcernProductId(productId: string): string | null {
 }
 
 /**
+ * 사주 궁합 주문의 상품 번호 — 요청(compat_requests)마다 하나씩 갖는 번호를 붙인다(`saju-compat:<요청 번호>`). 같은 검사 결과에 여러 상대와의 궁합을 따로 살 수 있다.
+ * 같은 요청에는 결제 완료 · 대기 주문이 하나만 생기므로(DB 고유 조건) 버튼을 여러 번 눌러도 한 건만 만들어진다.
+ */
+export const compatProductId = (requestId: string) => `${SAJU_COMPAT.id}:${requestId}`;
+
+/** 상품 번호에서 사주 궁합 요청 번호를 꺼낸다. 사주 궁합 주문이 아니면 null */
+export function parseCompatProductId(productId: string): string | null {
+  if (!productId.startsWith(`${SAJU_COMPAT.id}:`)) return null;
+  const id = productId.slice(SAJU_COMPAT.id.length + 1);
+  return UUID.test(id) ? id.toLowerCase() : null;
+}
+
+/** 사주 궁합 주문인가 */
+export const isCompatProduct = (productId: string) => parseCompatProductId(productId) !== null;
+
+/**
  * 유료 질문 주문의 상품 번호 — `cash-charge:<장부에 들어올 단위>:<보너스>:<번호>`. 질문 묶음 결제는 항상 `cash-charge:9:0:<방이름 + 임의 10자>`다(질문 3개 = 9단위).
  * 낱개(1개, 3단위) 결제는 묶음 전 버전이 만든 주문(`cash-charge:3:0:…`)에만 있고 기록은 그대로 남는다.
  * 서버가 주문을 만들 때 정한 값을 번호에 함께 적는다(결제 승인 때 DB가 이 값을 읽어 장부에 넣는다 — 승인과 같은 처리 안에서).
@@ -227,6 +260,7 @@ export function productNameOf(productId: string): string {
     const kind = cashOrderKind(cash);
     return kind === "pack" ? `${MIYU_CASH.name} ${QUESTION_PACK_SIZE}개` : kind === "single" ? `${MIYU_CASH.name} 1개` : `미유캐시 ${cash.cash}개 충전 (예전 방식)`;
   }
+  if (parseCompatProductId(productId)) return SAJU_COMPAT.name;
   return parseConcernProductId(productId) ? CONCERN_REPORT.name : productId;
 }
 

@@ -16,7 +16,7 @@
 //   질문을 쓰기 직전에도 그 회원의 남은 묶음을 같은 방식으로 다시 확인한다(`reconcileOpenPacksOfUser`).
 
 import type { GatewayPayment } from "../commerce/order.ts";
-import { isCashProduct } from "../config/product.ts";
+import { isCashProduct, isCompatProduct } from "../config/product.ts";
 import { applyPayment, refundAttention } from "./order-service.ts";
 import type { CashRefundResult, MiyuRepository, OrderRecord, PaymentGateway } from "./ports.ts";
 
@@ -91,6 +91,7 @@ export async function reconcileOrder(deps: Deps, order: OrderRecord, options: Re
           failureMessage: "결제가 완료되지 않아 정리됨",
         });
         if (closed) await safeEvent(repo, closed, "ABANDONED", { ageMinutes: Math.round(age / 60_000) });
+        if (closed && isCompatProduct(closed.productId)) await repo.scrubCompatRequest(closed.id).catch(() => false);
         return { kind: "closed", order: closed ?? order, reason: "ABANDONED" };
       }
       return { kind: "error", order, code: found.code };
@@ -106,6 +107,7 @@ export async function reconcileOrder(deps: Deps, order: OrderRecord, options: Re
       }
       const closed = await repo.updateOrder(order.id, ["pending"], { status: "canceled", failureCode: "CANCELED", failureMessage: "결제사에서 취소된 결제" });
       if (closed) await safeEvent(repo, closed, "CANCELED", { gatewayStatus: payment.status });
+      if (closed && isCompatProduct(closed.productId)) await repo.scrubCompatRequest(closed.id).catch(() => false);
       return { kind: "closed", order: closed ?? order, reason: "CANCELED" };
     }
 

@@ -75,7 +75,7 @@ export function HeroStart() {
               const first = !(prev && prev.from === "miyu");
               return (
                 <li key={i} className="flex items-end gap-2 motion-safe:animate-miyu-in" style={delay}>
-                  {first ? <MiyuAvatar className="size-10" mood={b.mood} /> : <span aria-hidden="true" className="size-10 shrink-0" />}
+                  {first ? <MiyuAvatar className="size-10" /> : <span aria-hidden="true" className="size-10 shrink-0" />}
                   <p className="max-w-[calc(100%-3rem)] rounded-2xl rounded-bl-md bg-canvas px-3.5 py-2.5 text-[15px] leading-[1.65] shadow-soft md:text-[16px]">{b.text}</p>
                 </li>
               );

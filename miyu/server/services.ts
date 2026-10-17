@@ -1,5 +1,6 @@
 import "server-only";
 import { createTossPaymentGateway } from "@/lib/integrations/tosspayments/gateway";
+import { createSupabaseBenefitRepository } from "@/lib/integrations/supabase/benefits";
 import { createSupabaseRepository } from "@/lib/integrations/supabase/repository";
 import { createMockLocalModel } from "@/lib/integrations/ai/mock-local";
 import { REPORT_GENERATION } from "@/lib/config/product";
@@ -16,6 +17,14 @@ import { createAdminSupabase, createServerSupabase } from "./supabase";
 /** 쓰기용 저장소 (서버 비밀키). 서비스에서 소유자를 확인한 뒤에만 쓴다. */
 export function writeRepository() {
   return createSupabaseRepository(createAdminSupabase());
+}
+
+/**
+ * 혜택(포인트 · 질문권 · 쿠폰 · 추천) 쓰기용 저장소 (서버 비밀키). 지급 · 차감 · 확정은 모두 서버만 부르고, 서비스에서 소유자를 확인한 뒤에만 쓴다.
+ * 혜택 표 · 함수가 아직 없는 DB(19~22번 전)에서는 호출이 42P01로 실패하고 서비스가 "준비 중"으로 처리한다.
+ */
+export function benefitRepository() {
+  return createSupabaseBenefitRepository(createAdminSupabase());
 }
 
 /** 화면 조회용 저장소 (로그인한 사용자 권한, RLS 적용) */

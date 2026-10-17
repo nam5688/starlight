@@ -94,9 +94,12 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
         </p>
       </section>
 
-      <p className="text-[14px]">
+      <p className="flex flex-col gap-2 text-[14px] sm:flex-row sm:gap-6">
         <Link href="/admin/metrics" className={textLink}>
           사업 지표 보기 (단계별 흐름 · 매출 · 광고 채널 · 만족도)
+        </Link>
+        <Link href="/admin/benefits" className={textLink}>
+          혜택 · 쿠폰 · 손익 관리 →
         </Link>
       </p>
 

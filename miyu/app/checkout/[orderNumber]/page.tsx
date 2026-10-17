@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { TossCheckout } from "@/components/checkout/toss-checkout";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
-import { cashOrderKind, formatKrw, LAUNCH_PAYMENT_METHODS, isCashProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, productNameOf, QUESTION_PACK_SIZE } from "@/lib/config/product";
+import { cashOrderKind, formatKrw, LAUNCH_PAYMENT_METHODS, isCashProduct, isCompatProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, productNameOf, QUESTION_PACK_SIZE } from "@/lib/config/product";
 import { paymentConfig, widgetVariantKey } from "@/server/env";
 import { readRepository, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
@@ -55,6 +55,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
   const isConcern = parseConcernProductId(order.productId) !== null;
   const isRepeat = (parsePersonalSeq(order.productId) ?? 1) > 1;
   const isCash = isCashProduct(order.productId);
+  const isCompat = isCompatProduct(order.productId);
   const cashParsed = parseCashProductId(order.productId);
   const isPack = cashParsed !== null && cashOrderKind(cashParsed) === "pack";
   const backPath = resultPathOf(order);
@@ -107,6 +108,11 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
       {isConcern && (
         <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
           기존 심층 리포트는 그대로 보관되고, 이 결제로는 지금 적어 둔 고민을 반영한 새 리포트가 따로 만들어집니다. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없습니다.
+        </p>
+      )}
+      {isCompat && (
+        <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
+          두 사람의 사주를 자세히 풀어 읽는 사주 궁합이에요. 결제가 확인되면 바로 만들기 시작하고, 끝나면 이 주문의 궁합 리포트로 열려요. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없어요. 상대 생년월일은 리포트를 만들 때만 쓰고 완성되면 지워요.
         </p>
       )}
       {isCash && (

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { retryReceivedReportAction, retryReportAction, startCheckoutAction } from "@/app/results/[id]/actions";
+import { retryReceivedReportAction, retryReportAction, startBenefitCheckoutAction, startCheckoutAction } from "@/app/results/[id]/actions";
+import { BenefitNoticeBox, hasDiscountOptions, isPlainQuote, PriceOptions, type BenefitNotice, type PriceQuoteView } from "@/components/results/price-options";
 import { ReportStatusPoller } from "@/components/results/report-status-poller";
 import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
@@ -21,6 +22,10 @@ export function PurchasePanel({
   paymentsNote,
   salesClosedReason = null,
   invite = null,
+  quote = null,
+  benefitNotice = null,
+  again = false,
+  idPrefix = "r-",
 }: {
   view: ResultView;
   /** 구매하면 더 받는 내용 (미리보기의 잠금 목록 제목) */
@@ -31,9 +36,21 @@ export function PurchasePanel({
   salesClosedReason?: { reason: GateReason | null } | null;
   /** 초대 링크로 들어온 사람의 가격 확인 결과(서버가 만든 값) — eligible일 때만 정가와 초대 가격을 함께 보인다(운영자 예외 2026-10-16) */
   invite?: InviteQuote | null;
+  /** 서버가 만든 결제 전 견적(정가 · 적격 할인 선택지 · 거절 사유 · 포인트 교환). 없거나 혜택이 모두 꺼진 평범한 견적이면 예전 구매 영역 그대로 보인다 */
+  quote?: PriceQuoteView | null;
+  /** 결제 시작 뒤 되돌아왔을 때의 알림(혜택 오류 · 적용 실패 · 확인 필요) */
+  benefitNotice?: BenefitNotice | null;
+  /** 같은 결과로 다시 받기 */
+  again?: boolean;
+  /** 같은 화면에 구매 영역이 여러 번 나올 때(개발용 미리보기) HTML id가 겹치지 않게 — 결과 화면은 기본값(r-purchase) */
+  idPrefix?: string;
 }) {
   const discount = invite?.kind === "eligible" ? invite : null;
   const { paidOrder, report, refunded, assessment } = view;
+  const purchaseId = `${idPrefix}purchase`;
+  // 혜택 선택지를 그리는 경우(평범한 견적이 아니고 새 구매를 받는 중). 할인 선택지가 있으면 가격은 선택지마다 보이고, 아니면 예전처럼 위쪽에 한 번 보인다
+  const priceView = quote && !isPlainQuote(quote) && !salesClosedReason ? quote : null;
+  const optionsCarryPrice = priceView ? hasDiscountOptions(priceView) : false;
   const action = nextActionForResult({
     purchase: paidOrder ? "paid" : refunded ? "refunded" : "none",
     reportStatus: report?.status ?? null,
@@ -43,8 +60,8 @@ export function PurchasePanel({
     const failed = action.kind === "recover-report";
     const canRetry = canRetryReport(report);
     return (
-      <section aria-labelledby="r-purchase" className="rounded-xl border border-line-strong px-5 py-6 md:px-7">
-        <h2 id="r-purchase" className="text-[20px] font-bold tracking-tight">
+      <section aria-labelledby={purchaseId} className="rounded-xl border border-line-strong px-5 py-6 md:px-7">
+        <h2 id={purchaseId} className="text-[20px] font-bold tracking-tight">
           결제가 완료되었습니다
         </h2>
         <div className="mt-2">
@@ -82,9 +99,9 @@ export function PurchasePanel({
   }
 
   return (
-    <section aria-labelledby="r-purchase" className="overflow-hidden rounded-xl border border-line-strong">
+    <section aria-labelledby={purchaseId} className="overflow-hidden rounded-xl border border-line-strong">
       <div className="px-5 py-5 md:px-7">
-        <h2 id="r-purchase" className="text-[20px] font-bold tracking-tight">
+        <h2 id={purchaseId} className="text-[20px] font-bold tracking-tight">
           {PERSONAL_REPORT.name}
         </h2>
         <p className="mt-2 text-[16px] leading-relaxed text-ink-2">
@@ -102,7 +119,7 @@ export function PurchasePanel({
           ))}
         </ul>
         <p className="mt-3 text-[14px] text-ink-3">한 번 구매로 위 내용을 모두 볼 수 있습니다. 일부를 따로 추가 결제하지 않습니다.</p>
-        {discount ? (
+        {optionsCarryPrice ? null : discount ? (
           <div className="mt-4">
             <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="text-[15px] text-ink-3">
@@ -122,6 +139,12 @@ export function PurchasePanel({
         )}
       </div>
       <div className="border-t border-line px-5 py-5 md:px-7">
+        {/* 평범한 견적(혜택 선택지 없음)에서 되돌아온 알림 — 오류여도 아래 정가 구매 버튼은 계속 쓸 수 있다 */}
+        {!salesClosedReason && !priceView && benefitNotice && (
+          <div className="mb-4">
+            <BenefitNoticeBox notice={benefitNotice} />
+          </div>
+        )}
         {salesClosedReason ? (
           <div>
             <button type="button" disabled className={buttonDisabled}>
@@ -131,6 +154,19 @@ export function PurchasePanel({
               {salesClosedMessage(salesClosedReason.reason)}
             </p>
           </div>
+        ) : priceView ? (
+          <PriceOptions
+            assessmentId={assessment.id}
+            view={priceView}
+            action={startBenefitCheckoutAction}
+            again={again}
+            paymentsReady={paymentsReady}
+            paymentsNote={paymentsNote}
+            invitePriceKrw={discount ? discount.priceKrw : null}
+            notice={benefitNotice}
+            idPrefix={`${idPrefix}po-`}
+            sectionId={purchaseId}
+          />
         ) : paymentsReady ? (
           <form action={startCheckoutAction.bind(null, assessment.id)}>
             <button type="submit" className={`${buttonPrimary} w-full sm:w-auto`}>

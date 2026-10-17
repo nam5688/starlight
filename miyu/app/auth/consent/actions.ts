@@ -5,6 +5,7 @@ import type { ConsentType } from "@/lib/membership/terms";
 import { submitAssessment } from "@/lib/services/assessment-service";
 import { agreeToTerms, canRemoveOnDecline } from "@/lib/services/member-service";
 import { clearPendingSubmission, readPendingSubmission } from "@/server/pending-submission";
+import { evaluateReferralSignup, registerReferralSignup } from "@/server/referral";
 import { pathAfterSave } from "@/server/room-choice";
 import { sajuEngine, writeRepository } from "@/server/services";
 import { getSessionUserId, safeNextPath } from "@/server/session";
@@ -26,6 +27,7 @@ export async function agreeTermsAction(_prev: ConsentFormState, formData: FormDa
   const repo = writeRepository();
   const result = await agreeToTerms(repo, userId, choices);
   if (!result.ok) return { message: result.message };
+  await registerReferralSignup(userId);
 
   const pending = await readPendingSubmission();
   if (pending) {
@@ -35,6 +37,7 @@ export async function agreeTermsAction(_prev: ConsentFormState, formData: FormDa
       { userId, channel: "web", info: pending.info, answers: pending.answers, today: new Date() },
     );
     if (!saved.ok) redirect("/auth/error?reason=save");
+    await evaluateReferralSignup(userId);
     redirect(await pathAfterSave(saved.assessment.id));
   }
   redirect(safeNextPath(formData.get("next")));

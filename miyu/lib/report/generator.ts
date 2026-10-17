@@ -4,7 +4,8 @@
 // 저장된 리포트는 kind로 구분해 그대로 다시 보여준다 (v1에는 kind가 없다).
 
 import type { ContextTopic, PersonalContextInput } from "../personalization/context.ts";
-import type { SajuResult } from "../saju/engine.ts";
+import type { SajuOk, SajuResult } from "../saju/engine.ts";
+import type { CompatReport } from "./compat/types.ts";
 import type { ConcernReportV1 } from "./concern/types.ts";
 import type { IntegratedReadingReport } from "./reading/types.ts";
 import type { FreeSummary, FullReport } from "./types.ts";
@@ -36,10 +37,19 @@ export type ConcernInput = Pick<ReportInput, "nickname" | "knownMbti" | "summary
   previous: { topic: ContextTopic; headline: string; texts: string[] }[];
 };
 
+/** 사주 궁합(유료)을 쓸 때 받는 값 — 두 사람의 사주 계산 결과와 화면에 보일 이름. 이름 · 생년월일 원문은 AI에 보내지 않는다(근거 문장에는 "A님 · B님"으로만 들어간다) */
+export type CompatInput = {
+  names: { a: string; b: string };
+  a: SajuOk;
+  b: SajuOk;
+  /** 시기(대운 · 세운)를 읽는 기준 연 · 월 (없으면 지금, 한국 날짜 기준) */
+  reference?: { year: number; month: number };
+};
+
 /** 개인 통합 리포트 생성 결과 (개발용 v1 · AI 읽기 구조 reading-v1 · 이전 AI 형식 v2) */
 export type ReportContent = FullReport | PersonalReportV2 | IntegratedReadingReport;
 /** 저장 · 열람하는 모든 리포트 (개인 종합 + 고민 반영) */
-export type AnyReportContent = ReportContent | ConcernReportV1;
+export type AnyReportContent = ReportContent | ConcernReportV1 | CompatReport;
 
 export const isPersonalV2 = (c: AnyReportContent): c is PersonalReportV2 => "kind" in c && c.kind === "personal-v2";
 export { isReadingReport } from "./reading/types.ts";
@@ -78,4 +88,6 @@ export interface ReportGenerator {
   generate(input: ReportInput, ctx?: GenerateContext): Promise<ReportContent>;
   /** 고민 반영 리포트 (없으면 이 생성기로는 고민 리포트를 발급할 수 없다 — 개발용 규칙 생성기) */
   generateConcern?(input: ConcernInput, ctx?: GenerateContext): Promise<ConcernReportV1>;
+  /** 사주 궁합 (없으면 이 생성기로는 사주 궁합을 만들 수 없다 — 개발용 규칙 생성기) */
+  generateCompat?(input: CompatInput, ctx?: GenerateContext): Promise<CompatReport>;
 }

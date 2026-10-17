@@ -9,6 +9,7 @@ import type { ConsentRecord } from "../../membership/terms.ts";
 import type { ConcernRecord } from "../../personalization/concern.ts";
 import type { PersonalContext } from "../../personalization/context.ts";
 import type {
+  CompatRequestRecord,
   AiUsageRecord,
   CashLedgerRecord,
   CashRefundResult,
@@ -41,6 +42,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const consents = new Map<string, ConsentRecord[]>();
   const contexts = new Map<string, PersonalContext>();
   const concernRecords = new Map<string, ConcernRecord>();
+  const compatRequests = new Map<string, CompatRequestRecord>();
   const talkRooms = new Map<string, TalkRoomRecord>();
   const chatQuestions: { userId: string; assessmentId: string; roomKey: string; createdAt: string }[] = [];
   // 무료 질문 자리 예약(답을 기다리는 중) — 10분 안에만 센다
@@ -185,6 +187,11 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         if (c.userId !== userId) continue;
         concernRecords.delete(k);
         counts.concern_records++;
+      }
+      // 사주 궁합의 상대 출생정보는 탈퇴하면 비운다(DB는 프로필의 탈퇴 표시 트리거가 한다)
+      for (const [k, c] of [...compatRequests]) {
+        if (c.userId !== userId || c.scrubbedAt) continue;
+        compatRequests.set(k, { ...c, partner: null, scrubbedAt: new Date(now().getTime()).toISOString() });
       }
       for (const [k, t] of [...talkRooms]) {
         if (t.userId !== userId) continue;
@@ -431,6 +438,24 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const record: ConcernRecord = { ...c, id: id(), createdAt: new Date(now().getTime() + ++tick).toISOString(), scrubbedAt: null };
       concernRecords.set(record.id, record);
       return { ok: true, value: record };
+    },
+    async insertCompatRequest(r) {
+      // DB와 같은 규칙: 주문이 있어야 하고(주문 소유자 = 요청한 사람), 같은 주문에는 한 줄만
+      const order = orders.get(r.orderId);
+      if (!order || order.userId !== r.userId) throw new Error("compat request owner mismatch");
+      if ([...compatRequests.values()].some((x) => x.orderId === r.orderId || x.id === r.id)) return { ok: false, reason: "conflict" };
+      const record: CompatRequestRecord = { id: r.id, orderId: r.orderId, userId: r.userId, partner: r.partner, scrubbedAt: null, createdAt: new Date(now().getTime() + ++tick).toISOString() };
+      compatRequests.set(record.id, record);
+      return { ok: true, value: record };
+    },
+    async getCompatRequestByOrder(orderId) {
+      return [...compatRequests.values()].find((x) => x.orderId === orderId) ?? null;
+    },
+    async scrubCompatRequest(orderId) {
+      const c = [...compatRequests.values()].find((x) => x.orderId === orderId);
+      if (!c || c.scrubbedAt) return false;
+      compatRequests.set(c.id, { ...c, partner: null, scrubbedAt: new Date(now().getTime()).toISOString() });
+      return true;
     },
     async getConcernRecord(recordId) {
       return concernRecords.get(recordId) ?? null;
@@ -764,5 +789,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, newId: id, orderHooks, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
+  return { repo, newId: id, orderHooks, compatRequests, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
 }

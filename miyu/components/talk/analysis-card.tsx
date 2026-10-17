@@ -16,7 +16,7 @@ export function AnalysisCard({ card, name, dateLabel }: { card: TalkCard; name: 
   return (
     <section aria-label="나의 분석 카드" className="overflow-hidden rounded-3xl bg-canvas shadow-soft">
       <div className="flex items-center gap-3 bg-accent-soft px-4 py-3.5">
-        <MiyuAvatar className="size-12" mood="happy" />
+        <MiyuAvatar className="size-12" />
         <div className="min-w-0 flex-1">
           <p className="flex items-baseline justify-between gap-3">
             <span className="text-[13px] font-bold text-accent-strong">ME:U 미유</span>

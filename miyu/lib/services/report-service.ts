@@ -2,11 +2,12 @@
 
 import { tasteStateFor, type TasteViewState } from "./taste-service.ts";
 import { REPORT_GENERATING_STALE_MS, REPORT_GENERATION_TIMEOUT_MS, REPORT_MAX_ATTEMPTS, REPORT_RETRY_COOLDOWN_MS } from "../commerce/report.ts";
-import { isCashProduct, parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
+import { isCashProduct, isCompatProduct, parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
 import { concernInputOf } from "../personalization/concern.ts";
 import type { AiUsageSample, ConcernInput, ReportGenerator, ReportInput } from "../report/generator.ts";
 import { reportTexts } from "../report/concern/texts.ts";
 import { isConcernReport } from "../report/concern/types.ts";
+import { compatInputFor } from "./compat-service.ts";
 import { genderOfSaju } from "../saju/engine.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { PersonalContext } from "../personalization/context.ts";
@@ -127,7 +128,12 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
         controller.abort();
       }, limit);
     });
-    const run = concernInput ? generator.generateConcern!(concernInput, { signal: controller.signal, onUsage }) : generator.generate(reportInputOf(assessment, context), { signal: controller.signal, onUsage });
+    // 사주 궁합은 구매할 때 보관한 상대 출생정보로 두 사람의 사주를 계산해 쓴다 (개인 통합 리포트와 입력이 다르다)
+    const isCompat = isCompatProduct(order.productId);
+    if (isCompat && !generator.generateCompat) throw new Error("이 리포트 생성기는 사주 궁합을 만들 수 없습니다.");
+    const compatInput = isCompat ? await compatInputFor(repo, order, assessment) : null;
+    const ctxArg = { signal: controller.signal, onUsage };
+    const run = compatInput ? generator.generateCompat!(compatInput, ctxArg) : concernInput ? generator.generateConcern!(concernInput, ctxArg) : generator.generate(reportInputOf(assessment, context), ctxArg);
     const content = await Promise.race([run, timeout]);
     const ready = await repo.updateReport(report.id, ["generating"], {
       status: "ready",
@@ -136,6 +142,8 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
       generatorVersion: generator.version,
       readyAt: deps.now().toISOString(),
     });
+    // 사주 궁합은 완성되면 보관해 둔 상대 출생정보를 지운다 (지우지 못해도 리포트 제공은 막지 않고, 정기 점검이 다시 지운다)
+    if (ready && isCompat) await repo.scrubCompatRequest(order.id).catch(() => false);
     return ready ?? repo.getReportByOrder(order.id);
   } catch (error) {
     controller.abort();

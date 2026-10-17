@@ -40,3 +40,6 @@ export type CompatReport = {
   placeholder?: true;
   generated: { provider: string; model: string; at: string };
 };
+
+/** 저장된 리포트 내용이 사주 궁합인지 — 개인 통합 리포트 · 고민 리포트와 같은 저장 칸에 kind로 구분해 담는다 */
+export const isCompatReport = (c: { kind?: string } | object | null | undefined): c is CompatReport => !!c && "kind" in c && (c as { kind?: string }).kind === "compat-saju-v1";

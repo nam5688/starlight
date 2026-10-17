@@ -249,6 +249,19 @@ export type TalkRoomRecord = { assessmentId: string; roomKey: string; userId: st
  */
 export type ChatSummaryRecord = { id: string; userId: string; assessmentId: string; room: string; visible: boolean; items: unknown; createdAt: string };
 
+/** 사주 궁합의 상대 출생정보 — 입력한 값만(이름은 글 제목용). 리포트가 완성되면 지운다 */
+export type CompatPartner = {
+  nickname: string;
+  calendar: "solar" | "lunar";
+  isLeapMonth: boolean;
+  birthYear: number;
+  birthMonth: number;
+  birthDay: number;
+  birthTime: string | null;
+  gender: "female" | "male" | null;
+};
+export type CompatRequestRecord = { id: string; orderId: string; userId: string; partner: CompatPartner | null; scrubbedAt: string | null; createdAt: string };
+
 export interface MiyuRepository {
   /** 동의 기록 (지우지 않고 쌓는다) */
   listConsents(userId: string): Promise<ConsentRecord[]>;
@@ -303,6 +316,15 @@ export interface MiyuRepository {
   listConcernRecordSummaries(userId: string): Promise<ConcernRecordSummary[]>;
   /** 내용만 지운다 (기록 자리와 주제 · 작성 시점 · 발급한 리포트는 남는다). 이미 지웠으면 그대로 */
   scrubConcernRecord(id: string, at: string): Promise<void>;
+
+  /**
+   * 사주 궁합(유료) 요청 — 구매한 사람이 입력한 상대 출생정보를 리포트가 만들어지는 동안에만 보관한다(서버만 읽는다). 요청 번호는 상품 번호(saju-compat:<요청 번호>)에 들어 있다.
+   * 리포트가 완성되면 scrubCompatRequest로 상대 출생정보를 지우고(partner: null), 탈퇴해도 지운다(DB 트리거). 테이블이 없으면(DB 변경 23번 전) 조회는 null, 저장은 오류(코드 42P01).
+   */
+  insertCompatRequest(request: { id: string; orderId: string; userId: string; partner: CompatPartner }): Promise<InsertResult<CompatRequestRecord>>;
+  getCompatRequestByOrder(orderId: string): Promise<CompatRequestRecord | null>;
+  /** 상대 출생정보를 지운다. 이미 지웠으면 false */
+  scrubCompatRequest(orderId: string): Promise<boolean>;
 
   /**
    * 대화(채팅방) 저장 — 쓰기 · 지우기는 서비스에서 소유자를 확인한 뒤에만. 테이블이 없으면(DB 변경 12번 전) 조회는 빈 값, 쓰기는 오류(코드 42P01).

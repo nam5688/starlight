@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { CompatForm } from "@/components/compat/compat-form";
+import { CompatPaidSection } from "@/components/compat/compat-paid-section";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow } from "@/components/ui/styles";
+import { SAJU_COMPAT } from "@/lib/config/product";
 
 export const metadata: Metadata = {
   title: "간단 궁합 · 우리 둘은 무슨 커플일까? · ME:U 미유",
@@ -26,6 +29,11 @@ export default function CompatPage() {
           <CompatForm />
         </div>
 
+        {/* 판매 스위치가 꺼져 있는 동안은 아무것도 그리지 않는다 */}
+        <Suspense fallback={null}>
+          <CompatPaidSection />
+        </Suspense>
+
         <section aria-labelledby="compat-levels" className="mt-14">
           <h2 id="compat-levels" className="text-[18px] font-bold">
             궁합은 세 단계로 준비하고 있어요
@@ -35,7 +43,7 @@ export default function CompatPage() {
               <span className="font-semibold text-ink">간단 궁합</span> <StatusBadge>지금 이용 가능</StatusBadge> — 커플 유형과 궁합 지수 한 장. 두 사람의 사주만 봐요.
             </li>
             <li>
-              <span className="font-semibold text-ink">사주 궁합</span> <StatusBadge>준비 중</StatusBadge> — 두 사람의 타고난 관계 흐름을 자세히 풀어요. 간단 궁합과 같은 계산을 길게 읽는 거예요.
+              <span className="font-semibold text-ink">사주 궁합</span> <StatusBadge>{SAJU_COMPAT.saleOpen ? "지금 이용 가능" : "준비 중"}</StatusBadge> — 두 사람의 타고난 관계 흐름을 자세히 풀어요. 간단 궁합과 같은 계산을 길게 읽는 거예요.
             </li>
             <li>
               <span className="font-semibold text-ink">리포트 궁합</span> <StatusBadge>준비 중</StatusBadge> — 두 사람의 사주에 각자가 직접 답한 성격과 관계 반응까지 함께 비교해요. 서로 동의한 경우에만 연결해요.

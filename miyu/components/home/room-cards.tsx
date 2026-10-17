@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { MiyuAvatar } from "@/components/talk/miyu-character";
+import { toneOfRoom } from "@/components/talk/miyu-moods";
 import { ArrowIcon, LockIcon } from "@/components/ui/icons";
 import { pageWide } from "@/components/ui/styles";
 import { REPORT_TIER_NAMES } from "@/lib/config/product";
 import { roomQuestionNote, roomSections } from "@/lib/report/chat/quota";
-import { ROOM_ORDER, ROOMS, type RoomId, type TalkMood } from "@/lib/report/reading/talk-room";
-
-/** 방마다 처음 보이는 표정 */
-const CARD_MOOD: Record<RoomId, TalkMood> = { main: "happy", daily: "wave", year: "aha", love: "playful", marriage: "happy", career: "glasses", money: "thinking", concern: "basic" };
+import { ROOM_ORDER, ROOMS } from "@/lib/report/reading/talk-room";
 
 /**
  * 홈의 다른 상담 주제 — 작은 선택 영역(운영자 방향 2026-10-16: 궁합을 위로 올린 만큼 나머지 주제는 큰 카드 여러 장 대신 간결하게).
@@ -37,7 +35,7 @@ export function RoomCards({ chatReady = true }: { chatReady?: boolean }) {
                 prefetch={false}
                 className="group flex h-full items-center gap-3 rounded-2xl bg-accent-soft px-4 py-3 shadow-soft ring-1 ring-accent/25 transition-shadow hover:shadow-pop focus-visible:outline-offset-4"
               >
-                <MiyuAvatar className="size-10" mood={CARD_MOOD[room]} />
+                <MiyuAvatar className="size-10" tone={toneOfRoom(room)} />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[17px] leading-tight font-bold">{def.label}</span>
                   <span className="mt-0.5 block text-[13px] leading-[1.45] font-medium text-ink-2">{roomQuestionNote("free", room, chatReady)}</span>

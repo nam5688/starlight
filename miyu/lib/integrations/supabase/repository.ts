@@ -13,6 +13,8 @@ import type {
   CashLedgerRecord,
   CashRefundResult,
   ChatReservation,
+  CompatPartner,
+  CompatRequestRecord,
   TasteReportRecord,
   TasteReservation,
   FunnelEventName,
@@ -228,6 +230,19 @@ function toConcernRecord(r: Row): ConcernRecord {
     agreedAt: r.agreed_at as string,
     createdAt: r.created_at as string,
     scrubbedAt: (r.scrubbed_at as string | null) ?? null,
+  };
+}
+
+function toCompatRequest(r: Row): CompatRequestRecord {
+  const partner = r.partner as Partial<CompatPartner> | null;
+  const filled = partner && typeof partner === "object" && typeof partner.birthYear === "number";
+  return {
+    id: r.id as string,
+    orderId: r.order_id as string,
+    userId: r.user_id as string,
+    partner: filled ? (partner as CompatPartner) : null,
+    scrubbedAt: (r.scrubbed_at as string | null) ?? null,
+    createdAt: r.created_at as string,
   };
 }
 
@@ -772,6 +787,37 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         fail("고민 기록 저장", status === 404 && !error.code ? { code: "42P01", message: "concern_records 테이블이 없습니다" } : error);
       }
       return { ok: true, value: toConcernRecord(data) };
+    },
+
+    async insertCompatRequest(r): Promise<InsertResult<CompatRequestRecord>> {
+      const { data, error, status } = await db
+        .from("compat_requests")
+        .insert({ id: r.id, order_id: r.orderId, user_id: r.userId, partner: r.partner })
+        .select()
+        .single();
+      if (error) {
+        if (error.code === UNIQUE_VIOLATION) return { ok: false, reason: "conflict" };
+        fail("사주 궁합 요청 저장", status === 404 && !error.code ? { code: "42P01", message: "compat_requests 테이블이 없습니다" } : error);
+      }
+      return { ok: true, value: toCompatRequest(data) };
+    },
+
+    async getCompatRequestByOrder(orderId) {
+      const { data, error } = await db.from("compat_requests").select().eq("order_id", orderId).maybeSingle();
+      if (error) {
+        if (error.code === "22P02" || isMissingTableError(error)) return null;
+        fail("사주 궁합 요청 조회", error);
+      }
+      return data ? toCompatRequest(data) : null;
+    },
+
+    async scrubCompatRequest(orderId) {
+      const { data, error } = await db.rpc("scrub_compat_request", { p_order: orderId });
+      if (error) {
+        if (isMissingTableError(error) || isMissingFunction(error)) return false;
+        fail("사주 궁합 상대 정보 지우기", error);
+      }
+      return data === true;
     },
 
     async getConcernRecord(id) {

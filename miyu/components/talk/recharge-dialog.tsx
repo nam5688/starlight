@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 import { TALK_COPY } from "@/lib/report/reading/talk";
 import { MiyuAvatar } from "./miyu-character";
+import type { MiyuTone } from "./miyu-moods";
 
 /**
  * 안내창의 종류 — 무료 질문을 다 썼을 때의 경우와 심층 리포트 안내
@@ -23,6 +24,8 @@ type Props = {
   action: RechargeAction | null;
   /** action이 pick일 때 누르면 — 안내창을 닫고 입력창으로 돌아간다 */
   onPick?: () => void;
+  /** 이 방의 캐릭터 색 */
+  tone?: MiyuTone;
 };
 
 /**
@@ -30,7 +33,7 @@ type Props = {
  * 열려 있는 동안 뒤쪽 화면은 초점과 읽기에서 빠지며, 닫으면 눌렀던 자리로 초점이 돌아온다.
  * 마감 타이머 · 불안을 자극하는 말은 쓰지 않고, "다음에 할게요"로 언제든 닫을 수 있다.
  */
-export function RechargeDialog({ open, onClose, variant, action, onPick }: Props) {
+export function RechargeDialog({ open, onClose, variant, action, onPick, tone }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const bodyId = useId();
@@ -57,7 +60,7 @@ export function RechargeDialog({ open, onClose, variant, action, onPick }: Props
       className="m-auto w-[min(92vw,22rem)] rounded-3xl bg-canvas p-0 text-ink shadow-pop backdrop:bg-black/40"
     >
       <div className="flex flex-col items-center gap-3 px-6 pt-7 pb-6 text-center">
-        <MiyuAvatar mood="happy" className="size-16" />
+        <MiyuAvatar tone={tone} className="size-16" />
         <h2 id={titleId} className="text-[20px] leading-snug font-bold">
           {text.title}
         </h2>

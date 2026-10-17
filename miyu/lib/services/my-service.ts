@@ -3,7 +3,7 @@
 
 import { packRemaining } from "../commerce/cash.ts";
 import type { OrderStatus } from "../commerce/order.ts";
-import { isPersonalProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
+import { isCompatProduct, isPersonalProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
@@ -234,6 +234,8 @@ export type OrderTrace = {
     pack: { questions: number; used: number; refundedQuestions: number; refundedKrw: number; remaining: number } | null;
   } | null;
   generation: Generation;
+  /** 사주 궁합(유료) 주문이면 true — 리포트는 개인 통합 결과 화면이 아니라 궁합 리포트 화면에서 연다 */
+  isCompat: boolean;
   events: { at: string; source: string; status: string | null; statusLabel: string | null; method?: string; mId?: string; approvedAt?: string }[];
 };
 
@@ -301,6 +303,7 @@ export async function traceOrder(
     entitled: order.status === "paid",
     cash: await cashTraceOf(readRepo, input.userId, order),
     generation: order.status === "paid" ? generationOf(report) : "none",
+    isCompat: isCompatProduct(order.productId),
     events: events.map((e) => ({
       at: e.createdAt,
       source: SOURCE_LABEL[e.source] ?? e.source,

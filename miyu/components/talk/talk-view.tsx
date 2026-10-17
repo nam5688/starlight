@@ -26,7 +26,6 @@ import {
   type RoomId,
   type RoomState,
   type TalkLine,
-  type TalkMood,
   type TalkSay,
 } from "@/lib/report/reading/talk-room";
 import { askMiyuAction, closeTalkRoomAction, resetTalkRoomAction, saveChatSummaryAction, saveTalkRoomAction, startQuestionPaymentAction } from "@/app/results/[id]/talk/actions";
@@ -34,6 +33,7 @@ import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
 import { CloseDialog } from "./close-dialog";
 import { MiyuAvatar, TypingDots } from "./miyu-character";
+import { toneOfRoom, type MiyuTone } from "./miyu-moods";
 import { RechargeDialog, type RechargeAction, type RechargeVariant } from "./recharge-dialog";
 
 /** 화면에 보이는 대화 한 줄 — 번호를 붙여 스크롤 · 초점이 어느 줄인지 찾는다 */
@@ -108,6 +108,8 @@ const writeSave = (scope: string, key: string, actions: RoomAction[]) => {
  */
 export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, badge, contextHref, roomHrefs, persist, payReturn }: Props) {
   const def = ROOMS[room];
+  /** 이 방의 캐릭터 색 — 상담 주제마다 다르다(연애 · 결혼 방만 윙크 · 하트의 핑크) */
+  const tone = toneOfRoom(room);
   const router = useRouter();
   const { name } = model;
   const key = roomSaveKey(model, room);
@@ -563,8 +565,6 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   );
 
   const replies = replyOptions(model, room, engine);
-  const visibleMiyu = log.filter((l): l is Item & { from: "miyu" } => l.from === "miyu" && l.say.kind !== "system" && l.say.kind !== "card");
-  const lastMood: TalkMood = visibleMiyu.length > 0 ? visibleMiyu[visibleMiyu.length - 1].mood : "basic";
   const lastLine = log[log.length - 1];
   const afterMiyuText = lastLine?.from === "miyu" && lastLine.say.kind !== "system";
   const byTopic = new Map([...model.topics, ...model.codeTopics].map((t) => [t.id, t]));
@@ -639,7 +639,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         <Link href={reportHref} aria-label="전체 리포트로 돌아가기" className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
           <ArrowIcon className="size-5 rotate-180" />
         </Link>
-        <MiyuAvatar className="size-11" mood={miyuBusy ? "thinking" : lastMood} bob={miyuBusy} />
+        <MiyuAvatar className="size-11" tone={tone} bob={miyuBusy} />
         <div className="min-w-0 flex-1">
           <h1 className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[17px] leading-tight font-bold">
             <span>
@@ -736,14 +736,14 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           const sameSender = i > 0 && prev.from === m.from && !isSystem && !(prev.from === "miyu" && prev.say.kind === "system");
           return (
             <div key={m.id} data-msg={m.id} className={`motion-safe:animate-miyu-in ${i === 0 ? "" : sameSender ? "mt-1.5" : "mt-4"}`}>
-              {m.from === "me" ? <MeBubble text={m.text} /> : m.say.kind === "system" ? <System text={m.say.text} sub={m.say.sub} /> : <MiyuRow say={m.say} mood={m.mood} first={!sameSender} model={model} dateLabel={dateLabel} dataHref={dataHref} />}
+              {m.from === "me" ? <MeBubble text={m.text} /> : m.say.kind === "system" ? <System text={m.say.text} sub={m.say.sub} /> : <MiyuRow say={m.say} tone={tone} first={!sameSender} model={model} dateLabel={dateLabel} dataHref={dataHref} />}
             </div>
           );
         })}
         {miyuBusy && (
           <div className={`motion-safe:animate-miyu-in ${afterMiyuText ? "mt-1.5" : "mt-4"}`}>
             <div className="flex items-start gap-2">
-              <div className="w-9 shrink-0">{!afterMiyuText && <MiyuAvatar className="size-9" mood="thinking" bob />}</div>
+              <div className="w-9 shrink-0">{!afterMiyuText && <MiyuAvatar className="size-9" tone={tone} bob />}</div>
               {/* 점 세 개가 차례로 튀는 "입력 중" 말풍선 — AI가 답을 만드는 동안에도 같은 모양을 쓴다 */}
               <div className="rounded-2xl rounded-tl-md bg-canvas px-4 py-3.5">
                 <span className="sr-only">{TALK_COPY.typing}</span>
@@ -965,8 +965,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           {note}
         </span>
       </form>
-      <CloseDialog open={closeOpen} onStay={() => !closing && setCloseOpen(false)} onClose={finishClose} busy={closing} error={closeError} />
-      <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} variant={rechargeVariant} action={rechargeAction} onPick={pickPay} />
+      <CloseDialog open={closeOpen} onStay={() => !closing && setCloseOpen(false)} onClose={finishClose} busy={closing} error={closeError} tone={tone} />
+      <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} variant={rechargeVariant} action={rechargeAction} onPick={pickPay} tone={tone} />
     </div>
   );
 }
@@ -1000,10 +1000,10 @@ function System({ text, sub }: { text: string; sub?: string }) {
 // 일반 답변은 테두리도 그림자도 없이 하얀 말풍선만 — 그림자는 분석 카드에만 약하게 쓴다(박스를 덜 쓴다)
 const bubble = "rounded-2xl rounded-tl-md bg-canvas px-3.5 py-2.5";
 
-function MiyuRow({ say, mood, first, model, dateLabel, dataHref }: { say: TalkSay; mood: TalkMood; first: boolean; model: TalkModel; dateLabel: string; dataHref: string }) {
+function MiyuRow({ say, tone, first, model, dateLabel, dataHref }: { say: TalkSay; tone: MiyuTone; first: boolean; model: TalkModel; dateLabel: string; dataHref: string }) {
   return (
     <div className="flex items-start gap-2">
-      <div className="w-9 shrink-0">{first && <MiyuAvatar className="size-9" mood={mood} />}</div>
+      <div className="w-9 shrink-0">{first && <MiyuAvatar className="size-9" tone={tone} />}</div>
       <div className="min-w-0 flex-1">
         <Content say={say} model={model} dateLabel={dateLabel} dataHref={dataHref} />
       </div>

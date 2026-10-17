@@ -598,6 +598,40 @@ wd18 as (
               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
               where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as withdraw_fn
 ),
+-- 19~22번: 혜택 시스템(포인트 · 질문권 · 쿠폰 · 0원 혜택 주문 · 추천 · 비용 · 탈퇴 정리)
+wd19 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'benefit_settings') as settings,
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'point_lots') as lots,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'grant_points') as grant_fn
+),
+wd20 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'coupons') as coupons,
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'benefit_order_grants') as grants,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'grant_benefit_order') as grant_fn
+),
+wd21 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'referral_signups') as signups,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'register_referral_signup') as register_fn,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'claim_referral_discount') as claim_fn
+),
+wd22 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'benefit_expenses') as expenses,
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'ai_usage' and column_name = 'request_key') as request_key,
+    coalesce((select bool_or(pg_get_functiondef(p.oid) like '%forfeit_member_benefits%')
+              from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'public' and p.proname = 'withdraw_member_data'), false) as withdraw_fn
+),
+wd23 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'compat_requests') as requests,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'scrub_compat_request') as scrub_fn,
+    exists (select 1 from pg_trigger where tgname = 'profiles_compat_withdraw' and not tgisinternal) as withdraw_trigger,
+    coalesce((select has_table_privilege('service_role', 'public.compat_requests', 'insert') from information_schema.tables where table_schema = 'public' and table_name = 'compat_requests'), false) as service_grant
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -729,5 +763,35 @@ select * from (
               when wd18.invites or wd18.discounts or wd18.status_fn or wd18.claim_fn or wd18.withdraw_fn then '일부만' else '아직 안 함' end,
          '표 invites (초대 링크) · invite_discounts (초대 할인 기록) / 함수 invite_discount_status · claim_invite_discount / 탈퇴 함수에 초대 링크 삭제 포함: ' || wd18.withdraw_fn::text
   from wd18
+  union all
+  select 19, '20261029000000_benefits_core.sql',
+         case when wd19.settings and wd19.lots and wd19.grant_fn then '적용됨'
+              when wd19.settings or wd19.lots or wd19.grant_fn then '일부만' else '아직 안 함' end,
+         '표 benefit_settings (혜택 설정 · 모두 꺼진 채로 시작) · point_lots (포인트 묶음) / 함수 grant_points · 질문권 장부 함수'
+  from wd19
+  union all
+  select 20, '20261030000000_coupons_free_orders.sql',
+         case when wd20.coupons and wd20.grants and wd20.grant_fn then '적용됨'
+              when wd20.coupons or wd20.grants or wd20.grant_fn then '일부만' else '아직 안 함' end,
+         '표 coupons · benefit_order_grants / 함수 grant_benefit_order (0원 혜택 주문, 서버가 승인한 혜택만)'
+  from wd20
+  union all
+  select 21, '20261031000000_referrals.sql',
+         case when wd21.signups and wd21.register_fn and wd21.claim_fn then '적용됨'
+              when wd21.signups or wd21.register_fn or wd21.claim_fn then '일부만' else '아직 안 함' end,
+         '표 referral_signups (추천 가입) / 함수 register_referral_signup · claim_referral_discount'
+  from wd21
+  union all
+  select 22, '20261101000000_benefit_finance_ai.sql',
+         case when wd22.expenses and wd22.request_key and wd22.withdraw_fn then '적용됨'
+              when wd22.expenses or wd22.request_key or wd22.withdraw_fn then '일부만' else '아직 안 함' end,
+         '표 benefit_expenses (비용 입력) / 열 ai_usage.request_key (질문 한 번의 AI 원가) / 탈퇴 함수에 혜택 정리 포함: ' || wd22.withdraw_fn::text
+  from wd22
+  union all
+  select 23, '20261102000000_compat_requests.sql',
+         case when wd23.requests and wd23.scrub_fn and wd23.withdraw_trigger and wd23.service_grant then '적용됨'
+              when wd23.requests or wd23.scrub_fn or wd23.withdraw_trigger or wd23.service_grant then '일부만' else '아직 안 함' end,
+         '표 compat_requests (사주 궁합 상대 입력 · 리포트 완성 · 환불 · 탈퇴 때 지움) / 함수 scrub_compat_request / 탈퇴 시 지우는 트리거: ' || wd23.withdraw_trigger::text || ' / 서버 권한: ' || wd23.service_grant::text
+  from wd23
 ) r
 order by "번호";

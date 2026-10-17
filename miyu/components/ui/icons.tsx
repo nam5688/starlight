@@ -105,6 +105,47 @@ export function PairIcon({ className = "size-5" }: { className?: string }) {
   );
 }
 
+/** 리포트 — 접힌 모서리가 있는 종이 (MY의 "내 리포트") */
+export function DocumentIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M5.5 2.8h6l3.5 3.5v10a1 1 0 01-1 1h-8.5a1 1 0 01-1-1V3.8a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M11.5 2.8v3.5H15M7.5 10h5M7.5 13h3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 대화 — 말풍선 (MY의 "미유와 대화하기") */
+export function ChatBubbleIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M4.5 3.8h11a1.7 1.7 0 011.7 1.7v6.2a1.7 1.7 0 01-1.7 1.7H9.2l-3.6 3v-3H4.5a1.7 1.7 0 01-1.7-1.7V5.5a1.7 1.7 0 011.7-1.7z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M7 8.6h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** 선물 상자 — 친구 초대 */
+export function GiftIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <rect x="3" y="7.5" width="14" height="9.2" rx="1.4" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M2.4 7.5h15.2v-2H2.4v2zM10 5.5v11.2" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M10 5.5C8.2 5.5 6.6 4.8 6.6 3.6c0-1.6 2.8-1.1 3.4 1.9zM10 5.5c1.8 0 3.4-.7 3.4-1.9 0-1.6-2.8-1.1-3.4 1.9z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 쿠폰 — 양쪽이 파인 표 */
+export function TicketIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M3 5.6h14a.8.8 0 01.8.8v1.7a1.9 1.9 0 000 3.8v1.7a.8.8 0 01-.8.8H3a.8.8 0 01-.8-.8v-1.7a1.9 1.9 0 000-3.8V6.4a.8.8 0 01.8-.8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M12.6 6.2v1.4M12.6 9.3v1.4M12.6 12.4v1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** 읽을 때 알아 둘 조건 */
 export function InfoIcon({ className = "size-4" }: { className?: string }) {
   return (

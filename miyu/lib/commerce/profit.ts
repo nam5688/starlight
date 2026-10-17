@@ -326,6 +326,80 @@ export function referralCohort(a: Assumptions, signups: number, convRate: number
   return { signups, convRate, buyers, signupCostKrw: round(signupCost), buyerContributionKrw: round(buyers * perBuyer), netKrw: round(buyers * perBuyer - signupCost) };
 }
 
+// ── 정가 구매 vs 추천 구매 — 같은 기준으로 비교 ─────────────
+
+export type AcquisitionRow = {
+  route: "list" | "referral";
+  label: string;
+  signups: number;
+  convRate: number;
+  buyers: number;
+  /** 구매자 한 명이 만드는 공헌이익(무료 원가 · 가입 포인트 · 광고비를 빼기 전) */
+  grossPerBuyerKrw: number;
+  freeCostKrw: number;
+  signupPointKrw: number;
+  adKrw: number;
+  netKrw: number;
+  netPerSignupKrw: number;
+};
+
+/**
+ * 같은 가입자 수 · 같은 무료 이용 원가 · 같은 광고비 기준으로 정가 유입과 추천 유입을 나란히 센다.
+ * - 광고 유입: 가입자 한 명을 데려오는 광고비 = 구매자당 광고비 × 구매 전환율(광고비를 구매자 기준으로 가정한 값을 가입자 기준으로 바꿈)
+ * - 추천 유입: 광고비 0, 대신 추천 가입 포인트(확정분)와 양쪽 질문권 비용이 든다
+ * - 무료 이용 원가는 두 유입 모두 가입자 전원이 진다(같은 `freeUserCostKrw`)
+ * `convList` · `convReferral`을 같은 값으로 넣으면 "전환율이 같다면"의 비교가 된다.
+ */
+export function compareAcquisition(a: Assumptions, signups: number, convList: number, convReferral: number): { list: AcquisitionRow; referral: AcquisitionRow; breakEvenConvReferral: number | null } {
+  const free = freeUserCostKrw(a);
+  const cpp = costPerIssuedPointKrw(a);
+  const noFunnel = { ...a, freeToPaidRate: 1, referralSignupToBuyRate: 1, signupConfirmRate: 0 };
+  const listLine = unitEconomics(noFunnel, { id: "L", label: "", product: "report", paidKrw: a.listPriceKrw, earnRate: 0.03, referral: false, review: false, paidAd: false });
+  const refLine = unitEconomics(noFunnel, { id: "R", label: "", product: "report", paidKrw: a.invitePriceKrw, earnRate: 0.03, referral: true, review: false, paidAd: false });
+  const listGross = listLine.contributionKrw + listLine.freeFunnelKrw;
+  const refGross = refLine.contributionKrw + refLine.freeFunnelKrw + refLine.signupPointCostKrw;
+
+  const listBuyers = signups * convList;
+  const listAd = signups * convList * a.adCostPerBuyerKrw;
+  const listFree = signups * free;
+  const list: AcquisitionRow = {
+    route: "list",
+    label: "정가 구매(광고 유입)",
+    signups,
+    convRate: convList,
+    buyers: listBuyers,
+    grossPerBuyerKrw: round(listGross),
+    freeCostKrw: round(listFree),
+    signupPointKrw: 0,
+    adKrw: round(listAd),
+    netKrw: round(listBuyers * listGross - listFree - listAd),
+    netPerSignupKrw: 0,
+  };
+  list.netPerSignupKrw = signups ? round(list.netKrw / signups) : 0;
+
+  const refBuyers = signups * convReferral;
+  const refSignupPoints = signups * a.signupRewardPoints * cpp * a.signupConfirmRate;
+  const refFree = signups * free;
+  const referral: AcquisitionRow = {
+    route: "referral",
+    label: "추천 구매(초대 가격 · 가입 포인트 · 질문권)",
+    signups,
+    convRate: convReferral,
+    buyers: refBuyers,
+    grossPerBuyerKrw: round(refGross),
+    freeCostKrw: round(refFree),
+    signupPointKrw: round(refSignupPoints),
+    adKrw: 0,
+    netKrw: round(refBuyers * refGross - refFree - refSignupPoints),
+    netPerSignupKrw: 0,
+  };
+  referral.netPerSignupKrw = signups ? round(referral.netKrw / signups) : 0;
+
+  // 추천 구매의 손익분기 전환율 = 가입자 한 명의 비용 ÷ 구매자 한 명의 공헌이익(가입 비용만큼 구매자가 벌어 와야 한다)
+  const breakEven = refGross > 0 ? (free + a.signupRewardPoints * cpp * a.signupConfirmRate) / refGross : null;
+  return { list, referral, breakEvenConvReferral: breakEven === null ? null : Math.round(breakEven * 10_000) / 10_000 };
+}
+
 // ── 연간 · 세후 ──────────────────────────────────────
 
 export type AnnualInput = {

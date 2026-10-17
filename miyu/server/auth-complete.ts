@@ -3,6 +3,7 @@ import { submitAssessment } from "@/lib/services/assessment-service";
 import { getMemberStatus } from "@/lib/services/member-service";
 import { consentPath } from "./member";
 import { clearPendingSubmission, readPendingSubmission } from "./pending-submission";
+import { evaluateReferralSignup, registerReferralSignup } from "./referral";
 import { pathAfterSave } from "./room-choice";
 import { sajuEngine, writeRepository } from "./services";
 
@@ -26,11 +27,14 @@ export async function pathAfterLogin(userId: string, next: string, via: string):
     return "/auth/error?reason=db";
   }
   if (status.needsConsent) return consentPath(next);
+  // 추천 링크로 가입했다면 추천 가입으로 등록한다(보상은 확정 조건을 모두 갖춘 뒤에만 — 로그인은 막지 않는다)
+  await registerReferralSignup(userId);
 
   const pending = await readPendingSubmission();
   if (pending) {
     await clearPendingSubmission();
     const saved = await submitAssessment({ repo, saju: sajuEngine }, { userId, channel: "web", info: pending.info, answers: pending.answers, today: new Date() });
+    if (saved.ok) await evaluateReferralSignup(userId);
     return saved.ok ? pathAfterSave(saved.assessment.id) : "/auth/error?reason=save";
   }
   return next;

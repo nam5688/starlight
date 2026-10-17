@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isInviteToken } from "@/lib/commerce/invite";
 import { isAuthConfigured } from "@/server/env";
 import { rememberInviteToken } from "@/server/invite";
+import { logReferralVisit } from "@/server/referral";
 import { getMember } from "@/server/member";
-import { readRepository } from "@/server/services";
+import { benefitRepository, readRepository } from "@/server/services";
 import { getSiteUrl } from "@/server/session";
 
 /**
@@ -16,6 +17,12 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/invite/[tok
   const to = (path: string) => NextResponse.redirect(new URL(path, site));
   if (!isInviteToken(token)) return to("/analyze");
   await rememberInviteToken(token);
+  // 새 추천 링크라면 방문을 기록한다(예전 초대 링크는 그대로 두 흐름이 같은 주소 · 쿠키를 쓴다). 확인은 서버가 하고 실패해도 이동은 막지 않는다
+  try {
+    if (await benefitRepository().getReferralLinkOwner(token)) await logReferralVisit(token);
+  } catch {
+    // 혜택 표가 아직 없는 DB에서는 건너뛴다
+  }
   if (isAuthConfigured()) {
     try {
       const member = await getMember();

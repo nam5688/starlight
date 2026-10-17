@@ -12,7 +12,7 @@ import type { RoomId } from "@/lib/report/reading/talk-room";
 import type { CapacityConfig } from "@/lib/services/capacity-service";
 import { capacityConfig, chatAiConfig, chatConfig, paymentConfig } from "./env";
 import { approvedLiveModel } from "./live-ai";
-import { now, writeRepository } from "./services";
+import { benefitRepository, now, writeRepository } from "./services";
 
 /** 사용 기록을 읽는 최대 줄 수 — 시험 기간(며칠)의 채팅 호출은 이보다 훨씬 적다. 넘으면 읽지 못한 것으로 보고 호출하지 않는다 */
 const USAGE_ROWS_MAX = 2000;
@@ -84,11 +84,20 @@ export function chatCapacity(): CapacityConfig {
 
 /** 결제하고 아직 쓰지 않은 질문의 장부 잔액 — 표가 없으면(DB 변경 13번 전) undefined (유료 질문을 쓸 수 없다) */
 async function cashInfo(userId: string): Promise<{ balance: number; per: number } | undefined> {
+  let cash: number;
   try {
-    return { balance: await writeRepository().getCashBalance(userId), per: MIYU_CASH.perQuestion };
+    cash = await writeRepository().getCashBalance(userId);
   } catch {
     return undefined;
   }
+  // 보상 질문권(후기 · 추천 · 프로모션)은 결제한 질문보다 먼저 쓰이므로 같은 단위(질문 1개 = per)로 더해 보인다. 혜택 표가 없으면(DB 19번 전) 0으로 둔다
+  let credits = 0;
+  try {
+    credits = await benefitRepository().getCreditBalance(userId);
+  } catch {
+    credits = 0;
+  }
+  return { balance: cash + credits * MIYU_CASH.perQuestion, per: MIYU_CASH.perQuestion };
 }
 
 /**

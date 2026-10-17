@@ -4,20 +4,20 @@ import { layoutCompatCard } from "@/lib/compat/share-card";
 import type { SimpleCompatCard } from "@/lib/compat/simple";
 import { layoutCard, type CardLayoutOptions } from "@/lib/report/reading/talk-card";
 import type { TalkCard } from "@/lib/report/reading/talk";
-import { MIYU_IMAGES } from "./miyu-moods";
+import { MIYU_IMAGES, type MiyuTone } from "./miyu-moods";
 
 type Options = Omit<CardLayoutOptions, "measure" | "width">;
 
 /** 화면에 쓰는 글꼴 · 색 · 캐릭터 그림으로 그릴 준비를 한다 */
-async function prepare() {
+async function prepare(tone: MiyuTone) {
   // 화면에 쓰는 글꼴과 같은 글꼴로 그린다 (아직 받는 중이면 기다린다)
   await document.fonts.ready;
   const root = getComputedStyle(document.documentElement);
   const family = getComputedStyle(document.body).fontFamily || "sans-serif";
   const colorOf = (name: string) => root.getPropertyValue(`--color-${name}`).trim() || "#30313b";
   const font = (size: number, weight: number) => `${weight} ${size}px ${family}`;
-  // 캐릭터 그림 파일이 정해져 있으면 먼저 불러온다 — 못 불러오면 기본 조약돌 그림으로 그린다
-  const character = await loadImage(MIYU_IMAGES.happy);
+  // 캐릭터 그림을 먼저 불러온다 — 못 불러오면 "미" 글자 프로필로 그린다
+  const character = await loadImage(MIYU_IMAGES[tone]);
   const probe = document.createElement("canvas").getContext("2d");
   if (!probe) throw new Error("이 브라우저에서는 이미지를 만들 수 없어요.");
   const measure = (text: string, size: number, weight: number) => {
@@ -28,13 +28,15 @@ async function prepare() {
 }
 
 export async function renderCardPng(card: TalkCard, options: Options): Promise<Blob> {
-  const { colorOf, font, character, measure } = await prepare();
+  // 분석 카드는 대표 미유(연두)
+  const { colorOf, font, character, measure } = await prepare("main");
   return await drawLayoutPng(layoutCard(card, { ...options, measure }), { colorOf, font, character });
 }
 
 /** 간단 궁합 공유 카드 — 이름 · 커플 유형 · 궁합 지수 · 핵심 한 줄만 담긴다(생년월일 없음). 이 기기 안에서 만들어지며 서버로 보내지 않는다 */
 export async function renderCompatCardPng(card: SimpleCompatCard): Promise<Blob> {
-  const { colorOf, font, character, measure } = await prepare();
+  // 궁합 카드는 연애 · 궁합 영역이라 윙크 · 하트의 핑크
+  const { colorOf, font, character, measure } = await prepare("love");
   return await drawLayoutPng(layoutCompatCard(card, { measure }), { colorOf, font, character });
 }
 
@@ -58,7 +60,7 @@ async function drawLayoutPng(layout: Layout, { colorOf, font, character }: DrawE
         ctx.fill();
       } else ctx.fillRect(op.x, op.y, op.w, op.h);
     } else if (op.type === "mark") {
-      // 운영자가 보낸 그림 그대로 둥근 정사각형으로 — 못 불러오면 "미" 글자 프로필로 대신한다
+      // 운영자가 보낸 그림 그대로 둥근 정사각형으로(흰 바탕) — 못 불러오면 "미" 글자 프로필로 대신한다
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(op.x, op.y, op.size, op.size, op.size * 0.26);

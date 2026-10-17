@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import { ROOM_COPY } from "@/lib/report/reading/talk-room";
 import { MiyuAvatar } from "./miyu-character";
+import type { MiyuTone } from "./miyu-moods";
 
 type Props = {
   open: boolean;
@@ -14,6 +15,8 @@ type Props = {
   busy: boolean;
   /** 저장하지 못했다면 이유 (대화는 지우지 않았다) */
   error: string | null;
+  /** 이 방의 캐릭터 색 */
+  tone?: MiyuTone;
 };
 
 /**
@@ -21,7 +24,7 @@ type Props = {
  * 네이티브 `<dialog>`라 Esc · 바깥 누르기로 닫히고(= 계속 대화하기), 열려 있는 동안 뒤쪽 화면은 초점과 읽기에서 빠지며, 닫으면 눌렀던 자리로 초점이 돌아온다.
  * 저장하지 않아도 이 방의 이야기가 보이지 않는 참고 기록으로 남는다는 것을 작게 알린다(숨기지 않는다).
  */
-export function CloseDialog({ open, onStay, onClose, busy, error }: Props) {
+export function CloseDialog({ open, onStay, onClose, busy, error, tone }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const bodyId = useId();
@@ -48,7 +51,7 @@ export function CloseDialog({ open, onStay, onClose, busy, error }: Props) {
       className="m-auto w-[min(92vw,22rem)] rounded-3xl bg-canvas p-0 text-ink shadow-pop backdrop:bg-black/40"
     >
       <div className="flex flex-col items-center gap-3 px-6 pt-7 pb-6 text-center">
-        <MiyuAvatar mood="basic" className="size-16" />
+        <MiyuAvatar tone={tone} className="size-16" />
         <h2 id={titleId} className="text-[20px] leading-snug font-bold">
           {copy.closeTitle}
         </h2>

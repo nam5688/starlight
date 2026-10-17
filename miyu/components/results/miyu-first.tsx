@@ -12,7 +12,7 @@ export function MiyuFirst({ talkHref, reportHref }: { talkHref: string; reportHr
     <section aria-labelledby="r-miyu-first" className="mx-auto w-full max-w-[720px] px-5 pt-5">
       <div className="rounded-2xl bg-accent-soft p-4 ring-1 ring-accent/25 md:p-5">
         <div className="flex items-center gap-3">
-          <MiyuAvatar className="size-12" mood="wave" />
+          <MiyuAvatar className="size-12" />
           <p id="r-miyu-first" className="rounded-2xl rounded-tl-md bg-canvas px-3.5 py-2.5 text-[15px] leading-[1.6] shadow-soft">
             분석이 끝났어요. 제가 먼저 쉽게 풀어드릴까요?
           </p>

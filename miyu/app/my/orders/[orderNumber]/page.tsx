@@ -105,8 +105,8 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
               : "결제 승인이 확인되지 않아 전체 리포트 열람 권한이 없습니다. 결제 성공 화면으로 이동했거나 리포트가 보였더라도, 서버 승인 기록이 없으면 결제 완료가 아닙니다."}
           </p>
           <p className="mt-2 text-[15px]">
-            <Link href={`/results/${order.assessmentId}`} className={textLink}>
-              연결된 결과 보기
+            <Link href={trace.isCompat ? `/compat/report/${order.orderNumber}` : `/results/${order.assessmentId}`} className={textLink}>
+              {trace.isCompat ? "사주 궁합 보기" : "연결된 결과 보기"}
             </Link>
           </p>
         </section>

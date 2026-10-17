@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { MiyuAvatar } from "@/components/talk/miyu-character";
+import { toneOfRoom } from "@/components/talk/miyu-moods";
 import { PageFallback } from "@/components/ui/page-fallback";
 import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { NEED_REPORT_COPY } from "@/lib/report/reading/room-entry";
@@ -38,7 +39,7 @@ async function Need({ params }: Pick<PageProps<"/go/[room]/need">, "params">) {
   return (
     <div className={`${pageNarrow} py-12 md:py-16`}>
       <div className="flex items-center gap-3">
-        <MiyuAvatar className="size-14" mood="basic" />
+        <MiyuAvatar className="size-14" tone={toneOfRoom(id)} />
         <div>
           <p className="text-[13px] font-semibold text-ink-3">{ROOMS[id].mode}</p>
           <h1 className="text-[22px] leading-snug font-bold tracking-tight">{NEED_REPORT_COPY.title}</h1>

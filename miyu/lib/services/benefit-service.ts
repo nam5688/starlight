@@ -121,6 +121,26 @@ export async function redeemCouponCode(deps: BenefitDeps, input: { userId: strin
   return { kind: "denied", reason: asCredit.ok ? asReport.reason : asCredit.reason === "product" ? asReport.reason : asCredit.reason };
 }
 
+// ── 추천 링크 화면 ─────────────────────────────
+
+export type ReferralLanding =
+  | { kind: "open"; priceKrw: number; listKrw: number }
+  /** 추천 링크가 아니거나(예전 초대 링크일 수 있다) 추천 기능이 꺼져 있다 — 부른 쪽이 예전 초대 링크 화면으로 넘어간다 */
+  | { kind: "not-referral" };
+
+/** 링크의 무작위 토큰이 지금 쓸 수 있는 추천 링크인가 — 초대한 사람의 정보는 돌려주지 않는다 */
+export async function referralLanding(benefits: BenefitRepository, token: string): Promise<ReferralLanding> {
+  if (!/^[A-Za-z0-9_-]{24}$/.test(token)) return { kind: "not-referral" };
+  try {
+    const { ready, settings } = await loadBenefitSettings(benefits);
+    if (!ready || !settings.features.referral) return { kind: "not-referral" };
+    if (!(await benefits.getReferralLinkOwner(token))) return { kind: "not-referral" };
+    return { kind: "open", priceKrw: settings.referral.inviteePrice, listKrw: PERSONAL_REPORT.priceKrw };
+  } catch {
+    return { kind: "not-referral" };
+  }
+}
+
 // ── 결제 전 견적 ───────────────────────────────
 
 export type QuoteInput = { userId: string; assessmentId: string; couponCode?: string | null; again?: boolean };
@@ -185,7 +205,8 @@ export type PlanResult =
 
 /** 고객의 선택 → 서버가 다시 만든 견적에서 가격 계획을 만든다 */
 export async function planCheckout(deps: BenefitDeps, input: QuoteInput & { choice: PlanChoice; newOrderNumber?: (now: Date) => string }): Promise<PlanResult> {
-  const q = await quoteForCheckout(deps, input);
+  // 화면이 코드를 선택지에만 담아 보내도 견적이 같은 코드로 만들어지게 한다(견적과 선택이 어긋나 "invalid-choice"가 되는 일을 막는다)
+  const q = await quoteForCheckout(deps, { ...input, couponCode: input.couponCode ?? input.choice.couponCode ?? null });
   if (q.kind !== "quote") return q;
   const { quote } = q;
   const choice = input.choice;
@@ -210,8 +231,8 @@ export async function planCheckout(deps: BenefitDeps, input: QuoteInput & { choi
       plan: {
         mode: "free",
         listKrw: quote.listKrw,
-        grant: async (product, orderNumber) => {
-          const r = await benefits.grantBenefitOrder({ userId: user, assessmentId: input.assessmentId, productId: product, kind: "points", pointPrice: option.points ?? 0, listPriceKrw: quote.listKrw, orderNumber, paymentEnv: "test" });
+        grant: async (product, orderNumber, env) => {
+          const r = await benefits.grantBenefitOrder({ userId: user, assessmentId: input.assessmentId, productId: product, kind: "points", pointPrice: option.points ?? 0, listPriceKrw: quote.listKrw, orderNumber, paymentEnv: env });
           return r.ok ? { ok: true } : { ok: false, reason: r.reason };
         },
       },
@@ -225,8 +246,8 @@ export async function planCheckout(deps: BenefitDeps, input: QuoteInput & { choi
       plan: {
         mode: "free",
         listKrw: quote.listKrw,
-        grant: async (product, orderNumber) => {
-          const r = await benefits.grantBenefitOrder({ userId: user, assessmentId: input.assessmentId, productId: product, kind: "coupon", couponCode: code, listPriceKrw: quote.listKrw, orderNumber, paymentEnv: "test" });
+        grant: async (product, orderNumber, env) => {
+          const r = await benefits.grantBenefitOrder({ userId: user, assessmentId: input.assessmentId, productId: product, kind: "coupon", couponCode: code, listPriceKrw: quote.listKrw, orderNumber, paymentEnv: env });
           return r.ok ? { ok: true } : { ok: false, reason: r.reason };
         },
       },

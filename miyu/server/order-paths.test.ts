@@ -1,7 +1,7 @@
 // 실행: npm test — 주문이 끝난 뒤 돌아갈 화면: 개인 통합 리포트는 결과 화면, 고민 반영 리포트는 나의 고민 기록소(결제 완료면 그 기록의 리포트)
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cashProductId, concernProductId, PERSONAL_REPORT, personalProductId } from "../lib/config/product.ts";
+import { cashProductId, compatProductId, concernProductId, PERSONAL_REPORT, personalProductId } from "../lib/config/product.ts";
 import { createQuestionNonce, questionProductId } from "../lib/commerce/cash.ts";
 import { resultPathOf } from "./order-paths.ts";
 
@@ -45,4 +45,11 @@ test("예전 선불 충전 주문 · 알 수 없는 방 이름은 기본 채팅�
   assert.equal(resultPathOf(legacy), `/results/${A}/talk`);
   assert.equal(resultPathOf(legacy, { paid: true }), `/results/${A}/talk?paid=MEU-20261015-ABCDEFGHJK`);
   assert.equal(resultPathOf({ assessmentId: A, productId: questionProductId("NOSUCHROOMABCDE12345") }), `/results/${A}/talk`, "없는 방이면 기본 채팅방");
+});
+
+test("사주 궁합 주문은 결제 전에는 궁합 입구로, 결제 완료 뒤에는 그 주문의 궁합 리포트로 간다 (개인 통합 리포트 결과 화면으로 가지 않는다)", () => {
+  const order = { assessmentId: A, productId: compatProductId(R), orderNumber: "MIYU-20261017-ABCDEF" };
+  assert.equal(resultPathOf(order), "/compat");
+  assert.equal(resultPathOf(order, { paid: true }), "/compat/report/MIYU-20261017-ABCDEF");
+  assert.equal(resultPathOf({ assessmentId: A, productId: compatProductId(R) }, { paid: true }), "/compat");
 });

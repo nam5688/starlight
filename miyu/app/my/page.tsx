@@ -6,18 +6,23 @@ import { Suspense } from "react";
 import { signOut } from "@/app/auth/actions";
 import { setMarketingAction } from "@/app/my/actions";
 import { LoginOptions } from "@/components/auth/login-options";
+import { MyHeader, MyHubList, MyStatCards } from "@/components/my/my-hub";
+import { hubCards, hubItems } from "@/components/my/my-hub-data";
 import { ConcernRow, ReportRow } from "@/components/my/report-rows";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDate } from "@/components/ui/format";
 import { CONCERN_RECORDS, formatKrw } from "@/lib/config/product";
 import { ROOM_COPY } from "@/lib/report/reading/talk-room";
+import { getBenefitOverview, type BenefitOverview } from "@/lib/services/benefit-service";
 import { getCashView } from "@/lib/services/cash-service";
+import { listMyCompat } from "@/lib/services/compat-service";
 import { getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
+import { logError } from "@/server/ops";
 import { reconcileUserInBackground } from "@/server/reconcile";
-import { readRepository } from "@/server/services";
+import { benefitRepository, now, readRepository, writeRepository } from "@/server/services";
 import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = {
@@ -29,8 +34,7 @@ export default function MyPage() {
   return (
     <main className="bg-page">
       <div className="mx-auto w-full max-w-[720px] px-5 py-8 md:py-12">
-        <h1 className="text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">MY</h1>
-        <p className="mt-1 text-[14px] leading-[1.6] text-ink-2">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있습니다.</p>
+        <MyHeader />
         <Suspense fallback={<PageFallback className="mt-8" />}>
           <MyContent />
         </Suspense>
@@ -76,15 +80,25 @@ async function MyContent() {
   reconcileUserInBackground(member.userId);
 
   const repo = await readRepository();
-  const [{ cards, concerns, orders }, cash, savedChats] = await Promise.all([getMyPage(repo, member.userId), getCashView(repo, member.userId, 1), repo.countVisibleChatSummaries(member.userId).catch(() => 0)]);
+  const [{ cards, concerns, orders }, cash, savedChats, benefits, compats] = await Promise.all([
+    getMyPage(repo, member.userId),
+    getCashView(repo, member.userId, 1),
+    repo.countVisibleChatSummaries(member.userId).catch(() => 0),
+    readBenefits(member.userId),
+    listMyCompat(repo, member.userId).catch(() => []),
+  ]);
   const paymentsReady = paymentConfig().ok;
   const talkHref = cards[0] ? `/results/${cards[0].assessmentId}/talk` : null;
   return (
     <>
-      <section aria-labelledby="my-list" className="mt-8">
+      <MyStatCards cards={hubCards(benefits, cash.ready ? cash.questions : 0)} />
+      <MyHubList items={hubItems(benefits, cards.length)} />
+
+      <section aria-labelledby="my-list" className="mt-12 scroll-mt-20">
         <h2 id="my-list" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
           내 리포트
         </h2>
+        <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있습니다.</p>
         {cards.length === 0 ? (
           <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-8 text-[15px] text-ink-2">아직 저장한 결과가 없습니다.</p>
         ) : (
@@ -95,6 +109,27 @@ async function MyContent() {
           </ul>
         )}
       </section>
+
+      {compats.length > 0 && (
+        <section aria-labelledby="my-compat" className="mt-12">
+          <h2 id="my-compat" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
+            내 사주 궁합
+          </h2>
+          <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">구매한 사주 궁합은 저장된 그대로 다시 볼 수 있어요. 상대 생년월일은 리포트가 만들어진 뒤 지워져요.</p>
+          <ul className="mt-3 space-y-3">
+            {compats.map((c) => (
+              <li key={c.orderNumber}>
+                <Link href={`/compat/report/${c.orderNumber}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl bg-canvas px-4 py-3.5 shadow-soft">
+                  <span className="text-[15px] font-semibold">{c.names ? `${c.names.a} × ${c.names.b}` : "사주 궁합"}</span>
+                  <span className="text-[13px] text-ink-3">
+                    {c.status === "paid-ready" ? "완성" : c.status === "generating" ? "만드는 중" : c.status === "failed" ? "만들지 못함 · 다시 만들 수 있어요" : "환불됨"} · {formatDate(c.createdAt)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="my-chats" className="mt-12">
         <h2 id="my-chats" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
@@ -116,10 +151,8 @@ async function MyContent() {
             결제해 둔 질문
           </h2>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl bg-canvas px-4 py-4 shadow-soft">
-            <p>
-              <span className="text-[26px] font-bold tabular-nums">{cash.questions}</span>
-              <span className="ml-1 text-[15px] font-semibold text-ink-2">개</span>
-              <span className="mt-0.5 block text-[13px] text-ink-3">결제하고 아직 쓰지 않은 질문이에요. 채팅방에서 질문을 적어 보내면 바로 쓰여요.</span>
+            <p className="text-[14px] leading-[1.6] text-ink-2">
+              결제하고 아직 쓰지 않은 질문이 있어요. 위의 ‘남은 질문권’ 숫자에 합쳐서 보여요. 채팅방에서 질문을 적어 보내면 바로 쓰여요.
             </p>
             {talkHref && (
               <Link href={talkHref} className={buttonSecondary}>
@@ -213,6 +246,16 @@ async function MyContent() {
       <Actions signedIn />
     </>
   );
+}
+
+/** 혜택은 서버가 본인 회원번호로만 읽는다. 읽지 못하면(DB 변경 전 · 오류) 혜택 카드 · 줄만 보이지 않고 나머지 MY는 그대로 열린다 */
+async function readBenefits(userId: string): Promise<BenefitOverview | null> {
+  try {
+    return await getBenefitOverview({ repo: writeRepository(), benefits: benefitRepository(), now }, userId);
+  } catch (e) {
+    logError("my.benefits-overview", e);
+    return null;
+  }
 }
 
 function Actions({ signedIn = false }: { signedIn?: boolean }) {

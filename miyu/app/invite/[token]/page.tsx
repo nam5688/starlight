@@ -6,8 +6,9 @@ import { PageFallback } from "@/components/ui/page-fallback";
 import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { INVITE_REASON_TEXT } from "@/lib/commerce/invite";
 import { formatKrw, FREE_ANALYSIS_TIME, INVITE_DISCOUNT, PERSONAL_REPORT } from "@/lib/config/product";
+import { referralLanding } from "@/lib/services/benefit-service";
 import { inviteLanding } from "@/lib/services/invite-service";
-import { writeRepository } from "@/server/services";
+import { benefitRepository, writeRepository } from "@/server/services";
 
 export const metadata: Metadata = {
   title: "초대 링크 · ME:U 미유",
@@ -31,11 +32,14 @@ export default function InvitePage({ params }: PageProps<"/invite/[token]">) {
 
 async function Invite({ params }: Pick<PageProps<"/invite/[token]">, "params">) {
   const { token } = await params;
-  const landing = await inviteLanding(writeRepository(), token);
+  // 새 추천 링크(제한 없는 초대)인지 먼저 확인하고, 아니면 예전 초대 링크(한 사람당 3명)로 본다 — 두 흐름이 같은 주소를 쓰고 예전 링크의 혜택은 그대로 이어진다
+  const referral = await referralLanding(benefitRepository(), token);
+  const landing = referral.kind === "open" ? ({ kind: "open" } as const) : await inviteLanding(writeRepository(), token);
+  const price = referral.kind === "open" ? referral.priceKrw : INVITE_DISCOUNT.priceKrw;
   return (
     <div className={`${pageNarrow} py-12 md:py-16`}>
       <div className="flex items-center gap-3">
-        <MiyuAvatar className="size-14" mood={landing.kind === "open" ? "happy" : "basic"} />
+        <MiyuAvatar className="size-14" />
         <div>
           <p className="text-[13px] font-semibold text-ink-3">친구가 보낸 초대</p>
           <h1 className="text-[22px] leading-snug font-bold tracking-tight">{landing.kind === "open" ? "초대 가격으로 심층 리포트를 받아 보세요" : "이 초대 링크는 지금 쓸 수 없어요"}</h1>
@@ -52,12 +56,16 @@ async function Invite({ params }: Pick<PageProps<"/invite/[token]">, "params">) 
               정가 <span className="tabular-nums line-through">{formatKrw(PERSONAL_REPORT.priceKrw)}</span>
             </span>
             <span className="text-[15px] font-semibold text-ink-2">→ 초대 가격</span>
-            <span className="text-[28px] leading-none font-bold tracking-tight tabular-nums">{formatKrw(INVITE_DISCOUNT.priceKrw)}</span>
+            <span className="text-[28px] leading-none font-bold tracking-tight tabular-nums">{formatKrw(price)}</span>
           </p>
           <ul className="mt-4 space-y-1.5 text-[14px] leading-[1.65] text-ink-3">
             <li>· {PERSONAL_REPORT.name}를 처음 받을 때 한 번만 적용돼요.</li>
             <li>· 무료 분석({FREE_ANALYSIS_TIME})을 먼저 마쳐야 해요. 분석은 무료예요.</li>
-            <li>· 이 링크로 초대 가격을 받을 수 있는 자리는 한정돼 있어서, 결제할 때 다시 확인해요. 자리가 없으면 정가로 받을 수 있어요.</li>
+            {referral.kind === "open" ? (
+              <li>· 가입과 무료 분석을 마친 새 회원에게 적용돼요. 조건은 결제할 때 서버가 다시 확인하고, 맞지 않으면 사유와 정가를 먼저 알려 드려요.</li>
+            ) : (
+              <li>· 이 링크로 초대 가격을 받을 수 있는 자리는 한정돼 있어서, 결제할 때 다시 확인해요. 자리가 없으면 정가로 받을 수 있어요.</li>
+            )}
             <li>· 궁합 비교는 준비 중이에요.</li>
           </ul>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">

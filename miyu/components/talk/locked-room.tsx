@@ -4,6 +4,7 @@ import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styl
 import { CHAT_ROOMS, formatKrw, PERSONAL_REPORT, REPORT_TIER_NAMES } from "@/lib/config/product";
 import { ROOMS, type RoomId } from "@/lib/report/reading/talk-room";
 import { MiyuAvatar } from "./miyu-character";
+import { toneOfRoom } from "./miyu-moods";
 
 /**
  * 무료 리포트(무료 분석)로는 열리지 않는 방 — 올해의 흐름 · 결혼 · 진로 · 재무(운영자 2026-10-15: 이 방들은 심층 리포트로만 열린다).
@@ -24,7 +25,7 @@ export function LockedRoom({ room, buyHref, ownedState, backHref }: { room: Room
     <main className="bg-page">
       <div className={`${pageNarrow} py-12 md:py-16`}>
         <div className="flex items-center gap-3">
-          <MiyuAvatar className="size-14" mood="basic" />
+          <MiyuAvatar className="size-14" tone={toneOfRoom(room)} />
           <div>
             <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
               <LockIcon className="size-3.5" />

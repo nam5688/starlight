@@ -3,7 +3,7 @@
 // 이 시험은 계산 구조가 맞는지 보는 것이며, 기본 가정(전환율 · 광고비 · 고정비 · 수요 등)이 실제와 맞다는 보증이 아니고 세무 결과를 보증하지 않는다.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ASSUMPTION_SOURCES, annualAfterTax, breakEvenBuyersPerMonth, costPerIssuedPointKrw, costPerPointUpperBoundKrw, DEFAULT_ASSUMPTIONS as A, freeUserCostKrw, netCashOfList, productJourneys, redemptionCostKrw, referralCohort, scenarioJourneys, unitEconomics, type Assumptions, type UnitLines } from "./profit.ts";
+import { ASSUMPTION_SOURCES, annualAfterTax, breakEvenBuyersPerMonth, compareAcquisition, costPerIssuedPointKrw, costPerPointUpperBoundKrw, DEFAULT_ASSUMPTIONS as A, freeUserCostKrw, netCashOfList, productJourneys, redemptionCostKrw, referralCohort, scenarioJourneys, unitEconomics, type Assumptions, type UnitLines } from "./profit.ts";
 import { householdTax, incomeTaxOf, miyuIncrementalTax, simpleVatPayable, vatModeForAnnualGross, vatSplit } from "./tax.ts";
 
 const J = Object.fromEntries(scenarioJourneys(A).map((j) => [j.id, j]));
@@ -188,4 +188,34 @@ test("모든 가정에 출처가 있고, 직접 잰 값(measured)은 AI 원가 �
   for (const k of ["freeToPaidRate", "referralSignupToBuyRate", "adCostPerBuyerKrw", "fixedMonthlyKrw", "monthlyBuyers", "pointUsageRate"] as const) assert.equal(ASSUMPTION_SOURCES[k].source, "assumed", k);
   assert.match(ASSUMPTION_SOURCES.aiQuestionCostKrw.note, /표본 1건/);
   assert.match(ASSUMPTION_SOURCES.aiReportCostKrw.note, /한 건도 없어/);
+});
+
+// ───── 정가 구매 vs 추천 구매(같은 기준) ─────
+
+test("정가 vs 추천: 같은 가입자 수 · 같은 무료 이용 원가를 쓰고 광고비는 정가 유입에만, 가입 포인트는 추천 유입에만 든다", () => {
+  const c = compareAcquisition(A, 1000, 0.05, 0.05);
+  assert.equal(c.list.freeCostKrw, c.referral.freeCostKrw);
+  assert.equal(c.list.freeCostKrw, Math.round(1000 * freeUserCostKrw(A) * 100) / 100);
+  assert.equal(c.referral.adKrw, 0);
+  assert.equal(c.list.signupPointKrw, 0);
+  assert.ok(c.list.adKrw > 0 && c.referral.signupPointKrw > 0);
+  // 같은 전환율이면 정가 구매가 더 벌고(가격이 높고 질문권 비용이 없다), 차이는 줄마다 설명된다
+  assert.ok(c.list.grossPerBuyerKrw > c.referral.grossPerBuyerKrw);
+});
+
+test("추천 구매의 손익분기 전환율: 그 전환율에서 순이익이 0이고, 그보다 낮으면 적자 · 높으면 흑자", () => {
+  const be = compareAcquisition(A, 10_000, 0.05, 0.05).breakEvenConvReferral;
+  assert.ok(be !== null && be > 0 && be < 1);
+  const at = compareAcquisition(A, 10_000, 0.05, be!);
+  assert.ok(Math.abs(at.referral.netKrw) < 10_000 * 0.001 * 100, String(at.referral.netKrw));
+  assert.ok(compareAcquisition(A, 10_000, 0.05, be! / 2).referral.netKrw < 0);
+  assert.ok(compareAcquisition(A, 10_000, 0.05, Math.min(1, be! * 2)).referral.netKrw > 0);
+  // 가입 포인트를 늘리면 손익분기 전환율이 올라간다
+  assert.ok(compareAcquisition({ ...A, signupRewardPoints: 1500 }, 100, 0.05, 0.05).breakEvenConvReferral! > be!);
+});
+
+test("정가 vs 추천: 가입자 수를 0으로 넣어도 나누기 오류 없이 0을 돌려준다", () => {
+  const c = compareAcquisition(A, 0, 0.05, 0.05);
+  assert.equal(c.list.netPerSignupKrw, 0);
+  assert.equal(c.referral.netPerSignupKrw, 0);
 });

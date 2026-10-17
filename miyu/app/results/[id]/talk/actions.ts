@@ -15,7 +15,7 @@ import { chatConfig, paymentConfig, paymentEnvOf } from "@/server/env";
 import { getMember } from "@/server/member";
 import { logError } from "@/server/ops";
 import { verifyPacksBeforeUse } from "@/server/reconcile";
-import { now, readRepository, writeRepository } from "@/server/services";
+import { benefitRepository, now, readRepository, writeRepository } from "@/server/services";
 
 type Input = { assessmentId: unknown; roomKey: unknown; actions?: unknown };
 
@@ -97,6 +97,7 @@ function askDeps(userId: string, assessmentId: string, room: RoomId, input: Pick
   const text = (v: unknown) => (typeof v === "string" && v.length <= 40 ? v : null);
   return {
     repo: writeRepository(),
+    benefits: benefitRepository(),
     answerer: chatAnswerer(),
     now,
     config: chatConfig(),

@@ -15,6 +15,7 @@ import { NO_LIMITS } from "./capacity-service.ts";
 import type { AssessmentRecord, MiyuRepository } from "./ports.ts";
 import { closeRoom } from "./summary-service.ts";
 import { saveTalkRoom } from "./talk-service.ts";
+import { createMemoryBenefits } from "./testing/memory-benefits.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
 const CONTEXT: ChatContext = { room: { label: "연애", mode: "연애박사 미유", focus: "연애 · 관계" }, intake: null, topic: { title: "가까운 관계", headline: "확인이 되면 마음이 편해져요", summary: ["확인이 있으면 편해져요."], detail: [] }, overview: { headline: "확인을 중요하게 여겨요", tendency: null, strength: null, caution: null, flow: null }, followUp: false, taste: false };
@@ -255,6 +256,70 @@ test("유료 질문: 답을 받지 못하면(호출 실패 · 검사에 걸림) 
   const boom = { provider: "t", model: "t", answer: async () => Promise.reject(new Error("boom")) } as ChatAnswerer;
   await assert.rejects(askFreeQuestion(deps({ answerer: boom }), input(mine, "질문", "u1", "daily")), /boom/);
   assert.equal(await repo.getCashBalance("u1"), before);
+});
+
+test("보상 질문권: 무료 질문을 다 쓴 뒤 결제한 질문보다 먼저 쓰이고(만료가 빠른 것부터), 결제해 둔 질문은 그대로 남으며, 화면에 보이는 남은 질문은 둘을 같은 단위로 합친 값이다", async () => {
+  const { mine, deps, repo, mem, buy } = await setup({ tier: "free", room: "love" });
+  const ben = createMemoryBenefits(mem, () => new Date("2026-10-15T03:00:00Z"));
+  const benefits = ben.repo;
+  for (let i = 0; i < 2; i++) assert.ok(ok(await askFreeQuestion(deps({ benefits }), input(mine))));
+  await benefits.grantCredit({ userId: "u1", kind: "promo", qty: 1, sourceRef: "t", opKey: "credit-a", expiresAt: "2026-12-01T00:00:00Z" });
+  await benefits.grantCredit({ userId: "u1", kind: "event", qty: 1, sourceRef: "t", opKey: "credit-b", expiresAt: "2026-11-01T00:00:00Z" });
+  await buy("u1", mine, 1);
+  const first = await askFreeQuestion(deps({ benefits }), input(mine, "보상 질문권으로 물어요"));
+  assert.ok(first.ok && first.kind === "answer");
+  if (!first.ok || first.kind !== "answer") return;
+  // 하나를 쓰고 남은 보상 질문권 1개 + 결제한 질문 3개(9단위) = 같은 단위로 합쳐 질문 4개(12단위)
+  assert.equal(first.cash?.balance, QUESTION_PACK_UNITS + MIYU_CASH.perQuestion);
+  assert.equal(await repo.getCashBalance("u1"), QUESTION_PACK_UNITS, "결제한 질문은 건드리지 않았다");
+  assert.equal(await benefits.getCreditBalance("u1"), 1);
+  const lots = await benefits.listCreditLots("u1");
+  assert.equal(lots.find((l) => l.kind === "event")?.remaining, 0, "만료가 빠른 질문권부터 쓴다");
+  assert.equal(mem.aiUsage.at(-1)?.creditSource, "reward");
+  assert.equal(mem.aiUsage.at(-1)?.purpose, "chat");
+  // 보상 질문권을 다 쓰면 결제한 질문으로 넘어간다
+  assert.ok(ok(await askFreeQuestion(deps({ benefits }), input(mine, "하나 더"))));
+  assert.equal(await benefits.getCreditBalance("u1"), 0);
+  assert.equal(await repo.getCashBalance("u1"), QUESTION_PACK_UNITS);
+  const third = await askFreeQuestion(deps({ benefits }), input(mine, "이번엔 결제한 질문"));
+  assert.ok(third.ok && third.kind === "answer");
+  assert.equal(await repo.getCashBalance("u1"), QUESTION_PACK_UNITS - MIYU_CASH.perQuestion);
+  assert.equal(mem.aiUsage.at(-1)?.creditSource, "paid");
+});
+
+test("보상 질문권: 답을 받지 못하면 쓴 질문권을 되돌리고 횟수에도 세지 않으며, 같은 질문 한 번의 AI 호출은 같은 request_key로 묶인다", async () => {
+  const { mine, deps, mem } = await setup({ tier: "free", room: "love" });
+  const ben = createMemoryBenefits(mem, () => new Date("2026-10-15T03:00:00Z"));
+  const benefits = ben.repo;
+  for (let i = 0; i < 2; i++) assert.ok(ok(await askFreeQuestion(deps({ benefits }), input(mine))));
+  await benefits.grantCredit({ userId: "u1", kind: "promo", qty: 1, sourceRef: "t", opKey: "credit-x", expiresAt: null });
+  const hard = { provider: "t", model: "t", answer: async () => Promise.reject(new ChatAnswerError("호출 실패", "MODEL")) } as ChatAnswerer;
+  const before = mem.chatQuestions.length;
+  assert.deepEqual(await askFreeQuestion(deps({ benefits, answerer: hard }), input(mine, "실패할 질문")), { ok: false, reason: "failed", message: ASK_MESSAGES.failed });
+  assert.equal(await benefits.getCreditBalance("u1"), 1, "답을 받지 못하면 되돌린다");
+  assert.equal(mem.chatQuestions.length, before);
+  assert.ok(ok(await askFreeQuestion(deps({ benefits }), input(mine, "다시"))));
+  assert.equal(await benefits.getCreditBalance("u1"), 0);
+  const keys = mem.aiUsage.map((u) => u.requestKey).filter(Boolean);
+  assert.ok(keys.length >= 3 && new Set(keys).size === keys.length, "질문마다 request_key가 다르다");
+});
+
+test("보상 질문권이 있어도 방 규칙은 그대로다: 질문을 열지 않는 방에서는 쓰이지 않고, 같은 질문을 동시에 5개 보내도 질문권 수만큼만 답한다", async () => {
+  const { mine, deps, mem } = await setup({ tier: "free", room: "career" });
+  const ben = createMemoryBenefits(mem, () => new Date("2026-10-15T03:00:00Z"));
+  const benefits = ben.repo;
+  await benefits.grantCredit({ userId: "u1", kind: "promo", qty: 2, sourceRef: "t", opKey: "credit-y", expiresAt: null });
+  const locked = await askFreeQuestion(deps({ benefits }), input(mine, "진로 질문", "u1", "career"));
+  assert.equal(locked.ok, false, "무료 리포트로는 진로 방이 열리지 않는다");
+  assert.equal(await benefits.getCreditBalance("u1"), 2, "닫힌 방에서는 질문권을 쓰지 않는다");
+
+  const open = await setup({ tier: "free", room: "love" });
+  const ben2 = createMemoryBenefits(open.mem, () => new Date("2026-10-15T03:00:00Z"));
+  for (let i = 0; i < 2; i++) assert.ok(ok(await askFreeQuestion(open.deps({ benefits: ben2.repo }), input(open.mine))));
+  await ben2.repo.grantCredit({ userId: "u1", kind: "promo", qty: 2, sourceRef: "t", opKey: "credit-z", expiresAt: null });
+  const rs = await Promise.all(Array.from({ length: 5 }, (_, i) => askFreeQuestion(open.deps({ benefits: ben2.repo }), input(open.mine, `동시 ${i}`))));
+  assert.equal(rs.filter((r) => r.ok && r.kind === "answer").length, 2);
+  assert.equal(await ben2.repo.getCreditBalance("u1"), 0);
 });
 
 test("무료 질문도 답을 받지 못하면 차감하지 않는다 — 호출이 실패했든 검사에 걸렸든 다시 물을 수 있다", async () => {

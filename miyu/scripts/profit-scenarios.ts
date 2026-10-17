@@ -2,7 +2,7 @@
 // 모든 값은 관리회계 **추정**이다: 가정(measured가 아닌 값)이 대부분이며 수요 · 전환율 · 광고비 · 고정비는 근거가 없다. 실제 값을 넣으면 표가 달라진다.
 // 실행: node scripts/profit-scenarios.ts [--write]  (miyu 폴더에서)
 import { writeFileSync } from "node:fs";
-import { ASSUMPTION_SOURCES, annualAfterTax, breakEvenBuyersPerMonth, costPerIssuedPointKrw, costPerPointUpperBoundKrw, DEFAULT_ASSUMPTIONS as A, freeUserCostKrw, netCashOfList, productJourneys, redemptionCostKrw, referralCohort, scenarioJourneys, unitEconomics, type Assumptions } from "../lib/commerce/profit.ts";
+import { ASSUMPTION_SOURCES, annualAfterTax, breakEvenBuyersPerMonth, compareAcquisition, costPerIssuedPointKrw, costPerPointUpperBoundKrw, DEFAULT_ASSUMPTIONS as A, freeUserCostKrw, netCashOfList, productJourneys, redemptionCostKrw, referralCohort, scenarioJourneys, unitEconomics, type Assumptions } from "../lib/commerce/profit.ts";
 
 const n = (v: number) => Math.round(v).toLocaleString("ko-KR");
 const d1 = (v: number) => (Math.round(v * 10) / 10).toLocaleString("ko-KR");
@@ -94,6 +94,20 @@ p(`| 기본 가정 | ${d1(breakEvenConv(A) * 100)}% |`);
 p(`| 검증 통과 70%(부정 · 중복 30% 보상 미지급) | ${d1(breakEvenConv({ ...A, signupConfirmRate: 0.7 }) * 100)}% |`);
 p(`| 포인트 전부 사용 · 전부 잠식(상한) | ${d1(breakEvenConv({ ...A, pointUsageRate: 1, pointCannibalization: 1 }) * 100)}% |`);
 p(`| AI 재작성 · 무료 상담 사용이 높음(J) | ${d1(breakEvenConv({ ...A, aiReportCostKrw: 1157, aiQuestionCostKrw: 51, deepQuestionUsageRate: 1, freeQuestionUsageRate: 1 }) * 100)}% |`);
+p();
+p("### 5-1. 정가 구매(광고 유입)와 추천 구매를 같은 기준으로 비교 (가입자 1,000명)");
+p();
+p(`**같은 기준**: 가입자 수 · 무료 이용 원가(가입자 전원이 진다: ${n(freeUserCostKrw(A))}원/명)는 두 유입이 같고, 광고비(구매자당 ${n(A.adCostPerBuyerKrw)}원 가정)는 정가 유입에만, 추천 가입 포인트(${A.signupRewardPoints}P) · 양쪽 질문권 비용은 추천 유입에만 든다. 구매자 한 명의 공헌이익은 무료 원가 · 가입 포인트 · 광고비를 빼기 전 값이다(정가 ${n(compareAcquisition(A, 1, 0.05, 0.05).list.grossPerBuyerKrw)}원 vs 추천 ${n(compareAcquisition(A, 1, 0.05, 0.05).referral.grossPerBuyerKrw)}원 — 추천은 가격이 ${n(A.invitePriceKrw)}원이고 질문권 ${2}개의 비용이 든다).`);
+p();
+p("| 비교 | 유입 | 전환율 | 구매자 | 구매자당 공헌(전) | 무료 원가 | 가입 포인트 | 광고비 | **순손익** | 가입자 1명당 |");
+p("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+for (const [label, lc, rc] of [["전환율이 같다(5% · 5%)", 0.05, 0.05], ["추천이 더 잘 산다(5% · 10%, 추천 전환율은 근거 없는 가정)", 0.05, 0.1], ["추천이 덜 산다(5% · 2%)", 0.05, 0.02]] as const) {
+  const c = compareAcquisition(A, 1000, lc, rc);
+  for (const r of [c.list, c.referral]) p(`| ${label} | ${r.route === "list" ? "정가" : "추천"} | ${d1(r.convRate * 100)}% | ${n(r.buyers)} | ${n(r.grossPerBuyerKrw)} | ${n(r.freeCostKrw)} | ${n(r.signupPointKrw)} | ${n(r.adKrw)} | **${n(r.netKrw)}** | ${n(r.netPerSignupKrw)} |`);
+}
+p();
+const be = compareAcquisition(A, 1000, 0.05, 0.05).breakEvenConvReferral;
+p(`추천 구매의 손익분기 전환율(가입자 한 명의 비용 ÷ 구매자 한 명의 공헌이익) = **${be === null ? "계산 불가" : d1(be * 100) + "%"}** — 이 값보다 낮으면 추천 유입은 적자다. 같은 전환율이면 정가 유입이 가입자당 더 남고(가격이 높고 질문권 비용이 없다), 추천 유입은 광고비 대신 가입 포인트가 들며 전환율이 더 높을 때만 앞선다. **이 표의 전환율 · 광고비는 모두 가정이며 실제 가입 데이터가 쌓이면 관리자 화면(/admin/benefits 손익)이 같은 계산을 측정값으로 다시 보인다.**`);
 p();
 p("## 6. 연간 · 세후 (일반과세 / 간이과세 시나리오, 청년창업 감면 0 · 50 · 75%)");
 p();
