@@ -8,15 +8,22 @@ import type { PaymentEnv } from "@/lib/services/ports";
 import { isTossDocsKey } from "./setup-checks";
 import { widgetVariantKeyFrom } from "@/lib/commerce/payment-method";
 import { deployInfoFrom } from "@/lib/ops/deploy-info";
+import { PREVIEW_BLOCK_REASON, previewGuardOf } from "@/lib/config/preview-guard";
 
 // 웹 채널 서버 설정. 값은 .env.local(로컬) 또는 Vercel 환경변수에서 읽는다.
 // 값이 없으면 해당 기능은 "설정 전"으로 표시되고 동작하지 않는다.
+// Vercel 미리보기(Preview) 배포에서는 운영 DB · 실결제 · 실제 AI가 환경변수에 들어와도 막는다(lib/config/preview-guard.ts).
 
 function read(name: string): string {
   return (process.env[name] ?? "").trim();
 }
 
+function previewGuard() {
+  return previewGuardOf(process.env);
+}
+
 export function supabaseEnv() {
+  if (previewGuard().blocksDatabase) return { url: "", publishableKey: "", secretKey: "" };
   return {
     url: read("NEXT_PUBLIC_SUPABASE_URL"),
     publishableKey: read("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
@@ -46,6 +53,7 @@ export function paymentConfig(): PaymentConfig {
   if (!clientKey || !secretKey) return { ok: false, reason: "결제 키 설정 전" };
 
   const liveMode = read("PAYMENTS_LIVE_MODE") === "true";
+  if (liveMode && previewGuard().active) return { ok: false, reason: PREVIEW_BLOCK_REASON.payment };
   const prefix = liveMode ? "live_" : "test_";
   if (!clientKey.startsWith(`${prefix}gck_`) || !secretKey.startsWith(`${prefix}gsk_`)) {
     return {
@@ -125,7 +133,7 @@ export function aiConfig(): AiConfig {
     }
     return { kind: "mock-local", baseUrl };
   }
-  if (provider === "anthropic") return resolveReportAnthropic(read);
+  if (provider === "anthropic") return previewGuard().active ? { kind: "invalid", reason: PREVIEW_BLOCK_REASON.ai } : resolveReportAnthropic(read);
   return { kind: "invalid", reason: `AI 제공사 ${provider}는 아직 연결하지 않았습니다 (anthropic만 있어요)` };
 }
 
@@ -186,6 +194,7 @@ export function chatConfig(): ChatServiceConfig {
  * 요약: 비움 → (AI_PROVIDER=mock-local이면 가짜 AI 서버, 아니면) 연결 없음 / anthropic → 승인 금액 · 호출 수 · 기간을 운영자가 직접 적어야 한다(없으면 호출하지 않는다). 키 값은 어디에도 출력하지 않는다.
  */
 export function chatAiConfig(): ChatAiConfig {
+  if (previewGuard().active && read("AI_CHAT_PROVIDER") === "anthropic") return { kind: "invalid", reason: PREVIEW_BLOCK_REASON.ai };
   const ai = aiConfig();
   return resolveChatAi(read, ai.kind === "mock-local" ? { baseUrl: ai.baseUrl } : null);
 }

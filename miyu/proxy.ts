@@ -1,11 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { previewGuardOf } from "@/lib/config/preview-guard";
 
 // 로그인 세션 갱신 (Next.js 16의 Proxy, 예전 이름은 Middleware).
 // 페이지를 그리기 전에 만료된 세션을 새로 고쳐 쿠키에 다시 써 둔다.
 // 권한 확인 자체는 각 페이지·서버 함수에서 다시 한다.
+// Vercel 미리보기 배포에서는 DB를 쓰지 않으므로(server/env.ts와 같은 규칙) 세션도 건드리지 않는다.
 
 export async function proxy(request: NextRequest) {
+  if (previewGuardOf(process.env).blocksDatabase) return NextResponse.next();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return NextResponse.next();
