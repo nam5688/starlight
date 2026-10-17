@@ -4,9 +4,13 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CompatReport, PairReport } from "@/lib/report/compat/types";
+import { ownReportInput, parseOwnCapture } from "@/lib/report/ai/own-run";
+import { buildFreePreview, type FreePreview } from "@/lib/report/preview";
+import { seoulReference } from "@/lib/report/reference";
+import type { IntegratedReadingReport } from "@/lib/report/reading/types";
 
 const ROOT = join(process.cwd(), "pilot-data", "ai-compare");
-const RUN = /^(?:rehearsal-)?(?:compat-saju-p1|compat-pair-p1)-\d{8}-\d{6}$/;
+const RUN = /^(?:rehearsal-)?(?:compat-saju-p1|compat-pair-p1|story-own)-\d{8}-\d{6}$/;
 
 export type LiveRunSummary = { id: string; stage: string; rehearsal: boolean; calls: number | null; spentKrw: number | null; result: string | null; hasReport: boolean };
 export type LiveRunDetail = {
@@ -19,6 +23,17 @@ export type LiveRunDetail = {
   report: CompatReport | PairReport | null;
   /** 모델이 돌려준 원문 — 검사에 걸린 글 포함 */
   attempts: { round: number; text: string }[];
+  /** 운영자 본인 입력 시험(story-own)에서만 — 같은 입력으로 만든 무료 리포트 · 심층 리포트 · 입력 확인 · 읽는 순서 글 · 읽기 전 지표 */
+  own: OwnRunDetail | null;
+};
+export type OwnRunDetail = {
+  /** 검사를 통과해 저장된 심층 리포트(없으면 null — 원문만 있다) */
+  reading: IntegratedReadingReport | null;
+  /** 같은 입력(운영자가 푼 응답 + 사주)으로 만든 무료 리포트 미리보기 — 무료 화면이 보이는 그대로 */
+  free: FreePreview | null;
+  inputCheck: string | null;
+  readable: string | null;
+  metrics: string | null;
 };
 
 const read = async (path: string) => {
@@ -37,7 +52,7 @@ const json = async (path: string) => {
     return null;
   }
 };
-const stageOf = (id: string) => (id.includes("compat-saju-p1") ? "compat-saju-p1" : "compat-pair-p1");
+const stageOf = (id: string) => (id.includes("story-own") ? "story-own" : id.includes("compat-saju-p1") ? "compat-saju-p1" : "compat-pair-p1");
 
 export async function listLiveRuns(): Promise<LiveRunSummary[]> {
   let names: string[];
@@ -79,5 +94,19 @@ export async function readLiveRun(id: string): Promise<LiveRunDetail | null> {
   }
   const attempts = (await Promise.all(files.map(async (f) => ({ round: Number(f.slice(5, -4)), text: (await read(join(ROOT, id, "attempts", f))) ?? "" })))).filter((a) => a.text.length > 0);
   if (!costAndChecks && !report && attempts.length === 0) return null;
-  return { id, stage: stageOf(id), rehearsal: id.startsWith("rehearsal-"), costAndChecks, report, attempts };
+  const stage = stageOf(id);
+  return { id, stage, rehearsal: id.startsWith("rehearsal-"), costAndChecks, report: stage === "story-own" ? null : report, attempts, own: stage === "story-own" ? await readOwn(id) : null };
+}
+
+/** 본인 입력 시험의 읽기 자료 — 무료 리포트는 저장해 둔 입력(input.json, 이 PC의 파일)에서 제품과 같은 코드로 다시 만든다(저장 · 외부 전송 없음) */
+async function readOwn(id: string): Promise<OwnRunDetail> {
+  const dir = join(ROOT, id);
+  const reading = (await json(join(dir, "report.json"))) as IntegratedReadingReport | null;
+  let free: FreePreview | null = null;
+  const capture = parseOwnCapture(await json(join(dir, "input.json")));
+  if (capture) {
+    const built = await ownReportInput(capture, new Date());
+    if (built.ok && built.input.saju.status === "ok") free = buildFreePreview({ summary: built.input.summary, saju: built.input.saju, reference: seoulReference(new Date()) });
+  }
+  return { reading, free, inputCheck: await read(join(dir, "input-check.md")), readable: await read(join(dir, "readable.md")), metrics: await read(join(dir, "metrics.md")) };
 }

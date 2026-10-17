@@ -12,6 +12,7 @@ import { birthDateError } from "@/lib/saju/manseryeok-engine";
 import { submitAssessment } from "@/lib/services/assessment-service";
 import { isAuthConfigured } from "@/server/env";
 import { kakaoAuthorizeUrl } from "@/server/kakao";
+import { captureOwnInput } from "@/server/own-input";
 import { savePendingSubmission } from "@/server/pending-submission";
 import { evaluateReferralSignup, registerReferralSignup } from "@/server/referral";
 import { pathAfterSave } from "@/server/room-choice";
@@ -54,6 +55,8 @@ export async function scoreDevAnswers(input: { info: unknown; answers: unknown }
   }
   const saju = await sajuEngine.calculate(birthInput(info));
   if (saju.status === "invalid") return { ok: false, message: saju.message };
+  // 운영자 본인 입력 시험 — 이 PC의 개발 서버에서 .env.local에 MIYU_OWN_INPUT_CAPTURE=yes를 직접 적었을 때만 로컬 파일로 남긴다(꺼져 있으면 아무 일도 하지 않는다)
+  await captureOwnInput(info, answers);
   return { ok: true, preview: buildFreePreview({ summary: buildDevFreeSummary(answers), saju, reference: seoulReference(new Date()) }) };
 }
 

@@ -220,6 +220,10 @@ export async function runStage(opts: {
   callTimeoutMs?: number;
   /** 같은 표현이 여러 곳에 되풀이되면 한 번 고쳐 쓰게 한다 (읽기 구조 · 기본은 끔 — 켜도 최악 비용은 "모두 고쳐 쓰기까지 가는 경우"에 이미 들어 있다) */
   repairRepeats?: boolean;
+  /** 형식 검사에 걸렸을 때 자동으로 고쳐 쓰는 횟수(기본: 생성기 기본값). 0이면 첫 응답에서 멈추고 실패로 남긴다 — 운영자가 글을 읽기 전에는 두 번째 호출을 하지 않는 시험용 */
+  maxRepairs?: number;
+  /** 제공사 일시 오류의 재시도 횟수(기본: 생성기 기본값). 0이면 호출을 한 번만 한다 */
+  maxRetries?: number;
 }): Promise<StageResult> {
   checkApproval(opts.stage, opts.guard, opts.approval);
   const variant = opts.variant ?? "reading-v1";
@@ -247,6 +251,8 @@ export async function runStage(opts: {
         sleep: opts.sleep,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         callTimeoutMs: opts.callTimeoutMs,
+        ...(opts.maxRepairs !== undefined ? { maxRepairs: opts.maxRepairs } : {}),
+        ...(opts.maxRetries !== undefined ? { maxRetries: opts.maxRetries } : {}),
       };
       const generator = variant === "philosophical-v0" ? createPhilosophicalGenerator(generatorOptions) : createAiReportGenerator({ ...generatorOptions, format: variant, repairRepeats: opts.repairRepeats });
       const started = Date.now();

@@ -230,16 +230,15 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   has({ persona: "P02" }, "P01");
   has({ alreadySpentGiven: false }, "--already-spent-krw");
   has({ twoRoundWorstKrw: 1234.05 }, "상한"); // 반올림 없이 그대로 비교한다
-  // 승인된 실행 2건(1차 마침 + 2차 재시험 1건) — 1차를 마쳤고 2차는 남아 있어 실제 호출 확인이 통과한다. 2차까지 마치면 다시 거절한다(새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만)
-  assert.equal(stage.restrict.runsApproved, 2);
+  // 승인된 실행: 1차(마침)뿐 — 2차 재시험(A안) 한 건은 운영자 지시(2026-10-17)로 가상 인물 P01이 아니라 운영자 본인 입력 단계(story-own)로 옮겼다. 같은 승인 한 건이라 P01 재시험은 막는다(새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만)
+  assert.equal(stage.restrict.runsApproved, 1);
   assert.equal(stage.restrict.runsDone, 1);
   assert.deepEqual(checkStageRestriction(stage, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
-  assert.deepEqual(checkStageRestriction(stage, { ...ok, execute: true }), [], "남은 승인 실행 1건이 있어 실제 호출 확인은 통과한다");
+  assert.ok(checkStageRestriction(stage, { ...ok, execute: true }).some((m) => m.includes("이미 실행했습니다")), "P01 재시험은 본인 입력 단계로 옮겨 실제 호출 확인에서 거절한다");
   has({ execute: true, alreadySpentGiven: false }, "--already-spent-krw");
-  assert.ok(checkStageRestriction({ restrict: { ...stage.restrict, runsDone: 2 } }, { ...ok, execute: true }).some((m) => m.includes("이미 실행했습니다")), "승인된 2건을 모두 마치면 거절한다");
   assert.deepEqual(checkStageRestriction(stage, { ...ok, twoRoundWorstKrw: 1222.04 }), [], "이전 지시문의 최악 1,222.04원도 상한 안");
   // 제한이 없는 단계는 이 확인을 하지 않는다
   assert.deepEqual(checkStageRestriction({}, { variant: "x", only: undefined, persona: undefined, alreadySpentGiven: false, twoRoundWorstKrw: 99999 }), []);
   // 기존 1 · 2단계는 제한이 없어 지금까지의 동작이 그대로다
-  assert.ok(COMPARE_STAGES.filter((s) => s.name !== "story-p01").every((s) => s.restrict === undefined));
+  assert.ok(COMPARE_STAGES.filter((s) => s.name !== "story-p01" && s.name !== "story-own").every((s) => s.restrict === undefined));
 });

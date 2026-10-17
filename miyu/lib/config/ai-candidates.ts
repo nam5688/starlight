@@ -96,10 +96,29 @@ export const COMPARE_STAGES: CompareStageDef[] = [
       persona: "P01",
       runCeilingKrw: 1234.04,
       requireAlreadySpent: true,
-      // 승인된 실행 2건 = 1차(2026-10-17 운영자 PC: 호출 2회(재작성 1회 포함) · 371원 · 형식 검사 0/1 · 저장되지 않음, 마침) + 2차 재시험 1건(A안, 아직 실행하지 않음). 실행하면 runsDone · lastRun을 고친다.
-      runsApproved: 2,
+      // 승인된 실행 = 1차(2026-10-17 운영자 PC: 호출 2회(재작성 1회 포함) · 371원 · 형식 검사 0/1 · 저장되지 않음, 마침).
+      // 2차 재시험 1건(A안)은 운영자 지시(2026-10-17)로 **가상 인물 P01이 아니라 운영자 본인 입력(story-own, 아래)으로 바꿨다** — 같은 승인 한 건을 쓰므로 이 단계의 P01 재시험은 막는다(runsApproved 1 = 이미 마침).
+      runsApproved: 1,
       runsDone: 1,
-      lastRun: "2026-10-17 · 호출 2회(재작성 1회) · 371원 · 형식 검사 불통과 · 저장되지 않음",
+      lastRun: "2026-10-17 · 호출 2회(재작성 1회) · 371원 · 형식 검사 불통과 · 저장되지 않음 (2차 재시험은 운영자 본인 입력 단계 story-own으로 옮김)",
+    },
+  },
+  // 운영자 지시(2026-10-17): 가상 인물이 아니라 **운영자가 직접 22문항에 답한 입력**으로 같은 story-v1 실제 AI 시험을 한다 — 모델 · 총액(누적 6,000원, 추가 3,532원) · 1회 상한(1,234.04원)은 story-p01과 같은 승인이다.
+  //   · 호출은 **첫 응답 1회만**(재작성 자동 실행 없음 — 운영자가 글 전문을 읽고 판단하기 전에는 두 번째 호출 · 다음 시험을 하지 않는다. 승인 안의 "고쳐 쓰기 1회"는 운영자가 읽은 뒤 따로 정해 쓴다).
+  //   · 입력은 운영자 PC의 로컬 파일(pilot-data/own-input, 저장소에 올라가지 않음)에만 있고 운영 DB에 저장하지 않는다.
+  {
+    name: "story-own",
+    label: "story-v1 운영자 본인 입력 실제 AI 1건 (운영자 지시 2026-10-17 — story-p01과 같은 승인: 총 6,000원 · 누적 2,468원 포함)",
+    personaCount: 1,
+    capKrw: 6000,
+    restrict: {
+      variant: "story-v1",
+      only: "A",
+      persona: "OWN",
+      runCeilingKrw: 1234.04,
+      requireAlreadySpent: true,
+      runsApproved: 1,
+      runsDone: 0,
     },
   },
 ];

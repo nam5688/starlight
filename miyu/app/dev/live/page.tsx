@@ -9,7 +9,7 @@ import { listLiveRuns } from "@/server/dev-live";
 
 export const metadata: Metadata = { title: "궁합 실제 AI 시험 결과 · ME:U 미유", robots: { index: false } };
 
-const STAGE_NAME: Record<string, string> = { "compat-saju-p1": "사주 궁합", "compat-pair-p1": "리포트 궁합" };
+const STAGE_NAME: Record<string, string> = { "compat-saju-p1": "사주 궁합", "compat-pair-p1": "리포트 궁합", "story-own": "개인 심층(본인 입력)" };
 
 export default function DevLivePage() {
   if (process.env.NODE_ENV === "production") notFound();
@@ -31,7 +31,7 @@ async function Runs() {
       <h1 className="mt-3 text-[22px] font-bold tracking-tight">실제 AI가 쓴 글 읽기</h1>
       <p className="mt-2 text-[14px] leading-[1.7] text-ink-3">
         운영자가 이 PC에서 <code>scripts/run-compat-live.ts</code>로 실제 AI를 부른 결과(<code>pilot-data/ai-compare</code>)를 실제 서비스 화면 그대로 읽습니다. 검사를 통과하지 못해 저장되지 않은 글도 돈을 쓰고 받은 원문이라 그대로 볼 수 있어요.
-        <strong> 검사 통과는 좋은 글이라는 뜻이 아니에요 — 글 전문을 직접 읽고 판단해 주세요.</strong> 개인 리포트(story-v1)는 <Link href="/dev/compare" className={textLink}>/dev/compare</Link>에서 읽어요.
+        <strong> 검사 통과는 좋은 글이라는 뜻이 아니에요 — 글 전문을 직접 읽고 판단해 주세요.</strong> 가상 인물로 한 개인 리포트(story-v1) 결과는 <Link href="/dev/compare" className={textLink}>/dev/compare</Link>에서, 운영자 본인 입력 시험(<code>scripts/run-own-story.ts</code>)은 여기서 무료 · 심층 리포트를 나란히 읽어요.
       </p>
       {runs.length === 0 ? (
         <p className="mt-6 rounded-xl bg-canvas p-4 text-[15px] leading-[1.7] text-ink-2">아직 결과가 없어요. 실행 방법은 <code>docs/real-ai-run-guide.md</code>에 있어요.</p>
