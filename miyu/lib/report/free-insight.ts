@@ -37,25 +37,25 @@ const CLAUSES: Record<TendencyId, { module: FreeInsight["basisModule"]; clauses:
   distance: {
     module: "relationship",
     clauses: [
-      { item: "r4", side: "agree", text: "가까운 사람에게도 속마음을 꺼내기까지 시간이 걸릴 수 있어요." },
-      { item: "r5", side: "agree", text: "관계가 깊어질수록, 혼자 정리하는 시간이 있어야 마음이 편해질 수 있어요." },
+      { item: "r4", side: "agree", text: "마음이 복잡할 때는 말로 꺼내기 전에 스스로 정리가 끝나야 입이 떨어지는 편일 수 있어요." },
+      { item: "r5", side: "agree", text: "가까워질수록 함께 있는 시간만큼 숨 돌리는 시간도 챙겨야 관계가 편해질 수 있어요." },
       { item: "r6", side: "disagree", text: "힘들 때는 기대는 것보다 혼자 견디는 쪽이 더 익숙할 수 있어요." },
     ],
   },
   stability: {
     module: "temperament",
     clauses: [
-      { item: "t3", side: "agree", text: "결과가 불확실한 일일수록 시작하기 전에 여러 번 따져 보는 편일 수 있어요." },
-      { item: "t2", side: "agree", text: "익숙한 방식이 이미 잘 돌아가고 있으면, 굳이 바꾸지 않는 쪽이 편할 수 있어요." },
+      { item: "t3", side: "agree", text: "확신이 서지 않는 일 앞에서는 한 번 더 점검하고 나서야 발을 떼는 편일 수 있어요." },
+      { item: "t2", side: "agree", text: "잘 굴러가는 방식에서 안정감을 얻고, 바꾸려면 그럴 이유가 있어야 마음이 움직일 수 있어요." },
       { item: "t4", side: "disagree", text: "일단 해 보고 고치기보다, 큰 문제가 없는지 먼저 확인하고 시작하는 편일 수 있어요." },
     ],
   },
   exploration: {
     module: "temperament",
     clauses: [
-      { item: "t1", side: "agree", text: "가 보지 않은 곳이나 해 보지 않은 일에 먼저 마음이 갈 수 있어요." },
+      { item: "t1", side: "agree", text: "익숙한 길보다 낯선 선택지가 눈에 들어올 때 마음이 먼저 움직일 수 있어요." },
       { item: "t2", side: "disagree", text: "익숙한 방식이 오래 이어지면, 슬슬 다른 방법을 찾고 싶어질 수 있어요." },
-      { item: "t4", side: "agree", text: "일단 시작하고, 문제가 생기면 그때 고치는 편일 수 있어요." },
+      { item: "t4", side: "agree", text: "준비가 다 끝나기를 기다리기보다 움직이면서 방향을 맞춰 가는 쪽이 더 편할 수 있어요." },
     ],
   },
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import { MiyuAvatar } from "@/components/talk/miyu-character";
 import { useState } from "react";
 import { ChevronIcon, InfoIcon } from "@/components/ui/icons";
 import { renderCompatCardPng } from "@/components/talk/card-image";
@@ -61,6 +62,7 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
   return (
     <section id="compat-result" aria-labelledby="compat-result-title" className="space-y-5">
       <div className="rounded-2xl bg-canvas p-6 text-center shadow-soft md:p-8">
+        <MiyuAvatar tone="love" className="mx-auto mb-3 size-14" />
         <p className="text-[14px] font-medium text-ink-3">
           {card.names.a} × {card.names.b}
         </p>

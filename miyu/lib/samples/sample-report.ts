@@ -28,9 +28,9 @@ export const sampleReport: FullReport = {
   // 가상 인물의 가상 응답(연락 · 마음 확인 문항에 '그렇다', 작은 오해 문항에 '아니다')으로 같은 규칙을 거쳐 만든 문단
   insight: buildFreeInsight({ r1: 5, r2: 4, r3: 2 }, "reassurance") ?? undefined,
   core: {
-    comfortableEnvironment: "기대하는 것과 일정이 미리 공유되고, 연락 주기가 일정한 관계와 환경",
-    repeatedReaction: "상대의 답이 늦거나 반응이 달라지면 이유를 여러 가지로 추측하고 다시 확인하려 합니다.",
-    stressTrigger: "계획이 갑자기 바뀌거나, 분명한 답을 듣지 못한 채 기다려야 할 때",
+    comfortableEnvironment: "서로의 기대와 연락 방식이 미리 공유되어, 반응의 이유를 짐작하지 않아도 되는 관계",
+    repeatedReaction: "연락이나 반응이 평소와 달라지면 그 이유가 마음에 남아 확인하고 싶어질 수 있습니다.",
+    stressTrigger: "분명한 답을 듣지 못한 채 기다려야 하거나, 연락이 달라진 이유를 알 수 없을 때",
     tryNow: "불안할 때는 추측을 늘리기보다 확인하고 싶은 것 한 가지를 짧게 묻기",
   },
   temperament: SAMPLE_TEMPERAMENT,

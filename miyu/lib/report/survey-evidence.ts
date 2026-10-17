@@ -84,7 +84,7 @@ export function surveyEvidence(summary: FreeSummary, knownMbti: string | null): 
       topics: ["love", "relationship"],
       strength: "moderate",
       fact: `관계 불안 ${anxiety.score} · 거리 두기 ${avoidance.score} (응답 환산값)`,
-      cue: "가까워지고 싶은 마음과 거리를 두고 싶은 마음이 함께 나타나, 가까운 관계에서 상황에 따라 반응이 달라질 수 있습니다.",
+      cue: "상대의 반응을 확인하고 싶어지는 경향과 혼자만의 거리가 필요한 경향이 응답에 함께 나타났습니다. 두 경향이 같은 장면에서 부딪히는지 서로 다른 장면에서 나뉘어 나타나는지는 이 응답으로 알 수 없으므로 단정하지 않고, 가까운 관계에서 상황에 따라 반응이 달라질 수 있다고만 읽습니다. 마음속에 어떤 바람이 있는지, 애착의 유형이 어떤지는 말하지 않습니다.",
     });
   }
   if (knownMbti) {
