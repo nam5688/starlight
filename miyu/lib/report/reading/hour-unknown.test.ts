@@ -100,6 +100,10 @@ test("검사: 시각을 모를 때 오행 · 십성의 없음 · 적음은 세 �
   // 같은 문장이나 바로 앞 문장에 범위를 밝히면 통과
   const scopeSame = errorsFor((d) => setFirst(d, 4, `세 기둥으로 보면 토 기운은 보이지 않아요(시주에 있을 수 있어요). ${PAD}`));
   assert.ok(!scopeSame.some((e) => /세 기둥 기준/.test(e)), scopeSame.join("\n"));
+  // 지시문이 쓰라고 알려 준 "(시주에 있을 수 있어요)" 자체를 시주 풀이로 막지 않는다(실제 AI가 지시문 그대로 쓴 문구를 검사가 막았던 모순) — 시주에 놓인 것을 읽는 말은 그대로 막는다
+  assert.ok(!scopeSame.some((e) => /시주로 읽는 풀이/.test(e)), scopeSame.join("\n"));
+  const readHour = errorsFor((d) => setFirst(d, 4, `시주에 놓인 식신이 표현력을 받쳐 줘요. ${PAD}`));
+  assert.ok(readHour.some((e) => /시주로 읽는 풀이/.test(e)), readHour.join("\n"));
   const scopePrev = errorsFor((d) => setFirst(d, 4, `출생 시각을 몰라 시주를 뺀 세 기둥으로 읽었어요. 토 기운이 하나도 없어서 중심을 잡는 힘이 적게 읽혀요. ${PAD}`));
   assert.ok(!scopePrev.some((e) => /세 기둥 기준/.test(e)), scopePrev.join("\n"));
   // "그럴 수는 없어요" 같은 일상어는 오행 없음으로 세지 않는다
