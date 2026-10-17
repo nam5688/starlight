@@ -161,7 +161,7 @@ export interface BenefitRepository {
   getCreditBalance(userId: string): Promise<number>;
   listCreditLots(userId: string): Promise<CreditLotRecord[]>;
   listCreditLedger(userId: string, limit: number): Promise<CreditLedgerRecord[]>;
-  grantCredit(input: { userId: string; kind: "event" | "admin" | "promo"; qty: number; sourceRef: string; opKey: string; expiresAt: string | null }): Promise<GrantResult>;
+  grantCredit(input: { userId: string; kind: "event" | "admin" | "promo" | "review"; qty: number; sourceRef: string; opKey: string; expiresAt: string | null }): Promise<GrantResult>;
   spendCredit(input: { userId: string; ref: string }): Promise<CreditSpendResult>;
   restoreCreditSpend(input: { userId: string; ref: string }): Promise<CreditRestoreResult>;
 

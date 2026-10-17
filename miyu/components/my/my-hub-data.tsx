@@ -1,6 +1,6 @@
 import { couponsVisible, pointsVisible, readyOverview, referralVisible } from "@/components/my/benefits/visibility";
 import type { HubItem, StatCardData } from "@/components/my/my-hub";
-import { ChatBubbleIcon, DocumentIcon, GiftIcon, PairIcon, TicketIcon } from "@/components/ui/icons";
+import { ChatBubbleIcon, DocumentIcon, GiftIcon, PairIcon, PencilIcon, TicketIcon } from "@/components/ui/icons";
 import type { BenefitOverview } from "@/lib/services/benefit-service";
 
 // MY 첫 부분에 무엇이 보이는지 정하는 규칙 — 실제 /my 화면과 개발용 미리보기(/dev/my-preview)가 같은 함수를 쓴다.
@@ -23,7 +23,7 @@ export function hubCards(overview: BenefitOverview | null, paidQuestions: number
   return cards;
 }
 
-/** 바로가기 목록 — 후기 시스템이 없으므로 "내가 작성한 리뷰" 줄은 만들지 않는다 */
+/** 바로가기 목록 — "내가 작성한 리뷰"는 이용 건마다 후기를 쓰고 고치는 화면(/my/reviews)이다. 후기 표(DB 25번)가 없으면 그 화면이 "준비 중"으로 안내한다 */
 export function hubItems(overview: BenefitOverview | null, reportCount: number): HubItem[] {
   const o = readyOverview(overview);
   const items: HubItem[] = [
@@ -37,6 +37,7 @@ export function hubItems(overview: BenefitOverview | null, reportCount: number):
       icon: <PairIcon />,
     },
     { id: "chats", title: "미유와 대화하기", description: "지난 상담 이어보기", href: "/my/chats", icon: <ChatBubbleIcon /> },
+    { id: "reviews", title: "내가 작성한 리뷰", description: "이용한 리포트 · 궁합 · 상담에 후기 남기기", href: "/my/reviews", icon: <PencilIcon /> },
   ];
   if (o && referralVisible(o)) {
     const f = o.settings.features;

@@ -143,7 +143,7 @@ export const SETTING_FIELDS: readonly SettingField[] = [
   { key: "feature.referral", label: "친구 추천(링크 · 추천 가격)", description: "켜면 새 추천 방식(추천 가입 기록 · 추천 가격)을 씁니다. 끄면 기존 초대 할인(5,900원 · 3명)이 그대로 동작합니다.", group: "switch", kind: "flag" },
   { key: "feature.referral_signup_points", label: "추천 가입 포인트", description: "추천받은 친구의 가입이 검증(계정 확인 · 무료 분석 완료 · 위험 신호 없음)을 통과하면 추천인에게 포인트를 줍니다.", group: "switch", kind: "flag" },
   { key: "feature.referral_purchase_credits", label: "친구 첫 구매 질문권", description: "추천받은 친구가 첫 심층 리포트를 결제하면 추천인 · 구매자에게 질문권을 줍니다.", group: "switch", kind: "flag" },
-  { key: "feature.review_reward", label: "후기 보상 질문권", description: "후기 작성 보상(질문권 1개)을 줍니다. 후기 시스템이 만들어지기 전에는 지급되지 않습니다.", group: "switch", kind: "flag" },
+  { key: "feature.review_reward", label: "후기 보상 질문권", description: "이용 후기(MY › 내가 작성한 리뷰)를 남기면 질문권을 줍니다 — 이용 건마다 한 번, 별점 · 내용 · 공개 여부와 관계없이 같습니다. 이 스위치가 꺼져 있는 동안 쓴 후기에는 소급해 주지 않습니다. 보상을 받고 쓴 후기는 공개될 때 '질문권 보상 제공'으로 표시됩니다. DB 변경 25번이 필요합니다.", group: "switch", kind: "flag" },
   { key: "earn.tiers", label: "누적 결제액별 적립률", description: "누적 유효 현금 결제액 구간별 적립률입니다(등급 도달 다음 구매부터 · 소급 없음). 10만~30만원 구간은 운영자 확정 전이라 기본 3%입니다.", group: "earn", kind: "tiers" },
   { key: "point.prices", label: "포인트 교환가(상품별)", description: "상품별 교환 포인트입니다. 현금 가격에서 계산하지 않고 이 값을 그대로 씁니다.", group: "point", kind: "prices" },
   { key: "point.expire_days", label: "포인트 유효기간", description: "지급일로부터 며칠 뒤 소멸하는지입니다. 0이면 소멸하지 않습니다. 지급할 때의 값이 그 포인트에 박힙니다.", group: "point", kind: "int", min: 0, max: 3650, unit: "일" },

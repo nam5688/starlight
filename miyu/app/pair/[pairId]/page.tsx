@@ -7,11 +7,12 @@ import { LoginOptions } from "@/components/auth/login-options";
 import { CopyLinkBox, PairChangeButtons, PairPayButton } from "@/components/pair/pair-forms";
 import { PairStatusPoller } from "@/components/pair/pair-status-poller";
 import { CompatReportView } from "@/components/report/compat-report-view";
+import { ReviewLink } from "@/components/reviews/review-link";
 import { ResultHeader } from "@/components/report/result-header";
 import { PageFallback } from "@/components/ui/page-fallback";
 import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
-import { getPairView, type PairView } from "@/lib/services/pair-service";
+import { getPairView, paidPairOrder, type PairView } from "@/lib/services/pair-service";
 import { isAuthConfigured, siteUrl } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { pairDeps } from "@/server/pair";
@@ -79,10 +80,13 @@ async function Content({ params }: Pick<PageProps<"/pair/[pairId]">, "params">) 
       </Frame>
     );
   }
-  return <Body view={view} />;
+  // 후기 입구는 결제한 사람에게만(구매 한 건에 후기와 보상은 한 번 — 상대는 같은 글을 읽어도 후기 대상이 아니다). 자격은 서버가 후기를 쓸 때 다시 확인한다
+  const deps = pairDeps();
+  const reviewRef = view.report.state === "ready" && view.purchase.state === "paid" && view.purchase.buyer === "me" ? ((await paidPairOrder(deps, { pairId, userId: member.userId }))?.id ?? null) : null;
+  return <Body view={view} reviewRef={reviewRef} />;
 }
 
-function Body({ view }: { view: Extract<PairView, { kind: "ok" }> }) {
+function Body({ view, reviewRef }: { view: Extract<PairView, { kind: "ok" }>; reviewRef: string | null }) {
   const price = formatKrw(view.priceKrw);
   const names = view.otherNickname ? `${view.myNickname ?? "나"} 님 · ${view.otherNickname} 님` : null;
 
@@ -93,6 +97,11 @@ function Body({ view }: { view: Extract<PairView, { kind: "ok" }> }) {
         <ResultHeader title="리포트 궁합" subtitle="두 사람의 사주와, 각자 직접 답한 응답의 방향을 같은 영역끼리 비교해 읽었어요. 재미 · 참고용이고 관계의 결과를 알려 주지 않아요." source={view.report.report.placeholder ? "dev-scoring" : undefined} meta={`저장된 리포트${names ? ` · ${names}` : ""}`} tone="love" />
         <div className={`${pageNarrow} pb-14`}>
           <CompatReportView report={view.report.report} viewer={view.role} />
+          {reviewRef && (
+            <div className="mt-8">
+              <ReviewLink kind="pair_compat" subjectRef={reviewRef} />
+            </div>
+          )}
           <Section title="연결 · 동의 관리">
             <p>연결을 끊어도 이미 만들어진 글은 두 사람 모두 계속 읽을 수 있어요. 동의를 철회하면 내 자료는 새 궁합에 더 쓰이지 않고, 나는 이 글을 더 읽을 수 없어요.</p>
             <PairChangeButtons pairId={view.pairId} canUnlink={view.can.unlink} canWithdraw={view.can.withdraw} />

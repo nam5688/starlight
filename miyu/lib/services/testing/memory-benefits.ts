@@ -62,6 +62,13 @@ type CLedger = CreditLedgerRecord & { userId: string; opKey: string };
 type Redemption = CouponRedemptionRecord;
 type Signup = { inviteeUserId: string; inviterUserId: string; linkToken: string; anonId: string | null; status: ReferralSignupStatus; risk: string[]; signedUpAt: string; holdUntil: string; decidedAt: string | null; decisionReason: string | null };
 
+/** 객체에서 열 몇 개를 뺀 복사본 — 시험용 저장소가 본인이 볼 수 없는 열(회원 번호 · 멱등 키)을 빼고 돌려줄 때 쓴다 */
+function omit<T extends object, K extends keyof T>(o: T, ...keys: K[]): Omit<T, K> {
+  const copy = { ...o };
+  for (const k of keys) delete copy[k];
+  return copy;
+}
+
 export function createMemoryBenefits(mem: Mem, now: () => Date = () => new Date()) {
   const settings = new Map<string, unknown>(Object.entries(rawDefaultSettings()));
   const history: SettingHistoryRecord[] = [];
@@ -348,10 +355,10 @@ export function createMemoryBenefits(mem: Mem, now: () => Date = () => new Date(
       return balanceOf(userId);
     },
     async listPointLots(userId) {
-      return pointLots.filter((l) => l.userId === userId).map(({ userId: _u, ...l }) => l).reverse();
+      return pointLots.filter((l) => l.userId === userId).map((l) => omit(l, "userId")).reverse();
     },
     async listPointLedger(userId, limit) {
-      return pointLedger.filter((l) => l.userId === userId).map(({ userId: _u, opKey: _o, ...l }) => l).reverse().slice(0, limit);
+      return pointLedger.filter((l) => l.userId === userId).map((l) => omit(l, "userId", "opKey")).reverse().slice(0, limit);
     },
     async grantPoints({ userId, amount, sourceKind, sourceRef, opKey, expiresAt }) {
       return grantPointsInner(userId, amount, sourceKind, sourceRef, opKey, expiresAt, null);
@@ -367,10 +374,10 @@ export function createMemoryBenefits(mem: Mem, now: () => Date = () => new Date(
       return creditBalance(userId);
     },
     async listCreditLots(userId) {
-      return creditLots.filter((l) => l.userId === userId).map(({ userId: _u, ...l }) => l).reverse();
+      return creditLots.filter((l) => l.userId === userId).map((l) => omit(l, "userId")).reverse();
     },
     async listCreditLedger(userId, limit) {
-      return creditLedger.filter((l) => l.userId === userId).map(({ userId: _u, opKey: _o, ...l }) => l).reverse().slice(0, limit);
+      return creditLedger.filter((l) => l.userId === userId).map((l) => omit(l, "userId", "opKey")).reverse().slice(0, limit);
     },
     async grantCredit({ userId, kind, qty, sourceRef, opKey, expiresAt }) {
       return grantCreditInner(userId, kind, qty, sourceRef, opKey, expiresAt);
@@ -456,12 +463,12 @@ export function createMemoryBenefits(mem: Mem, now: () => Date = () => new Date(
       return true;
     },
     async listCouponRedemptions(couponId, limit) {
-      return redemptions.filter((r) => r.couponId === couponId).map(({ key: _k, ...r }) => r).reverse().slice(0, limit);
+      return redemptions.filter((r) => r.couponId === couponId).map((r) => omit(r, "key")).reverse().slice(0, limit);
     },
     async listUserCouponRedemptions(userId, limit) {
       return redemptions
         .filter((r) => r.userId === userId)
-        .map(({ key: _k, ...r }) => ({ ...r, code: coupons.find((c) => c.id === r.couponId)?.code ?? "", name: coupons.find((c) => c.id === r.couponId)?.name ?? "" }))
+        .map((r0) => omit(r0, "key")).map((r) => ({ ...r, code: coupons.find((c) => c.id === r.couponId)?.code ?? "", name: coupons.find((c) => c.id === r.couponId)?.name ?? "" }))
         .reverse()
         .slice(0, limit);
     },
@@ -561,7 +568,7 @@ export function createMemoryBenefits(mem: Mem, now: () => Date = () => new Date(
     async getBenefitGrant(orderId) {
       const g = grants.get(orderId);
       if (!g) return null;
-      const { userId: _u, ...rest } = g;
+      const rest = omit(g, "userId");
       return rest;
     },
     async listBenefitGrants(limit) {

@@ -148,7 +148,7 @@ export async function joinPairInvite(deps: PairDeps, input: { token: string; use
 }
 
 /** 이 쌍의 결제 주문들 — 주문은 결제한 사람의 검사 결과 번호에 묶여 있으므로 두 사람의 검사 결과에서 모두 찾는다 */
-async function pairOrders(repo: MiyuRepository, pair: PairRecord): Promise<OrderRecord[]> {
+export async function pairOrders(repo: MiyuRepository, pair: PairRecord): Promise<OrderRecord[]> {
   const ids = [pair.aAssessmentId, pair.bAssessmentId].filter((x): x is string => !!x);
   const productId = pairProductId(pair.id);
   const lists = await Promise.all(ids.map((id) => repo.listOrdersForAssessment(id)));

@@ -37,6 +37,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const orders = new Map<string, OrderRecord>();
   /** 주문 상태가 바뀔 때 부르는 훅(테스트용 혜택 저장소가 DB 트리거 대신 등록한다) */
   const orderHooks: ((before: OrderRecord, after: OrderRecord) => void)[] = [];
+  /** 회원 탈퇴 처리가 끝났을 때 부르는 훅(테스트용 저장소가 DB의 "프로필 탈퇴 표시" 트리거 대신 등록한다) */
+  const withdrawHooks: ((userId: string) => void)[] = [];
   const reports = new Map<string, ReportRecord>();
   const events: { orderId: string; source: PaymentEventSource; status: string | null; detail: Record<string, unknown>; createdAt: string }[] = [];
   const consents = new Map<string, ConsentRecord[]>();
@@ -232,6 +234,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         }
       }
       profiles.set(userId, { ...profiles.get(userId)!, nickname: null });
+      for (const hook of withdrawHooks) hook(userId);
       return { ok: true, counts };
     },
     async updateProfileNickname(userId, nickname) {
@@ -789,5 +792,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, newId: id, orderHooks, compatRequests, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
+  return { repo, newId: id, orderHooks, withdrawHooks, compatRequests, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
 }

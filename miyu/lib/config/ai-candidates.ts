@@ -104,6 +104,25 @@ export const COMPARE_STAGES: CompareStageDef[] = [
 ];
 
 /**
+ * 궁합 실제 AI 시험 단계 — 사주 궁합 · 리포트 궁합은 아직 어떤 승인에도 포함되지 않았다(승인된 실행 0회 · 1회 상한 0원 = 승인 없음).
+ * 운영자가 모델 · 호출 수 · 최대 비용을 정해 승인하면 그 값으로 `runsApproved`와 `runCeilingKrw`(반올림 없이 그대로 비교하는 최악 비용 상한)를 고친다 —
+ * 그 전에는 드라이런만 되고 `--execute`는 거절된다. 제안과 비용은 docs/real-ai-approval-proposal.md. 가상 인물만 쓴다(실제 고객 정보 금지).
+ */
+export type CompatLiveStageDef = {
+  name: "compat-saju-p1" | "compat-pair-p1";
+  label: string;
+  kind: "saju" | "pair";
+  /** 승인 총액(원, 누적 사용액 포함) — 하드스톱 한도의 바탕 */
+  capKrw: number;
+  restrict: { runCeilingKrw: number; runsApproved: number; runsDone: number; lastRun?: string };
+};
+
+export const COMPAT_LIVE_STAGES: CompatLiveStageDef[] = [
+  { name: "compat-saju-p1", label: "사주 궁합 실제 AI 1건 (가상 쌍 C1) — 승인 전", kind: "saju", capKrw: 4000, restrict: { runCeilingKrw: 0, runsApproved: 0, runsDone: 0 } },
+  { name: "compat-pair-p1", label: "리포트 궁합 실제 AI 1건 (가상 인물 P01 · P02) — 승인 전", kind: "pair", capKrw: 4000, restrict: { runCeilingKrw: 0, runsApproved: 0, runsDone: 0 } },
+];
+
+/**
  * 1단계 승인(운영자 2026-10-13, 재시도 포함 3,000원)의 사용 기록. 실제 호출은 운영자 PC의 비교 실행(pilot-data, 저장소에 올라가지 않음)이었고 합계는 운영자가 확인한 값이다.
  * 새 호출을 할 때마다 운영자가 확인한 누적액으로 고친다. 이 값은 호출 전 안전선(채팅 시험 상한)의 근거일 뿐 호출을 허락하지 않는다.
  */

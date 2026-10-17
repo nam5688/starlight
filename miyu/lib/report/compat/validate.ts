@@ -2,7 +2,7 @@
 // 이전 읽기 구조와 같은 글 규칙(textIssues)을 쓰고, 궁합에서만 필요한 확인(관계 판정 · 속마음 · 관계 종류 단정 · 시기 이야기는 timing 영역에서만)을 더한다.
 // 한계: 낱말 · 길이 · 표지를 센 어림이다. 말을 바꿔 쓴 속마음 단정 · 관계의 좋고 나쁨 판정은 못 찾는다 — 지시문(prompt.ts)과 사람이 읽는 평가가 본다. 좋은 글의 보증이 아니다.
 import type { Evidence } from "../evidence.ts";
-import { findRepeatedPhrasesIn, type RepeatedPhrase } from "../reading/repeat.ts";
+import { findRepeatedPhrasesIn, repeatMessages, type RepeatedPhrase } from "../reading/repeat.ts";
 import { distinctTerms } from "../reading/terms.ts";
 import { allowedYearsOf, countSentences, textIssues } from "../reading/validate.ts";
 import { COMPAT_LIMITS as L, COMPAT_STEP_GROUPS, hasTimingEvidence, pairSectionsFor, sectionsFor } from "./plan.ts";
@@ -29,6 +29,37 @@ const RELATION_KIND = /남편|아내|남자\s*친구|여자\s*친구|남친|여�
 const TIMING_TALK = /올해|내년|작년|내후년|(?<![가-힣\d])\d{1,2}\s*월(?![가-힣]*\s*생)|대운|세운|(?:관계|인연)이\s*(?:깊어지|좋아지|나빠지|풀리)는\s*(?:때|시기|해|달)/;
 /** timing 영역 안에서도 계산하지 않은 것 — 내년 · 달 · 관계가 좋아지거나 나빠지는 때 · 두 시기가 맞물리는 해 · 추천 날짜 · "좋은 시기 / 나쁜 시기" */
 const TIMING_NOT_COMPUTED = /내년|작년|내후년|(?<![가-힣\d])\d{1,2}\s*월(?![가-힣]*\s*생)|(?:관계|인연)이\s*(?:깊어지|좋아지|나빠지|풀리)는\s*(?:때|시기|해|달)|맞물리는\s*(?:해|때|시기)|겹치는\s*해|추천\s*(?:날짜|하는\s*날)|(?:좋은|나쁜|안\s*좋은)\s*(?:시기|해|때)/;
+/**
+ * 두 사람의 시기에 좋고 나쁨을 매기는 말 — 시기 영역은 두 사람의 시기 "주제"가 겹치는지 다른지만 쓴다. 어느 한쪽의 시기가 좋다 · 나쁘다, 한쪽이 더 낫다, 운이 풀린다는 계산하지 않았다.
+ * (실제 AI 첫 시험 전에 대리 작성기 글의 반복 · 시기 풀이를 점검하며 더했다 — 사후 수정이고 새 글이 통과한다는 증거가 아니다)
+ */
+export const TIMING_VERDICT = /시기(?:가|는|도)\s*(?:더\s*)?(?:좋|나쁘|안\s*좋|유리|불리)|(?:운이|운세가|흐름이)\s*(?:좋|나쁘|트이|막히|풀리)|[AB]님(?:의|은|이)?\s*(?:시기|대운|세운)(?:가|는)?[^.!?]{0,14}(?:보다|더)\s*(?:좋|나|유리|앞서|빠르)|(?:막히|풀리|트이)는\s*(?:시기|때|해)/;
+
+/**
+ * 입력받지 않은 구체적인 사건을 아는 사실처럼 쓰는 문장 — 두 사람이 다퉜다 · 헤어졌다 · 처음 만났다처럼 지나간 사건을 단정하는 말.
+ * "~했던 때가 있었을 거예요 · ~할 수 있어요 · ~기 쉬워요"처럼 조건 · 추측으로 쓴 공감은 막지 않는다(문장에 그런 표지가 있으면 통과).
+ */
+const EVENT_STEM = /처음\s*만났|처음\s*만난|다퉜|다투었|싸웠|싸운\s*(?:적|뒤|후)|헤어졌|헤어진\s*(?:적|뒤|후)|이별했|재결합|재회했|사귀었|사귀고\s*있|사귀는\s*(?:중|사이)|결혼했|결혼한\s*(?:사이|지)|동거했|동거하고|고백했|연락이\s*끊|바람을\s*피|외도|이혼했|임신했|출산했|화해했|상처받았|참아\s*왔|참아왔/;
+const HEDGED = /수\s*있|기\s*쉬|있었을\s*(?:거|수)|[ㄹ을]\s*수도|일\s*수도|(?:이|가)\s*있다면|다면|라면|면\s*[^.!?]{0,12}(?:어요|해요)|거예요|것\s*같|(?:읽혀|보여)요/;
+export function unfoundedEventIn(text: string): string | null {
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    const m = EVENT_STEM.exec(sentence);
+    if (m && !HEDGED.test(sentence)) return m[0];
+  }
+  return null;
+}
+
+/** 같은 구절이 서로 다른 글 조각에 되풀이되는 것을 몇 개까지 봐줄까 — 이 수를 넘으면 고쳐 쓴다(12자 이상 같은 토막, repeat.ts) */
+export const COMPAT_REPEAT_MAX = 2;
+/** 문단이 같은 다섯 글자로 시작하는 것을 몇 개 문단까지 봐줄까 — 이 수를 넘으면 같은 틀로 열리는 글이다 */
+export const COMPAT_OPENER_MAX = 3;
+const norm = (t: string) => t.replace(/^\s*\[[^\]]*\]/, "").replace(/[\s.,!?·'"“”‘’()\-]/g, "");
+export function repeatedOpeners(texts: { where: string; text: string }[]): { opener: string; count: number }[] {
+  const count = new Map<string, number>();
+  for (const { where, text } of texts) if (/paragraphs\[/.test(where)) count.set(norm(text).slice(0, 5), (count.get(norm(text).slice(0, 5)) ?? 0) + 1);
+  return [...count].filter(([k, n]) => k.length === 5 && n > COMPAT_OPENER_MAX).map(([opener, n]) => ({ opener, count: n }));
+}
+
 /** 건넬 말(say)은 따옴표로 감싸지 않는다(화면이 따옴표를 붙인다) */
 const QUOTE_WRAP = /["“”‘’「」『』]/;
 
@@ -164,9 +195,17 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: Co
     if (RELATION_KIND.test(t)) errors.push(`${where}: 두 사람의 관계 종류(남편 · 아내 · 남자친구 · 여자친구 · 애인)를 알고 있는 것처럼 쓰지 않습니다 — "두 분"으로 씁니다.`);
     const inTiming = where.startsWith("sections.timing") && hasTimingEvidence(evidence);
     if (!inTiming && TIMING_TALK.test(t)) errors.push(`${where}: 두 사람의 시기("${TIMING_TALK.exec(t)![0]}")는 ${hasTimingEvidence(evidence) ? "timing 영역에서만" : "시기 근거가 없어"} 쓰지 않습니다.`);
+    if (inTiming && TIMING_VERDICT.test(t)) errors.push(`${where}: 두 사람의 시기에 좋고 나쁨을 매기지 않습니다("${TIMING_VERDICT.exec(t)![0]}") — 시기 영역은 두 시기의 주제가 겹치는지 다른지만 쓰세요.`);
+    const ev = unfoundedEventIn(t);
+    if (ev) errors.push(`${where}: 입력받지 않은 두 사람의 사건("${ev}")을 아는 사실처럼 쓰지 않습니다 — "~했던 때가 있었을 수 있어요"처럼 조건 · 추측으로 쓰거나 장면의 가능성("~기 쉬워요")으로 바꾸세요.`);
     if (inTiming && TIMING_NOT_COMPUTED.test(t)) errors.push(`${where}: "${TIMING_NOT_COMPUTED.exec(t)![0]}"는 계산하지 않은 시기 이야기라 쓰지 않습니다 — 근거(compat.timing.*)에 적힌 시기 · 연도 안에서 두 시기의 주제가 겹치는지 다른지만 쓰세요.`);
   }
 
+  // 되풀이 — 영역 · 행동 사이에 같은 구절이 여러 곳 나오거나 문단이 같은 틀로 열리면 고쳐 쓰게 한다(말을 바꿔 되풀이한 문장은 못 찾는다 — 사람이 읽는 평가가 본다)
+  const repeats = findRepeatedPhrasesIn(texts);
+  if (repeats.length > COMPAT_REPEAT_MAX) errors.push(...repeatMessages(repeats), `같은 구절이 ${repeats.length}곳에서 되풀이돼요 — ${COMPAT_REPEAT_MAX}곳 이하로 줄이고, 영역마다 그 영역에서만 새로 알 수 있는 말을 쓰세요.`);
+  for (const o of repeatedOpeners(texts)) errors.push(`문단 ${o.count}개가 같은 말("${o.opener}…")로 시작해요 — 문단마다 다른 장면 · 다른 첫말로 여세요.`);
+
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, draft: d as CompatDraftV1, repeats: findRepeatedPhrasesIn(texts) };
+  return { ok: true, draft: d as CompatDraftV1, repeats };
 }

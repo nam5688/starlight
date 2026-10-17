@@ -101,6 +101,9 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
         <Link href="/admin/benefits" className={textLink}>
           혜택 · 쿠폰 · 손익 관리 →
         </Link>
+        <Link href="/admin/reviews" className={textLink}>
+          후기 관리 →
+        </Link>
       </p>
 
       <section aria-labelledby="a-deploy">

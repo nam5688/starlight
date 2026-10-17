@@ -142,7 +142,7 @@ export type AiUsageInput = {
 export type AiUsageRecord = AiUsageInput & { id: number; createdAt: string };
 
 /** 화면에서 보내는 방문 단계 — 결제 시작 · 승인 · 리포트 완성은 orders · reports에서 센다 */
-export const FUNNEL_EVENT_NAMES = ["visit", "analyze_start", "analyze_complete", "preview_view", "report_view"] as const;
+export const FUNNEL_EVENT_NAMES = ["visit", "analyze_start", "analyze_complete", "preview_view", "report_view", "review_section_view", "review_all_click"] as const;
 export type FunnelEventName = (typeof FUNNEL_EVENT_NAMES)[number];
 /** 이름 · 생년월일 · 응답 · 고민 · 리포트 내용은 담지 않는다 */
 export type FunnelEventInput = { anonId: string; name: FunnelEventName; path: string | null; src: string | null; medium: string | null; campaign: string | null; referrerHost: string | null };

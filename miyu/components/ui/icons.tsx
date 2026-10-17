@@ -156,3 +156,22 @@ export function InfoIcon({ className = "size-4" }: { className?: string }) {
     </svg>
   );
 }
+
+/** 별점 — 채워진 별(filled) · 빈 별. 별점은 "5점 만점에 4점" 같은 글자와 함께 쓴다(모양 · 색만으로 뜻을 구분하지 않는다) */
+export function StarIcon({ className = "size-4", filled = false }: { className?: string; filled?: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" fill={filled ? "currentColor" : "none"} aria-hidden="true" className={className}>
+      <path d="M8 1.9l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.1l-3.6 1.9.7-4L2.2 6.2l4-.6L8 1.9z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 후기 쓰기 — 연필 */
+export function PencilIcon({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className={className}>
+      <path d="M3.5 16.5l.9-3.6 8.6-8.6a1.7 1.7 0 012.4 0l.3.3a1.7 1.7 0 010 2.4l-8.6 8.6-3.6.9z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M11.2 6.1l2.7 2.7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
