@@ -217,10 +217,10 @@ test("한 모델만 실행(--only): 인물마다 한 건씩 생성하고 모든 
 test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 금액 · 최악 비용 상한을 어기면 이유가 나오고, 맞으면 통과한다", () => {
   const stage = COMPARE_STAGES.find((s) => s.name === "story-p01");
   assert.ok(stage?.restrict, "story-p01 단계가 있고 제한이 있다");
-  assert.equal(stage.capKrw, 4000, "총 승인 한도 4,000원(누적 사용액 포함)");
+  assert.equal(stage.capKrw, 6000, "총 승인 한도 6,000원(누적 사용액 2,468원 포함 — 지금부터 추가 지출 상한 3,532원, A안 2026-10-17)");
   assert.equal(stage.personaCount, 1);
-  assert.equal(stage.restrict.runCeilingKrw, 1230, "운영자가 2026-10-17에 1,204원 → 1,230원으로 다시 승인(1,222.04원을 반올림해 통과시키지 않는다)");
-  const ok = { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1230 };
+  assert.equal(stage.restrict.runCeilingKrw, 1234.03, "운영자가 승인안의 최악 비용 1,234.03원을 1회 상한으로 승인(2026-10-17 A안, 반올림 없이 그대로 비교)");
+  const ok = { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1234.03 };
   assert.deepEqual(checkStageRestriction(stage, ok), [], "범위 안이고 상한과 같으면 통과");
   const has = (patch: object, word: string) => assert.ok(checkStageRestriction(stage, { ...ok, ...patch }).some((m) => m.includes(word)), word);
   has({ variant: "reading-v1" }, "story-v1");
@@ -229,14 +229,15 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   has({ persona: undefined }, "P01");
   has({ persona: "P02" }, "P01");
   has({ alreadySpentGiven: false }, "--already-spent-krw");
-  has({ twoRoundWorstKrw: 1230.01 }, "상한"); // 반올림 없이 그대로 비교한다
-  // 승인받은 1건을 마쳤으면(2026-10-17 실행) 드라이런은 되고 실제 호출(--execute)은 거절한다 — 새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만
-  assert.equal(stage.restrict.runsApproved, 1);
+  has({ twoRoundWorstKrw: 1234.04 }, "상한"); // 반올림 없이 그대로 비교한다
+  // 승인된 실행 2건(1차 마침 + 2차 재시험 1건) — 1차를 마쳤고 2차는 남아 있어 실제 호출 확인이 통과한다. 2차까지 마치면 다시 거절한다(새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만)
+  assert.equal(stage.restrict.runsApproved, 2);
   assert.equal(stage.restrict.runsDone, 1);
   assert.deepEqual(checkStageRestriction(stage, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
-  has({ execute: true }, "이미 실행했습니다");
-  assert.deepEqual(checkStageRestriction({ restrict: { ...stage.restrict, runsDone: 0 } }, { ...ok, execute: true }), [], "남은 승인 실행이 있으면 실제 호출 확인은 통과한다");
-  assert.deepEqual(checkStageRestriction(stage, { ...ok, twoRoundWorstKrw: 1222.04 }), [], "지금의 최악 1,222.04원은 상한 1,230원 안");
+  assert.deepEqual(checkStageRestriction(stage, { ...ok, execute: true }), [], "남은 승인 실행 1건이 있어 실제 호출 확인은 통과한다");
+  has({ execute: true, alreadySpentGiven: false }, "--already-spent-krw");
+  assert.ok(checkStageRestriction({ restrict: { ...stage.restrict, runsDone: 2 } }, { ...ok, execute: true }).some((m) => m.includes("이미 실행했습니다")), "승인된 2건을 모두 마치면 거절한다");
+  assert.deepEqual(checkStageRestriction(stage, { ...ok, twoRoundWorstKrw: 1222.04 }), [], "이전 지시문의 최악 1,222.04원도 상한 안");
   // 제한이 없는 단계는 이 확인을 하지 않는다
   assert.deepEqual(checkStageRestriction({}, { variant: "x", only: undefined, persona: undefined, alreadySpentGiven: false, twoRoundWorstKrw: 99999 }), []);
   // 기존 1 · 2단계는 제한이 없어 지금까지의 동작이 그대로다

@@ -54,6 +54,45 @@ export const COMPAT_REPEAT_MAX = 2;
 /** 문단이 같은 다섯 글자로 시작하는 것을 몇 개 문단까지 봐줄까 — 이 수를 넘으면 같은 틀로 열리는 글이다 */
 export const COMPAT_OPENER_MAX = 3;
 const norm = (t: string) => t.replace(/^\s*\[[^\]]*\]/, "").replace(/[\s.,!?·'"“”‘’()\-]/g, "");
+/** 리포트 궁합: 근거(pair.*)에 적힌 "응답에서 나타난 경향" 풀이 문구를 글에 그대로 옮긴 곳 — 띄어쓰기를 뺀 연속 글자 수 */
+export const PAIR_MEANING_RUN = 12;
+/** 이 수까지의 옮김은 허용한다(한 번쯤 닮은 구절이 나오는 것은 자연스럽다) — 넘으면 응답을 그대로 읽어 주는 글로 보고 고쳐 쓰게 한다 */
+export const PAIR_MEANING_ECHO_MAX = 1;
+
+const squash = (t: string) => t.replace(/[\s"'“”‘’.,·]/g, "");
+
+/**
+ * 두 사람의 응답 비교 근거(pair.*)에서 A님 · B님의 "경향" 풀이 문구를 꺼내, 글 조각이 그 문구를 연속 PAIR_MEANING_RUN글자 이상 그대로 담았는지 센다.
+ * 응답을 재진술한 글(근거의 문구를 말투만 바꿔 옮긴 글)을 찾는 어림이다 — 말을 바꿔 다시 쓴 재진술은 못 찾으므로 사람이 읽는 평가가 따로 본다.
+ */
+export function echoedMeaningsIn(texts: { where: string; text: string }[], evidence: Evidence[]): { where: string; run: string }[] {
+  const meanings: string[] = [];
+  for (const e of evidence) {
+    if (!e.id.startsWith("pair.") || e.id === "pair.mbti") continue;
+    const m = /경향은 "([^"]+)", B님은 "([^"]+)"/.exec(e.fact);
+    if (m) meanings.push(squash(m[1]!), squash(m[2]!));
+  }
+  const found: { where: string; run: string }[] = [];
+  for (const { where, text } of texts) {
+    const t = squash(text);
+    for (const m of meanings) {
+      let hit: string | null = null;
+      for (let i = 0; i + PAIR_MEANING_RUN <= m.length; i++) {
+        const run = m.slice(i, i + PAIR_MEANING_RUN);
+        if (t.includes(run)) {
+          hit = run;
+          break;
+        }
+      }
+      if (hit) {
+        found.push({ where, run: hit });
+        break;
+      }
+    }
+  }
+  return found;
+}
+
 export function repeatedOpeners(texts: { where: string; text: string }[]): { opener: string; count: number }[] {
   const count = new Map<string, number>();
   for (const { where, text } of texts) if (/paragraphs\[/.test(where)) count.set(norm(text).slice(0, 5), (count.get(norm(text).slice(0, 5)) ?? 0) + 1);
@@ -93,7 +132,7 @@ export function visibleCompatTexts(d: CompatDraftV1): { where: string; text: str
 }
 
 /** 리포트 궁합에서 응답을 읽어 주는 말 — 두 사람의 원래 답을 옮기는 표현만 막는다("같은 쪽으로 답한" 같은 영역 수준 말은 허용) */
-const PAIR_ECHO = /라고 (?:답|응답)|(?:답|응답)(?:했|하셨)(?:으므로|기에|기 때문)|문항(?:에서|에는|에 )|검사 결과|고르(?:셨|신)|선택(?:하셨|한 답)/;
+const PAIR_ECHO = /[라다]고 (?:답|응답)|(?:답|응답)하셨|(?:답|응답)(?:했|하셨)(?:으므로|기에|기 때문)|문항(?:에서|에는|에 )|검사 결과|고르(?:셨|신)|선택(?:하셨|한 답)/;
 /** 애착 유형 이름 — 가까운 관계 반응은 어떤 장면에서 나타나는지로만 쓴다(단정 금지) */
 const ATTACHMENT_TYPE = /(?:안정|불안|회피|혼란)\s*(?:형|애착)|애착\s*유형|(?:불안|회피)(?:형|적)\s*(?:인|사람|성향)/;
 
@@ -205,6 +244,15 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: Co
   const repeats = findRepeatedPhrasesIn(texts);
   if (repeats.length > COMPAT_REPEAT_MAX) errors.push(...repeatMessages(repeats), `같은 구절이 ${repeats.length}곳에서 되풀이돼요 — ${COMPAT_REPEAT_MAX}곳 이하로 줄이고, 영역마다 그 영역에서만 새로 알 수 있는 말을 쓰세요.`);
   for (const o of repeatedOpeners(texts)) errors.push(`문단 ${o.count}개가 같은 말("${o.opener}…")로 시작해요 — 문단마다 다른 장면 · 다른 첫말로 여세요.`);
+
+  // 리포트 궁합 — 근거에 적힌 응답 풀이 문구를 그대로 옮긴 글(응답 재진술)
+  if (pair) {
+    const echoed = echoedMeaningsIn(texts, evidence);
+    if (echoed.length > PAIR_MEANING_ECHO_MAX) {
+      for (const e of echoed.slice(0, 4)) errors.push(`${e.where}: 근거의 응답 풀이 문구를 그대로 옮겼어요("${e.run}…") — 응답이 두 사람의 어떤 장면에서 어떻게 나타날지로 바꿔 쓰세요.`);
+      errors.push(`응답을 그대로 읽어 주는 글이 ${echoed.length}곳이에요 — ${PAIR_MEANING_ECHO_MAX}곳 이하로 줄이세요.`);
+    }
+  }
 
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, draft: d as CompatDraftV1, repeats };

@@ -81,22 +81,23 @@ export type StageRestriction = {
 export const COMPARE_STAGES: CompareStageDef[] = [
   { name: "stage-1", label: "1단계: 가상 인물 2명 × 후보 2개 = 생성 4건", personaCount: 2, capKrw: 3000 },
   { name: "stage-2", label: "2단계: 가상 인물 10명 × 후보 2개 = 생성 20건 (1단계 결과를 보고 따로 승인)", personaCount: 10, capKrw: 8000 },
-  // 운영자 승인 2026-10-17: AI 테스트 총 승인 한도 4,000원(누적 사용액 포함). story-v1 + 현재 지시문, 가상 인물 P01 실제 AI 1건만.
-  // 필요한 자동 재작성은 그 1건의 품질 검사 범위에서만. 다른 인물 · 궁합 AI · 리포트 궁합 · 추가 비교 생성에는 쓰지 않는다. 최대 비용이 상한을 넘으면 실행하지 않고 다시 확인한다.
-  // 1회 실행 상한: 처음 승인 1,204원(지시문 0.1 기준) → 지시문 0.2에서 입력이 길어져 최악이 1,222.04원이라 운영자가 같은 날 **1,230원**으로 다시 승인했다(반올림 없이 그대로 비교한다 — 총 4,000원 · 범위는 그대로).
+  // 운영자 승인 2026-10-17(1차): AI 테스트 총 승인 한도 4,000원(누적 사용액 포함). story-v1 + 현재 지시문, 가상 인물 P01 실제 AI 1건만(1회 상한 1,230원) — 마쳤다(371원 · 형식 검사 불통과).
+  // 운영자 승인 2026-10-17(2차, A안): **총 6,000원(누적 사용액 2,468원 포함 → 지금부터 추가 지출 상한 3,532원, 6,000원을 더 써도 된다는 뜻이 아니다)**, 모델 claude-sonnet-5-5.
+  //   이 단계는 story-v1 재시험 1회(생성 + 필요하면 고쳐 쓰기 = 호출 최대 2회) · 1회 상한은 승인안의 최악 비용 **1,234.03원**(지시문 0.3 기준, 반올림 없이 그대로 비교 — 넘으면 호출 전에 멈추고 다시 승인받는다).
+  //   다른 인물 · 추가 비교에는 쓰지 않는다. 사주 궁합 · 리포트 궁합은 아래 COMPAT_LIVE_STAGES에서 각각 따로 승인했다.
   {
     name: "story-p01",
-    label: "story-v1 P01 실제 AI 1건 (운영자 승인 2026-10-17 — 총 4,000원, 누적 사용액 포함)",
+    label: "story-v1 P01 실제 AI 재시험 1건 (운영자 승인 2026-10-17 A안 — 총 6,000원, 누적 사용액 2,468원 포함)",
     personaCount: 1,
-    capKrw: 4000,
+    capKrw: 6000,
     restrict: {
       variant: "story-v1",
       only: "A",
       persona: "P01",
-      runCeilingKrw: 1230,
+      runCeilingKrw: 1234.03,
       requireAlreadySpent: true,
-      // 2026-10-17 운영자 PC 실행: 호출 2회(재작성 1회 포함) · 371원 · 형식 검사 0/1(저장되지 않음). 승인된 1건을 마쳤다 — 같은 승인으로는 다시 실행하지 않는다.
-      runsApproved: 1,
+      // 승인된 실행 2건 = 1차(2026-10-17 운영자 PC: 호출 2회(재작성 1회 포함) · 371원 · 형식 검사 0/1 · 저장되지 않음, 마침) + 2차 재시험 1건(A안, 아직 실행하지 않음). 실행하면 runsDone · lastRun을 고친다.
+      runsApproved: 2,
       runsDone: 1,
       lastRun: "2026-10-17 · 호출 2회(재작성 1회) · 371원 · 형식 검사 불통과 · 저장되지 않음",
     },
@@ -104,9 +105,8 @@ export const COMPARE_STAGES: CompareStageDef[] = [
 ];
 
 /**
- * 궁합 실제 AI 시험 단계 — 사주 궁합 · 리포트 궁합은 아직 어떤 승인에도 포함되지 않았다(승인된 실행 0회 · 1회 상한 0원 = 승인 없음).
- * 운영자가 모델 · 호출 수 · 최대 비용을 정해 승인하면 그 값으로 `runsApproved`와 `runCeilingKrw`(반올림 없이 그대로 비교하는 최악 비용 상한)를 고친다 —
- * 그 전에는 드라이런만 되고 `--execute`는 거절된다. 제안과 비용은 docs/real-ai-approval-proposal.md. 가상 인물만 쓴다(실제 고객 정보 금지).
+ * 궁합 실제 AI 시험 단계 — 운영자가 모델 · 호출 수 · 최대 비용을 정해 승인한 값이 `runsApproved`와 `runCeilingKrw`(반올림 없이 그대로 비교하는 최악 비용 상한)다.
+ * 승인된 횟수를 마쳤거나 승인이 없으면(0회 · 1회 상한 0원) 드라이런만 되고 `--execute`는 거절된다. 제안과 비용은 docs/real-ai-approval-proposal.md. 가상 인물만 쓴다(실제 고객 정보 금지).
  */
 export type CompatLiveStageDef = {
   name: "compat-saju-p1" | "compat-pair-p1";
@@ -117,9 +117,11 @@ export type CompatLiveStageDef = {
   restrict: { runCeilingKrw: number; runsApproved: number; runsDone: number; lastRun?: string };
 };
 
+// 운영자 승인 2026-10-17(A안): 총 6,000원(누적 2,468원 포함 → 추가 지출 상한 3,532원), 모델 claude-sonnet-5-5, 각 시험 호출 최대 2회(생성 + 고쳐 쓰기).
+// 1회 상한은 운영자가 정한 최악 비용 그대로다 — 사주 궁합 635원 · 리포트 궁합 680원. 지금 입력으로 센 최악은 사주 궁합 634.99원(통과) · **리포트 궁합 680.15원(0.15원 넘어 거절된다 — 운영자가 680.15원으로 확인하기 전에는 실행하지 않는다)**.
 export const COMPAT_LIVE_STAGES: CompatLiveStageDef[] = [
-  { name: "compat-saju-p1", label: "사주 궁합 실제 AI 1건 (가상 쌍 C1) — 승인 전", kind: "saju", capKrw: 4000, restrict: { runCeilingKrw: 0, runsApproved: 0, runsDone: 0 } },
-  { name: "compat-pair-p1", label: "리포트 궁합 실제 AI 1건 (가상 인물 P01 · P02) — 승인 전", kind: "pair", capKrw: 4000, restrict: { runCeilingKrw: 0, runsApproved: 0, runsDone: 0 } },
+  { name: "compat-saju-p1", label: "사주 궁합 실제 AI 1건 (가상 쌍 C1) — 운영자 승인 2026-10-17 A안(총 6,000원, 누적 2,468원 포함)", kind: "saju", capKrw: 6000, restrict: { runCeilingKrw: 635, runsApproved: 1, runsDone: 0 } },
+  { name: "compat-pair-p1", label: "리포트 궁합 실제 AI 1건 (가상 인물 P01 · P02) — 운영자 승인 2026-10-17 A안(총 6,000원, 누적 2,468원 포함)", kind: "pair", capKrw: 6000, restrict: { runCeilingKrw: 680, runsApproved: 1, runsDone: 0 } },
 ];
 
 /**
