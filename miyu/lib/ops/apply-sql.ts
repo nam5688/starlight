@@ -101,3 +101,65 @@ commit;
 ${checkSql.trimEnd()}
 `;
 }
+
+/**
+ * **스테이징(아무것도 만들지 않은 새 Supabase 프로젝트) 전용** — 마이그레이션 전체(1번부터)를 SQL Editor에서 한 번에 실행하는 한 파일로 묶는다.
+ * 운영 DB(이미 표가 있는 프로젝트)에 실수로 실행되지 않도록 시작할 때 앱의 대표 표(profiles · orders · assessments)가 하나라도 있으면 아무것도 바꾸지 않고 멈춘다.
+ * 운영 DB에는 이 파일을 쓰지 않는다 — 운영 적용은 별도 승인이며 docs/db-rollout-19-25.md의 번호별 절차를 따른다.
+ */
+export function buildStagingApplySql(opts: { migrations: MigrationFile[]; checkSql: string }): string {
+  const { migrations, checkSql } = opts;
+  const body = migrations
+    .map((m, i) => `-- ═════════════════════════════════════════════════════════════════
+-- ${i + 1}번: ${m.name}   (아래는 supabase/migrations 파일 내용 그대로)
+-- ═════════════════════════════════════════════════════════════════
+${m.sql.trimEnd()}
+`)
+    .join("\n");
+  return `-- ME:U(미유) 스테이징 전용 — DB 변경 1~${migrations.length}번을 SQL Editor에서 한 번에 실행하는 통합 파일
+--
+-- ⚠ 이 파일은 **아무것도 만들지 않은 새 Supabase 프로젝트(스테이징)에만** 쓴다. 운영 프로젝트에서는 실행하지 않는다.
+--   (운영 DB 적용은 별도 승인이며 docs/db-rollout-19-25.md의 번호별 절차를 따른다.)
+--
+-- 이 파일은 supabase/migrations의 1~${migrations.length}번 파일을 한 글자도 고치지 않고 이어 붙인 것이다.
+-- (scripts/render-apply-sql.ts --staging 이 만든다 — 직접 고치지 않는다. 내용이 바뀌면 서버 테스트가 알려 준다.)
+--
+-- 사용: 새 Supabase 프로젝트 → SQL Editor → New query → 이 파일 내용을 모두 붙여넣고 Run (한 번만).
+--
+-- 안전장치
+--  1) 시작할 때 조건을 확인한다: 이 프로젝트에 앱의 표(profiles · orders · assessments)가 하나도 없어야 하고, Supabase Auth(auth.users)는 있어야 한다.
+--     이미 표가 있으면(= 운영 프로젝트이거나 한 번 실행한 프로젝트) 아무것도 바꾸지 않고 "시작 조건 불충족" 오류로 멈춘다.
+--  2) 전체가 하나의 트랜잭션(begin ... commit)이다. 중간에 오류가 나면 이 파일이 한 일이 모두 취소된다.
+--  3) 어떤 기존 데이터도 지우거나 고치지 않는다(새 프로젝트라 지울 데이터가 없다).
+--  4) 마지막 결과 표(읽기 전용 확인 조회)에서 1~${migrations.length}번이 모두 "적용됨"이면 끝이다.
+--
+-- Supabase가 "위험한 작업이 포함되어 있다"는 확인 창을 보여 주면: 제약 조건 교체와 함수 안의 "탈퇴 시 삭제" 문장 때문이다. 새 프로젝트라 실행해도 된다.
+
+begin;
+
+do $check$
+declare
+  present text[] := '{}';
+  t text;
+begin
+  if to_regclass('auth.users') is null then
+    raise exception '시작 조건 불충족 — Supabase Auth(auth.users)가 없습니다. Supabase 프로젝트의 SQL Editor에서 실행했는지 확인하세요. 아무것도 바꾸지 않았습니다.';
+  end if;
+  foreach t in array array['profiles', 'orders', 'assessments'] loop
+    if to_regclass('public.' || t) is not null then present := present || t; end if;
+  end loop;
+  if cardinality(present) > 0 then
+    raise exception '시작 조건 불충족 — 이 프로젝트에는 이미 앱의 표가 있습니다: %. 이 파일은 비어 있는 새 스테이징 프로젝트 전용입니다(운영 프로젝트에서 실행하면 안 됩니다). 아무것도 바꾸지 않았습니다.', present;
+  end if;
+end
+$check$;
+
+${body}
+commit;
+
+-- ═════════════════════════════════════════════════════════════════
+-- 확인: 모든 번호의 적용 여부 (읽기 전용 — 아무것도 바꾸지 않는다)
+-- ═════════════════════════════════════════════════════════════════
+${checkSql.trimEnd()}
+`;
+}

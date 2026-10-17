@@ -53,3 +53,40 @@ test("마지막은 읽기 전용 확인 조회이고, 통합 파일 어디에도
     assert.doesNotMatch(line, /^\s{0,0}(truncate|drop\s+(table|schema|function|trigger|index|policy)|delete|update|insert)\b/i, `최상위 위험 문장: ${line}`);
   }
 });
+
+// ── 스테이징(비어 있는 새 프로젝트) 전용 통합 파일: supabase/apply-staging-all.sql ──
+import { buildStagingApplySql } from "../lib/ops/apply-sql.ts";
+
+const all = files.map((name) => ({ name, sql: readFileSync(new URL(name, dir), "utf8") }));
+const stagingCommitted = readFileSync(new URL("../supabase/apply-staging-all.sql", import.meta.url), "utf8");
+
+test("스테이징 통합 파일은 마이그레이션 전체에서 만든 그대로다 (마이그레이션이 늘거나 바뀌면 node scripts/render-apply-sql.ts --staging을 다시 실행)", () => {
+  assert.ok(all.length >= 25, "1~25번이 모두 있다");
+  assert.equal(stagingCommitted, buildStagingApplySql({ migrations: all, checkSql }));
+});
+
+test("스테이징 통합 파일: 마이그레이션 내용이 한 글자도 바뀌지 않고 번호 순서대로 들어 있다", () => {
+  let at = -1;
+  for (const m of all) {
+    const i = stagingCommitted.indexOf(m.sql.trimEnd(), at + 1);
+    assert.ok(i > at, `${m.name}이 순서대로 들어 있지 않음`);
+    at = i;
+  }
+});
+
+test("스테이징 통합 파일: 운영 DB에 실수로 실행되지 않게 시작 조건(앱의 표가 하나도 없어야 함)이 있고, 전체가 하나의 트랜잭션이다", () => {
+  assert.match(stagingCommitted, /스테이징 전용/);
+  assert.match(stagingCommitted, /운영 프로젝트에서는 실행하지 않는다/);
+  for (const t of ["profiles", "orders", "assessments"]) assert.ok(stagingCommitted.includes(`'${t}'`), t);
+  assert.match(stagingCommitted, /시작 조건 불충족/);
+  assert.match(stagingCommitted, /아무것도 바꾸지 않았습니다/);
+  const begin = stagingCommitted.indexOf("\nbegin;\n");
+  const check = stagingCommitted.indexOf("do $check$");
+  const first = stagingCommitted.indexOf(all[0]!.sql.trimEnd());
+  const commit = stagingCommitted.indexOf("\ncommit;\n");
+  const verify = stagingCommitted.indexOf("-- 확인: 모든 번호의 적용 여부");
+  assert.ok(begin > 0 && begin < check && check < first && first < commit && commit < verify);
+  assert.equal(stagingCommitted.match(/\nbegin;\n/g)?.length, 1);
+  assert.equal(stagingCommitted.match(/\ncommit;\n/g)?.length, 1);
+  assert.ok(stagingCommitted.slice(verify).includes(checkSql.trimEnd()), "마지막은 읽기 전용 확인 조회");
+});
