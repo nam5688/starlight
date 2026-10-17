@@ -25,11 +25,15 @@ import { assembleStory, storyDepthSource } from "../reading/story-assemble.ts";
 import { STORY_FORMAT } from "../reading/story-plan.ts";
 import { buildStoryRepairMessage, buildStoryUserMessage, STORY_PROMPT_VERSION, STORY_SYSTEM_PROMPT } from "../reading/story-prompt.ts";
 import { validateStoryDraft, visibleStoryTexts } from "../reading/story-validate.ts";
+import { assembleStory7, story7DepthSource } from "../reading/story7-assemble.ts";
+import { STORY7_FORMAT, STORY7_PROMPT_VERSION } from "../reading/story7-plan.ts";
+import { buildStory7RepairMessage, buildStory7UserMessage, STORY7_SYSTEM_PROMPT } from "../reading/story7-prompt.ts";
+import { normalizeStory7Draft, STORY7_MOTIF_BLOCKS, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
 import { checkReadingDepth } from "../reading/depth.ts";
 import { buildReadingRepairMessage, buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
 import { findRepeatedPhrases, findRepeatedPhrasesIn, repeatMessages } from "../reading/repeat.ts";
 import { findMotifSpread, motifMessages, normalizeStoryDraft } from "../reading/story-motif.ts";
-import type { IntegratedReadingReport, ReadingDraftV1, StoryDraftV1 } from "../reading/types.ts";
+import type { IntegratedReadingReport, ReadingDraftV1, Story7DraftV1, StoryDraftV1 } from "../reading/types.ts";
 import { plainPeriodLabel, validateReadingDraft } from "../reading/validate.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
 import { buildRepairMessage, buildUserMessage, PROMPT_VERSION, SYSTEM_PROMPT } from "../v2/prompt.ts";
@@ -51,9 +55,10 @@ export type AiGeneratorOptions = {
   /**
    * 개인 통합 리포트의 형식 — 기본은 읽기 구조(reading-v1: 결론 → 짧은 요약 → 쉬운 예시 → 접힌 풀이 · 근거, 예시 화면과 같은 구성).
    * story-v1은 영역마다 하나의 이야기를 끝까지 쓰는 형식(2026-10-16, 반복을 만드는 칸의 나눔을 바꾼 비교용 후보 — 기본으로 바꾸는 것은 운영자 결정, 같은 저장 모양에 layout "story"로 구분).
+   * story-7은 7개 고정 대주제(운영자 확정 2026-10-17, 같은 저장 모양에 layout "story7") — 실제 AI로 검증하기 전에는 판매에 쓰지 않는다.
    * personal-v2는 이전 형식이며 비교 · 호환용이다.
    */
-  format?: "reading-v1" | "story-v1" | "personal-v2";
+  format?: "reading-v1" | "story-v1" | "story-7" | "personal-v2";
   /**
    * 형식 검사를 통과해도 내용 차이 검사(reading/depth.ts)에서 걸리면 한 번 고쳐 쓰게 하고 그래도 안 되면 실패로 남긴다 (읽기 구조만).
    * 낱말 · 표지를 센 어림이어서 기본은 끄고(보고만), 실제 AI를 연결할 때 운영자가 켠다. 모의 글은 이 검사를 통과할 수 없다.
@@ -136,7 +141,9 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       ? { system: READING_SYSTEM_PROMPT, promptVersion: READING_PROMPT_VERSION }
       : format === STORY_FORMAT
         ? { system: STORY_SYSTEM_PROMPT, promptVersion: STORY_PROMPT_VERSION }
-        : { system: SYSTEM_PROMPT, promptVersion: PROMPT_VERSION };
+        : format === STORY7_FORMAT
+          ? { system: STORY7_SYSTEM_PROMPT, promptVersion: STORY7_PROMPT_VERSION }
+          : { system: SYSTEM_PROMPT, promptVersion: PROMPT_VERSION };
   /** 호출 한 번 (일시 오류 재시도 · 사용 기록은 model-caller) */
   const call = (messages: ModelMessage[], ctx: GenerateContext) => caller.call(messages, ctx, spec);
   const concernSpec = { system: CONCERN_SYSTEM_PROMPT, promptVersion: CONCERN_PROMPT_VERSION };
@@ -244,10 +251,11 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const baseEvidence = buildEvidence(input, ref);
       const evidence = format === "reading-v1" && opts.adaptEvidence ? opts.adaptEvidence(baseEvidence, input) : baseEvidence;
       const context = input.context;
-      if (format === "reading-v1" || format === STORY_FORMAT) {
-        // 두 형식은 같은 순서로 쓴다: 초안 → 형식 검사 → (켜 둔 경우) 내용 검사 · 반복 확인 → 조립. 달라지는 것(자료 · 검사 · 조립)만 이 꾸러미에 둔다.
+      if (format === "reading-v1" || format === STORY_FORMAT || format === STORY7_FORMAT) {
+        // 세 형식은 같은 순서로 쓴다: 초안 → 형식 검사 → (켜 둔 경우) 내용 검사 · 반복 확인 → 조립. 달라지는 것(자료 · 검사 · 조립)만 이 꾸러미에 둔다.
         const story = format === STORY_FORMAT;
-        type AnyDraft = ReadingDraftV1 | StoryDraftV1;
+        const story7 = format === STORY7_FORMAT;
+        type AnyDraft = ReadingDraftV1 | StoryDraftV1 | Story7DraftV1;
         const kit: {
           message: string;
           repair: (errors: string[]) => string;
@@ -257,7 +265,24 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           repeatNotes: (draft: AnyDraft) => string[];
           assemble: (draft: AnyDraft) => IntegratedReadingReport;
           promptVersion: string;
-        } = story
+        } = story7
+          ? {
+              message: buildStory7UserMessage(evidence, ref.iso, context),
+              repair: buildStory7RepairMessage,
+              // 문장 수 한도를 넘은 문단은 문장은 그대로 두고 문단 나눔만 나눈 뒤 검사한다(한 문단 때문에 글 전체를 버리지 않는다)
+              validate: (parsed) => validateStory7Draft(normalizeStory7Draft(parsed), evidence, { hasContext: Boolean(context) }),
+              depthErrors: (draft) => {
+                const depth = checkReadingDepth({ draft: story7DepthSource(draft as Story7DraftV1) });
+                return depth.pass ? [] : depth.flags.filter((f) => f.severity === "fail").map((f) => f.message);
+              },
+              repeatNotes: (draft) => {
+                const texts = visibleStory7Texts(draft as Story7DraftV1);
+                return [...repeatMessages(findRepeatedPhrasesIn(texts)), ...motifMessages(findMotifSpread(texts, STORY7_MOTIF_BLOCKS))];
+              },
+              assemble: (draft) => assembleStory7({ draft: draft as Story7DraftV1, evidence, input, reference: ref, promptVersion: STORY7_PROMPT_VERSION, ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, STORY7_PROMPT_VERSION] }),
+              promptVersion: STORY7_PROMPT_VERSION,
+            }
+          : story
           ? {
               message: buildStoryUserMessage(evidence, ref.iso, context),
               repair: buildStoryRepairMessage,

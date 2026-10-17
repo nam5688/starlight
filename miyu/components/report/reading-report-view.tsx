@@ -7,6 +7,7 @@ import type { SajuSection, ScoreRow } from "@/lib/report/types";
 import { SajuChart } from "./detail-sections";
 import { MonthCalendarView } from "./month-calendar";
 import { SECTION_CALENDAR_NOTE } from "@/lib/report/reading/plan";
+import { STORY7_SECTIONS } from "@/lib/report/reading/story7-plan";
 import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
 import { ActionList } from "./integrated-view";
 import { ReadingNav } from "./reading-nav";
@@ -71,7 +72,6 @@ export function ReadingReportView({
   const tendency = tendencyPhrase(tendencyTitle);
   // 큰 주제에 붙이는 번호 — 주제 5개 다음이 "앞으로의 시기"
   const numberOf = new Map(report.blocks.map((b, i) => [b.id, i + 1]));
-  const flowNumber = report.blocks.length + 1;
   const rangeOf = (g: ReadingGroupId) => {
     const ns = report.blocks.filter((b) => b.group === g).map((b) => numberOf.get(b.id)!);
     return ns.length === 0 ? "" : ns.length === 1 ? `${ns[0]}` : `${ns[0]}~${ns[ns.length - 1]}`;
@@ -80,15 +80,23 @@ export function ReadingReportView({
   const focus = report.focus ?? [];
   const hasExtras = Boolean(extras && (extras.plain || extras.questions.length || extras.situations.length || extras.partner || extras.items));
   const story = report.layout === "story";
+  // 7개 대주제(story-7) — 1~5번은 blocks, 6번은 flow, 7번은 advice + actions. 번호 순서대로 한 줄로 이어 읽고 이동 막대도 7개 이름이다
+  const story7 = report.layout === "story7";
   const used = report.inputs.filter((i) => i.status !== "none").map((i) => i.name.replace(/\(.*\)/, ""));
   const none = report.inputs.filter((i) => i.status === "none").map((i) => i.name);
-  const nav = [
-    { id: id("summary"), label: "전체 요약" },
-    ...(focus.length ? [{ id: id("focus"), label: "내 고민" }] : []),
-    ...GROUPS.filter((g) => report.blocks.some((b) => b.group === g.id)).map((g) => ({ id: id(g.section), label: g.label })),
-    { id: id(report.flow.id), label: "앞으로의 시기" },
-    ...(hasExtras ? [{ id: id("extras"), label: "더 알아보기" }] : []),
-  ];
+  const nav = story7
+    ? [
+        { id: id("summary"), label: "전체 요약" },
+        ...STORY7_SECTIONS.map((p) => ({ id: id(p.blockId), label: p.navLabel })),
+        ...(hasExtras ? [{ id: id("extras"), label: "더 알아보기" }] : []),
+      ]
+    : [
+        { id: id("summary"), label: "전체 요약" },
+        ...(focus.length ? [{ id: id("focus"), label: "내 고민" }] : []),
+        ...GROUPS.filter((g) => report.blocks.some((b) => b.group === g.id)).map((g) => ({ id: id(g.section), label: g.label })),
+        { id: id(report.flow.id), label: "앞으로의 시기" },
+        ...(hasExtras ? [{ id: id("extras"), label: "더 알아보기" }] : []),
+      ];
 
   return (
     <div className="bg-page pb-16">
@@ -172,7 +180,27 @@ export function ReadingReportView({
           </section>
         )}
 
-        {GROUPS.map((g) => {
+        {story7 && (
+          <>
+            {report.blocks.map((b, i) => (
+              <SectionShell key={b.id} id={id(b.id)} title={b.topic} n={i + 1}>
+                <Story7Body block={b} id={id(`${b.id}-body`)} hasCalendar={Boolean(report.calendars?.items.length)} />
+              </SectionShell>
+            ))}
+            <SectionShell id={id(report.flow.id)} title={report.flow.topic} n={report.blocks.length + 1}>
+              <FlowArticle report={report} id={id} story hideLabel />
+            </SectionShell>
+            {report.advice && (
+              <SectionShell id={id(report.advice.id)} title={report.advice.topic} n={report.blocks.length + 2}>
+                <Story7Body block={report.advice} id={id(`${report.advice.id}-body`)} hasCalendar={false}>
+                  <ActionChecklist actions={report.actions} />
+                </Story7Body>
+              </SectionShell>
+            )}
+          </>
+        )}
+
+        {!story7 && GROUPS.map((g) => {
           const blocks = report.blocks.filter((b) => b.group === g.id);
           if (blocks.length === 0) return null;
           return (
@@ -190,92 +218,14 @@ export function ReadingReportView({
           );
         })}
 
-        <section id={id(report.flow.id)} aria-labelledby={id(`${report.flow.id}-h`)} className={`mt-12 ${SCROLL_MARGIN}`}>
-          <h2 id={id(`${report.flow.id}-h`)} className="flex items-baseline justify-between gap-3 border-t-2 border-accent pt-3 text-[18px] font-bold">
-            <span>앞으로의 시기</span>
-          </h2>
-          <article className="mt-6">
-            <p className="mb-0.5 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
-              <NumberBadge n={flowNumber} />
-              {report.flow.topic}
-            </p>
-            <h3 className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">{report.flow.headline}</h3>
-            {story ? (
-              <div className="mt-3">
-                <Paragraphs items={[report.flow.summary, ...(report.flow.paragraphs ?? [])]} />
-              </div>
-            ) : (
-              <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
-            )}
-            <CaveatNote text={report.flow.caveat} />
-
-            <LuckTimelineCard timeline={report.timeline} reference={report.timelineReference} />
-
-            <div className="mt-4 rounded-xl border border-line bg-canvas p-4 md:p-5">
-              <p className="text-[17px] font-bold tracking-tight">가까운 세 해</p>
-              <ul className="mt-2 divide-y divide-line">
-                {report.flow.years.map((y) => (
-                  <li key={y.year} className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-baseline gap-x-3 py-2.5">
-                    <span className="text-[16px] font-bold text-accent tabular-nums">{y.year}</span>
-                    <span className="text-[15px] leading-snug">{y.theme}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <FoldRow>
-              {report.calendars && report.calendars.items.length > 0 && (
-                <Fold label="월별 달력" hint="가까운 관계 · 재물이 눈에 띄기 쉬운 달" wide>
-                  <MonthCalendarView calendars={report.calendars.items} idPrefix={id("cal")} />
-                </Fold>
-              )}
-              <Fold label="자세한 풀이" wide>
-                <div className="divide-y divide-line [&>div]:py-6 [&>div:first-child]:pt-0 [&>div:last-child]:pb-0">
-                  {report.flow.periods.length > 0 && (
-                  <div>
-                    <p className="text-[16px] font-bold">시기별로 읽으면</p>
-                    <ul className="mt-3 space-y-5">
-                      {report.flow.periods.map((p) => (
-                        <li key={p.period} className="border-l-[3px] border-line-strong pl-3.5">
-                          <p className="text-[13px] font-semibold text-ink-3">{p.period}</p>
-                          <Prose text={p.theme} className="mt-1.5 text-[15px] leading-[1.75]" />
-                          <Prose text={p.watch} className="mt-2 text-[15px] leading-[1.75] text-ink-2" />
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  )}
-                  <div>
-                    <p className="text-[16px] font-bold">응답으로 본 가능성</p>
-                    <Prose text={report.flow.scenarioNote} className="mt-0.5 text-[13px] leading-[1.6] text-ink-3" />
-                    <ul className="mt-3 space-y-5">
-                      {report.flow.scenarios.map((s) => (
-                        <li key={s.when} className="border-l-[3px] border-accent pl-3.5">
-                          <p className="text-[13px] font-semibold text-accent">이런 모습이 이어지면</p>
-                          <Prose text={s.when} className="mt-1 text-[15px] leading-[1.7] font-semibold" />
-                          <p className="mt-3 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
-                            <ArrowIcon className="size-3.5" />
-                            이렇게 될 수 있어요
-                          </p>
-                          <Prose text={s.then} className="mt-1 text-[15px] leading-[1.75]" />
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[16px] font-bold">연구 통계</p>
-                    <Prose text={report.flow.statistics} className="mt-2 text-[14px] leading-[1.75] text-ink-2" />
-                  </div>
-                </div>
-              </Fold>
-              {REPORT_BASIS.visible && (
-                <Fold label="시기 계산과 해석 근거" wide>
-                  <BasisList basis={report.flow.basis} />
-                </Fold>
-              )}
-            </FoldRow>
-          </article>
-        </section>
+        {!story7 && (
+          <section id={id(report.flow.id)} aria-labelledby={id(`${report.flow.id}-h`)} className={`mt-12 ${SCROLL_MARGIN}`}>
+            <h2 id={id(`${report.flow.id}-h`)} className="flex items-baseline justify-between gap-3 border-t-2 border-accent pt-3 text-[18px] font-bold">
+              <span>앞으로의 시기</span>
+            </h2>
+            <FlowArticle report={report} id={id} story={story} />
+          </section>
+        )}
 
         {hasExtras && extras && (
           <section id={id("extras")} aria-labelledby={id("extras-h")} className={`mt-12 ${SCROLL_MARGIN}`}>
@@ -307,25 +257,15 @@ export function ReadingReportView({
           </section>
         )}
 
-        <section aria-labelledby={id("actions")} className="mt-12">
-          <h2 id={id("actions")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
-            지금 확인해 볼 것
-          </h2>
-          <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">정답을 정하는 목록이 아니라, 위의 해석이 나에게 맞는지 확인해 볼 수 있는 작은 행동이에요.</p>
-          <ul className="mt-4 space-y-2">
-            {report.actions.map((a) => (
-              <li key={a.title}>
-                <label className="flex cursor-pointer gap-3 rounded-xl border border-line bg-canvas p-4">
-                  <input type="checkbox" className="mt-0.5 size-5 shrink-0 cursor-pointer accent-accent" />
-                  <span className="min-w-0">
-                    <span className="block text-[16px] leading-snug font-semibold">{a.title}</span>
-                    <Prose as="span" text={a.detail} className="mt-1 block text-[15px] leading-[1.65] text-ink-2" />
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {!story7 && (
+          <section aria-labelledby={id("actions")} className="mt-12">
+            <h2 id={id("actions")} className="border-t-2 border-accent pt-3 text-[18px] font-bold">
+              지금 확인해 볼 것
+            </h2>
+            <p className="mt-1 text-[14px] leading-[1.6] text-ink-3">정답을 정하는 목록이 아니라, 위의 해석이 나에게 맞는지 확인해 볼 수 있는 작은 행동이에요.</p>
+            <ActionChecklist actions={report.actions} />
+          </section>
+        )}
 
         <section aria-labelledby={id("data")} className="mt-12">
           <h2 id={id("data")} className={`border-t-2 border-accent pt-3 text-[18px] font-bold ${SCROLL_MARGIN}`}>
@@ -469,5 +409,165 @@ function NumberBadge({ n }: { n: number }) {
     <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-[13px] font-bold text-accent-strong tabular-nums" aria-label={`주제 ${n}`}>
       {n}
     </span>
+  );
+}
+
+/** 앞으로의 시기(6번) 본문 — 결론 → 이야기(또는 요약) → 조건 안내 → 타임라인 · 가까운 세 해 → 접힘(월별 달력 · 자세한 풀이 · 근거). 7개 대주제는 장 제목을 따로 달아 이름표를 숨긴다 */
+function FlowArticle({ report, id, story, hideLabel = false }: { report: IntegratedReadingReport; id: (name: string) => string; story: boolean; hideLabel?: boolean }) {
+  return (
+    <article className={hideLabel ? "" : "mt-6"}>
+      {!hideLabel && (
+        <p className="mb-0.5 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
+          <NumberBadge n={report.blocks.length + 1} />
+          {report.flow.topic}
+        </p>
+      )}
+      <h3 className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">{report.flow.headline}</h3>
+      {story ? (
+        <div className="mt-3">
+          <Paragraphs items={[report.flow.summary, ...(report.flow.paragraphs ?? [])]} />
+        </div>
+      ) : (
+        <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
+      )}
+      <CaveatNote text={report.flow.caveat} />
+
+      <LuckTimelineCard timeline={report.timeline} reference={report.timelineReference} />
+
+      <div className="mt-4 rounded-xl border border-line bg-canvas p-4 md:p-5">
+        <p className="text-[17px] font-bold tracking-tight">가까운 세 해</p>
+        <ul className="mt-2 divide-y divide-line">
+          {report.flow.years.map((y) => (
+            <li key={y.year} className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-baseline gap-x-3 py-2.5">
+              <span className="text-[16px] font-bold text-accent tabular-nums">{y.year}</span>
+              <span className="text-[15px] leading-snug">{y.theme}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <FoldRow>
+        {report.calendars && report.calendars.items.length > 0 && (
+          <Fold label="월별 달력" hint="가까운 관계 · 재물이 눈에 띄기 쉬운 달" wide>
+            <MonthCalendarView calendars={report.calendars.items} idPrefix={id("cal")} />
+          </Fold>
+        )}
+        <Fold label="자세한 풀이" wide>
+          <div className="divide-y divide-line [&>div]:py-6 [&>div:first-child]:pt-0 [&>div:last-child]:pb-0">
+            {report.flow.periods.length > 0 && (
+            <div>
+              <p className="text-[16px] font-bold">시기별로 읽으면</p>
+              <ul className="mt-3 space-y-5">
+                {report.flow.periods.map((p) => (
+                  <li key={p.period} className="border-l-[3px] border-line-strong pl-3.5">
+                    <p className="text-[13px] font-semibold text-ink-3">{p.period}</p>
+                    <Prose text={p.theme} className="mt-1.5 text-[15px] leading-[1.75]" />
+                    <Prose text={p.watch} className="mt-2 text-[15px] leading-[1.75] text-ink-2" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            )}
+            <div>
+              <p className="text-[16px] font-bold">응답으로 본 가능성</p>
+              <Prose text={report.flow.scenarioNote} className="mt-0.5 text-[13px] leading-[1.6] text-ink-3" />
+              <ul className="mt-3 space-y-5">
+                {report.flow.scenarios.map((s) => (
+                  <li key={s.when} className="border-l-[3px] border-accent pl-3.5">
+                    <p className="text-[13px] font-semibold text-accent">이런 모습이 이어지면</p>
+                    <Prose text={s.when} className="mt-1 text-[15px] leading-[1.7] font-semibold" />
+                    <p className="mt-3 flex items-center gap-1.5 text-[13px] font-semibold text-ink-3">
+                      <ArrowIcon className="size-3.5" />
+                      이렇게 될 수 있어요
+                    </p>
+                    <Prose text={s.then} className="mt-1 text-[15px] leading-[1.75]" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-[16px] font-bold">연구 통계</p>
+              <Prose text={report.flow.statistics} className="mt-2 text-[14px] leading-[1.75] text-ink-2" />
+            </div>
+          </div>
+        </Fold>
+        {REPORT_BASIS.visible && (
+          <Fold label="시기 계산과 해석 근거" wide>
+            <BasisList basis={report.flow.basis} />
+          </Fold>
+        )}
+      </FoldRow>
+    </article>
+  );
+}
+
+/** 지금 확인해 볼 작은 행동 목록 — 정답을 정하는 목록이 아니라 위의 해석이 나에게 맞는지 확인해 보는 행동 */
+function ActionChecklist({ actions }: { actions: { title: string; detail: string }[] }) {
+  return (
+    <ul className="mt-4 space-y-2">
+      {actions.map((a) => (
+        <li key={a.title}>
+          <label className="flex cursor-pointer gap-3 rounded-xl border border-line bg-canvas p-4">
+            <input type="checkbox" className="mt-0.5 size-5 shrink-0 cursor-pointer accent-accent" />
+            <span className="min-w-0">
+              <span className="block text-[16px] leading-snug font-semibold">{a.title}</span>
+              <Prose as="span" text={a.detail} className="mt-1 block text-[15px] leading-[1.65] text-ink-2" />
+            </span>
+          </label>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** 7개 대주제 하나의 틀 — 위쪽 포인트 선 · 번호와 장 이름. 7개가 순서대로 이어져 어디까지 읽었는지 알 수 있다 */
+function SectionShell({ id, title, n, children }: { id: string; title: string; n: number; children: React.ReactNode }) {
+  return (
+    <section id={id} aria-labelledby={`${id}-h`} className={`mt-12 ${SCROLL_MARGIN}`}>
+      <h2 id={`${id}-h`} className="flex items-center justify-between gap-3 border-t-2 border-accent pt-3 text-[18px] font-bold">
+        <span className="flex items-center gap-2">
+          <NumberBadge n={n} />
+          {title}
+        </span>
+        <span className="text-[13px] font-semibold text-ink-3 tabular-nums">{n} / 7</span>
+      </h2>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+/** 7개 대주제 1~5 · 7번 본문 — 결론(제목) → 문단들(5번은 소제목 일 · 재물로 나뉨) → 안내 → (7번은 행동 목록) */
+function Story7Body({ block: b, id, hasCalendar, children }: { block: ReadingBlock; id: string; hasCalendar: boolean; children?: React.ReactNode }) {
+  const calendarNote = hasCalendar ? SECTION_CALENDAR_NOTE[b.id as keyof typeof SECTION_CALENDAR_NOTE] : undefined;
+  return (
+    <article aria-labelledby={`${id}-h`}>
+      <h3 id={`${id}-h`} className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">
+        {b.headline}
+      </h3>
+      {b.parts && b.parts.length > 0 ? (
+        <div className="mt-3 space-y-6">
+          {b.parts.map((p) => (
+            <div key={p.title}>
+              <p className="mb-1.5 text-[15px] font-bold text-accent-strong">{p.title}</p>
+              <Paragraphs items={p.paragraphs} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3">
+          <Paragraphs items={[b.summary, ...b.details]} />
+        </div>
+      )}
+      {b.caveat && <CaveatNote text={b.caveat} />}
+      {calendarNote && <p className="mt-3 text-[13px] leading-[1.6] text-ink-3">{calendarNote}</p>}
+      {children}
+      {REPORT_BASIS.visible && (
+        <FoldRow>
+          <Fold label="분석 근거 보기">
+            <BasisList basis={b.basis} />
+          </Fold>
+        </FoldRow>
+      )}
+    </article>
   );
 }

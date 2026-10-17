@@ -46,6 +46,22 @@ export function visibleStoryTexts(d: StoryDraftV1): { where: string; text: strin
   return out;
 }
 
+/**
+ * 없는 기운 · 십성을 생활 기능의 부족이나 원인으로 풀지 않는다 — 한 문장에 이름 + 없음 + (기능어 또는 인과 연결)이 함께 있으면 막는다.
+ * 영역별 이야기(story-v1)와 7개 대주제(story-7)가 같은 검사를 쓴다.
+ */
+export function absenceErrors(paragraphs: unknown[], where: string): string[] {
+  const out: string[] = [];
+  for (const p of paragraphs.filter(isString)) {
+    for (const sentence of p.split(/(?<=[.!?])\s+/)) {
+      if (!ABSENCE_MAPPING.kind.test(sentence) || !ABSENCE_MAPPING.absent.test(sentence)) continue;
+      const hit = ABSENCE_MAPPING.gloss.exec(sentence) ?? ABSENCE_MAPPING.causal.exec(sentence) ?? (ABSENCE_MAPPING.allowedFrame.test(sentence) ? null : ABSENCE_MAPPING.causalLoose.exec(sentence));
+      if (hit) out.push(`${where}: "${sentence.slice(0, 40)}…" — 원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인("${hit[0]}")으로 풀지 않습니다. 근거는 "전통 해석에서 생활에서 채우라고 권하는 경우가 많다 · 시기에 그 주제가 크게 느껴질 수 있다"까지만 말하고, 이 사람의 행동은 응답 근거로 쓰세요.`);
+    }
+  }
+  return out;
+}
+
 export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { hasContext?: boolean } = {}): StoryValidation {
   const errors: string[] = [];
   const d = raw as Partial<StoryDraftV1> | null;
@@ -95,16 +111,7 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
     if (n > TASK_PER_AREA_MAX) errors.push(`${where}: "~해 보세요" 같은 행동 과제 문장이 ${n}개 — 영역 본문에는 ${TASK_PER_AREA_MAX}개까지만 두고 구체적인 실천은 마지막 actions에 모으세요.`);
   };
 
-  // 없는 기운 · 십성을 생활 기능의 부족이나 원인으로 풀지 않는다 — 한 문장에 이름 + 없음 + (기능어 또는 인과 연결)이 함께 있으면 막는다
-  const absenceIssues = (paragraphs: unknown[], where: string) => {
-    for (const p of paragraphs.filter(isString)) {
-      for (const sentence of p.split(/(?<=[.!?])\s+/)) {
-        if (!ABSENCE_MAPPING.kind.test(sentence) || !ABSENCE_MAPPING.absent.test(sentence)) continue;
-        const hit = ABSENCE_MAPPING.gloss.exec(sentence) ?? ABSENCE_MAPPING.causal.exec(sentence) ?? (ABSENCE_MAPPING.allowedFrame.test(sentence) ? null : ABSENCE_MAPPING.causalLoose.exec(sentence));
-        if (hit) errors.push(`${where}: "${sentence.slice(0, 40)}…" — 원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인("${hit[0]}")으로 풀지 않습니다. 근거는 "전통 해석에서 생활에서 채우라고 권하는 경우가 많다 · 시기에 그 주제가 크게 느껴질 수 있다"까지만 말하고, 이 사람의 행동은 응답 근거로 쓰세요.`);
-      }
-    }
-  };
+  const absenceIssues = (paragraphs: unknown[], where: string) => errors.push(...absenceErrors(paragraphs, where));
 
   // 핵심 문장 · 첫 화면 카드 — 공유용 카드 이미지에 그대로 실리므로 이름을 쓰지 않는다
   text(d.headline, "headline", L.headline.min, L.headline.max);

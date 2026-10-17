@@ -7,6 +7,7 @@ import { composeMockCompat } from "../compat/mock-model.ts";
 import { composeMockConcernDraft } from "../concern/mock-model.ts";
 import { composeMockReading } from "../reading/mock-model.ts";
 import { composeMockStory } from "../reading/story-mock-model.ts";
+import { composeMockStory7 } from "../reading/story7-mock-model.ts";
 import { ModelCallError, type TextModel } from "./model.ts";
 
 const TOPIC_FOR: Record<string, string[]> = {
@@ -115,6 +116,8 @@ export function createMockModel(opts: { failTimes?: number; invalidTimes?: numbe
       // 영역별 이야기(story-v1) 요청은 사용자 메시지에 areas(core · relation · work-money)가 있다
       const draft = user.startsWith("다음 자료로 사주 궁합 풀이 JSON") || user.startsWith("다음 자료로 리포트 궁합 풀이 JSON")
         ? composeMockCompat(user)
+        : user.startsWith("다음 자료로 개인 심층 리포트(7개 고정 대주제) JSON")
+        ? composeMockStory7(user)
         : user.includes('"task":"concern-report"')
         ? composeMockConcernDraft(user)
         : user.startsWith("다음 자료로 개인 통합 리포트 JSON")

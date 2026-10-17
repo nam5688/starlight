@@ -1,4 +1,5 @@
-// 개인 심층 리포트 7개 대주제 — 검토용 초안 (운영자 확정 구성 2026-10-17, 앞서 검토한 12개 장 안은 운영자가 취소했다). **어디에도 연결하지 않았다**(`story7.test.ts`가 확인) — 지금 신규 생성은 story-v1(영역 셋 + 시기 + 행동)이다.
+// 개인 심층 리포트 7개 대주제 — 운영자 확정 구성(2026-10-17, 앞서 검토한 12개 장 안은 운영자가 취소했다). 이 파일의 구성 · 한도 · 고정 문구가 지시문(story7-prompt.ts) · 검사(story7-validate.ts) · 조립(story7-assemble.ts) ·
+// 모의 작성기가 쓰는 한 곳이다(story-7 형식으로 신규 생성에 연결, `lib/config/product.ts`의 `REPORT_GENERATION.format`). **실제 AI로 검증하기 전에는 판매에 쓰지 않는다**(운영자 결정) — 판매 스위치는 그대로다.
 // 7개 대주제는 모든 리포트에 고정으로 보이고, 장마다 **다른 핵심 질문 하나**에만 답한다. 7개를 억지로 길게 쓰지 않는다 — 장마다 소유한 근거 수에 맞춰 문단 상한이 달라진다(`maxParagraphs`).
 // 장의 종류는 둘이다: **근거를 소유하는 장**(1 · 3 · 4 · 5 · 6)과 **앞 장을 엮는 장**(2 · 7). 엮는 장은 자기 근거가 없으므로 앞 장을 다시 쓰지 않고 `mustAdd`(새로 보태야 할 것)만 쓴다.
 // 12개 장 안에서 겹쳤던 근거를 합쳤다: 사주 구조 · 기질 · 핵심 성향 → 1, 연애 · 애착 · 갈등 · 회복 → 3(같은 관계 응답 두세 개를 두 장이 나눠 쓰던 문제), 일 · 재물 → 5(소제목으로 구분), 겉과 속 → 폐기(근거 없음).
@@ -8,9 +9,15 @@ import type { Topic } from "../evidence.ts";
 export type Story7Kind = "owner" | "synthesis";
 export type StoryV1Source = "headline" | "cards" | "core" | "relation" | "work-money" | "flow" | "actions" | "focus";
 
+export type Story7BlockId = "tendency" | "strength-burden" | "love" | "people" | "work-money" | "flow" | "advice";
+
 export type Story7Section = {
   no: number;
   id: string;
+  /** 저장 · 화면에서 이 장이 쓰는 블록 이름 — 채팅방 · 주제 이동이 이미 쓰는 id(tendency · strength-burden · love · work-money)를 그대로 쓴다. 6번은 flow, 7번은 advice(저장 모양은 types.ts) */
+  blockId: Story7BlockId;
+  /** 이동 막대에 보이는 짧은 이름 */
+  navLabel: string;
   title: string;
   kind: Story7Kind;
   /** 운영자가 적은 세부 항목 — 이 장이 다루는 것 */
@@ -52,7 +59,7 @@ const NEVER = /^$/;
 
 export const STORY7_SECTIONS: Story7Section[] = [
   {
-    no: 1, id: "me", title: "나는 어떤 사람일까?", kind: "owner",
+    no: 1, id: "me", blockId: "tendency", navLabel: "나는 누구", title: "나는 어떤 사람일까?", kind: "owner",
     includes: ["대표 OOO형", "사주 구조", "핵심 성향", "성격 · 기질 · MBTI"],
     question: "이 사람은 어떤 사람인가 — 사주의 중심 구조와 평소 행동 방식(성격 · 기질 · 입력한 MBTI)이 한 사람 안에서 어떻게 만나는가",
     repeatGuard: "여기서 소개한 특징을 뒤 장에서 다시 설명하지 않는다 — 뒤 장은 그 특징이 그 장의 질문에서 만드는 새 조건만 쓴다. 사주 용어만 나열하지 않는다",
@@ -66,7 +73,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     gap28: "구분 9개 중 정보를 받는 방식(2~3장면)은 읽을 수 없다. 유형명 분류 입력이 점수가 아닌 장면 읽기 결과로 바뀌면 규칙을 다시 설계해야 한다",
   },
   {
-    no: 2, id: "strength-weakness", title: "나의 강점과 약점", kind: "synthesis",
+    no: 2, id: "strength-weakness", blockId: "strength-burden", navLabel: "강점 · 약점", title: "나의 강점과 약점", kind: "synthesis",
     includes: ["강점이 발휘되는 조건", "부담이 되는 조건", "회복 방법"],
     question: "같은 특징이 어떤 조건에서 강점으로 쓰이고 어떤 조건에서 부담이 되며, 부담이 쌓였을 때 어떻게 회복하는가",
     repeatGuard: "특징 이름을 다시 말하지 않고 조건(속도 · 환경 · 상대)만 쓴다. 강점 · 부담이라는 판단어는 이 장에서만 쓰고 다른 장에서는 쓰지 않는다. 단순 긍정 · 부정 형용사 나열 금지",
@@ -80,7 +87,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     gap28: "회복 장면 s08 · s11 · s14 세 개가 있어 \"혼자 / 사람 곁 / 몸을 움직여\" 같은 회복 방식을 읽을 수 있다(구분 최소 3장면은 채우나 맥락은 모두 개인 생활 — 사람 시험 전)",
   },
   {
-    no: 3, id: "love-attachment", title: "연애와 애착", kind: "owner",
+    no: 3, id: "love-attachment", blockId: "love", navLabel: "연애 · 애착", title: "연애와 애착", kind: "owner",
     includes: ["연애 성향", "애정 표현", "친밀감", "갈등과 화해"],
     question: "가까운 사람 앞에서 마음을 주고 표현하는 방식과 거리의 속도, 그리고 어긋났을 때 확인하고 회복하는 순서 — 편안한 관계의 조건까지",
     repeatGuard: "애착 유형 이름을 쓰지 않고 한 문항으로 단정하지 않는다. 친구 · 가족 · 동료 이야기는 4번에서 쓴다(연애 풀이를 다시 쓰지 않는다)",
@@ -95,7 +102,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     gap28: "장면 8개(s15~s21 · s24)로 가장 풍부하다 — 확인 · 회복 구분은 읽을 수 있고 도움 받는 방식은 s18 · s21 2장면이라 읽지 못한다. 맥락은 모두 가까운 관계 한 가지다",
   },
   {
-    no: 4, id: "people", title: "인간관계와 인연", kind: "owner",
+    no: 4, id: "people", blockId: "people", navLabel: "인간관계", title: "인간관계와 인연", kind: "owner",
     includes: ["친구", "가족", "동료 등 연애 이외의 인간관계"],
     question: "연애 밖의 사람들(친구 · 가족 · 동료) 사이에서 관계의 폭과 깊이는 어떻고, 협력이 쉬운 조건과 부딪히기 쉬운 조건은 무엇인가",
     repeatGuard: "연애 풀이를 다시 쓰지 않는다. 귀인 · 사람복(신살)을 말하지 않는다 — 신살을 계산하지 않았다",
@@ -109,7 +116,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     gap28: "장면 s04 · s12 · s22 · s26 네 개(친구 · 모임 · 낯선 사람) — 가족 · 동료 장면은 없고, 구분을 읽을 맥락 두 가지는 못 채운다",
   },
   {
-    no: 5, id: "work-money", title: "일과 재물", kind: "owner",
+    no: 5, id: "work-money", blockId: "work-money", navLabel: "일 · 재물", title: "일과 재물", kind: "owner",
     includes: ["일 · 진로 · 적성", "업무 방식", "재물과 돈의 흐름"],
     question: "이 사람의 힘이 잘 쓰이는 일의 조건(역할 · 권한 · 속도 · 협업 · 평가 기준)과 결정 · 변화의 방식 / 돈을 대하는 모습과 재성 등 명리 근거가 말하는 범위",
     repeatGuard: "일 소제목과 재물 소제목이 같은 응답(신중함 · 생활 방식)을 되풀이하지 않는다 — 재물은 돈 앞의 선택으로만 쓴다. 적성을 직업 하나로 단정하지 않고, 재성이 없다고 돈 관리가 약하다고 쓰지 않는다. 투자 · 대출 · 업종 추천 금지",
@@ -125,7 +132,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     gap28: "일 장면 6개(s03 s13 s23 s25 s27 s28)로 풍부하나 재물은 s05 한 장면뿐이라 읽을 수 없다",
   },
   {
-    no: 6, id: "timing", title: "앞으로의 운과 변화", kind: "owner",
+    no: 6, id: "timing", blockId: "flow", navLabel: "앞으로의 운", title: "앞으로의 운과 변화", kind: "owner",
     includes: ["계산된 대운 · 세운", "변화의 흐름", "시기별 해석"],
     question: "계산된 대운 · 세운이 지금과 가까운 앞으로 어떤 주제를 두드러지게 하는가, 이 사람이 그 시기를 어떻게 받아들일까",
     repeatGuard: "시기 이야기(대운 · 세운 · 올해 · 연도)는 이 장에만 쓴다 — 다른 장에서 다시 말하지 않는다(PERIOD_TALK 규칙 유지). 근거 없는 연도 · 사건 예언 금지",
@@ -136,7 +143,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     moreSaju: null, gap22: null, gap28: null,
   },
   {
-    no: 7, id: "advice", title: "미유의 종합 조언", kind: "synthesis",
+    no: 7, id: "advice", blockId: "advice", navLabel: "종합 조언", title: "미유의 종합 조언", kind: "synthesis",
     includes: ["현재 고민을 반영한 실천 가능한 조언 2~3가지"],
     question: "앞 장을 모두 보았을 때 지금 무엇을 먼저 할 것인가 — 알려 준 고민이 있으면 그 고민에, 없으면 이 분석에서 읽힌 우선순위에",
     repeatGuard: "앞의 장을 다시 요약하지 않는다. 앞 장에서 쓴 처방(예: 회복 신호)을 같은 말로 되풀이하지 않는다. 알려 준 고민이 없으면 고민을 지어내지 않는다",
@@ -158,3 +165,59 @@ export const STORY7_BY_NO = (no: number): Story7Section => {
 
 /** 28문항의 장면 번호(s01~s28) 28개를 한 장에 하나씩 나눈 표 — 장면 소유자 */
 export const STORY7_SCENE_OWNER: Record<string, number> = Object.fromEntries(STORY7_SECTIONS.flatMap((s) => s.scenes.map((sc) => [sc, s.no])));
+
+// ── 제품 연결에 쓰는 값 (지시문 · 검사 · 조립 · 모의 작성기 · 시험이 같은 값을 쓴다) ──
+
+export const STORY7_FORMAT = "story-7";
+/** 지시문 버전 — 비교용 지시문(story7-experiment-0.1)과 이름이 다르다. 실제 AI로는 아직 한 번도 시험하지 못했다(검증되지 않음) */
+export const STORY7_PROMPT_VERSION = "story-7-prompt-0.1";
+
+/** 글자 · 문장 수 한도 — 7개 대주제는 장마다 소유한 근거 수에 맞춰 문단 수 상한(`maxParagraphs`)이 달라지고, 나머지 한도는 영역별 이야기(story-v1)와 같은 값이다 */
+export const STORY7_LIMITS = {
+  sectionHeadline: { min: 8, max: 34 },
+  paragraph: { min: 60, max: 380, sentencesMax: 3 },
+  /** 5번 일과 재물 — 소제목마다 문단 수(두 소제목 합은 그 장의 maxParagraphs 이하, 재물 소제목은 근거가 약해도 비워 두지 않는다) */
+  part: { min: 1, max: 2 },
+  years: { min: 1, max: 3, themeMax: 40 },
+  scenarios: { min: 1, max: 2, whenMax: 90, thenMax: 220 },
+  actions: { min: 2, max: 3, titleMax: 30, detailMin: 20, detailMax: 220 },
+  /** 두 제목이 이 몫 이상 같은 낱말이면 같은 말로 본다 */
+  headlineOverlapMax: 0.5,
+} as const;
+
+/** 7개 장 가운데 입력한 MBTI를 쓸 수 있는 장 — 맞닿는 곳에서만, 시기(6번)에는 쓰지 않는다 */
+export const STORY7_MBTI_NOS = [1, 3, 5] as const;
+export const STORY7_MBTI_MIN = 2;
+/** 같은 개인 성향 근거가 몇 개 장까지 앞세워질 수 있는가를 세는 장 — 근거를 소유하는 장(앞 장을 엮는 2 · 7번은 자기 근거가 없어 세지 않는다) */
+export const STORY7_OWNER_NOS = [1, 3, 4, 5, 6] as const;
+
+/**
+ * 맺음 틀 예산 — story-v1의 예산에 "계속 ~라면 ~"과 "~하는 게 좋아요" 변형을 더했다(실제 AI 첫 글과 대리 작성기 글에서 틀을 바꿔 되풀이한 말).
+ * 표지를 센 어림이며, 장마다 다른 모양으로 맺는지는 지시문과 사람이 읽는 평가가 본다.
+ */
+export const STORY7_FORMULA_BUDGET: { re: RegExp; max: number; label: string }[] = [
+  { re: /맞아 보여요/g, max: 4, label: "맞아 보여요" },
+  { re: /(?:볼|살펴볼|물어볼|짚어 볼|확인해 볼) (?:때|차례|신호)(?:예요|이에요)/g, max: 2, label: "~볼 때예요" },
+  { re: /계속 [^.!?]{0,40}(?:라면|다면|이어지면|하다 보면)/g, max: 2, label: "계속 ~라면" },
+  { re: /(?:살펴보|확인해 보|물어보|짚어 보)는 게 좋아요/g, max: 2, label: "~하는 게 좋아요" },
+];
+
+/** 입력받지 않은 가족 이야기 — 가족 구성 · 가족과 있었던 일은 입력이 없고 년주 · 월주를 부모 자리로 읽는 규칙도 검토 전이라 쓰지 않는다(운영자 확정) */
+export const FAMILY_CLAIM = /부모님?|형제|자매|어머니|아버지|엄마|아빠/;
+/** 귀인 · 사람복은 신살을 계산하기 전에는 쓰지 않는다(운영자 확정 — 근거 없는 귀인 예언 금지) */
+export const LUCK_PERSON = /귀인|사람복|인복/;
+/** 재물의 운명을 판정하는 말 — 재성 하나로 돈복을 판정하지 않는다 */
+export const WEALTH_FATE = /부자|가난|돈복|재물복|재물운이 (?:좋|나쁘|없)|돈이 (?:모이|새)/;
+/** 돈 습관을 말하는 낱말 — 소비 · 저축 · 투자 습관을 직접 물은 응답이 없으므로 이 사람의 습관을 사실처럼 쓰지 않고 조건형 · 질문으로만 쓴다 */
+export const MONEY_HABIT = /저축|소비|지출|씀씀이|투자|통장|지갑|돈 관리|돈을 쓰/;
+/** 조건형 · 질문 표지 — 돈 습관 문장에 이 표지가 없으면 습관을 단정한 것으로 본다(어림) */
+export const CONDITIONAL_MARK = /(?:수 있|기 쉬|듯해|(?:면|라면|다면|으면) |때는|때에는|경우|살펴볼|볼 만|[?]|일 수|곳이에요|쪽에 가깝|가능성|편이라면)/;
+
+/** 코드가 붙이는 한 줄 안내 — AI가 "자료가 없어요"를 쓰지 않게 하려고 자료가 실제로 없는 곳(상대 · 가족 · 동료 · 돈 응답)만 여기서 밝힌다 */
+export const STORY7_CAVEAT: Partial<Record<Story7BlockId, (name: string) => string>> = {
+  love: (name) => `상대 자료: 없음 · 이 부분은 ${name} 님의 사주와 응답만으로 읽었어요.`,
+  people: () => "친구 · 가족 · 동료와의 실제 관계를 입력받은 것은 아니에요. 사주에서 읽히는 관계의 경향과 평소 반응에서 읽은 것만 썼어요.",
+  "work-money": () => "돈 부분은 소비 · 저축 습관을 직접 물은 응답이 아니라 사주의 재물 해석과 평소 행동 경향을 이어 읽었어요. 투자나 대출 결정의 근거가 아니에요.",
+};
+
+export const story7SectionOf = (no: number): Story7Section | undefined => STORY7_SECTIONS.find((s) => s.no === no);

@@ -1,6 +1,6 @@
-// 7개 대주제 초안 — 구조 · 근거 배분 · 비교 시험용 지시문 · "아무 곳에도 연결하지 않았다"를 확인한다. 7개 구조가 좋다는 것을 확인하는 시험이 아니다(글에서 실제로 반복이 줄었는지는 docs/story-7-sections-review.md의 비교가 따로 본다).
+// 7개 대주제 — 구조 · 근거 배분 · 지시문 · 순수 계산(서비스에 닿지 않음)을 확인한다. 7개 구조가 좋다는 것을 확인하는 시험이 아니다(글에서 실제로 반복이 줄었는지는 docs/story-7-sections-review.md의 비교가 따로 본다).
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 import { CONCERN_RECORDS } from "../../config/product.ts";
@@ -95,9 +95,9 @@ test("7번 장의 \"현재 고민을 반영\"은 지금 화면에 고민 입력 
   assert.match(STORY7_SECTIONS[6].gap22 ?? "", /CONCERN_RECORDS\.visible = false/);
 });
 
-test("비교 시험용 지시문: 7개 대주제 이름이 모두 있고, 없는 칸(cards · areas · work-money · 영역 이름)을 가리키지 않으며, 입력은 장마다 배정된 근거를 담는다", () => {
+test("제품 지시문: 7개 대주제 이름이 모두 있고, 없는 칸(areas · work-money · 영역 이름)을 가리키지 않으며, 입력은 장마다 배정된 근거를 담는다", () => {
   for (const s of STORY7_SECTIONS) assert.ok(STORY7_SYSTEM_PROMPT.includes(s.title), s.title);
-  for (const word of ["cards", "work-money", "areas[]", "\"core\"", "\"relation\""]) assert.ok(!STORY7_SYSTEM_PROMPT.includes(word), `지시문에 ${word}`);
+  for (const word of ["areas[]", "\"core\"", "\"relation\"", "work-money", "personalEvidence는 코드가 영역마다"]) assert.ok(!STORY7_SYSTEM_PROMPT.includes(word), `지시문에 ${word}`);
   assert.match(STORY7_SYSTEM_PROMPT, /7개 대주제가 항상 모두 나온다/);
   assert.match(STORY7_SYSTEM_PROMPT, /길게 채우는 것이 목표가 아니다/);
   assert.match(STORY7_SYSTEM_PROMPT, /알려 준 고민\(context\)이 있으면/);
@@ -178,17 +178,13 @@ test("저장된 비교 글 4편: 문서(story-7-sections-review.md 3장)에 적�
   for (const r of rows) for (const no of [2, 7]) assert.deepEqual(r.s7.sections.find((s) => s.no === no)!.evidence, [], `${r.id} ${no}`);
 });
 
-test("연결하지 않았다: 화면 · 서버 · 서비스 · 리포트 생성 어디에서도 7개 대주제 초안을 불러오지 않는다(예외는 story7-* 파일과 측정 스크립트뿐)", () => {
-  const root = join(import.meta.dirname, "..", "..", "..");
-  const hits: string[] = [];
-  const walk = (dir: string) => {
-    for (const name of readdirSync(dir)) {
-      if (name === "node_modules" || name === ".next" || name === "pilot-data" || name === "docs") continue;
-      const path = join(dir, name);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (/\.(ts|tsx)$/.test(name) && !name.startsWith("story7") && name !== "measure-story7.ts" && /story7-(plan|measure|prompt)/.test(readFileSync(path, "utf8"))) hits.push(path.slice(root.length + 1));
-    }
-  };
-  for (const d of ["app", "components", "server", "lib", "scripts"]) walk(join(root, d));
-  assert.deepEqual(hits, [], "7개 대주제 초안을 불러오는 파일이 있다 — 승인 전에는 연결하지 않는다");
+test("7개 대주제 모듈(story7-*)은 순수 계산이다 — 서비스 · 외부 연결 · 서버 코드를 불러오지 않는다(판매 스위치 · DB · 결제에 닿지 않는다)", () => {
+  const dir = import.meta.dirname;
+  const bad: string[] = [];
+  for (const name of readdirSync(dir)) {
+    if (!name.startsWith("story7") || name.endsWith(".test.ts")) continue;
+    const src = readFileSync(join(dir, name), "utf8");
+    for (const m of src.matchAll(/from "([^"]+)"/g)) if (/services\/|integrations\/|server\/|@\//.test(m[1])) bad.push(`${name}: ${m[1]}`);
+  }
+  assert.deepEqual(bad, []);
 });

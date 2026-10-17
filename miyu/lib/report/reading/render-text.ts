@@ -7,6 +7,9 @@ import type { IntegratedReadingReport } from "./types.ts";
 
 const AREA_NAME: Record<string, string> = { core: "내 사주의 중심", relation: "가까운 관계", "work-money": "일과 재물", flow: "앞으로의 흐름" };
 
+/** 7개 대주제(story-7) 리포트의 번호가 붙은 장 이름 — 1~5번은 blocks, 6번은 flow, 7번은 advice */
+const NUMBER = (n: number, topic: string) => `${n}. ${topic}`;
+
 export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { tendencyName?: string } = {}): string {
   const out: string[] = [];
   const p = (...lines: string[]) => out.push(...lines, "");
@@ -19,8 +22,14 @@ export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { tenden
     p("## 알려 주신 고민까지 반영한 해석");
     for (const f of r.focus) p(f.text);
   }
-  for (const b of r.blocks) {
-    p(`## ${b.topic}`, `### ${b.headline}`);
+  const story7 = r.layout === "story7";
+  for (const [i, b] of r.blocks.entries()) {
+    p(`## ${story7 ? NUMBER(i + 1, b.topic) : b.topic}`, `### ${b.headline}`);
+    if (b.parts?.length) {
+      for (const part of b.parts) p(`#### ${part.title}`, ...part.paragraphs);
+      if (b.caveat) p(`> ${b.caveat}`);
+      continue;
+    }
     p(b.summary);
     if (b.example) p(`예를 들면: ${b.example}`);
     if (b.traits) for (const t of b.traits) p(`**${t.name}** (내가 강한 포인트: ${t.shinesShort} / 내가 힘들 수 있는 포인트: ${t.burdenShort})`, `- 내가 강한 포인트: ${t.shines}`, `- 내가 힘들 수 있는 포인트: ${t.burden}`, `- 예: ${t.example}`);
@@ -31,12 +40,13 @@ export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { tenden
     if (b.watch) p(`살펴볼 점: ${b.watch}`);
     if (b.caveat) p(`> ${b.caveat}`);
   }
-  p(`## ${r.flow.topic}`, `### ${r.flow.headline}`);
+  p(`## ${story7 ? NUMBER(r.blocks.length + 1, r.flow.topic) : r.flow.topic}`, `### ${r.flow.headline}`);
   p(r.flow.summary, ...(r.flow.paragraphs ?? []), `> ${r.flow.caveat}`, r.flow.cardText);
   p(...r.flow.years.map((y) => `- ${y.year}: ${y.theme}`));
   for (const x of r.flow.periods) p(`**${x.period}** ${x.theme}`, x.watch);
   p("이런 모습이 이어지면 / 이렇게 될 수 있습니다", ...r.flow.scenarios.map((s) => `- ${s.when} → ${s.then}`));
-  p("## 지금 확인해 볼 것");
+  if (story7 && r.advice) p(`## ${NUMBER(r.blocks.length + 2, r.advice.topic)}`, `### ${r.advice.headline}`, r.advice.summary, ...r.advice.details);
+  p(story7 ? "### 조언 2~3가지(실천)" : "## 지금 확인해 볼 것");
   p(...r.actions.map((a, i) => `${i + 1}. **${a.title}** ${a.detail}${a.area ? ` (${AREA_NAME[a.area] ?? a.area}에서)` : ""}`));
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }

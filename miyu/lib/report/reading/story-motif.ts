@@ -34,11 +34,14 @@ const blockOf = (where: string): string => {
   return where;
 };
 
-/** 화면 글(visibleStoryTexts)에서 한 낱말이 제목 · 카드와 여러 영역에 번졌는지 찾는다 */
-export function findMotifSpread(texts: { where: string; text: string }[]): MotifSpread[] {
+/**
+ * 화면 글(visibleStoryTexts)에서 한 낱말이 제목 · 카드와 여러 영역에 번졌는지 찾는다.
+ * 7개 대주제(story-7)는 글 조각 위치의 이름이 달라 `blocks`로 위치를 장 이름("head"는 제목 · 카드)으로 바꾸는 방법과 센 장 목록을 넘긴다.
+ */
+export function findMotifSpread(texts: { where: string; text: string }[], blocks?: { of: (where: string) => string; main: string[] }): MotifSpread[] {
   const stems = new Map<string, { n: number; blocks: Set<string> }>();
   for (const { where, text } of texts) {
-    const block = blockOf(where);
+    const block = blocks ? blocks.of(where) : blockOf(where);
     for (const w of text.match(/[가-힣]{2,}/g) ?? []) {
       const s = w.slice(0, 2);
       if (COMMON_STEMS.has(s)) continue;
@@ -48,7 +51,7 @@ export function findMotifSpread(texts: { where: string; text: string }[]): Motif
       stems.set(s, e);
     }
   }
-  const main = [...STORY_AREAS.map((a) => a.id as string), "flow"];
+  const main = blocks ? blocks.main : [...STORY_AREAS.map((a) => a.id as string), "flow"];
   const out: MotifSpread[] = [];
   for (const [stem, e] of stems) {
     const inAreas = main.filter((b) => e.blocks.has(b));
@@ -82,7 +85,7 @@ export function splitSentences(t: string): string[] {
 }
 
 /** 문장 n개를 한 문단 한도(max) 이하로 고르게 나눈 묶음 크기 — 4 → 2+2, 5 → 3+2, 7 → 3+2+2 */
-function chunkSizes(n: number, max: number): number[] {
+export function chunkSizes(n: number, max: number): number[] {
   const k = Math.ceil(n / max);
   const base = Math.floor(n / k);
   const extra = n % k;

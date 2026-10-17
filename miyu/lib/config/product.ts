@@ -3,11 +3,12 @@
 // 브라우저가 보낸 금액은 믿지 않는다.
 
 /**
- * 새로 만드는 개인 통합 리포트의 생성 형식 — 운영자 결정(2026-10-16): 영역별 이야기(story-v1)를 새로 생성되는 리포트의 기본으로 쓴다.
- * 이미 저장된 리포트는 자동으로 바꾸지 않는다(저장된 글 · 형식 그대로 읽힌다). 실제 서비스 AI로는 아직 이 형식을 시험하지 못했다(대리 작성기만) —
- * 시험에서 형식 검사를 통과하지 못하면 이 한 줄을 "reading-v1"로 되돌린다(되돌려도 저장된 story 리포트는 그대로 읽힌다).
+ * 새로 만드는 개인 통합 리포트의 생성 형식 — 운영자 결정(2026-10-17): 7개 고정 대주제(story-7: 나는 어떤 사람일까? · 나의 강점과 약점 · 연애와 애착 · 인간관계와 인연 · 일과 재물 · 앞으로의 운과 변화 · 미유의 종합 조언)를
+ * 새로 생성되는 리포트의 기본으로 쓴다(이전 기본은 영역별 이야기 story-v1, 2026-10-16). **실제 AI로 검증하기 전에는 판매에 사용하지 않는다(운영자 결정)** — 판매 스위치 · 결제 · 운영 DB는 바꾸지 않았다.
+ * 이미 저장된 리포트는 자동으로 바꾸지 않는다(저장된 글 · 형식 그대로 읽힌다). 실제 서비스 AI로는 story-7을 아직 한 번도 시험하지 못했다(모의 작성기만) —
+ * 시험에서 형식 검사를 통과하지 못하거나 읽을 만하지 않으면 이 한 줄을 "story-v1" 또는 "reading-v1"로 되돌린다(되돌려도 저장된 story · story7 리포트는 그대로 읽힌다).
  */
-export const REPORT_GENERATION = { format: "story-v1" } as const satisfies { format: "reading-v1" | "story-v1" };
+export const REPORT_GENERATION = { format: "story-7" } as const satisfies { format: "reading-v1" | "story-v1" | "story-7" };
 
 export const PERSONAL_REPORT = {
   id: "personal-integrated-report",

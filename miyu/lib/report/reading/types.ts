@@ -67,6 +67,8 @@ export type ReadingBlock = {
   reactionFlow?: { when: string; steps: { label: string; text: string }[]; helpful: string };
   /** 깊게 읽는 소단락(제목 → 풀이 → 해 볼 것) — 가까운 관계 · 일과 돈 주제만 */
   sections?: ReadingSection[];
+  /** 소제목으로 나뉜 본문(7개 대주제의 "일과 재물": 일 · 재물) — summary는 첫 문단, details는 나머지 문단을 그대로 이어 담아 채팅 · 내보내기가 같이 읽고, 화면은 이 구분으로 소제목을 보인다 */
+  parts?: { title: string; paragraphs: string[] }[];
   /** 읽는 데 중요한 조건(자료 없음 · 해석의 범위) — 본문 가까이에 짧게 */
   caveat?: string;
   basis: ReadingBasis;
@@ -110,9 +112,11 @@ export type IntegratedReadingReport = {
   kind: "integrated-reading";
   /**
    * 글의 짜임 — "story": 영역마다 하나의 이야기를 끝까지 쓴 형식(story-v1, 2026-10-16). 영역의 첫 문단은 summary에, 나머지 문단은 details에 담고 요약 · 예시 · 특징 카드 · 소단락 · 살펴볼 점은 없다.
-   * 없으면 예전 읽기 구조(reading-v1: 칸마다 요약 · 예시 · 풀이 · 살펴볼 점). 두 형식이 같은 저장 모양을 써서 채팅 · 관리자 · 내보내기가 둘 다 읽는다.
+   * "story7": 7개 고정 대주제(나는 어떤 사람일까? · 나의 강점과 약점 · 연애와 애착 · 인간관계와 인연 · 일과 재물 · 앞으로의 운과 변화 · 미유의 종합 조언, story-7 · 2026-10-17 운영자 확정) —
+   *   blocks는 1~5번(강점과 약점은 id "strength-burden", 인간관계는 "people"), flow는 6번, advice는 7번(actions와 함께 화면의 7번 대주제). 요약 · 예시 · 특징 카드 · 소단락 · 살펴볼 점은 없다.
+   * 없으면 예전 읽기 구조(reading-v1: 칸마다 요약 · 예시 · 풀이 · 살펴볼 점). 세 형식이 같은 저장 모양을 써서 채팅 · 관리자 · 내보내기가 모두 읽는다.
    */
-  layout?: "story";
+  layout?: "story" | "story7";
   source: DataSource;
   personName: string;
   /** 핵심 해석 한 문장 (모바일 두 줄 이내) */
@@ -126,7 +130,9 @@ export type IntegratedReadingReport = {
   timelineReference: { year: number; month: number };
   /** 월 단위 "움직이는 달" 달력 — 사용자의 사주 계산 결과로 코드가 만든다(AI가 쓰지 않는다). 규칙 버전과 함께 저장하고 열 때마다 새로 계산하지 않는다. 이전에 저장된 리포트에는 없다 */
   calendars?: { ruleVersion: string; items: MonthCalendar[] };
-  /** 다음 행동 체크리스트 — area는 이 행동이 어느 영역의 풀이에서 나왔는지(story 형식만) */
+  /** 7번 대주제 "미유의 종합 조언"(story7 형식만) — 앞 장을 다시 요약하지 않고 서로 다른 장의 결론이 만나는 곳에서 "왜 이 순서인가"를 쓴 글. 행동 2~3가지는 아래 actions가 맡는다 */
+  advice?: ReadingBlock;
+  /** 다음 행동 체크리스트 — area는 이 행동이 어느 영역의 풀이에서 나왔는지(story 형식만). story7에서는 7번 대주제의 조언 2~3가지 */
   actions: { title: string; detail: string; area?: string }[];
   // ── 실제 생성된 리포트에만 있는 값 (예시에는 없다). 글은 AI가 쓰고, 아래 값은 코드가 채운다 ──
   /** 만세력 계산 결과의 화면용 표 */
@@ -152,7 +158,7 @@ export type IntegratedReadingReport = {
 
 // ── AI가 돌려주는 부분(초안). 근거 · 사주 용어 풀이 · 안전 안내 · 시기 계산은 코드가 채운다 ──
 
-export type ReadingBlockId = "tendency" | "strength-burden" | "values" | "love" | "work-money";
+export type ReadingBlockId = "tendency" | "strength-burden" | "values" | "love" | "work-money" | "people" | "advice";
 
 export type ReadingTraitDraft = ReadingTrait & { example: string };
 
@@ -235,8 +241,37 @@ export type StoryDraftV1 = {
   actions: { title: string; detail: string; area: StoryActionArea; evidence: string[] }[];
 };
 
+// ── story-7(7개 대주제) — AI가 돌려주는 초안. 장마다 결론 한 문장 + 문단들, 5번만 소제목(일 · 재물)으로 나뉜 문단, 6번에는 시기 표(years · scenarios), 7번의 조언 행동은 actions ──
+
+export type Story7SectionDraft = {
+  no: number;
+  /** 이 장에서만 말하는 연결 한 문장 — 본문을 다 쓴 뒤 풀이의 결론으로 쓴다 */
+  headline: string;
+  /** 소제목이 없는 장의 문단들 */
+  paragraphs?: string[];
+  /** 소제목이 있는 장(5번: 일 · 재물)의 문단들 */
+  parts?: { title: string; paragraphs: string[] }[];
+  /** 6번에만 — 가까운 세 해(계산된 해만) · 응답으로 본 가능성 */
+  years?: { year: string; theme: string }[];
+  scenarios?: { when: string; then: string }[];
+  /** 본문에서 실제로 쓴 근거 ID — 앞 장을 엮는 장(2 · 7)은 비워도 된다 */
+  evidence: string[];
+};
+
+export type Story7DraftV1 = {
+  /** 이 사람의 중심이 되는 연결 한 문장 (공유용 카드에 실리므로 이름을 쓰지 않는다) */
+  headline: string;
+  /** 첫 화면 카드 — 2번 대주제의 결론을 카드로 줄인 것(새 내용 없음). 지금 나의 시기 카드는 코드가 계산해 채운다 */
+  cards: { strength: { keyword: string; note: string }; caution: { keyword: string; note: string } };
+  sections: Story7SectionDraft[];
+  /** 7번 대주제의 실천 가능한 조언 2~3가지 — 앞 장에서 나온 서로 다른 행동 */
+  actions: { title: string; detail: string; evidence: string[] }[];
+};
+
 /** 저장된 리포트가 영역별 이야기(story) 형식인가 */
 export const isStoryReport = (c: unknown): c is IntegratedReadingReport => isReadingReport(c) && c.layout === "story";
+/** 저장된 리포트가 7개 대주제(story7) 형식인가 */
+export const isStory7Report = (c: unknown): c is IntegratedReadingReport => isReadingReport(c) && c.layout === "story7";
 
 /** 저장된 리포트가 이 읽기 구조인가 (kind만 본다. 실제로 생성된 리포트에는 saju · base · extras · generated가 있고, 예시 화면의 데이터에는 없다) */
 export const isReadingReport = (c: unknown): c is IntegratedReadingReport => typeof c === "object" && c !== null && (c as { kind?: unknown }).kind === "integrated-reading";
