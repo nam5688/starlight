@@ -20,6 +20,7 @@ import { isReadingReport, isStoryReport, type StoryDraftV1 } from "./types.ts";
 import { readingTexts } from "../concern/texts.ts";
 import { checkReadingDepth } from "./depth.ts";
 import { findRepeatedPhrasesIn } from "./repeat.ts";
+import { countSentences as countSentencesOf } from "./validate.ts";
 import { visibleStoryTexts } from "./story-validate.ts";
 
 const P01 = buildPersonas(1)[0];
@@ -58,7 +59,7 @@ test("가운데 점수의 방향은 근거로 만들지 않는다", () => {
 
 test("입력한 MBTI는 알파벳이 아니라 선호의 방향으로 풀어 근거 문구에 건넨다 — 형식이 아니면 만들지 않는다", () => {
   assert.deepEqual(mbtiDirections("INFJ"), [
-    "에너지는 안에서 충분히 정리한 뒤 밖으로 꺼내는 쪽",
+    "에너지는 안에서 충분히 생각을 거친 뒤 밖으로 드러내는 쪽",
     "정보는 전체 의미와 가능성을 먼저 보는 쪽",
     "판단은 사람과 관계에 미칠 영향을 먼저 보는 쪽",
     "생활은 미리 정해 두어야 마음이 놓이는 쪽",
@@ -77,7 +78,7 @@ test("P01은 근거 45개(사주 34 · 응답 10 · MBTI 1) — 입력한 MBTI(�
   assert.equal(P01_EVIDENCE.filter((e) => e.source === "saju").length, 34);
   assert.equal(P01_EVIDENCE.filter((e) => e.source === "survey").length, 10);
   assert.equal(P01_EVIDENCE.filter((e) => e.source === "self").length, 1);
-  assert.match(P01_EVIDENCE.find((e) => e.id === "self.mbti")!.cue, /안에서 충분히 정리한 뒤/);
+  assert.match(P01_EVIDENCE.find((e) => e.id === "self.mbti")!.cue, /안에서 충분히 생각을 거친 뒤/);
   assert.match(P01_EVIDENCE.find((e) => e.id === "survey.ei.low")!.cue, /함께할 때 에너지가 생깁니다/);
 });
 
@@ -264,10 +265,10 @@ test("조립: 영역의 첫 문단은 summary, 나머지는 details — 같은 �
 test("생성기: story-v1은 같은 흐름(초안 → 형식 검사 → 조립)으로 리포트를 만들고 지시문 버전을 남긴다 — 이전 형식 기본값은 그대로", async () => {
   const model = createMockModel({});
   const gen = createAiReportGenerator({ model, format: "story-v1", now: () => new Date("2026-10-16T09:00:00+09:00") });
-  assert.match(gen.version, /story-v1-prompt-0\.2/);
+  assert.match(gen.version, /story-v1-prompt-0\.3/);
   const report = (await gen.generate(P01.input, {})) as ReturnType<typeof assembleStory>;
   assert.equal(report.layout, "story");
-  assert.equal(report.generated?.promptVersion, "story-v1-prompt-0.2");
+  assert.equal(report.generated?.promptVersion, "story-v1-prompt-0.3");
   assert.equal(model.calls, 1);
   const legacy = createAiReportGenerator({ model: createMockModel({}), now: () => new Date("2026-10-16T09:00:00+09:00") });
   assert.match(legacy.version, /reading-v1-prompt-0\.13/);
@@ -358,6 +359,13 @@ test("원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인�
   const ok = "원국에서 수 기운이 드러나지 않는 점은 이번 풀이에서 속도를 낮추고 생각을 식히는 방식이 생활에서 자연스럽게 확보되는지 살펴보는 보조 근거로만 썼어요 그리고 이 사람의 행동은 응답에서만 읽었어요.";
   const e2 = errorsOf((d) => (d.areas[2].paragraphs[1] = ok));
   assert.ok(!e2.some((x) => /생활 기능의 부족이나 원인/.test(x)), e2.join("\n"));
+  // 실제 AI 글(2026-10-17 P01)의 문장 — "보이지 않아서" 뒤에 생활 부담으로 이어 붙인 것(사후 보강). 같은 없음이라도 시기 · 채우는 쪽 틀 안의 문장은 막지 않는다
+  const bad4 = "반면 내가 만들어 내는 기운(식상)은 보이지 않아서, 결과물을 먼저 내보이는 일은 부담이 되기 쉬울 수 있어요.";
+  const e4 = errorsOf((d) => (d.areas[2].paragraphs[1] = `${bad4} 그래서 평가 기준을 미리 적어 두면 편할 수 있어요 그리고 오래 이어 가요.`));
+  assert.ok(e4.some((x) => /생활 기능의 부족이나 원인/.test(x)), e4.join("\n"));
+  const ok4 = "원국에 식상이 없어서 식상을 만나는 시기에는 표현하고 내보이는 주제가 상대적으로 크게 느껴질 수 있다고 봐요 그리고 이 사람의 행동은 응답에서만 읽었어요.";
+  const e5 = errorsOf((d) => (d.areas[2].paragraphs[1] = ok4));
+  assert.ok(!e5.some((x) => /생활 기능의 부족이나 원인/.test(x)), e5.join("\n"));
   // 흐름 영역에서도 같다
   const e3 = errorsOf((d) => (d.flow.paragraphs[1] = `${bad1} 올해 시기에는 이 주제가 크게 느껴질 수 있어요 그리고 천천히 살펴봐요.`));
   assert.ok(e3.some((x) => /flow: .*생활 기능의 부족이나 원인/.test(x)), e3.join("\n"));
@@ -389,4 +397,96 @@ test("같은 개인 성향 근거를 세 영역 이상이 앞세우면 막는다
 test("지시문 0.2: 생활 풀이가 먼저 · 없는 기운 읽는 법 · 영역마다 나눈 개인 근거를 말한다", () => {
   for (const must of ["문단의 순서는 생활 풀이가 먼저다", "첫 문단 — 이 사람이 어떤 사람인지를 일상의 장면과 말로 먼저", "[원국에 \"없는\" 기운 · 십성을 읽는 법", "수 기운이 없다 → 쉬는 힘이 없다", "재성이 없다 → 돈 관리가 약하다", "코드가 영역마다 겹치지 않게 나눠 준"]) assert.ok(STORY_SYSTEM_PROMPT.includes(must), must);
   assert.ok(!STORY_SYSTEM_PROMPT.includes("사주에서 읽은 것 → 그것이 이 사람에게 나타나는 장면 → 겪기 쉬웠던 부담(공감) → 맞는 방향"), "예전 순서 문장이 남아 있지 않다");
+});
+
+// ───── 0.3: 실제 AI 첫 글(P01, 2026-10-17)을 읽고 — 사후 수정이다(새 글이 통과한다는 증거가 아니다) ─────
+
+test("지시문 0.3: 작성 과정을 말하는 예시를 지우고 막는다 · 일과 재물에는 돈 이야기 · MBTI(weak)는 제목의 중심이 아니다 · 한 낱말이 글 전체를 끌지 않는다", () => {
+  // 0.2가 모델에게 보여 줘 따라 쓰게 한 문장 — 이제 지시문에는 "쓰지 않는다"는 말로만 나온다
+  assert.ok(!/쓸 때는 "이번 풀이에서는 보조 근거로 살펴봤어요" 정도의 거리로/.test(STORY_SYSTEM_PROMPT), "예전 예시 문장이 권유로 남아 있지 않다");
+  assert.ok(!/꼭 필요할 때만 "이번 분석에서는 한쪽으로 정하지 않았어요" 정도로 짧게 말한다/.test(STORY_SYSTEM_PROMPT), "갈림을 말하라는 문장이 남아 있지 않다");
+  for (const must of ["글을 쓴 사정을 설명하는 문장은 풀이가 아니라 빈칸이므로 쓰지 않는다", "돈 이야기가 1~2문장이라도 있어야 한다", "strength가 weak이다. 제목", "한 낱말(예: 정리", "갈림 자체는 글에서 말하지 않는다"]) assert.ok(STORY_SYSTEM_PROMPT.includes(must), must);
+});
+
+test("작성 과정을 말하는 문장은 막는다 — 실제 AI 글의 두 문장 · 풀이 안의 비슷한 말은 막지 않는다", () => {
+  const bad = ["다만 태어난 달의 기운은 이 힘을 덜어내는 쪽이라, 강약은 이번 분석에서 한쪽으로 정하지 않았어요.", "돈과 자원을 다루는 기운은 이번 풀이에서 근거가 약해 길게 풀지 않았어요.", "근거가 약해서 길게 풀지 않았어요."];
+  for (const [i, text] of bad.entries()) {
+    const e = errorsOf((d) => (d.areas[0].paragraphs[2] = `${text} 그래서 평소에는 천천히 확인하는 쪽이 편해요 그리고 오래 이어 가요.`));
+    assert.ok(e.some((x) => /작성 과정을 말하는 문장/.test(x)), `${i}: ${e.join("\n")}`);
+  }
+  // "이번 풀이" · "이번 분석"이 나와도 글을 쓴 사정이 아닌 풀이는 막지 않는다
+  const ok = errorsOf((d) => (d.areas[0].paragraphs[2] = "이번 풀이에서 가장 먼저 눈에 들어오는 것은 맡은 일을 오래 책임지는 모습이에요. 그래서 평소에는 천천히 확인하는 쪽이 편해요 그리고 오래 이어 가요."));
+  assert.ok(!ok.some((x) => /작성 과정을 말하는 문장/.test(x)), ok.join("\n"));
+});
+
+test("일과 재물 영역에 돈 이야기가 없으면 막는다 — 작성 과정 문장으로 돈을 말한 척한 것은 세지 않는다", () => {
+  const noMoney = errorsOf((d) => (d.areas[2].paragraphs = d.areas[2].paragraphs.map((p) => p.replace(/돈|재물|수입|지출|소비|저축|씀씀이|금전|재정|자산|월급|통장|지갑/g, "자원"))));
+  assert.ok(noMoney.some((x) => /일과 재물 영역에 돈 이야기가 없습니다/.test(x)), noMoney.join("\n"));
+  const fakeMoney = errorsOf((d) => (d.areas[2].paragraphs = [...d.areas[2].paragraphs.slice(0, 2).map((p) => p.replace(/돈|재물|수입|지출|소비|저축|씀씀이|금전|재정|자산|월급|통장|지갑/g, "자원")), "돈에 대해서는 이번 풀이에서 근거가 약해 길게 풀지 않았어요. 그래서 일을 맡을 때는 기준을 먼저 적어 두는 쪽이 편해요 그리고 오래 이어 가요."]));
+  assert.ok(fakeMoney.some((x) => /돈 이야기가 없습니다/.test(x)), fakeMoney.join("\n"));
+  // 예시 글은 돈 이야기가 있어 막히지 않는다
+  assert.ok(!errorsOf(() => undefined).some((x) => /돈 이야기가 없습니다/.test(x)));
+});
+
+test("생성기: 형식은 맞지만 한 낱말이 제목과 여러 영역에 번졌으면 한 번 고쳐 쓰게 한다 — 고쳐 쓴 글이 형식에서 떨어지면 첫 글을 받고, 켜지 않으면 그대로 받는다", async () => {
+  const base = mockDraft();
+  // 첫 글: 같은 낱말("정리")을 제목 · 카드 · 세 영역 · 시기에 심는다(문장 수 · 길이는 그대로 — 형식 검사는 통과한다)
+  const spread = JSON.parse(
+    JSON.stringify(base)
+      .replaceAll("문단을 쓰는 자리입니다", "정리 문단을 쓰는 자리입니다")
+      .replace("[모의 생성] 강점", "[모의 생성] 정리 강점")
+      .replace("모의 결론입니다", "정리 결론입니다"),
+  );
+  assert.ok(validateStoryDraft(spread, P01_EVIDENCE, { hasContext: true }).ok, "심은 글도 형식 검사는 통과한다");
+  const scripted = (texts: string[]) => {
+    let n = 0;
+    return {
+      provider: "mock",
+      model: "mock-0",
+      get calls() {
+        return n;
+      },
+      async complete(req: { messages: { role: string; content: string }[] }) {
+        void req;
+        return { text: texts[Math.min(n++, texts.length - 1)], model: "mock-0", usage: { inputTokens: 0, outputTokens: 0 } };
+      },
+    };
+  };
+  const now = () => new Date("2026-10-16T09:00:00+09:00");
+  // 켜 둔 경우: 첫 글(번짐) → 한 번 고쳐 쓰기 → 번지지 않은 글을 받는다(호출 2회)
+  const m1 = scripted([JSON.stringify(spread), JSON.stringify(base)]);
+  const r1 = (await createAiReportGenerator({ model: m1, format: "story-v1", repairRepeats: true, now }).generate(P01.input, {})) as ReturnType<typeof assembleStory>;
+  assert.equal(m1.calls, 2);
+  assert.ok(!JSON.stringify(r1).includes("정리 결론"), "고쳐 쓴 글을 받았다");
+  // 고쳐 쓴 글이 형식 검사에서 떨어지면 번졌어도 형식은 맞는 첫 글을 쓴다(잘 쓴 글을 이 검사 때문에 버리지 않는다)
+  const m2 = scripted([JSON.stringify(spread), '{"headline": "짧음"}', '{"headline": "짧음"}']);
+  const r2 = (await createAiReportGenerator({ model: m2, format: "story-v1", repairRepeats: true, now }).generate(P01.input, {})) as ReturnType<typeof assembleStory>;
+  assert.equal(r2.layout, "story");
+  assert.ok(JSON.stringify(r2).includes("정리 결론"));
+  // 켜지 않으면(기본) 한 번에 받는다
+  const m3 = scripted([JSON.stringify(spread)]);
+  await createAiReportGenerator({ model: m3, format: "story-v1", now }).generate(P01.input, {});
+  assert.equal(m3.calls, 1);
+});
+
+test("생성기: 한 문단이 문장 수 한도를 한 문장 넘겨도 문단 나눔만 보정해 한 번에 받는다 — 글은 한 글자도 바뀌지 않는다(실제 AI 글에서 이 한 건 때문에 두 번 모두 버려졌다)", async () => {
+  const d = clone(mockDraft());
+  const [a1, a2] = d.areas[0].paragraphs[1].split(/(?<=[.!?])\s+/);
+  // 서로 다른 문장 두 개를 더해 4문장짜리 문단 하나를 만든다(같은 문장을 되풀이하면 다른 검사에 걸린다)
+  const x1 = "[모의 생성] 이 문장은 문단 나눔 보정을 시험하려고 더한 첫 번째 문장입니다.";
+  const x2 = "[모의 생성] 이 문장은 문단 나눔 보정을 시험하려고 더한 두 번째 문장입니다.";
+  d.areas[0].paragraphs[1] = [a1, a2, x1, x2].join(" ");
+  assert.equal(countSentencesOf(d.areas[0].paragraphs[1]), 4);
+  assert.equal(validateStoryDraft(d, P01_EVIDENCE, { hasContext: true }).ok, false, "보정 전에는 문장 수 한도를 넘는다");
+  const model = { provider: "mock", model: "mock-0", calls: 0, async complete() { this.calls++; return { text: JSON.stringify(d), model: "mock-0", usage: { inputTokens: 0, outputTokens: 0 } }; } };
+  const report = (await createAiReportGenerator({ model, format: "story-v1", now: () => new Date("2026-10-16T09:00:00+09:00") }).generate(P01.input, {})) as ReturnType<typeof assembleStory>;
+  assert.equal(model.calls, 1, "고쳐 쓰기 없이 한 번에 받는다");
+  assert.equal(report.layout, "story");
+  const text = readingTexts(report).all.join(" ").replace(/\s+/g, " ");
+  let at = -1;
+  for (const sentence of [a1, a2, x1, x2]) {
+    const i = text.indexOf(sentence.replace(/\s+/g, " "), at + 1);
+    assert.ok(i > at, `문장이 순서대로 그대로 들어 있다: ${sentence.slice(0, 20)}`);
+    at = i;
+  }
 });

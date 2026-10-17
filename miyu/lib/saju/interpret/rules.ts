@@ -34,11 +34,11 @@ const DAY_MASTER_CUE: Record<string, string> = {
 };
 
 const ELEMENT_MEANING: Record<FiveElement, string> = {
-  목: "성장 · 계획 · 시작하려는 힘",
-  화: "표현 · 열정 · 드러내는 힘",
-  토: "안정 · 중재 · 지키려는 힘",
-  금: "결단 · 기준 · 정리하는 힘",
-  수: "생각 · 유연함 · 쉬어 가는 힘",
+  목: "성장 · 계획 · 시작",
+  화: "표현 · 열정 · 드러냄",
+  토: "안정 · 중재 · 유지",
+  금: "기준 · 정리 · 결단",
+  수: "생각 · 유연함 · 쉼",
 };
 
 const GROUP_RULE: Record<Group, { topics: Topic[]; cue: string; timing: string }> = {
@@ -208,7 +208,7 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         topics: ["personality"],
         strength: "moderate",
         fact: `원국 글자에 ${iga(el)} 없음 (지장간 제외)`,
-        cue: `전통 해석에서는 ${el} 기운(${ELEMENT_MEANING[el]})을 생활에서 의식적으로 채우는 쪽을 권하는 경우가 많습니다. 없다는 것이 결함이라는 뜻은 아닙니다.`,
+        cue: `전통 해석에서는 ${el} 기운(${ELEMENT_MEANING[el]}의 주제)이 원국에 없으면 그 기운이 들어오는 시기에 그 주제가 상대적으로 크게 느껴질 수 있다고 보고, 생활에서 의식적으로 채우는 쪽을 권하는 경우가 많습니다. 없다는 것이 결함이거나 그 기능이 부족하다는 뜻은 아닙니다.`,
       });
     }
   }

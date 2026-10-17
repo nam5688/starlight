@@ -5,7 +5,8 @@
 import type { Evidence } from "../evidence.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
 import { READING_LIMITS as L, TERM_LIMITS } from "./plan.ts";
-import { ABSENCE_MAPPING, FIRST_PARAGRAPH_TERMS_MAX, FORMULA_BUDGET, MBTI_AREAS, PERIOD_TALK, PERSONAL_REUSE, STORY_AREAS, STORY_FLOW_TOPIC, STORY_LIMITS as S, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
+import { ABSENCE_MAPPING, FIRST_PARAGRAPH_TERMS_MAX, FORMULA_BUDGET, MBTI_AREAS, MONEY_WORDS, PERIOD_TALK, PERSONAL_REUSE, PROCESS_TALK, STORY_AREAS, STORY_FLOW_TOPIC, STORY_LIMITS as S, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
+import { splitSentences } from "./story-motif.ts";
 import { distinctTerms } from "./terms.ts";
 import type { StoryDraftV1 } from "./types.ts";
 import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./validate.ts";
@@ -99,7 +100,7 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
     for (const p of paragraphs.filter(isString)) {
       for (const sentence of p.split(/(?<=[.!?])\s+/)) {
         if (!ABSENCE_MAPPING.kind.test(sentence) || !ABSENCE_MAPPING.absent.test(sentence)) continue;
-        const hit = ABSENCE_MAPPING.gloss.exec(sentence) ?? ABSENCE_MAPPING.causal.exec(sentence);
+        const hit = ABSENCE_MAPPING.gloss.exec(sentence) ?? ABSENCE_MAPPING.causal.exec(sentence) ?? (ABSENCE_MAPPING.allowedFrame.test(sentence) ? null : ABSENCE_MAPPING.causalLoose.exec(sentence));
         if (hit) errors.push(`${where}: "${sentence.slice(0, 40)}…" — 원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인("${hit[0]}")으로 풀지 않습니다. 근거는 "전통 해석에서 생활에서 채우라고 권하는 경우가 많다 · 시기에 그 주제가 크게 느껴질 수 있다"까지만 말하고, 이 사람의 행동은 응답 근거로 쓰세요.`);
       }
     }
@@ -142,6 +143,11 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
       if (firstTerms.length > FIRST_PARAGRAPH_TERMS_MAX) errors.push(`${w}.paragraphs[0]: 첫 문단에 사주 용어(${firstTerms.join(" · ")})를 쓰지 않습니다 — 이 사람이 어떤 사람인지를 일상의 말로 먼저 쓰고, 그렇게 읽은 이유(사주)는 둘째 문단부터 쓰세요.`);
     }
     absenceIssues(paragraphs, w);
+    // 일과 재물 영역에는 돈 이야기가 실제로 있어야 한다 — 작성 과정을 말하는 문장("근거가 약해 길게 풀지 않았어요")은 돈 이야기로 세지 않는다
+    if (plan.id === "work-money") {
+      const money = paragraphs.filter(isString).flatMap(splitSentences).filter((s) => !PROCESS_TALK.test(s)).join(" ");
+      if (!MONEY_WORDS.test(money)) errors.push(`${w}: 일과 재물 영역에 돈 이야기가 없습니다 — 재물 해석 근거가 약하면 1~2문장으로 짧게, 평소 행동 경향(신중함 · 지속성 등)이 돈 앞의 선택(지출 · 저축 · 큰 결정)에서 어떻게 나타날 수 있는지를 조건형으로 쓰세요. "근거가 약해 다루지 않았다"고 쓰지 않습니다.`);
+    }
     if (isString(a.headline) && paragraphs.some((t) => isString(t) && t.includes(a.headline.trim()))) errors.push(`${w}: 문단이 제목을 그대로 되풀이합니다 — 제목은 본문을 다 쓴 뒤의 결론이고 문단은 그 연결을 풀어 쓰는 글입니다.`);
     tasks(paragraphs, w);
     for (const t of paragraphs) if (isString(t) && PERIOD_TALK.test(t)) errors.push(`${w}: 시기 이야기("${PERIOD_TALK.exec(t)![0]}")는 "${STORY_FLOW_TOPIC}" 영역에만 씁니다 — 이 영역에서는 시기를 말하지 않고, 같은 이야기를 두 번 풀지 않습니다.`);
@@ -231,6 +237,11 @@ export function validateStoryDraft(raw: unknown, evidence: Evidence[], opts: { h
   for (const f of FORMULA_BUDGET) {
     const n = bodyText.match(f.re)?.length ?? 0;
     if (n > f.max) errors.push(`areas: "${f.label}"이(가) ${n}곳에 나와요(${f.max}곳까지) — 영역마다 같은 틀로 맺지 말고, 방향을 질문 · 기준 · 건넬 말 · 조건처럼 영역에 맞는 다른 모양으로 쓰세요.`);
+  }
+  // 글이 아니라 글을 쓴 사정을 말하는 문장 — 읽는 사람에게는 풀이가 아니라 빈칸이다
+  for (const { where, text: t } of texts) {
+    const hit = PROCESS_TALK.exec(t);
+    if (hit) errors.push(`${where}: 작성 과정을 말하는 문장("${t.slice(Math.max(0, hit.index - 8), hit.index + hit[0].length).trim().slice(0, 50)}")은 쓰지 않습니다 — 쓸 것이 없으면 그 이야기를 하지 않고, 쓸 수 있는 근거로 이 사람의 모습을 풀어 쓰세요.`);
   }
   errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext) }));
   for (const { where, text: t } of texts) if (TYPE_CODE.test(t)) errors.push(`${where}: 알파벳 유형 코드("${TYPE_CODE.exec(t)![0]}")를 쓰지 않습니다 — 입력한 MBTI는 "입력해 주신 성향"으로 부릅니다.`);

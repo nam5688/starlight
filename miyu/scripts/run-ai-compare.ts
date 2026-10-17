@@ -67,8 +67,8 @@ console.log(`- 예상 비용(평소 수준): ${won(plan.expectedKrw)} · 모든 
 console.log(`- 하드스톱 한도: ${won(remainingCap)}${alreadySpent > 0 ? ` (승인 총액 ${won(stage.capKrw)} − 이미 쓴 ${won(alreadySpent)})` : ""} (환율 ${settings.fxKrwPerUsd.toLocaleString("ko-KR")}원/달러 · 여유율 ${Math.round((settings.surcharge - 1) * 100)}% 가정 — 실제 청구는 제공사 콘솔에서 확인)`);
 
 // 승인 범위가 좁은 단계(예: story-p01)는 변형 · 모델 · 인물 · 이미 쓴 금액 · 최악 비용 상한을 드라이런에서도 확인한다 — 어긋나면 호출하지 않는다
-const restrictionIssues = checkStageRestriction(stage, { variant, only, persona: personaArg, alreadySpentGiven: arg("--already-spent-krw") !== undefined, twoRoundWorstKrw: plan.twoRoundWorstKrw });
-if (stage.restrict) console.log(`- 승인 범위: ${stage.restrict.variant} · 후보 ${stage.restrict.only} · 인물 ${stage.restrict.persona} 1건 · 최악 비용 상한 ${won(stage.restrict.runCeilingKrw)}`);
+const restrictionIssues = checkStageRestriction(stage, { variant, only, persona: personaArg, alreadySpentGiven: arg("--already-spent-krw") !== undefined, twoRoundWorstKrw: plan.twoRoundWorstKrw, execute: args.includes("--execute") });
+if (stage.restrict) console.log(`- 승인 범위: ${stage.restrict.variant} · 후보 ${stage.restrict.only} · 인물 ${stage.restrict.persona} 1건 · 최악 비용 상한 ${won(stage.restrict.runCeilingKrw)} · 승인된 실행 ${stage.restrict.runsDone}/${stage.restrict.runsApproved}회 마침${stage.restrict.runsDone >= stage.restrict.runsApproved ? " — 새 실행은 운영자가 다시 승인해야 함" : ""}`);
 if (restrictionIssues.length > 0) {
   console.error("\n승인 범위 확인 — 실행할 수 없습니다:");
   for (const i of restrictionIssues) console.error(`- ${i}`);

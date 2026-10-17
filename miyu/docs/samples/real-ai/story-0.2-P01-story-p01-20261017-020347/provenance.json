@@ -1,0 +1,15 @@
+{
+  "kind": "real-ai-failed-draft",
+  "savedAs": "failed",
+  "passedChecks": false,
+  "model": "claude-sonnet-5-5",
+  "format": "story-v1",
+  "promptVersion": "story-v1-prompt-0.2",
+  "persona": "P01",
+  "approval": { "approvedOn": "2026-10-17", "totalCapKrw": 4000, "runCeilingKrw": 1230 },
+  "run": { "calls": 2, "rewrites": 1, "costKrw": 371, "generated": "0/1", "firstAttemptPassed": false, "firstAttemptFindings": 9, "secondAttemptFindings": 1 },
+  "cumulativeKrw": { "before": 2097, "after": 2468, "approvedTotal": 4000, "remaining": 1532 },
+  "firstAttemptTextInRepo": false,
+  "originalSha256": "142a01c977418d93aa38a3598b91de066791adf4dde9b4a1634c1ebe9d6696d3",
+  "note": "원문(두 번째 응답)만 보관. 첫 응답의 9건은 운영자 PC의 round1.txt를 읽기 전에는 분류하지 못했다. 이 글은 검사를 통과한 리포트가 아니라 예시로 쓰지 않는다."
+}

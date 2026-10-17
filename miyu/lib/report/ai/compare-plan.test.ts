@@ -230,6 +230,12 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   has({ persona: "P02" }, "P01");
   has({ alreadySpentGiven: false }, "--already-spent-krw");
   has({ twoRoundWorstKrw: 1230.01 }, "상한"); // 반올림 없이 그대로 비교한다
+  // 승인받은 1건을 마쳤으면(2026-10-17 실행) 드라이런은 되고 실제 호출(--execute)은 거절한다 — 새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만
+  assert.equal(stage.restrict.runsApproved, 1);
+  assert.equal(stage.restrict.runsDone, 1);
+  assert.deepEqual(checkStageRestriction(stage, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
+  has({ execute: true }, "이미 실행했습니다");
+  assert.deepEqual(checkStageRestriction({ restrict: { ...stage.restrict, runsDone: 0 } }, { ...ok, execute: true }), [], "남은 승인 실행이 있으면 실제 호출 확인은 통과한다");
   assert.deepEqual(checkStageRestriction(stage, { ...ok, twoRoundWorstKrw: 1222.04 }), [], "지금의 최악 1,222.04원은 상한 1,230원 안");
   // 제한이 없는 단계는 이 확인을 하지 않는다
   assert.deepEqual(checkStageRestriction({}, { variant: "x", only: undefined, persona: undefined, alreadySpentGiven: false, twoRoundWorstKrw: 99999 }), []);

@@ -188,12 +188,14 @@ export function checkApproval(stage: { name: string; capKrw: number }, guard: Bu
  * 실행기가 드라이런 · 실제 호출 모두에서 부르며, 이유가 있으면 호출하지 않는다.
  */
 export function checkStageRestriction(
-  stage: { restrict?: { variant: string; only: string; persona: string; runCeilingKrw: number; requireAlreadySpent: boolean } },
-  input: { variant: string; only: string | undefined; persona: string | undefined; alreadySpentGiven: boolean; twoRoundWorstKrw: number },
+  stage: { restrict?: { variant: string; only: string; persona: string; runCeilingKrw: number; requireAlreadySpent: boolean; runsApproved: number; runsDone: number; lastRun?: string } },
+  input: { variant: string; only: string | undefined; persona: string | undefined; alreadySpentGiven: boolean; twoRoundWorstKrw: number; execute?: boolean },
 ): string[] {
   const r = stage.restrict;
   if (!r) return [];
   const why: string[] = [];
+  // 승인받은 실행을 다 썼으면 호출하지 않는다(드라이런은 그대로 볼 수 있다) — 새 실행은 운영자가 다시 승인한 뒤 runsApproved를 올린다
+  if (input.execute && r.runsDone >= r.runsApproved) why.push(`이 승인(${r.runsApproved}건)은 이미 실행했습니다${r.lastRun ? ` (${r.lastRun})` : ""}. 새 실행은 운영자가 다시 승인해야 합니다.`);
   if (input.variant !== r.variant) why.push(`이 승인은 ${r.variant} 지시문 한 가지에만 쓸 수 있습니다 (지금 ${input.variant}).`);
   if (input.only !== r.only) why.push(`이 승인은 후보 ${r.only} 한 모델에만 쓸 수 있습니다 (--only ${r.only}를 적어야 합니다).`);
   if (input.persona !== r.persona) why.push(`이 승인은 가상 인물 ${r.persona} 한 명에만 쓸 수 있습니다 (--persona ${r.persona}를 적어야 합니다).`);

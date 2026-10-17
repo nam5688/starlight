@@ -71,6 +71,11 @@ export type StageRestriction = {
   runCeilingKrw: number;
   /** 같은 승인 총액 안에서 이미 쓴 금액을 반드시 적게 한다 (--already-spent-krw — 빠뜨리면 총액을 처음부터 쓰는 것처럼 계산된다) */
   requireAlreadySpent: boolean;
+  /** 승인받은 실행 횟수와 이미 마친 횟수 — 다 썼으면 드라이런은 되지만 --execute는 거절한다(새 실행은 운영자가 다시 승인해 이 값을 고친다) */
+  runsApproved: number;
+  runsDone: number;
+  /** 마친 실행의 기록 한 줄(날짜 · 호출 수 · 비용 · 결과) — 거절 안내에 보인다 */
+  lastRun?: string;
 };
 
 export const COMPARE_STAGES: CompareStageDef[] = [
@@ -84,7 +89,17 @@ export const COMPARE_STAGES: CompareStageDef[] = [
     label: "story-v1 P01 실제 AI 1건 (운영자 승인 2026-10-17 — 총 4,000원, 누적 사용액 포함)",
     personaCount: 1,
     capKrw: 4000,
-    restrict: { variant: "story-v1", only: "A", persona: "P01", runCeilingKrw: 1230, requireAlreadySpent: true },
+    restrict: {
+      variant: "story-v1",
+      only: "A",
+      persona: "P01",
+      runCeilingKrw: 1230,
+      requireAlreadySpent: true,
+      // 2026-10-17 운영자 PC 실행: 호출 2회(재작성 1회 포함) · 371원 · 형식 검사 0/1(저장되지 않음). 승인된 1건을 마쳤다 — 같은 승인으로는 다시 실행하지 않는다.
+      runsApproved: 1,
+      runsDone: 1,
+      lastRun: "2026-10-17 · 호출 2회(재작성 1회) · 371원 · 형식 검사 불통과 · 저장되지 않음",
+    },
   },
 ];
 
@@ -92,6 +107,7 @@ export const COMPARE_STAGES: CompareStageDef[] = [
  * 1단계 승인(운영자 2026-10-13, 재시도 포함 3,000원)의 사용 기록. 실제 호출은 운영자 PC의 비교 실행(pilot-data, 저장소에 올라가지 않음)이었고 합계는 운영자가 확인한 값이다.
  * 새 호출을 할 때마다 운영자가 확인한 누적액으로 고친다. 이 값은 호출 전 안전선(채팅 시험 상한)의 근거일 뿐 호출을 허락하지 않는다.
  */
+// 2026-10-17: story-p01 실행(371원)은 4,000원 승인(누적 2,097원 포함)의 사용분이라 이 1단계 장부(3,000원 승인 · 채팅 시험 상한의 근거)를 바꾸지 않는다 — 누적 2,468원 · 남은 1,532원은 story-p01 단계 설명과 docs에 적었다.
 export const STAGE1_LEDGER = { approvedKrw: 3000, spentKrw: 2097, asOf: "2026-10-16" } as const;
 
 /**

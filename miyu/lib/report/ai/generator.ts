@@ -21,7 +21,8 @@ import { buildStoryRepairMessage, buildStoryUserMessage, STORY_PROMPT_VERSION, S
 import { validateStoryDraft, visibleStoryTexts } from "../reading/story-validate.ts";
 import { checkReadingDepth } from "../reading/depth.ts";
 import { buildReadingRepairMessage, buildReadingUserMessage, READING_PROMPT_VERSION, READING_SYSTEM_PROMPT } from "../reading/prompt.ts";
-import { findRepeatedPhrases, findRepeatedPhrasesIn, repeatMessages, type RepeatedPhrase } from "../reading/repeat.ts";
+import { findRepeatedPhrases, findRepeatedPhrasesIn, repeatMessages } from "../reading/repeat.ts";
+import { findMotifSpread, motifMessages, normalizeStoryDraft } from "../reading/story-motif.ts";
 import type { IntegratedReadingReport, ReadingDraftV1, StoryDraftV1 } from "../reading/types.ts";
 import { plainPeriodLabel, validateReadingDraft } from "../reading/validate.ts";
 import { surveyEvidence, SURVEY_RULE_VERSION } from "../survey-evidence.ts";
@@ -224,19 +225,24 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           repair: (errors: string[]) => string;
           validate: (parsed: unknown) => { ok: true; draft: AnyDraft } | { ok: false; errors: string[] };
           depthErrors: (draft: AnyDraft) => string[];
-          repeats: (draft: AnyDraft) => RepeatedPhrase[];
+          /** 형식은 맞지만 고쳐 쓰기를 부탁할 반복 안내(되풀이 구절 · 한 낱말의 번짐) — 비어 있으면 그대로 받는다 */
+          repeatNotes: (draft: AnyDraft) => string[];
           assemble: (draft: AnyDraft) => IntegratedReadingReport;
           promptVersion: string;
         } = story
           ? {
               message: buildStoryUserMessage(evidence, ref.iso, context),
               repair: buildStoryRepairMessage,
-              validate: (parsed) => validateStoryDraft(parsed, evidence, { hasContext: Boolean(context) }),
+              // 문장 수 한도를 넘은 문단은 문장은 그대로 두고 문단 나눔만 나눈 뒤 검사한다(한 문단 때문에 글 전체를 버리지 않는다 — story-motif.ts)
+              validate: (parsed) => validateStoryDraft(normalizeStoryDraft(parsed), evidence, { hasContext: Boolean(context) }),
               depthErrors: (draft) => {
                 const depth = checkReadingDepth({ draft: storyDepthSource(draft as StoryDraftV1) });
                 return depth.pass ? [] : depth.flags.filter((f) => f.severity === "fail").map((f) => f.message);
               },
-              repeats: (draft) => findRepeatedPhrasesIn(visibleStoryTexts(draft as StoryDraftV1)),
+              repeatNotes: (draft) => {
+                const texts = visibleStoryTexts(draft as StoryDraftV1);
+                return [...repeatMessages(findRepeatedPhrasesIn(texts)), ...motifMessages(findMotifSpread(texts))];
+              },
               assemble: (draft) => assembleStory({ draft: draft as StoryDraftV1, evidence, input, reference: ref, promptVersion: STORY_PROMPT_VERSION, ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, STORY_PROMPT_VERSION] }),
               promptVersion: STORY_PROMPT_VERSION,
             }
@@ -248,7 +254,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
                 const depth = checkReadingDepth({ draft: draft as ReadingDraftV1 });
                 return depth.pass ? [] : depth.flags.filter((f) => f.severity === "fail").map((f) => f.message);
               },
-              repeats: (draft) => findRepeatedPhrases(draft as ReadingDraftV1),
+              repeatNotes: (draft) => repeatMessages(findRepeatedPhrases(draft as ReadingDraftV1)),
               assemble: (draft) => assembleReading({ draft: draft as ReadingDraftV1, evidence, input, reference: ref, promptVersion: READING_PROMPT_VERSION, ruleVersions: [SAJU_RULE_VERSION, SURVEY_RULE_VERSION, READING_PROMPT_VERSION] }),
               promptVersion: READING_PROMPT_VERSION,
             };
@@ -290,11 +296,11 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           }
           // 같은 표현이 여러 곳에 되풀이되면 한 번 고쳐 쓰게 한다 (켜 둔 경우만, 마지막 시도에서는 그대로 받는다)
           if (opts.repairRepeats && round < maxRepairs) {
-            const repeats = kit.repeats(checked.draft);
-            if (repeats.length > 0) {
+            const notes = kit.repeatNotes(checked.draft);
+            if (notes.length > 0) {
               softFallback ??= checked.draft;
               done("ok");
-              retry(repeatMessages(repeats));
+              retry(notes);
               continue;
             }
           }
