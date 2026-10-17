@@ -13,7 +13,9 @@ const SCAN = ["app", "components", "lib", "server"];
 const SKIP_DIR = new Set(["node_modules", ".next", "pilot-data", "docs", "public", "supabase"]);
 
 /** 합쇼체로 끝나는 문장(마침표 · 물음표 · 따옴표 · 문자열 끝) */
-const FORMAL = /[가-힣]+(?:습니다|ㅂ니다|입니다|합니다|됩니다|바랍니다|십시오|겠습니다|드립니다|있습니다|없습니다|니까)(?=[.?!"'`<)\s]|$)/;
+// 받침 ㅂ인 음절(갑 · 봅 · 줍 · 생깁 …) 뒤의 "니다 · 니까"까지 잡는다 — 예전 정규식은 낱자 ㅂ을 적어 이런 말을 놓쳤다
+const B_FINAL = Array.from({ length: 19 * 21 }, (_, i) => String.fromCharCode(0xac00 + i * 28 + 17)).join("");
+const FORMAL = new RegExp(`[가-힣]+(?:습니다|입니다|합니다|됩니다|바랍니다|십시오|겠습니다|드립니다|있습니다|없습니다|[${B_FINAL}]니다|[${B_FINAL}]니까|니까)(?=[.?!"'\`<)\\s]|$)`);
 
 export type Kind = "legal" | "operator" | "user" | "internal";
 export function classify(path: string): Kind {

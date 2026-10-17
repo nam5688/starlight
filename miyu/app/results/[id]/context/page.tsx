@@ -73,7 +73,7 @@ async function ContextContent({ params, searchParams }: Pick<PageProps<"/results
       <p className="text-[13px] font-semibold text-accent">내 고민 자세히 알려주기</p>
       <h1 className="mt-1.5 text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">나의 고민 기록소</h1>
       <p className="mt-3 text-[16px] leading-relaxed text-ink-2">
-        지금 가장 궁금한 문제와 반복되는 상황을 적어 두세요. 같은 사주라도 고민에 따라 더 자세히 봐야 할 부분이 다릅니다. 고민을 저장한 뒤 새 리포트를 발급하면, 그 고민의 상황마다 왜 그런지와 해 볼 선택을 풀어 드립니다.
+        지금 가장 궁금한 문제와 반복되는 상황을 적어 두세요. 같은 사주라도 고민에 따라 더 자세히 봐야 할 부분이 달라요. 고민을 저장한 뒤 새 리포트를 발급하면, 그 고민의 상황마다 왜 그런지와 해 볼 선택을 풀어 드려요.
       </p>
 
       <p className="mt-6 rounded-lg border border-line bg-mist px-4 py-3 text-[15px] leading-relaxed text-ink-2">{SAVE_VS_ISSUE_NOTICE}</p>

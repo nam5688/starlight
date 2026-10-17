@@ -66,7 +66,7 @@ export function buildInputs(args: { knownMbti: string | null; hasContext: boolea
   const out: ReadingInput[] = [
     { name: "사주", status: args.hasSaju ? "used" : "none", note: "만세력 엔진으로 계산한 원국 · 대운 · 세운이에요. 해석 규칙은 전문가 검토 전 초안이에요.", usedIn: usedIn(/^saju\./) },
     args.knownMbti
-      ? { name: "MBTI", status: "used", note: `본인이 입력한 ${args.knownMbti}입니다. 참고값으로만 봤으며 공식 MBTI 검사 결과가 아닙니다.`, usedIn: usedIn(/^self\.mbti$/) }
+      ? { name: "MBTI", status: "used", note: `본인이 입력한 ${args.knownMbti}이에요. 참고값으로만 봤으며 공식 MBTI 검사 결과가 아니에요.`, usedIn: usedIn(/^self\.mbti$/) }
       : { name: "MBTI", status: "none", note: "입력하지 않았어요.", usedIn: [] },
   ];
   for (const g of RESPONSE_GROUPS) {

@@ -302,7 +302,7 @@ export function LuckTimelineCard({ timeline, reference, className = "mt-5", soft
 export function BasisList({ basis }: { basis: ReadingBasis }) {
   const groups: { label: string; items: string[]; note?: string }[] = [
     { label: "사주 계산 결과", items: basis.computed, note: "만세력 엔진이 계산한 값이에요." },
-    { label: "전통 해석 규칙", items: basis.tradition, note: "계산 결과를 읽는 규칙이며 검증된 사실이 아닙니다." },
+    { label: "전통 해석 규칙", items: basis.tradition, note: "계산 결과를 읽는 규칙이며 검증된 사실이 아니에요." },
     { label: "응답 · 본인 입력", items: basis.answers },
     ...(basis.differences?.length ? [{ label: "서로 다르게 나온 부분", items: basis.differences }] : []),
     { label: "다른 가능성 · 아직 확인되지 않은 것", items: basis.unknown },

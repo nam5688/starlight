@@ -48,7 +48,7 @@ export function FreeSummaryView({
     <main className="mx-auto w-full max-w-3xl px-5 py-10 md:px-8 md:py-14">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <SourceBadge source={preview.source} />
-        <span className="text-[13px] text-ink-3">개발용 예시 문항과 임시 규칙으로 계산 · 실제 분석 결과가 아닙니다</span>
+        <span className="text-[13px] text-ink-3">개발용 예시 문항과 임시 규칙으로 계산 · 실제 분석 결과가 아니에요</span>
       </div>
       <h1 id="step-heading" tabIndex={-1} className="mt-3 text-[26px] font-bold tracking-tight outline-none md:text-[30px]">
         {info.nickname.trim()} 님의 무료 미리보기
@@ -108,7 +108,7 @@ export function FreeSummaryView({
           )}
           <p className="border-t border-line bg-mist px-5 py-4 text-[14px] leading-relaxed text-ink-2 md:px-7">
             {authReady
-              ? "로그인하는 동안 검사 결과는 암호화해 30분만 보관하고, 저장이 끝나면 지웁니다. "
+              ? "로그인하는 동안 검사 결과는 암호화해 30분만 보관하고, 저장이 끝나면 지워요. "
               : "로그인이 아직 설정되지 않아 저장할 수 없어요. "}
             구매하면 어떤 리포트를 받는지는{" "}
             <Link href="/report/sample" className={textLink}>
@@ -127,7 +127,7 @@ export function FreeSummaryView({
               처음부터 다시
             </button>
           </div>
-          <p className="text-[14px] leading-relaxed text-ink-3">저장하지 않으면 새로고침하거나 페이지를 벗어날 때 이 결과가 사라집니다.</p>
+          <p className="text-[14px] leading-relaxed text-ink-3">저장하지 않으면 새로고침하거나 페이지를 벗어날 때 이 결과가 사라져요.</p>
         </div>
       </div>
     </main>

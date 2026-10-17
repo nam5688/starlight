@@ -31,7 +31,7 @@ export function TendencyBlock({
         대표 경향
       </h2>
       <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">{summary.tendency.name}</p>
-      <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">후보 유형 · 분류 규칙 확정 전. 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아닙니다.</p>
+      <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">후보 유형 · 분류 규칙 확정 전. 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아니에요.</p>
 
       <p className="mt-6 border-l-[3px] border-accent pl-3.5 text-[18px] leading-snug font-semibold md:text-[20px]">{summary.oneLiner}</p>
 

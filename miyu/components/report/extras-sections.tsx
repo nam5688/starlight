@@ -178,7 +178,7 @@ export function PartnerSection({ partner, id }: { partner: NonNullable<ReportExt
         ))}
       </div>
       <FoldRow>
-        <Fold label="관계 주제가 두드러질 수 있는 해" hint={partner.timing.years.length > 0 ? "연 단위 주제이며 예측이 아닙니다" : partner.timing.note} wide>
+        <Fold label="관계 주제가 두드러질 수 있는 해" hint={partner.timing.years.length > 0 ? "연 단위 주제이며 예측이 아니에요" : partner.timing.note} wide>
           <p className="text-[14px] leading-[1.7] text-ink-3">{partner.timing.note}</p>
           {partner.timing.years.length > 0 && (
             <ul className="mt-4 space-y-4">

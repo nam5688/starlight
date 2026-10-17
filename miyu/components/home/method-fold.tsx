@@ -25,7 +25,7 @@ const INFORMATION: { name: string; sees: string; limit: string }[] = [
   {
     name: "기질",
     sees: "새로운 일, 불확실함, 타인의 반응, 오래 걸리는 일에 대한 평소 반응",
-    limit: "현재 응답 기준의 경향이며, 높고 낮음이 좋고 나쁨이 아닙니다.",
+    limit: "현재 응답 기준의 경향이며, 높고 낮음이 좋고 나쁨이 아니에요.",
   },
   {
     name: "가까운 관계(애착)",

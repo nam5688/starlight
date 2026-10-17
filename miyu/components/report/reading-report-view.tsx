@@ -116,7 +116,7 @@ export function ReadingReportView({
             </div>
           )}
           <p className="mt-2 text-[22px] leading-[1.4] font-bold tracking-tight md:text-[28px]">{report.headline}</p>
-          {tendency && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아닙니다.</p>}
+          {tendency && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아니에요.</p>}
           <SummaryCards cards={report.summary} />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <a href={`#${id("tendency")}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-accent px-3 text-[15px] font-semibold text-white transition-colors hover:bg-accent-strong">

@@ -235,7 +235,7 @@ export async function confirmPayment(
       status: "AMOUNT_MISMATCH",
       detail: { requested: input.amount, expected: order.amount },
     });
-    return { kind: "rejected", code: "AMOUNT_MISMATCH", message: "결제 금액이 주문 금액과 다릅니다.", order };
+    return { kind: "rejected", code: "AMOUNT_MISMATCH", message: "결제 금액이 주문 금액과 달라요.", order };
   }
 
   // 결제사에 승인을 요청하기 직전의 용량 · 예산 확인. 승인을 요청하지 않으면 카드에서 돈이 빠지지 않는다

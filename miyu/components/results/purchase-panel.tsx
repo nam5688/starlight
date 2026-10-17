@@ -75,7 +75,7 @@ export function PurchasePanel({
           ) : (
             <p className="text-[15px] leading-relaxed text-ink-2">
               여러 번 다시 만들어 보았지만 리포트를 만들지 못했어요. 결제는 정상 처리되어 있으며, 운영자가 확인한 뒤 재처리 또는 환불해
-              드립니다. 문의하실 때 아래 주문번호를 알려 주세요.
+              드려요. 문의하실 때 아래 주문번호를 알려 주세요.
             </p>
           )}
         </div>

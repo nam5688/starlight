@@ -392,10 +392,10 @@ function personOf(a: AssessmentRecord): PairPerson {
  */
 export async function pairInputFor(repo: MiyuRepository, pairs: PairRepository, order: OrderRecord, reference?: PairInput["reference"]): Promise<PairInput> {
   const pairId = parsePairProductId(order.productId);
-  if (!pairId) throw new Error("리포트 궁합 주문이 아닙니다.");
+  if (!pairId) throw new Error("리포트 궁합 주문이 아니에요.");
   const pair = await pairs.getPair(pairId);
   if (!pair) throw new Error("리포트 궁합 쌍을 찾을 수 없어요.");
-  if (order.userId !== pair.aUserId && order.userId !== pair.bUserId) throw new Error("리포트 궁합 쌍의 구성원이 아닙니다.");
+  if (order.userId !== pair.aUserId && order.userId !== pair.bUserId) throw new Error("리포트 궁합 쌍의 구성원이 아니에요.");
   if (pair.status !== "linked" || !pair.bAssessmentId) throw new Error("연결이 끊겨 리포트 궁합을 만들 수 없어요.");
   if (pair.aWithdrawnAt || pair.bWithdrawnAt) throw new Error("동의가 철회돼 리포트 궁합을 만들 수 없어요.");
   const [a, b] = await Promise.all([repo.getAssessment(pair.aAssessmentId), repo.getAssessment(pair.bAssessmentId)]);

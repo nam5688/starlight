@@ -33,7 +33,7 @@ export default function SampleReportPage() {
       <div className="mx-auto w-full max-w-[720px] px-5 pt-5 pb-5 md:pt-10">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <SourceBadge source={report.source} />
-          <span className="text-[13px] text-ink-3">가상 인물 예시 · 실제 검사 · 만세력 계산 결과가 아닙니다</span>
+          <span className="text-[13px] text-ink-3">가상 인물 예시 · 실제 검사 · 만세력 계산 결과가 아니에요</span>
         </div>
         <h1 className="mt-3 text-[24px] leading-snug font-bold tracking-tight md:text-[30px]">무료 리포트와 심층 리포트, 실제로 읽어보세요.</h1>
         <p className="mt-2 text-[15px] leading-[1.7] text-ink-2">같은 가상 인물({report.personName} 님)의 결과로, 풀이의 범위와 깊이를 비교할 수 있어요.</p>

@@ -81,7 +81,7 @@ export function FullReportView({
           점수와 상세 분석
         </SectionTitle>
         <FoldRow>
-          <Fold label="항목별 점수 보기" hint="0~100은 응답 환산값이며 백분위나 정확도가 아닙니다" wide>
+          <Fold label="항목별 점수 보기" hint="0~100은 응답 환산값이며 백분위나 정확도가 아니에요" wide>
             <p className="mb-5 text-[13px] leading-[1.65] text-ink-3">{SCORE_NOTE}</p>
             <ScoreGroups summary={report} />
           </Fold>

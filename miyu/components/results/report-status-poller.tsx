@@ -49,7 +49,7 @@ export function ReportStatusPoller({ assessmentId, recordId, orderNumber }: { as
       <p>
         {info.waiting === "capacity"
           ? "지금 리포트를 준비하는 주문이 많아 순서를 기다리고 있어요. 순서가 되면 바로 만들기 시작하며, 결제는 정상 처리되었어요."
-          : "리포트를 만들고 있어요. 보통 1분 안팎 걸리며, 끝나면 이 화면에 바로 나타납니다."}
+          : "리포트를 만들고 있어요. 보통 1분 안팎 걸리며, 끝나면 이 화면에 바로 나타나요."}
         {seconds >= 60 && " 이 화면을 닫아도 만들기는 계속되고, MY에서 다시 열 수 있어요."}
       </p>
       {info.delayed && (

@@ -26,7 +26,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
         </h2>
         <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">{tendency.name}</p>
         <p className="mt-3 border-l-[3px] border-accent pl-4 text-[18px] font-semibold leading-relaxed md:text-[20px]">{tendency.line}</p>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-3">후보 유형 · 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아닙니다.</p>
+        <p className="mt-2 text-[13px] leading-relaxed text-ink-3">후보 유형 · 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아니에요.</p>
       </section>
 
       {/* ② 내 성향과 지나온 모습 */}
@@ -190,7 +190,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
                     <h3 className="text-[15px] font-semibold text-ink-2">평소 행동 방식</h3>
                     <span className="text-[14px] font-semibold text-ink-2">이번 응답</span>
                   </div>
-                  <p className="mt-2 text-[13px] leading-relaxed text-ink-3">0~100은 응답을 환산한 값이며 백분위나 정확도가 아닙니다.</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-ink-3">0~100은 응답을 환산한 값이며 백분위나 정확도가 아니에요.</p>
                   <div className="divide-y divide-line">
                     {preview.mbti.axes.map((r) => (
                       <AxisBar key={r.id} row={r} />

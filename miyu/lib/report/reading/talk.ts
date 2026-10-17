@@ -139,7 +139,7 @@ export type TalkBubble =
   /** 무료 맛보기의 잠금 안내 — 이어지는 내용이 답하는 질문들(문장이 아니라 질문만). 구매 버튼은 화면이 model.buy로 붙인다 */
   | { kind: "lock"; title: string; hooks: string[] };
 
-export const CARD_DISCLAIMER = "참고용 해석이며 예측이나 진단이 아닙니다.";
+export const CARD_DISCLAIMER = "참고용 해석이며 예측이나 진단이 아니에요.";
 
 /**
  * 질문 한 번의 글자 수 한도(운영자 2026-10-15: "500자도 너무 많다 — 무료 300자 · 유료 리포트 500자 · 질문 충전한 사람도 500자").

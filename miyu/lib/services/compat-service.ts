@@ -140,7 +140,7 @@ export async function startCompatCheckout(
 /** 사주 궁합 리포트를 만들 때 쓸 두 사람 — 상대 출생정보가 이미 지워졌거나 없으면 오류 */
 export async function compatInputFor(repo: MiyuRepository, order: OrderRecord, assessment: { nickname: string; saju: unknown }): Promise<{ names: { a: string; b: string }; a: SajuOk; b: SajuOk }> {
   const requestId = parseCompatProductId(order.productId);
-  if (!requestId) throw new Error("사주 궁합 주문이 아닙니다.");
+  if (!requestId) throw new Error("사주 궁합 주문이 아니에요.");
   const request = await repo.getCompatRequestByOrder(order.id);
   if (!request || request.userId !== order.userId) throw new Error("사주 궁합 요청을 찾을 수 없어요.");
   if (!request.partner || request.scrubbedAt) throw new Error("상대 입력이 지워져 사주 궁합을 만들 수 없어요.");
