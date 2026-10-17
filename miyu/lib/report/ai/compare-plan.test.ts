@@ -219,8 +219,8 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   assert.ok(stage?.restrict, "story-p01 단계가 있고 제한이 있다");
   assert.equal(stage.capKrw, 4000, "총 승인 한도 4,000원(누적 사용액 포함)");
   assert.equal(stage.personaCount, 1);
-  assert.equal(stage.restrict.runCeilingKrw, 1222, "운영자가 2026-10-17에 1,204원 → 1,222원으로 다시 승인");
-  const ok = { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1222 };
+  assert.equal(stage.restrict.runCeilingKrw, 1230, "운영자가 2026-10-17에 1,204원 → 1,230원으로 다시 승인(1,222.04원을 반올림해 통과시키지 않는다)");
+  const ok = { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1230 };
   assert.deepEqual(checkStageRestriction(stage, ok), [], "범위 안이고 상한과 같으면 통과");
   const has = (patch: object, word: string) => assert.ok(checkStageRestriction(stage, { ...ok, ...patch }).some((m) => m.includes(word)), word);
   has({ variant: "reading-v1" }, "story-v1");
@@ -229,8 +229,8 @@ test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 
   has({ persona: undefined }, "P01");
   has({ persona: "P02" }, "P01");
   has({ alreadySpentGiven: false }, "--already-spent-krw");
-  has({ twoRoundWorstKrw: 1222.5 }, "상한"); // 반올림하면 1,223원
-  assert.deepEqual(checkStageRestriction(stage, { ...ok, twoRoundWorstKrw: 1222.04 }), [], "화면에 보이는 값(원 단위 반올림)으로 비교 — 1,222.04원은 1,222원");
+  has({ twoRoundWorstKrw: 1230.01 }, "상한"); // 반올림 없이 그대로 비교한다
+  assert.deepEqual(checkStageRestriction(stage, { ...ok, twoRoundWorstKrw: 1222.04 }), [], "지금의 최악 1,222.04원은 상한 1,230원 안");
   // 제한이 없는 단계는 이 확인을 하지 않는다
   assert.deepEqual(checkStageRestriction({}, { variant: "x", only: undefined, persona: undefined, alreadySpentGiven: false, twoRoundWorstKrw: 99999 }), []);
   // 기존 1 · 2단계는 제한이 없어 지금까지의 동작이 그대로다

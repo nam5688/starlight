@@ -198,8 +198,8 @@ export function checkStageRestriction(
   if (input.only !== r.only) why.push(`이 승인은 후보 ${r.only} 한 모델에만 쓸 수 있습니다 (--only ${r.only}를 적어야 합니다).`);
   if (input.persona !== r.persona) why.push(`이 승인은 가상 인물 ${r.persona} 한 명에만 쓸 수 있습니다 (--persona ${r.persona}를 적어야 합니다).`);
   if (r.requireAlreadySpent && !input.alreadySpentGiven) why.push("같은 총액 안에서 이미 쓴 금액(--already-spent-krw)을 적어야 합니다. 빠뜨리면 남은 한도가 아니라 총액으로 계산됩니다.");
-  // 화면에 보이는 값(원 단위 반올림)과 같은 기준으로 비교한다 — 승인은 화면에 보인 금액으로 받았다
-  if (Math.round(input.twoRoundWorstKrw) > r.runCeilingKrw) why.push(`모두 고쳐 쓰기까지 가는 최악 비용 ${Math.round(input.twoRoundWorstKrw).toLocaleString("ko-KR")}원이 승인한 상한 ${r.runCeilingKrw.toLocaleString("ko-KR")}원을 넘습니다. 실행하지 않고 운영자가 상한을 다시 확인해야 합니다.`);
+  // 반올림 없이 그대로 비교한다 — 상한 바로 위의 값을 반올림해 통과시키지 않는다
+  if (input.twoRoundWorstKrw > r.runCeilingKrw) why.push(`모두 고쳐 쓰기까지 가는 최악 비용 ${(Math.round(input.twoRoundWorstKrw * 100) / 100).toLocaleString("ko-KR")}원이 승인한 상한 ${r.runCeilingKrw.toLocaleString("ko-KR")}원을 넘습니다. 실행하지 않고 운영자가 상한을 다시 확인해야 합니다.`);
   return why;
 }
 
