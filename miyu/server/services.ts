@@ -1,6 +1,8 @@
 import "server-only";
 import { createTossPaymentGateway } from "@/lib/integrations/tosspayments/gateway";
 import { createSupabaseBenefitRepository } from "@/lib/integrations/supabase/benefits";
+import { createSupabaseReviewRepository } from "@/lib/integrations/supabase/reviews";
+import { createSupabasePairRepository } from "@/lib/integrations/supabase/pairs";
 import { createSupabaseRepository } from "@/lib/integrations/supabase/repository";
 import { createMockLocalModel } from "@/lib/integrations/ai/mock-local";
 import { REPORT_GENERATION } from "@/lib/config/product";
@@ -25,6 +27,22 @@ export function writeRepository() {
  */
 export function benefitRepository() {
   return createSupabaseBenefitRepository(createAdminSupabase());
+}
+
+/**
+ * 이용 후기(리뷰) 쓰기 · 관리용 저장소 (서버 비밀키). 소유자 확인은 서비스(lib/services/review-service.ts)가 한다.
+ * 후기 표 · 함수가 아직 없는 DB(25번 전)에서는 호출이 42P01로 실패하고 서비스가 "준비 중" · 빈 목록으로 처리한다.
+ */
+export function reviewRepository() {
+  return createSupabaseReviewRepository(createAdminSupabase());
+}
+
+/**
+ * 리포트 궁합(쌍 · 동의 · 연결) 쓰기용 저장소 (서버 비밀키). 쌍 표는 서버만 읽고 쓴다(브라우저에서는 볼 수 없다).
+ * 24번 전의 DB에서는 호출이 42P01로 실패하고 서비스가 "준비 중"으로 처리한다.
+ */
+export function pairRepository() {
+  return createSupabasePairRepository(createAdminSupabase());
 }
 
 /** 화면 조회용 저장소 (로그인한 사용자 권한, RLS 적용) */

@@ -632,6 +632,14 @@ wd23 as (
     exists (select 1 from pg_trigger where tgname = 'profiles_compat_withdraw' and not tgisinternal) as withdraw_trigger,
     coalesce((select has_table_privilege('service_role', 'public.compat_requests', 'insert') from information_schema.tables where table_schema = 'public' and table_name = 'compat_requests'), false) as service_grant
 ),
+wd24 as (
+  select
+    exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = 'pairs') as pairs,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'pair_join') as join_fn,
+    exists (select 1 from pg_trigger where tgname = 'profiles_pairs_withdraw' and not tgisinternal) as withdraw_trigger,
+    exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'orders_one_paid_pair') as one_paid,
+    coalesce((select has_table_privilege('service_role', 'public.pairs', 'insert') from information_schema.tables where table_schema = 'public' and table_name = 'pairs'), false) as service_grant
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -793,5 +801,11 @@ select * from (
               when wd23.requests or wd23.scrub_fn or wd23.withdraw_trigger or wd23.service_grant then '일부만' else '아직 안 함' end,
          '표 compat_requests (사주 궁합 상대 입력 · 리포트 완성 · 환불 · 탈퇴 때 지움) / 함수 scrub_compat_request / 탈퇴 시 지우는 트리거: ' || wd23.withdraw_trigger::text || ' / 서버 권한: ' || wd23.service_grant::text
   from wd23
+  union all
+  select 24, '20261103000000_pair_reports.sql',
+         case when wd24.pairs and wd24.join_fn and wd24.withdraw_trigger and wd24.one_paid and wd24.service_grant then '적용됨'
+              when wd24.pairs or wd24.join_fn or wd24.withdraw_trigger or wd24.one_paid or wd24.service_grant then '일부만' else '아직 안 함' end,
+         '표 pairs (리포트 궁합 쌍 · 동의 · 해제 · 철회) / 함수 pair_join · pair_withdraw_consent · pair_unlink / 탈퇴 시 쌍을 끊는 트리거: ' || wd24.withdraw_trigger::text || ' / 쌍마다 결제 완료 주문 하나(고유 조건): ' || wd24.one_paid::text || ' / 서버 권한: ' || wd24.service_grant::text
+  from wd24
 ) r
 order by "번호";

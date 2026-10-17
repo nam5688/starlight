@@ -5,7 +5,7 @@ import type { Evidence } from "../evidence.ts";
 import type { GenerateContext } from "../generator.ts";
 import { createModelCaller } from "../ai/model-caller.ts";
 import { ModelCallError, type ModelMessage, type TextModel } from "../ai/model.ts";
-import { buildCompatRepairMessage, buildCompatUserMessage, COMPAT_PROMPT_VERSION, COMPAT_SYSTEM_PROMPT } from "./prompt.ts";
+import { buildCompatRepairMessage, buildCompatUserMessage, buildPairUserMessage, COMPAT_PROMPT_VERSION, COMPAT_SYSTEM_PROMPT, PAIR_PROMPT_VERSION, PAIR_SYSTEM_PROMPT } from "./prompt.ts";
 import type { CompatDraftV1 } from "./types.ts";
 import { validateCompatDraft } from "./validate.ts";
 
@@ -21,7 +21,7 @@ export class CompatWriteError extends Error {
   }
 }
 
-export type CompatWriterOptions = { model: TextModel; maxRepairs?: number; maxRetries?: number; sleep?: (ms: number) => Promise<void> };
+export type CompatWriterOptions = { model: TextModel; maxRepairs?: number; maxRetries?: number; sleep?: (ms: number) => Promise<void>; /** 기본은 사주 궁합, pair는 리포트 궁합(응답 비교 근거 포함) */ mode?: "saju" | "pair" };
 
 export interface CompatWriter {
   write(input: { evidence: Evidence[]; cautions?: string[] }, ctx?: GenerateContext): Promise<CompatDraftV1>;
@@ -33,13 +33,15 @@ export interface CompatWriter {
 export function createCompatWriter(opts: CompatWriterOptions): CompatWriter {
   const caller = createModelCaller({ model: opts.model, maxRetries: opts.maxRetries ?? 1, sleep: opts.sleep, maxOutputTokens: COMPAT_WRITE_LIMITS.maxOutputTokens, callTimeoutMs: COMPAT_WRITE_LIMITS.callTimeoutMs });
   const maxRepairs = opts.maxRepairs ?? 1;
-  const spec = { system: COMPAT_SYSTEM_PROMPT, promptVersion: COMPAT_PROMPT_VERSION };
+  const pair = opts.mode === "pair";
+  const promptVersion = pair ? PAIR_PROMPT_VERSION : COMPAT_PROMPT_VERSION;
+  const spec = { system: pair ? PAIR_SYSTEM_PROMPT : COMPAT_SYSTEM_PROMPT, promptVersion };
   return {
     provider: opts.model.provider,
     model: opts.model.model,
-    promptVersion: COMPAT_PROMPT_VERSION,
+    promptVersion,
     async write(input, ctx = {}) {
-      const messages: ModelMessage[] = [{ role: "user", content: buildCompatUserMessage(input.evidence, input.cautions) }];
+      const messages: ModelMessage[] = [{ role: "user", content: (pair ? buildPairUserMessage : buildCompatUserMessage)(input.evidence, input.cautions) }];
       let lastErrors: string[] = [];
       for (let round = 0; round <= maxRepairs; round++) {
         let call: Awaited<ReturnType<typeof caller.call>>;
@@ -56,7 +58,7 @@ export function createCompatWriter(opts: CompatWriterOptions): CompatWriter {
         } catch {
           parsed = null;
         }
-        const check = validateCompatDraft(parsed, input.evidence);
+        const check = validateCompatDraft(parsed, input.evidence, pair ? { pair: true } : {});
         if (check.ok) {
           caller.recordResult(ctx, spec, call, "ok");
           return check.draft;

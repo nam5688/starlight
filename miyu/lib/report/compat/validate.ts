@@ -5,7 +5,7 @@ import type { Evidence } from "../evidence.ts";
 import { findRepeatedPhrasesIn, type RepeatedPhrase } from "../reading/repeat.ts";
 import { distinctTerms } from "../reading/terms.ts";
 import { allowedYearsOf, countSentences, textIssues } from "../reading/validate.ts";
-import { COMPAT_LIMITS as L, COMPAT_STEP_GROUPS, hasTimingEvidence, sectionsFor } from "./plan.ts";
+import { COMPAT_LIMITS as L, COMPAT_STEP_GROUPS, hasTimingEvidence, pairSectionsFor, sectionsFor } from "./plan.ts";
 import type { CompatDraftV1 } from "./types.ts";
 
 export type CompatValidation = { ok: true; draft: CompatDraftV1; repeats: RepeatedPhrase[] } | { ok: false; errors: string[] };
@@ -61,7 +61,17 @@ export function visibleCompatTexts(d: CompatDraftV1): { where: string; text: str
   return out;
 }
 
-export function validateCompatDraft(raw: unknown, evidence: Evidence[]): CompatValidation {
+/** 리포트 궁합에서 응답을 읽어 주는 말 — 두 사람의 원래 답을 옮기는 표현만 막는다("같은 쪽으로 답한" 같은 영역 수준 말은 허용) */
+const PAIR_ECHO = /라고 (?:답|응답)|(?:답|응답)(?:했|하셨)(?:으므로|기에|기 때문)|문항(?:에서|에는|에 )|검사 결과|고르(?:셨|신)|선택(?:하셨|한 답)/;
+/** 애착 유형 이름 — 가까운 관계 반응은 어떤 장면에서 나타나는지로만 쓴다(단정 금지) */
+const ATTACHMENT_TYPE = /(?:안정|불안|회피|혼란)\s*(?:형|애착)|애착\s*유형|(?:불안|회피)(?:형|적)\s*(?:인|사람|성향)/;
+
+export type CompatValidateOptions = {
+  /** 리포트 궁합 — 영역에 응답(response)이 더해지고(비교 근거가 있을 때) 응답을 읽어 주는 말 검사가 달라진다 */
+  pair?: boolean;
+};
+
+export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: CompatValidateOptions = {}): CompatValidation {
   const errors: string[] = [];
   const d = raw as Partial<CompatDraftV1> | null;
   if (!d || typeof d !== "object") return { ok: false, errors: ["JSON 객체가 아닙니다."] };
@@ -88,7 +98,8 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[]): CompatV
   text(d.headline, "headline", L.headline.min, L.headline.max);
 
   // 영역이 정해진 순서로 모두 있어야 한다 — 근거에 시기(compat.timing.*)가 있을 때만 timing까지
-  const expected = sectionsFor(evidence);
+  const pair = opts.pair === true;
+  const expected = pair ? pairSectionsFor(evidence) : sectionsFor(evidence);
   const sections = Array.isArray(d.sections) ? d.sections : [];
   if (!Array.isArray(d.sections)) errors.push("sections: 목록이 아닙니다.");
   else if (sections.length !== expected.length || expected.some((p, i) => sections[i]?.id !== p.id)) errors.push(`sections: ${expected.map((s) => s.id).join(" · ")} 순서로 ${expected.length}개를 모두 써야 합니다${hasTimingEvidence(evidence) ? "" : "(시기 근거가 없으면 timing 영역은 쓰지 않습니다)"}.`);
@@ -110,6 +121,7 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[]): CompatV
     });
     ids(s.evidence, `${where}.evidence`);
     if (plan.id === "timing" && isIds(s.evidence) && !s.evidence.some((id) => id.startsWith("compat.timing."))) errors.push(`${where}.evidence: 시기 영역은 compat.timing.* 근거를 써야 합니다.`);
+    if (plan.id === "response" && isIds(s.evidence) && !s.evidence.some((id) => id.startsWith("pair.") && id !== "pair.mbti")) errors.push(`${where}.evidence: 응답 영역은 두 사람의 응답을 비교한 근거(pair.*, 입력한 MBTI 비교만은 안 됩니다)를 써야 합니다.`);
     if (isIds(s.evidence)) for (const id of new Set(s.evidence)) reuse.set(id, (reuse.get(id) ?? new Set()).add(plan.id));
   }
   for (const [id, where] of reuse) if (where.size > L.evidenceReuseMax) errors.push(`근거 ${id}를 ${where.size}개 영역(${[...where].join(" · ")})이 씁니다 — ${L.evidenceReuseMax}개 영역까지만. 영역마다 다른 근거의 연결을 앞세우세요.`);
@@ -143,8 +155,9 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[]): CompatV
 
   // 글 규칙 — 이전 읽기 구조와 같은 검사 + 궁합에서만 필요한 검사
   const texts = visibleCompatTexts(d as CompatDraftV1);
-  errors.push(...textIssues(texts, evidence, { allowedYears: compatAllowedYears(evidence), hasContext: false }));
+  errors.push(...textIssues(texts, evidence, { allowedYears: compatAllowedYears(evidence), hasContext: false, ...(pair ? { echo: PAIR_ECHO } : {}) }));
   for (const { where, text: t } of texts) {
+    if (pair && ATTACHMENT_TYPE.test(t)) errors.push(`${where}: 가까운 관계 반응을 애착 유형 이름("${ATTACHMENT_TYPE.exec(t)![0]}")으로 부르지 않습니다 — 어떤 장면에서 어떻게 나타나는지로 쓰세요.`);
     if (BARE_LETTER.test(t)) errors.push(`${where}: 두 사람을 "A님 · B님"으로만 부릅니다("A"나 "B" 한 글자로 부르지 않습니다).`);
     if (VERDICT.test(t)) errors.push(`${where}: 관계의 좋고 나쁨을 판정하거나 운명으로 단정하는 표현("${VERDICT.exec(t)![0]}")을 쓰지 않습니다 — 어떤 장면에서 어떻게 달라지는지로 쓰세요.`);
     if (INNER_MIND.test(t)) errors.push(`${where}: 두 사람 가운데 한 사람의 속마음 · 감정을 아는 것처럼 쓰지 않습니다.`);

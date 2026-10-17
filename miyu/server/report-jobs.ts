@@ -4,14 +4,14 @@ import { isCashProduct } from "@/lib/config/product";
 import type { OrderRecord } from "@/lib/services/ports";
 import { claimReport, completeReport, queueReport, runReport } from "@/lib/services/report-service";
 import { capacityConfig } from "./env";
-import { now, reportGenerator, writeRepository } from "./services";
+import { now, pairRepository, reportGenerator, writeRepository } from "./services";
 
 // 리포트 생성은 응답을 보낸 뒤 백그라운드에서 한다 (AI 생성이 길어도 결제 화면이 멈추지 않게).
 // 서버가 중간에 꺼지면 결과 화면의 상태 확인이 멈춘 작업을 이어받는다 (report-service의 claimReport).
 
 const deps = () => {
   const capacity = capacityConfig();
-  return { repo: writeRepository(), generator: reportGenerator(), now, capacity, ...(capacity.generationTimeoutMs > 0 ? { timeoutMs: capacity.generationTimeoutMs } : {}) };
+  return { repo: writeRepository(), pairs: pairRepository(), generator: reportGenerator(), now, capacity, ...(capacity.generationTimeoutMs > 0 ? { timeoutMs: capacity.generationTimeoutMs } : {}) };
 };
 
 function log(where: string, e: unknown) {

@@ -43,3 +43,17 @@ export type CompatReport = {
 
 /** 저장된 리포트 내용이 사주 궁합인지 — 개인 통합 리포트 · 고민 리포트와 같은 저장 칸에 kind로 구분해 담는다 */
 export const isCompatReport = (c: { kind?: string } | object | null | undefined): c is CompatReport => !!c && "kind" in c && (c as { kind?: string }).kind === "compat-saju-v1";
+
+/**
+ * 리포트 궁합(유료 2)의 저장 형식 — 사주 궁합과 같은 위쪽 요약 · 영역 · 행동 모양에 응답 영역(response)과 비교 요약이 더해진 것.
+ * **이름 · 생년월일 · 응답 원문 · 점수가 없다** — 본문은 "A님 · B님"이고 화면이 읽는 사람에게 누가 누구인지 알려 준다. 비교한 영역은 이름만(원래 답 없음).
+ */
+export type PairReport = Omit<CompatReport, "kind" | "names" | "notes"> & {
+  kind: "compat-pair-v1";
+  /** 두 사람이 모두 뚜렷하게 답해 비교한 영역의 이름(예: "관계 불안") · 한쪽만 뚜렷해 비교하지 않은 영역 수 */
+  response: { comparedLabels: string[]; skipped: number };
+  notes: { cautions: string[]; items: string[]; page: string };
+};
+
+export const isPairReport = (c: { kind?: string } | object | null | undefined): c is PairReport => !!c && "kind" in c && (c as { kind?: string }).kind === "compat-pair-v1";
+

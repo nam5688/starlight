@@ -49,7 +49,7 @@ export const CONCERN_REPORT = {
 
 /**
  * 사주 궁합(유료 1) — 내 사주(구매한 사람의 검사 결과)와 상대의 생년월일로 두 사주를 자세히 풀어 읽는 궁합. 무료 간단 궁합과 **같은 엔진 · 같은 결과**(lib/saju/interpret/compat.ts)를 풀어 쓴다.
- * - **가격 4,900원은 출시 검토용이며 운영자가 확정하기 전까지 판매하지 않는다**(운영자 2026-10-17). 바꿀 때는 여기서만 바꾼다.
+ * - **가격 4,900원은 출시 가격으로 확정됐다**(운영자 2026-10-17). 다만 판매 스위치는 실제 AI 검증과 결제 QA를 마치기 전까지 열지 않는다. 바꿀 때는 여기서만 바꾼다.
  * - **saleOpen이 false인 동안 결제를 시작하지 않는다**(화면은 "준비 중"). 켜는 조건: 결과물을 실제 AI로 읽어 확인하고 계산 규칙을 확인한 뒤 운영자가 true로 바꾼다(docs/compat-engine.md).
  * - 상대 생년월일은 리포트를 만드는 동안에만 따로 보관하고(compat_requests, 서버만 읽는다) 리포트가 완성되면 지운다. 상대의 출생정보 처리 근거 · 보관은 법률 검토 대상이다.
  * - 상대의 응답(기질 · 성격 · 애착)은 쓰지 않는다 — 두 사람의 응답을 비교하는 것은 별도 상품(리포트 궁합)이다.
@@ -57,9 +57,9 @@ export const CONCERN_REPORT = {
 export const SAJU_COMPAT = {
   id: "saju-compat",
   name: "사주 궁합",
-  /** 출시 검토 가격(부가세 포함, 원) — 운영자 확정 전 */
+  /** 출시 가격(부가세 포함, 원) — 운영자 확정 2026-10-17 */
   priceKrw: 4900,
-  priceNote: "출시 검토 가격 · 확정 전",
+  priceNote: "출시 가격 확정 · 판매는 실제 AI 검증과 결제 QA 뒤",
   /** 판매 스위치 — 운영자가 결과물 확인 · 가격 확정 뒤 true로 바꾼다 */
   saleOpen: false,
 } as const;
@@ -200,6 +200,37 @@ export function parseCompatProductId(productId: string): string | null {
 export const isCompatProduct = (productId: string) => parseCompatProductId(productId) !== null;
 
 /**
+ * 리포트 궁합(유료 2) — 두 사람이 각자 분석을 마치고 서로 궁합 생성에 동의한 뒤, 한 쌍의 지정된 결과로 한 번 결제하면 두 사람 모두 열람하는 궁합(운영자 확정 2026-10-17).
+ * - **가격 9,900원은 출시 가격으로 확정됐고**(운영자 2026-10-17) 판매 스위치(saleOpen)는 실제 AI 검증과 결제 QA를 마치기 전까지 열지 않는다. 바꿀 때는 여기서만 바꾼다.
+ * - 쌍마다 결제 완료 주문은 하나뿐이다(DB 고유 조건, 상품 번호 `report-compat:<쌍 번호>`). 주문은 결제한 사람의 검사 결과 번호에 묶인다.
+ * - 저장되는 글에는 이름 · 생년월일 · 응답 원문 · 점수가 없고, 상대의 원래 답 · 개인 리포트 · 비공개 상담은 어느 쪽에도 보이지 않는다.
+ * - 동의 문구를 바꾸면 consentVersion을 올린다(어느 문구에 동의했는지 쌍마다 기록한다).
+ */
+export const PAIR_COMPAT = {
+  id: "report-compat",
+  name: "리포트 궁합",
+  priceKrw: 9900,
+  priceNote: "출시 가격 확정 · 판매는 실제 AI 검증과 결제 QA 뒤",
+  /** 판매 스위치 — 실제 AI 검증 · 결제 QA · 법률 검토 뒤 운영자가 true로 바꾼다. 스테이징 시험용 환경변수 덮어쓰기는 server/sale-switch.ts */
+  saleOpen: false,
+  /** 초대 링크 유효 기간(일) — 지나면 상대가 들어올 수 없다 */
+  inviteDays: 14,
+  consentVersion: "pair-consent-1",
+} as const;
+
+export const pairProductId = (pairId: string) => `${PAIR_COMPAT.id}:${pairId}`;
+
+/** 상품 번호에서 리포트 궁합의 쌍 번호를 꺼낸다. 리포트 궁합 주문이 아니면 null */
+export function parsePairProductId(productId: string): string | null {
+  if (!productId.startsWith(`${PAIR_COMPAT.id}:`)) return null;
+  const id = productId.slice(PAIR_COMPAT.id.length + 1);
+  return UUID.test(id) ? id.toLowerCase() : null;
+}
+
+/** 리포트 궁합 주문인가 */
+export const isPairProduct = (productId: string) => parsePairProductId(productId) !== null;
+
+/**
  * 유료 질문 주문의 상품 번호 — `cash-charge:<장부에 들어올 단위>:<보너스>:<번호>`. 질문 묶음 결제는 항상 `cash-charge:9:0:<방이름 + 임의 10자>`다(질문 3개 = 9단위).
  * 낱개(1개, 3단위) 결제는 묶음 전 버전이 만든 주문(`cash-charge:3:0:…`)에만 있고 기록은 그대로 남는다.
  * 서버가 주문을 만들 때 정한 값을 번호에 함께 적는다(결제 승인 때 DB가 이 값을 읽어 장부에 넣는다 — 승인과 같은 처리 안에서).
@@ -261,6 +292,7 @@ export function productNameOf(productId: string): string {
     return kind === "pack" ? `${MIYU_CASH.name} ${QUESTION_PACK_SIZE}개` : kind === "single" ? `${MIYU_CASH.name} 1개` : `미유캐시 ${cash.cash}개 충전 (예전 방식)`;
   }
   if (parseCompatProductId(productId)) return SAJU_COMPAT.name;
+  if (parsePairProductId(productId)) return PAIR_COMPAT.name;
   return parseConcernProductId(productId) ? CONCERN_REPORT.name : productId;
 }
 
@@ -300,3 +332,17 @@ export const DAILY_FREE = { enabled: true } as const;
  * 끄고 싶으면 enabled를 false로 — 구매한 풀이에서는 나이 방향 문장이, 무료 맛보기에서는 그 질문이 빠지고 분위기 · 오래 가는 관계 풀이는 그대로 남는다.
  */
 export const PARTNER_AGE_DIRECTION = { enabled: true } as const;
+
+/**
+ * 이용 후기(리뷰) 화면 설정 — 운영자 요청 2026-10-17. 보상(질문권 개수 · 스위치 · 최소 글자 수)은 여기가 아니라 혜택 설정(`feature.review_reward` · `review.reward_credits` · `review.min_body_chars`)에서 관리자가 바꾼다.
+ *  - minToShowOnHome: 공개 후기가 이 개수 이상일 때만 메인에 후기 영역이 보인다(기본 1 — 실제 후기가 하나라도 있으면 보임). 후기가 없으면 영역 전체(제목도 · 빈 상태도)를 그리지 않는다. 가짜 후기로 채우지 않는다.
+ *  - homeMax: 메인에 보이는 후기 수(운영자 요청 "최초에는 3~6개") · pageSize: 전체 후기 쪽당 개수 · bodyMax: 후기 한 건의 글자 수 상한.
+ *  - noticeVersion: 공개 전 안내 문구의 판. 안내 문구(`lib/commerce/reviews.ts`의 REVIEW_NOTICES)를 바꾸면 날짜를 올린다 — 공개에 동의한 시점에 어떤 안내를 봤는지 후기마다 남긴다.
+ */
+export const REVIEWS = {
+  minToShowOnHome: 1,
+  homeMax: 6,
+  pageSize: 12,
+  bodyMax: 500,
+  noticeVersion: "2026-10-17",
+} as const;

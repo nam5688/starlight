@@ -17,6 +17,8 @@ import { ROOM_COPY } from "@/lib/report/reading/talk-room";
 import { getBenefitOverview, type BenefitOverview } from "@/lib/services/benefit-service";
 import { getCashView } from "@/lib/services/cash-service";
 import { listMyCompat } from "@/lib/services/compat-service";
+import { listMyPairs } from "@/lib/services/pair-service";
+import { pairDeps } from "@/server/pair";
 import { getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
@@ -80,12 +82,13 @@ async function MyContent() {
   reconcileUserInBackground(member.userId);
 
   const repo = await readRepository();
-  const [{ cards, concerns, orders }, cash, savedChats, benefits, compats] = await Promise.all([
+  const [{ cards, concerns, orders }, cash, savedChats, benefits, compats, pairs] = await Promise.all([
     getMyPage(repo, member.userId),
     getCashView(repo, member.userId, 1),
     repo.countVisibleChatSummaries(member.userId).catch(() => 0),
     readBenefits(member.userId),
     listMyCompat(repo, member.userId).catch(() => []),
+    listMyPairs(pairDeps(), member.userId).catch(() => []),
   ]);
   const paymentsReady = paymentConfig().ok;
   const talkHref = cards[0] ? `/results/${cards[0].assessmentId}/talk` : null;
@@ -123,6 +126,27 @@ async function MyContent() {
                   <span className="text-[15px] font-semibold">{c.names ? `${c.names.a} × ${c.names.b}` : "사주 궁합"}</span>
                   <span className="text-[13px] text-ink-3">
                     {c.status === "paid-ready" ? "완성" : c.status === "generating" ? "만드는 중" : c.status === "failed" ? "만들지 못함 · 다시 만들 수 있어요" : "환불됨"} · {formatDate(c.createdAt)}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {pairs.length > 0 && (
+        <section aria-labelledby="my-pairs" className="mt-12">
+          <h2 id="my-pairs" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
+            내 리포트 궁합
+          </h2>
+          <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">두 사람이 연결한 쌍의 궁합이에요. 한 사람이 결제하면 두 사람이 같은 글을 저장된 그대로 다시 볼 수 있어요.</p>
+          <ul className="mt-3 space-y-3">
+            {pairs.map((p) => (
+              <li key={p.pairId}>
+                <Link href={`/pair/${p.pairId}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-2xl bg-canvas px-4 py-3.5 shadow-soft">
+                  <span className="text-[15px] font-semibold">{p.otherNickname ? `${p.otherNickname} 님과` : "상대를 기다리는 초대"}</span>
+                  <span className="text-[13px] text-ink-3">
+                    {p.report === "ready" ? "완성" : p.report === "generating" ? "만드는 중" : p.report === "failed" ? "만들지 못함 · 다시 만들 수 있어요" : p.report === "blocked" ? "열람이 막힘" : p.status === "invited" ? "상대를 기다리는 중" : p.status === "linked" ? "연결됨 · 결제 전" : "연결이 끊김"} · {formatDate(p.createdAt)}
                   </span>
                 </Link>
               </li>

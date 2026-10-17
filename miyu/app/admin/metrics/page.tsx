@@ -136,6 +136,9 @@ function Revenue({ m }: { m: Metrics }) {
         <Row label="사주 궁합 (별도)">
           {r.compat.paidCount}건 · {formatKrw(r.compat.netKrw)} · 환불 {r.compat.refundedCount}건 · AI 비용 어림 {krw(r.compat.aiCostKrw)} (판매 스위치가 꺼져 있는 동안은 0건 — 위 리포트 매출 · 한 건당 계산에는 넣지 않음)
         </Row>
+        <Row label="리포트 궁합 (별도)">
+          {r.pair.paidCount}건 · {formatKrw(r.pair.netKrw)} · 환불 {r.pair.refundedCount}건 · AI 비용 어림 {krw(r.pair.aiCostKrw)} (한 쌍에 한 번 결제 — 판매 스위치가 꺼져 있는 동안은 0건 · 위 리포트 매출 · 한 건당 계산에는 넣지 않음)
+        </Row>
         <Row label="제외한 것">테스트 결제 {r.testPaidCount}건 (매출 아님) · 중복 결제 의심 {r.duplicateSuspects}건 (운영자 확인)</Row>
         <Row label="AI 비용 (실결제 리포트)">{e.pricingConfigured ? krw(e.aiCostKrw) : "토큰 단가 설정 전 — 비용 계산 안 함"}</Row>
         <Row label="한 건당 평균">

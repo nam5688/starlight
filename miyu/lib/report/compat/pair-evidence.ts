@@ -17,6 +17,8 @@ export type PairEvidenceResult = {
   evidence: Evidence[];
   /** 두 사람 모두 뚜렷하게 답해 비교한 영역 id */
   compared: string[];
+  /** 비교한 영역의 이름(화면 요약용 — 점수 · 원래 답 없음) */
+  comparedLabels: string[];
   /** 한쪽만 뚜렷하게 답해 비교하지 않은 영역 id — 화면에서 "비교하지 않았어요"로만 알린다(둘 다 뚜렷하지 않은 영역은 세지 않는다) */
   unclear: string[];
 };
@@ -51,6 +53,7 @@ export function pairEvidenceOf(a: PairResponses, b: PairResponses): PairEvidence
   const rb = rowsOf(b);
   const evidence: Evidence[] = [];
   const compared: string[] = [];
+  const comparedLabels: string[] = [];
   const unclear: string[] = [];
   for (const [id, x] of ra) {
     const y = rb.get(id);
@@ -63,6 +66,7 @@ export function pairEvidenceOf(a: PairResponses, b: PairResponses): PairEvidence
     const same = x.side === y.side;
     const both = Math.abs(x.score - 50) >= 30 && Math.abs(y.score - 50) >= 30;
     compared.push(id);
+    comparedLabels.push(x.label);
     evidence.push({
       id: `pair.${id}`,
       source: "survey",
@@ -86,5 +90,5 @@ export function pairEvidenceOf(a: PairResponses, b: PairResponses): PairEvidence
       cue: `본인들이 알려 준 자기 인식 참고값입니다. 선호가 같은 곳은 닮은 반응, 다른 곳은 다른 반응이 나타날 수 있는 장면을 구체화하는 데만 쓰고, 행동의 원인으로 단정하거나 두 사람의 응답 · 사주 풀이를 덮어쓰지 않습니다(응답이 먼저입니다). 알파벳 코드를 본문에 쓰지 않습니다. ${LIMIT_CUE}`,
     });
   }
-  return { evidence, compared, unclear };
+  return { evidence, compared, comparedLabels, unclear };
 }

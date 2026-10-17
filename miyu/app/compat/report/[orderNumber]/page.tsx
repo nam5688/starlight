@@ -6,6 +6,7 @@ import { LoginOptions } from "@/components/auth/login-options";
 import { CompatStatusPoller } from "@/components/compat/compat-status-poller";
 import { CompatReportView } from "@/components/report/compat-report-view";
 import { ResultHeader } from "@/components/report/result-header";
+import { ReviewLink } from "@/components/reviews/review-link";
 import { PageFallback } from "@/components/ui/page-fallback";
 import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { getCompatReportView } from "@/lib/services/compat-service";
@@ -78,10 +79,13 @@ async function Content({ params }: Pick<PageProps<"/compat/report/[orderNumber]"
   const report = view.report;
   return (
     <>
-      <ResultHeader title={`${report.names.a} × ${report.names.b} 사주 궁합`} subtitle="두 사람의 사주를 풀어 읽은 궁합이에요. 재미 · 참고용이고 관계의 결과를 알려 주지 않아요." source={report.placeholder ? "dev-scoring" : undefined} meta={`저장된 리포트 · 주문번호 ${orderNumber}`} />
+      <ResultHeader title={`${report.names.a} × ${report.names.b} 사주 궁합`} subtitle="두 사람의 사주를 풀어 읽은 궁합이에요. 재미 · 참고용이고 관계의 결과를 알려 주지 않아요." source={report.placeholder ? "dev-scoring" : undefined} meta={`저장된 리포트 · 주문번호 ${orderNumber}`} tone="love" />
       <div className={`${pageNarrow} pb-14`}>
         <CompatReportView report={report} />
         <div className="mt-8">
+          <ReviewLink kind="saju_compat" subjectRef={view.order.id} />
+        </div>
+        <div className="mt-6">
           <Link href="/my" className={buttonSecondary}>
             MY로 가기
           </Link>

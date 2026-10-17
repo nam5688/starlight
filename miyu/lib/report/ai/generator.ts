@@ -13,9 +13,10 @@ import { checkConcernDepth } from "../concern/depth.ts";
 import { alreadyProvidedOf, buildConcernRepairMessage, buildConcernUserMessage, CONCERN_PROMPT_VERSION, CONCERN_SYSTEM_PROMPT } from "../concern/prompt.ts";
 import type { ConcernDraftV1, ConcernReportV1 } from "../concern/types.ts";
 import { validateConcernDraft } from "../concern/validate.ts";
-import type { CompatInput, ConcernInput, GenerateContext, ReportGenerator, ReportInput } from "../generator.ts";
-import { assembleCompatReport } from "../compat/assemble.ts";
-import type { CompatReport } from "../compat/types.ts";
+import type { CompatInput, ConcernInput, GenerateContext, PairInput, ReportGenerator, ReportInput } from "../generator.ts";
+import { assembleCompatReport, assemblePairReport } from "../compat/assemble.ts";
+import { pairEvidenceOf } from "../compat/pair-evidence.ts";
+import type { CompatReport, PairReport } from "../compat/types.ts";
 import { createCompatWriter } from "../compat/writer.ts";
 import { compatOf } from "../../saju/interpret/compat.ts";
 import { compatTimingOf } from "../../saju/interpret/compat-timing.ts";
@@ -152,6 +153,19 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep });
       const draft = await writer.write({ evidence, cautions: result.cautions }, ctx);
       return assembleCompatReport(draft, result, input.names, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" });
+    },
+    /**
+     * 리포트 궁합 — 사주 궁합과 같은 엔진 결과(compatOf)와 시기 근거에, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*)를 더해 AI가 풀어 쓴 글을 검사해 조립한다.
+     * 위쪽 요약은 사주 궁합 · 간단 궁합과 같은 결과다. 이름 · 생년월일 원문 · 응답 원문 · 점수는 AI에 보내지 않고 저장하지도 않는다.
+     */
+    async generatePair(input: PairInput, ctx: GenerateContext = {}): Promise<PairReport> {
+      const ref = input.reference ?? seoulYm(now());
+      const result = compatOf(input.a.saju, input.b.saju);
+      const pairs = pairEvidenceOf({ summary: input.a.summary, mbti: input.a.knownMbti }, { summary: input.b.summary, mbti: input.b.knownMbti });
+      const evidence = [...result.evidence, ...compatTimingOf(input.a.saju, input.b.saju, { year: ref.year, month: ref.month }).evidence, ...pairs.evidence];
+      const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep, mode: "pair" });
+      const draft = await writer.write({ evidence, cautions: result.cautions }, ctx);
+      return assemblePairReport(draft, result, { labels: pairs.comparedLabels, skipped: pairs.unclear.length }, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" });
     },
     async generateConcern(input: ConcernInput, ctx: GenerateContext = {}): Promise<ConcernReportV1> {
       const ref = input.reference ? { ...input.reference, iso: seoulYm(now()).iso } : seoulYm(now());

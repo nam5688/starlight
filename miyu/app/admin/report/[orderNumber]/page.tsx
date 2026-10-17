@@ -11,7 +11,7 @@ import { ReadingReportView } from "@/components/report/reading-report-view";
 import { ResultHeader } from "@/components/report/result-header";
 import { PageFallback } from "@/components/ui/page-fallback";
 import { pageWide, textLink } from "@/components/ui/styles";
-import { isCompatReport } from "@/lib/report/compat/types";
+import { isCompatReport, isPairReport } from "@/lib/report/compat/types";
 import { isConcernReport } from "@/lib/report/concern/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { adminReportView } from "@/lib/services/admin-support-service";
@@ -85,7 +85,14 @@ async function Content({ params }: Pick<PageProps<"/admin/report/[orderNumber]">
           )}
         </section>
       </div>
-      {isCompatReport(content) ? (
+      {isPairReport(content) ? (
+        <>
+          <ResultHeader title="리포트 궁합" subtitle="운영자 확인용 보기" source={content.placeholder ? "dev-scoring" : undefined} meta={`검사일 ${created} · 저장된 리포트${view.generator ? ` · 생성 ${view.generator}` : ""}`} />
+          <div className={`${pageWide} pb-10`}>
+            <CompatReportView report={content} />
+          </div>
+        </>
+      ) : isCompatReport(content) ? (
         <>
           <ResultHeader title={`${content.names.a} × ${content.names.b} 사주 궁합`} subtitle="운영자 확인용 보기" source={content.placeholder ? "dev-scoring" : undefined} meta={`검사일 ${created} · 저장된 리포트${view.generator ? ` · 생성 ${view.generator}` : ""}`} />
           <div className={`${pageWide} pb-10`}>

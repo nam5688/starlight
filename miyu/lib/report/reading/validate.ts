@@ -107,16 +107,17 @@ export function allowedYearsOf(evidence: Evidence[]): Set<string> {
  * 화면에 보이는 모든 글에 같은 규칙을 적용하는 확인 — 사주 용어 사용 · 해석 키워드 나열 · 점수 · 원인 좁히기 · 응답 읽어 주기 · 풀이마다 붙는 경고 · 자료 없음 말 · 나이 · 금지 표현 ·
  * 결정 대행 · 계산되지 않은 해 · 같은 문장 반복. 이전 읽기 구조(validateReadingDraft)와 영역별 이야기(story-validate.ts)가 같이 쓴다 — 두 형식의 기준이 갈라지지 않게 한 곳에 둔다.
  */
-export function textIssues(texts: { where: string; text: string }[], evidence: Evidence[], o: { allowedYears: Set<string>; hasContext: boolean }): string[] {
+export function textIssues(texts: { where: string; text: string }[], evidence: Evidence[], o: { allowedYears: Set<string>; hasContext: boolean; echo?: RegExp }): string[] {
   const errors: string[] = [];
   const { allowedYears } = o;
+  const echo = o.echo ?? ANSWER_ECHO;
   // 사주 용어는 설명과 함께 쓸 수 있고, 근거 목록에 없는 판정은 쓰지 않는다(terms.ts — 읽는 순서대로 처음 쓸 때 풀이가 붙었는지 본다)
   errors.push(...checkTermUse(texts, evidence));
   for (const { where, text: t } of texts) {
     if (RAW_THEME_TEXT.test(t)) errors.push(`${where}: 해석 키워드 나열("${RAW_THEME_TEXT.exec(t)![0]}")을 그대로 옮기지 않습니다 — 쉬운 제목 → 생활에서 뜻하는 것 → 예시로 풀어 쓰세요(예: 배운 것을 일에 써 보는 것, 내 의견을 말하는 것).`);
     if (SCORE_TEXT.test(t)) errors.push(`${where}: 점수 · 퍼센트 · 확률 표현은 본문에 쓰지 않습니다.`);
     if (CAUSE_NARROWING.test(t)) errors.push(`${where}: 원인을 하나로 좁혀 말하지 않습니다 ("~때문이에요" 대신 "~일 수 있어요").`);
-    if (ANSWER_ECHO.test(t)) errors.push(`${where}: 응답을 그대로 읽어 주는 말("${ANSWER_ECHO.exec(t)![0]}")을 쓰지 않습니다 — 사주에서 읽은 성향이 이 사람에게 어떤 장면으로 나타나는지로 풀어 쓰세요.`);
+    if (echo.test(t)) errors.push(`${where}: 응답을 그대로 읽어 주는 말("${echo.exec(t)![0]}")을 쓰지 않습니다 — 사주에서 읽은 성향이 이 사람에게 어떤 장면으로 나타나는지로 풀어 쓰세요.`);
     if (HEDGE_REPEAT.test(t)) errors.push(`${where}: 풀이마다 "사주만으로는 알 수 없어요" 같은 경고를 붙이지 않습니다 — 조건("~할 때는")으로 풀이 안에 녹이세요(한계 안내는 한곳에 모읍니다).`);
     if (NO_DATA_TEXT.test(t)) errors.push(`${where}: 응답이나 자료가 없다는 말("${NO_DATA_TEXT.exec(t)![0]}")을 본문에 쓰지 않습니다 — 응답 근거가 없는 주제는 사주 근거만으로 풀이를 끝까지 쓰세요(필요한 안내는 코드가 한곳에 붙입니다).`);
     if (AGE_TEXT.test(t)) errors.push(`${where}: 나이를 쓰지 않습니다.`);

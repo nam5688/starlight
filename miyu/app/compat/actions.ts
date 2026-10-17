@@ -2,13 +2,13 @@
 
 import { notFound, redirect } from "next/navigation";
 import { computeSimpleCompat, type SimpleCompatOutcome } from "@/lib/compat/simple";
-import { SAJU_COMPAT } from "@/lib/config/product";
 import { startCompatCheckout, getCompatReportView, type StartCompatResult } from "@/lib/services/compat-service";
 import { readAcquisition } from "@/server/acquisition";
 import { saleGateCheck } from "@/server/capacity";
 import { paymentConfig, paymentEnvOf } from "@/server/env";
 import { getMember } from "@/server/member";
 import { claimAndSchedule } from "@/server/report-jobs";
+import { saleOpenOf } from "@/server/sale-switch";
 import { now, readRepository, reportGenerator, writeRepository } from "@/server/services";
 
 /**
@@ -34,7 +34,7 @@ const MESSAGE: Record<Exclude<StartCompatResult["kind"], "order" | "invalid" | "
  * 금액 · 소유자 · 입력 확인은 모두 서버가 다시 한다. 상대 입력은 결제 주문과 함께 리포트가 만들어지는 동안에만 보관한다.
  */
 export async function startCompatCheckoutAction(input: { assessmentId: string; partner: unknown }): Promise<CompatStartOutcome> {
-  if (!SAJU_COMPAT.saleOpen) return { ok: false, message: MESSAGE["not-open"] };
+  if (!saleOpenOf("saju-compat")) return { ok: false, message: MESSAGE["not-open"] };
   const assessmentId = typeof input?.assessmentId === "string" ? input.assessmentId : "";
   if (!/^[0-9a-f-]{36}$/.test(assessmentId)) return { ok: false, message: "내 검사 결과를 찾을 수 없어요." };
   const member = await getMember();
@@ -42,7 +42,7 @@ export async function startCompatCheckoutAction(input: { assessmentId: string; p
   const config = paymentConfig();
   if (!config.ok) return { ok: false, message: "결제가 아직 설정되지 않았어요." };
   const result = await startCompatCheckout(
-    { repo: writeRepository(), now, gate: saleGateCheck, generatorReady: Boolean(reportGenerator().generateCompat) },
+    { repo: writeRepository(), now, gate: saleGateCheck, generatorReady: Boolean(reportGenerator().generateCompat), saleOpen: saleOpenOf("saju-compat") },
     { userId: member.userId, assessmentId, partner: input.partner, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition() },
   );
   if (result.kind === "order") redirect(`/checkout/${result.order.orderNumber}`);

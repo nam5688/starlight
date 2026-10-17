@@ -7,7 +7,7 @@
 // - 이름 · 생년월일 · 응답 · 고민 · 리포트 내용은 이 집계에 들어오지 않는다 (익명 방문 번호와 주문 · 리포트의 상태 · 금액뿐).
 // - 순이익은 결제 수수료 · 세금을 빼지 않은 단순 계산이다 (AI 비용만 뺀다).
 
-import { isCashProduct, isCompatProduct, isPersonalProduct, parseConcernProductId } from "../config/product.ts";
+import { isCashProduct, isCompatProduct, isPairProduct, isPersonalProduct, parseConcernProductId } from "../config/product.ts";
 import type { FunnelEventRecord, MetricsOrder, MiyuRepository } from "./ports.ts";
 import { seoulDayStart } from "./capacity-service.ts";
 
@@ -45,6 +45,8 @@ export type Metrics = {
     cash: { paidCount: number; refundedCount: number; netKrw: number };
     /** 사주 궁합(유료) — 위 리포트 매출 · 한 건당 계산에 넣지 않고 따로 센다. aiCostKrw는 그 리포트를 만든 호출의 비용 어림(단가 미설정이면 0) */
     compat: { paidCount: number; refundedCount: number; netKrw: number; aiCostKrw: number };
+    /** 리포트 궁합(유료) — 사주 궁합과 따로 센다(같은 쌍에 결제 완료 주문은 하나). 위 리포트 매출 · 한 건당 계산에 넣지 않는다 */
+    pair: { paidCount: number; refundedCount: number; netKrw: number; aiCostKrw: number };
   };
   economics: {
     aiCostKrw: number;
@@ -97,7 +99,8 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   const liveAll = orders.filter(isLive);
   const liveCash = liveAll.filter((o) => isCashProduct(o.productId));
   const liveCompat = liveAll.filter((o) => isCompatProduct(o.productId));
-  const liveOrders = liveAll.filter((o) => !isCashProduct(o.productId) && !isCompatProduct(o.productId));
+  const livePair = liveAll.filter((o) => isPairProduct(o.productId));
+  const liveOrders = liveAll.filter((o) => !isCashProduct(o.productId) && !isCompatProduct(o.productId) && !isPairProduct(o.productId));
   const livePaid = liveOrders.filter((o) => o.status === "paid");
   const liveRefunded = liveOrders.filter((o) => o.status === "refunded");
   const readyReports = reports.filter((r) => r.status === "ready");
@@ -129,6 +132,8 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   const cashRefunded = liveCash.filter((o) => o.status === "refunded");
   const compatPaid = liveCompat.filter((o) => o.status === "paid");
   const compatRefunded = liveCompat.filter((o) => o.status === "refunded");
+  const pairPaid = livePair.filter((o) => o.status === "paid");
+  const pairRefunded = livePair.filter((o) => o.status === "refunded");
   const concernPaid = liveConcern.filter((o) => o.status === "paid");
   const concernNet = sum(concernPaid);
   const duplicateSuspects = anomalies.filter((e) => /DUPLICATE/.test(e.message) || /DUPLICATE/.test(JSON.stringify(e.detail))).length;
@@ -139,6 +144,8 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
   const aiCostKrw = Math.round(usage.filter((u) => u.reportId && liveOrderIds.has(reportOrder.get(u.reportId) ?? "")).reduce((n, u) => n + (u.estCostKrw ?? 0), 0) * 100) / 100;
   const compatOrderIds = new Set(liveCompat.map((o) => o.id));
   const compatAiCostKrw = Math.round(usage.filter((u) => u.reportId && compatOrderIds.has(reportOrder.get(u.reportId) ?? "")).reduce((n, u) => n + (u.estCostKrw ?? 0), 0) * 100) / 100;
+  const pairOrderIds = new Set(livePair.map((o) => o.id));
+  const pairAiCostKrw = Math.round(usage.filter((u) => u.reportId && pairOrderIds.has(reportOrder.get(u.reportId) ?? "")).reduce((n, u) => n + (u.estCostKrw ?? 0), 0) * 100) / 100;
   const paidCount = livePaid.length;
   const avgNet = paidCount > 0 ? Math.round(netKrw / paidCount) : null;
   const avgCost = pricingConfigured && paidCount > 0 ? Math.round((aiCostKrw / paidCount) * 100) / 100 : null;
@@ -197,7 +204,7 @@ export async function getMetrics(repo: MiyuRepository, now: Date, days: number):
     since,
     funnel,
     sources,
-    revenue: { grossKrw, refundedKrw, netKrw, paidCount, refundedCount: liveRefunded.length, testPaidCount, duplicateSuspects, concern: { paidCount: concernPaid.length, netKrw: concernNet }, cash: { paidCount: cashPaid.length, refundedCount: cashRefunded.length, netKrw: sum(cashPaid) }, compat: { paidCount: compatPaid.length, refundedCount: compatRefunded.length, netKrw: sum(compatPaid), aiCostKrw: compatAiCostKrw } },
+    revenue: { grossKrw, refundedKrw, netKrw, paidCount, refundedCount: liveRefunded.length, testPaidCount, duplicateSuspects, concern: { paidCount: concernPaid.length, netKrw: concernNet }, cash: { paidCount: cashPaid.length, refundedCount: cashRefunded.length, netKrw: sum(cashPaid) }, compat: { paidCount: compatPaid.length, refundedCount: compatRefunded.length, netKrw: sum(compatPaid), aiCostKrw: compatAiCostKrw }, pair: { paidCount: pairPaid.length, refundedCount: pairRefunded.length, netKrw: sum(pairPaid), aiCostKrw: pairAiCostKrw } },
     economics: {
       aiCostKrw,
       avgAiCostPerPaidKrw: avgCost,

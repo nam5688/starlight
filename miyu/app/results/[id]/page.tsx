@@ -8,6 +8,7 @@ import { ReportFeedback } from "@/components/results/report-feedback";
 import { IdentityCard } from "@/components/results/identity-card";
 import { MiyuFirst } from "@/components/results/miyu-first";
 import { TalkEntry } from "@/components/results/talk-entry";
+import { ReviewLink } from "@/components/reviews/review-link";
 import { talkRoomPath } from "@/components/talk/room-paths";
 import { buildTalkModel } from "@/lib/report/reading/talk";
 import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
@@ -33,7 +34,7 @@ import { buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { CONCERN_RECORDS, LUCKY_INDEX, PERSONAL_TYPE, REPORT_BASIS } from "@/lib/config/product";
 import { type BenefitNotice, type PriceQuoteView, readBenefitQuery } from "@/lib/commerce/benefit-query";
 import { isConcernReport } from "@/lib/report/concern/types";
-import { isCompatReport } from "@/lib/report/compat/types";
+import { isCompatReport, isPairReport } from "@/lib/report/compat/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { buildIdentity } from "@/lib/report/identity";
 import { buildFreePreview } from "@/lib/report/preview";
@@ -129,7 +130,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
 
   if (view.paidOrder && report?.status === "ready" && report.content) {
     const content = report.content;
-    if (isConcernReport(content) || isCompatReport(content)) notFound(); // 개인 통합 리포트 주문에는 고민 반영 · 사주 궁합 리포트가 붙지 않는다
+    if (isConcernReport(content) || isCompatReport(content) || isPairReport(content)) notFound(); // 개인 통합 리포트 주문에는 고민 반영 · 사주 궁합 리포트가 붙지 않는다
     const feedback = await (await readRepository()).getFeedback(report.id);
     // 친구 초대(심층 리포트를 받은 분만) — 확인에 실패하면 이 구역만 보이지 않는다
     const inviteView = await getInviteView(writeRepository(), { userId: member.userId, assessmentId: assessment.id }).catch((e) => {
@@ -158,6 +159,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           latestGenerator={view.received[0]?.report?.status === "ready" && view.received[0].report.generator ? `${view.received[0].report.generator} ${view.received[0].report.generatorVersion ?? ""}`.trim() : null}
           nowGenerator={`${generator.name} ${generator.version}`}
         />
+        <ReviewLink kind="personal" subjectRef={view.paidOrder.id} />
         <p className="text-[13px] text-ink-3">
           주문번호 {view.paidOrder.orderNumber} · 생성 {report.generator} {report.generatorVersion}
         </p>
@@ -181,6 +183,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           }
           source={content.source}
           meta={`검사일 ${created} · 저장된 리포트${receivedRows.length > 1 ? ` · ${seq}번째로 받은 리포트` : ""}`}
+          tone="main"
         />
         {isReadingReport(content) && <TalkEntry id={assessment.id} tier="deep" chatReady={chatConnected()} rooms={availableRooms(buildTalkModel(content, { saju: assessment.saju, today: seoulDate(now()) }))} remembered={await peekRoomChoice()} />}
         {isReadingReport(content) ? (

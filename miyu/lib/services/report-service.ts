@@ -2,12 +2,14 @@
 
 import { tasteStateFor, type TasteViewState } from "./taste-service.ts";
 import { REPORT_GENERATING_STALE_MS, REPORT_GENERATION_TIMEOUT_MS, REPORT_MAX_ATTEMPTS, REPORT_RETRY_COOLDOWN_MS } from "../commerce/report.ts";
-import { isCashProduct, isCompatProduct, parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
+import { isCashProduct, isCompatProduct, isPairProduct, parseConcernProductId, parsePersonalSeq } from "../config/product.ts";
 import { concernInputOf } from "../personalization/concern.ts";
 import type { AiUsageSample, ConcernInput, ReportGenerator, ReportInput } from "../report/generator.ts";
 import { reportTexts } from "../report/concern/texts.ts";
 import { isConcernReport } from "../report/concern/types.ts";
 import { compatInputFor } from "./compat-service.ts";
+import { pairInputFor } from "./pair-service.ts";
+import type { PairRepository } from "./pair-ports.ts";
 import { genderOfSaju } from "../saju/engine.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { PersonalContext } from "../personalization/context.ts";
@@ -23,6 +25,8 @@ type ReportDeps = {
   capacity?: CapacityConfig;
   /** 한 번의 생성 시도에 허용하는 시간 (기본 REPORT_GENERATION_TIMEOUT_MS) */
   timeoutMs?: number;
+  /** 리포트 궁합의 쌍 저장소 — 리포트 궁합 주문을 만들 때만 필요하다(없으면 그 주문은 실패로 남는다) */
+  pairs?: PairRepository;
 };
 
 /**
@@ -132,8 +136,13 @@ export async function completeReport(deps: ReportDeps, order: OrderRecord, repor
     const isCompat = isCompatProduct(order.productId);
     if (isCompat && !generator.generateCompat) throw new Error("이 리포트 생성기는 사주 궁합을 만들 수 없습니다.");
     const compatInput = isCompat ? await compatInputFor(repo, order, assessment) : null;
+    // 리포트 궁합은 연결된 두 사람의 검사 결과(사주 + 응답 방향)로 쓴다 — 쌍이 끊겼거나 동의가 철회됐으면 여기서 실패한다
+    const isPair = isPairProduct(order.productId);
+    if (isPair && !generator.generatePair) throw new Error("이 리포트 생성기는 리포트 궁합을 만들 수 없습니다.");
+    if (isPair && !deps.pairs) throw new Error("리포트 궁합 저장소가 연결되지 않았습니다.");
+    const pairInput = isPair ? await pairInputFor(repo, deps.pairs!, order) : null;
     const ctxArg = { signal: controller.signal, onUsage };
-    const run = compatInput ? generator.generateCompat!(compatInput, ctxArg) : concernInput ? generator.generateConcern!(concernInput, ctxArg) : generator.generate(reportInputOf(assessment, context), ctxArg);
+    const run = pairInput ? generator.generatePair!(pairInput, ctxArg) : compatInput ? generator.generateCompat!(compatInput, ctxArg) : concernInput ? generator.generateConcern!(concernInput, ctxArg) : generator.generate(reportInputOf(assessment, context), ctxArg);
     const content = await Promise.race([run, timeout]);
     const ready = await repo.updateReport(report.id, ["generating"], {
       status: "ready",

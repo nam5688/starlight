@@ -6,6 +6,7 @@ import { buttonPrimary } from "@/components/ui/styles";
 import { formatKrw, SAJU_COMPAT } from "@/lib/config/product";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
+import { saleOpenOf } from "@/server/sale-switch";
 import { readRepository } from "@/server/services";
 
 function Frame({ children }: { children: React.ReactNode }) {
@@ -20,11 +21,11 @@ function Frame({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * /compat의 "사주 궁합 받기" 구역 — **판매 스위치(SAJU_COMPAT.saleOpen)가 꺼져 있으면 아무것도 그리지 않는다**(지금).
+ * /compat의 "사주 궁합 받기" 구역 — **판매 스위치(SAJU_COMPAT.saleOpen, 시험 환경에서만 server/sale-switch.ts)가 꺼져 있으면 아무것도 그리지 않는다**(지금).
  * 켜져 있으면: 로그인 → 내 검사 결과(가장 최근) → 상대 입력 → 결제. 내 검사 결과가 없으면 무료 분석으로 안내한다.
  */
 export async function CompatPaidSection() {
-  if (!SAJU_COMPAT.saleOpen || !isAuthConfigured()) return null;
+  if (!saleOpenOf("saju-compat") || !isAuthConfigured()) return null;
   const member = await getMember();
   if (!member) {
     return (

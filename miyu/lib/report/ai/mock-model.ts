@@ -113,7 +113,7 @@ export function createMockModel(opts: { failTimes?: number; invalidTimes?: numbe
       const user = req.messages[0].content;
       // 고민 반영 리포트 요청(task: concern-report)에는 고민 리포트 형식으로, 읽기 구조 요청(개인 통합 리포트 JSON)에는 읽기 구조로 답한다
       // 영역별 이야기(story-v1) 요청은 사용자 메시지에 areas(core · relation · work-money)가 있다
-      const draft = user.startsWith("다음 자료로 사주 궁합 풀이 JSON")
+      const draft = user.startsWith("다음 자료로 사주 궁합 풀이 JSON") || user.startsWith("다음 자료로 리포트 궁합 풀이 JSON")
         ? composeMockCompat(user)
         : user.includes('"task":"concern-report"')
         ? composeMockConcernDraft(user)

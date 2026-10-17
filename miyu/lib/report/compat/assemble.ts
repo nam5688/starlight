@@ -4,8 +4,8 @@
 // 시기 영역(timing)은 초안에 있을 때만 조립하고, 안내는 시기를 쓴 경우 / 쓰지 못한 경우를 나눠 코드가 채운다.
 import { cardOf } from "../../compat/simple.ts";
 import type { CompatResult } from "../../saju/interpret/compat.ts";
-import { COMPAT_NOTES, COMPAT_PROMPT_VERSION, COMPAT_REPORT_KIND, COMPAT_SECTIONS, COMPAT_STEP_GROUPS } from "./plan.ts";
-import type { CompatDraftV1, CompatReport, CompatStep } from "./types.ts";
+import { COMPAT_NOTES, COMPAT_PROMPT_VERSION, COMPAT_REPORT_KIND, COMPAT_SECTIONS, COMPAT_STEP_GROUPS, PAIR_NOTES, PAIR_PROMPT_VERSION, PAIR_REPORT_KIND, PAIR_SECTIONS } from "./plan.ts";
+import type { CompatDraftV1, CompatReport, CompatStep, PairReport } from "./types.ts";
 
 export type CompatAssembleMeta = { provider: string; model: string; at: string; placeholder?: boolean };
 
@@ -47,6 +47,53 @@ export function assembleCompatReport(draft: CompatDraftV1, result: CompatResult,
       cautions: card.cautions,
       items: [COMPAT_NOTES.noResponses, hasTiming ? COMPAT_NOTES.timingUsed : COMPAT_NOTES.timingMissing, COMPAT_NOTES.noInnerMind, COMPAT_NOTES.rule],
       page: COMPAT_NOTES.page,
+    },
+    ...(meta.placeholder ? { placeholder: true as const } : {}),
+    generated: { provider: meta.provider, model: meta.model, at: meta.at },
+  };
+}
+
+/**
+ * 리포트 궁합 조립 — 위쪽 요약은 사주 궁합 · 간단 궁합과 같은 함수(cardOf)로 같은 엔진 결과에서 채워 세 가지가 어긋나지 않는다.
+ * 본문의 "A님 · B님"은 **바꾸지 않는다**(저장되는 글에는 이름 · 생년월일이 없다 — 화면이 읽는 사람에게 누가 누구인지 알려 준다).
+ * 비교한 응답 영역은 이름과 개수만 담고 점수 · 원래 답은 담지 않는다.
+ */
+export function assemblePairReport(draft: CompatDraftV1, result: CompatResult, compared: { labels: string[]; skipped: number }, meta: CompatAssembleMeta): PairReport {
+  const card = cardOf(result, { a: "A님", b: "B님" });
+  const sections = PAIR_SECTIONS.flatMap((plan) => {
+    const s = draft.sections.find((x) => x.id === plan.id);
+    return s ? [{ id: plan.id, topic: plan.topic, headline: s.headline, paragraphs: [...s.paragraphs] }] : [];
+  });
+  const hasTiming = sections.some((s) => s.id === "timing");
+  const steps = Object.fromEntries(COMPAT_STEP_GROUPS.map((g) => [g.id, draft.steps[g.id].map((a): CompatStep => ({ title: a.title, detail: a.detail, say: a.say }))])) as PairReport["steps"];
+  return {
+    kind: PAIR_REPORT_KIND,
+    ruleVersion: result.version,
+    promptVersion: PAIR_PROMPT_VERSION,
+    summary: {
+      typeName: card.typeName,
+      typeLine: card.typeLine,
+      score: card.score,
+      scoreMeaning: card.scoreMeaning,
+      core: card.core,
+      scoreBasis: card.notes.scoreBasis,
+      scoreNotProbability: card.notes.scoreNotProbability,
+      parts: card.basis,
+    },
+    headline: draft.headline,
+    sections,
+    steps,
+    response: { comparedLabels: [...compared.labels], skipped: compared.skipped },
+    notes: {
+      cautions: card.cautions,
+      items: [
+        PAIR_NOTES.privacy,
+        compared.labels.length === 0 ? PAIR_NOTES.noCompared : compared.skipped > 0 ? PAIR_NOTES.skipped : "",
+        hasTiming ? COMPAT_NOTES.timingUsed : COMPAT_NOTES.timingMissing,
+        COMPAT_NOTES.noInnerMind,
+        COMPAT_NOTES.rule,
+      ].filter((t) => t.length > 0),
+      page: PAIR_NOTES.page,
     },
     ...(meta.placeholder ? { placeholder: true as const } : {}),
     generated: { provider: meta.provider, model: meta.model, at: meta.at },

@@ -14,7 +14,7 @@ export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.3";
  */
 export const COMPAT_TIMING_BUILT = true;
 
-export type CompatSectionId = "overview" | "fit" | "friction" | "express" | "long" | "timing";
+export type CompatSectionId = "overview" | "fit" | "friction" | "express" | "long" | "timing" | "response";
 
 export type CompatSectionPlan = {
   id: CompatSectionId;
@@ -75,6 +75,44 @@ export const COMPAT_SECTIONS: CompatSectionPlan[] = [
     optional: true,
   },
 ];
+
+// ─── 리포트 궁합(유료 2, 2026-10-17 구현 · 판매 스위치 꺼짐) ───
+// 사주 궁합과 같은 엔진 · 같은 위쪽 요약(cardOf)을 쓰고, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*, pair-evidence.ts)를 더해 "응답" 영역을 하나 둔다.
+// 저장되는 글에는 이름 · 생년월일 · 응답 원문 · 점수가 없다 — 본문은 "A님 · B님"이고 화면이 읽는 사람에게 누가 누구인지 알려 준다.
+export const PAIR_REPORT_KIND = "compat-pair-v1" as const;
+export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.1";
+
+const RESPONSE_SECTION: CompatSectionPlan = {
+  id: "response",
+  topic: "각자 답한 내용으로 본 두 사람",
+  ask: "두 사람이 각자 직접 답한 응답의 방향이 같은 쪽인 영역에서는 어떤 장면에서 닮게 반응하기 쉬운지, 서로 다른 쪽인 영역에서는 어떤 장면에서 어긋나기 쉽고 어떻게 서로 보완할 수 있는지를 사주에서 읽은 관계와 이어서 쓴다. 근거(pair.*)에 적힌 영역만 쓰고 점수 · 문항 문장 · 원래 답을 옮기지 않으며 애착 유형 이름으로 부르지 않는다. 응답이 사주와 다르면 차이를 지우지 않고 상황별 차이로 설명한다",
+  sources: "pair.*",
+  paragraphs: { min: 2, max: 3 },
+  optional: true,
+};
+
+/** 리포트 궁합의 영역 순서 — 사주 궁합의 영역에 응답 영역(근거가 있을 때만)을 "서로 다른 표현과 행동 방식" 다음에 끼운다 */
+export const PAIR_SECTIONS: CompatSectionPlan[] = [...COMPAT_SECTIONS.slice(0, 4), RESPONSE_SECTION, ...COMPAT_SECTIONS.slice(4)];
+
+/** 응답 영역을 쓸 만한 비교 근거가 있는가 — 비교한 응답(pair.mbti가 아닌 pair.*)이 하나 이상. 입력한 MBTI 비교만으로는 영역을 만들지 않는다 */
+export const hasPairResponseEvidence = (evidence: { id: string; uncertain?: boolean }[]): boolean => evidence.some((e) => e.id.startsWith("pair.") && e.id !== "pair.mbti" && !e.uncertain);
+
+/** 이번 근거로 써야 하는 리포트 궁합의 영역 — 응답 근거가 없으면 response를, 시기 근거가 없으면 timing을 뺀다 */
+export const pairSectionsFor = (evidence: { id: string; uncertain?: boolean }[]): CompatSectionPlan[] =>
+  PAIR_SECTIONS.filter((s) => (s.id === "response" ? hasPairResponseEvidence(evidence) : !s.optional || hasTimingEvidence(evidence)));
+
+/** 가짜 AI 서버 · 모의 작성기가 리포트 궁합 요청을 알아보는 표지 */
+export const PAIR_PROMPT_MARK = "[미유 리포트 궁합]";
+
+/** 코드가 채우는 리포트 궁합의 고정 안내 — AI가 쓰지 않는다 */
+export const PAIR_NOTES = {
+  page: "리포트 궁합은 두 사람의 출생정보에서 전통 사주 해석을 단순화한 규칙으로 읽은 관계에, 두 사람이 각자 직접 답한 응답의 방향을 같은 영역끼리 비교해 더한 참고 콘텐츠입니다. 두 사람의 실제 성격이나 마음, 관계의 결과를 알려 주지 않으며 어떤 일이 일어난다는 예측이 아닙니다.",
+  privacy: "상대의 원래 답 · 개인 리포트 · 상담 내용은 이 풀이에도 보이지 않아요. 두 사람이 모두 뚜렷하게 답한 영역의 방향(같은 쪽 · 다른 쪽)만 썼어요.",
+  /** 한쪽만 뚜렷하게 답해 비교하지 않은 영역이 있을 때 */
+  skipped: "한쪽만 뚜렷하게 답한 영역은 비교하지 않았어요. 없는 응답을 짐작해 채우지 않았어요.",
+  /** 비교할 영역이 하나도 없을 때 */
+  noCompared: "두 사람이 모두 뚜렷하게 답한 영역이 없어서 이번 풀이는 사주 궁합과 같은 사주 중심으로만 썼어요.",
+} as const;
 
 /** 행동 묶음 셋 — 운영자가 말한 "A가 B에게 해 볼 행동 · B가 A에게 해 볼 행동 · 함께 조율할 방법" */
 export type CompatStepGroupId = "aToB" | "bToA" | "together";

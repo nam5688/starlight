@@ -1,23 +1,42 @@
 import { ChevronIcon, InfoIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { COMPAT_STEP_GROUPS, type CompatStepGroupId } from "@/lib/report/compat/plan";
-import type { CompatReport } from "@/lib/report/compat/types";
+import type { CompatReport, PairReport } from "@/lib/report/compat/types";
 
-/** 행동 묶음 이름 — 실제 이름이 있으면 이름으로 쓴다("A님이 B님에게 해 볼 행동" → "슬기 님이 남수 님에게 해 볼 행동") */
-function stepLabel(id: CompatStepGroupId, names: { a: string; b: string }): string {
-  if (id === "aToB") return `${names.a} 님이 ${names.b} 님에게 해 볼 행동`;
-  if (id === "bToA") return `${names.b} 님이 ${names.a} 님에게 해 볼 행동`;
-  return "함께 조율할 방법";
+/** 글을 쓴 곳의 표시 — 모의 작성기 · 시험용 대리 작성기만 "실제 서비스 AI가 아니다"라고 밝히고, 실제 AI가 쓴 글에는 붙이지 않는다 */
+export function writerLabelOf(provider: string): string | null {
+  if (provider === "mock") return "모의 작성기";
+  if (provider === "proxy-writer") return "대리 작성기(실제 서비스 AI 아님)";
+  return null;
+}
+
+/** 행동 묶음 이름 — 실제 이름이 있으면 이름으로 쓴다("A님이 B님에게 해 볼 행동" → "슬기 님이 남수 님에게 해 볼 행동"). 리포트 궁합은 저장된 글이 "A님 · B님"이라 그대로 쓴다 */
+function stepLabel(id: CompatStepGroupId, names: { a: string; b: string } | null): string {
+  if (id === "together") return "함께 조율할 방법";
+  const from = id === "aToB" ? "A" : "B";
+  const to = id === "aToB" ? "B" : "A";
+  return names ? `${id === "aToB" ? names.a : names.b} 님이 ${id === "aToB" ? names.b : names.a} 님에게 해 볼 행동` : `${from}님이 ${to}님에게 해 볼 행동`;
+}
+
+/** 리포트 궁합에서 이 묶음이 누구 몫인지 — 읽는 사람이 누구인지 알 때만 "내 실천 · 상대 실천" 표시를 붙인다 */
+function stepOwner(id: CompatStepGroupId, viewer: "a" | "b" | null | undefined): "mine" | "theirs" | null {
+  if (!viewer || id === "together") return null;
+  const owner = id === "aToB" ? "a" : "b";
+  return owner === viewer ? "mine" : "theirs";
 }
 
 /**
  * 사주 궁합 리포트(유료 · 아직 판매하지 않음) 화면 — 위쪽의 커플 유형 · 궁합 지수 · 핵심 한 줄은 무료 간단 궁합과 같은 엔진 결과(코드가 채움)이고, 아래 풀이만 AI가 쓴 본문이다.
  * 지금은 개발용 화면(/dev/compat)에서만 쓴다. 모의 작성기의 자리 표시 글(report.placeholder)이면 그렇다고 표시한다.
  */
-export function CompatReportView({ report }: { report: CompatReport }) {
+export function CompatReportView({ report, viewer }: { report: CompatReport | PairReport; viewer?: "a" | "b" | null }) {
   const s = report.summary;
+  const pair = report.kind === "compat-pair-v1" ? report : null;
+  const names = report.kind === "compat-saju-v1" ? report.names : null;
+  // 리포트 궁합: 읽는 사람의 실천 묶음을 먼저 보인다(두 사람이 같은 글을 보지만 각자 먼저 읽을 곳이 다르다)
+  const groups = pair && viewer ? [...COMPAT_STEP_GROUPS].sort((x, y) => Number(stepOwner(y.id, viewer) === "mine") - Number(stepOwner(x.id, viewer) === "mine")) : COMPAT_STEP_GROUPS;
   return (
-    <article aria-label="사주 궁합 풀이" className="space-y-5">
+    <article aria-label={pair ? "리포트 궁합 풀이" : "사주 궁합 풀이"} className="space-y-5">
       {report.placeholder && (
         <p role="note" className="rounded-xl bg-caution-soft px-4 py-3 text-[14px] leading-[1.7] text-caution">
           모의 작성기의 자리 표시 글이에요. 실제 풀이가 아니고 판매할 수 없는 글이에요.
@@ -25,9 +44,8 @@ export function CompatReportView({ report }: { report: CompatReport }) {
       )}
 
       <div className="rounded-2xl bg-canvas p-6 text-center shadow-soft md:p-8">
-        <p className="text-[14px] font-medium text-ink-3">
-          {report.names.a} × {report.names.b}
-        </p>
+        <p className="text-[14px] font-medium text-ink-3">{names ? `${names.a} × ${names.b}` : "A님 × B님"}</p>
+        {pair && viewer && <p className="mt-1 text-[13px] text-ink-3">이 글에서 {viewer === "a" ? "A님은 나, B님은 상대" : "B님은 나, A님은 상대"}예요.</p>}
         <h2 className="mt-2 text-[26px] leading-tight font-bold tracking-tight text-accent-strong md:text-[32px]">{s.typeName}</h2>
         <p className="mx-auto mt-3 max-w-[30rem] text-[16px] leading-[1.65] text-ink">{s.typeLine}</p>
         <div className="mt-5 border-t border-line pt-5">
@@ -45,9 +63,16 @@ export function CompatReportView({ report }: { report: CompatReport }) {
       </div>
 
       <div className="px-1">
-        <p className="text-[13px] font-semibold text-accent">사주 궁합 풀이</p>
+        <p className="text-[13px] font-semibold text-accent">{pair ? "리포트 궁합 풀이" : "사주 궁합 풀이"}</p>
         <h2 className="mt-1 text-[22px] leading-snug font-bold tracking-tight md:text-[26px]">{report.headline}</h2>
       </div>
+
+      {pair && (
+        <p className="rounded-xl bg-canvas px-4 py-3 text-[14px] leading-[1.7] text-ink-2 shadow-soft">
+          <span className="block text-[13px] font-semibold text-accent">두 사람의 응답에서 비교한 영역</span>
+          {pair.response.comparedLabels.length > 0 ? pair.response.comparedLabels.join(" · ") : "두 사람이 모두 뚜렷하게 답한 영역이 없어 이번에는 비교하지 않았어요."}
+        </p>
+      )}
 
       {report.sections.map((sec, i) => (
         <section key={sec.id} aria-labelledby={`compat-sec-${sec.id}`} className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
@@ -70,9 +95,13 @@ export function CompatReportView({ report }: { report: CompatReport }) {
           두 분이 해 볼 수 있는 것
         </h3>
         <div className="mt-3 space-y-5">
-          {COMPAT_STEP_GROUPS.map((g) => (
+          {groups.map((g) => (
             <div key={g.id}>
-              <p className="text-[13px] font-semibold text-accent">{stepLabel(g.id, report.names)}</p>
+              <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-accent">
+                {stepLabel(g.id, names)}
+                {stepOwner(g.id, pair ? viewer : null) === "mine" && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[12px] text-accent-strong">내가 해 볼 행동</span>}
+                {stepOwner(g.id, pair ? viewer : null) === "theirs" && <span className="rounded-full bg-mist px-2 py-0.5 text-[12px] text-ink-3">상대가 해 볼 행동</span>}
+              </p>
               <ul className="mt-2 space-y-4">
                 {report.steps[g.id].map((a) => (
                   <li key={a.title}>
@@ -121,7 +150,7 @@ export function CompatReportView({ report }: { report: CompatReport }) {
         </details>
         <p className="mt-4 text-[12px] leading-[1.7] text-ink-3">{report.notes.page}</p>
         <p className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-ink-3">
-          <StatusBadge>{report.generated.provider === "mock" ? "모의 작성기" : "대리 작성기(실제 서비스 AI 아님)"}</StatusBadge>
+          {writerLabelOf(report.generated.provider) && <StatusBadge>{writerLabelOf(report.generated.provider)}</StatusBadge>}
           <span>
             규칙 {report.ruleVersion} · 지시문 {report.promptVersion}
           </span>

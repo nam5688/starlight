@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { TossCheckout } from "@/components/checkout/toss-checkout";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
-import { cashOrderKind, formatKrw, LAUNCH_PAYMENT_METHODS, isCashProduct, isCompatProduct, parseCashProductId, parseConcernProductId, parsePersonalSeq, productNameOf, QUESTION_PACK_SIZE } from "@/lib/config/product";
+import { cashOrderKind, formatKrw, LAUNCH_PAYMENT_METHODS, isCashProduct, isCompatProduct, parseCashProductId, parseConcernProductId, parsePairProductId, parsePersonalSeq, productNameOf, QUESTION_PACK_SIZE } from "@/lib/config/product";
 import { paymentConfig, widgetVariantKey } from "@/server/env";
 import { readRepository, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
@@ -56,6 +56,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
   const isRepeat = (parsePersonalSeq(order.productId) ?? 1) > 1;
   const isCash = isCashProduct(order.productId);
   const isCompat = isCompatProduct(order.productId);
+  const isPair = parsePairProductId(order.productId) !== null;
   const cashParsed = parseCashProductId(order.productId);
   const isPack = cashParsed !== null && cashOrderKind(cashParsed) === "pack";
   const backPath = resultPathOf(order);
@@ -115,6 +116,11 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
           두 사람의 사주를 자세히 풀어 읽는 사주 궁합이에요. 결제가 확인되면 바로 만들기 시작하고, 끝나면 이 주문의 궁합 리포트로 열려요. 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없어요. 상대 생년월일은 리포트를 만들 때만 쓰고 완성되면 지워요.
         </p>
       )}
+      {isPair && (
+        <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
+          두 사람이 각자 분석을 마치고 서로 동의해 연결한 쌍의 리포트 궁합이에요. 한 쌍에 한 번만 결제하면 두 사람이 모두 같은 글을 읽을 수 있어요. 결제가 확인되면 바로 만들기 시작하고, 만들기에 실패하면 같은 주문으로 다시 시도하며 추가 결제는 없어요. 상대의 개인 리포트 · 문항별 답은 보이지 않아요.
+        </p>
+      )}
       {isCash && (
         <p className="mt-4 text-[14px] leading-relaxed text-ink-2">
           <span className="font-semibold text-ink">{isPack ? `질문 ${QUESTION_PACK_SIZE}개 = ${formatKrw(order.amount)}.` : `질문 1개 = ${formatKrw(order.amount)}.`}</span>{" "}
@@ -130,7 +136,7 @@ async function CheckoutContent({ params }: Pick<PageProps<"/checkout/[orderNumbe
       )}
       <p className="mt-6 text-[14px] text-ink-3">
         <Link href={backPath} className={textLink}>
-          {isConcern ? "고민 기록소로 돌아가기" : isCash ? "채팅방으로 돌아가기" : "결과 화면으로 돌아가기"}
+          {isConcern ? "고민 기록소로 돌아가기" : isCash ? "채팅방으로 돌아가기" : isPair ? "리포트 궁합으로 돌아가기" : "결과 화면으로 돌아가기"}
         </Link>
       </p>
     </>
