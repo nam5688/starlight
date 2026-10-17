@@ -1,6 +1,7 @@
 // 7개 대주제(story-7)의 모의 작성기 — 실제 AI를 부르지 않고, 받은 근거 목록의 ID로 형식 검사를 통과하는 초안을 만든다.
 // 단위 테스트 · 리허설(`scripts/run-own-story.ts --rehearsal`) · 로컬 전체 흐름 검사(가짜 AI 서버)에서만 쓴다. 문장은 근거를 풀어 쓴 글이 아니라 자리 표시이며 "[모의 생성]"이 붙는다. 내용 검사(depth.ts)는 이 표시가 남은 글을 판매할 수 없다고 본다.
 import type { Evidence } from "../evidence.ts";
+import { ELEMENT_FORTUNE, fortifyPrimaryOf } from "../../saju/interpret/fortune.ts";
 import { STORY7_MBTI_NOS, STORY7_SECTIONS } from "./story7-plan.ts";
 import type { Story7DraftV1, Story7SectionDraft } from "./types.ts";
 
@@ -43,12 +44,16 @@ export function composeMockStory7(userMessage: string): Story7DraftV1 {
     if (plan.no === 6) {
       const years = payload.periods.filter((p) => p.ref.startsWith("y")).slice(0, 3);
       const periodIds = payload.periods.slice(0, 2).flatMap((p) => p.evidence.slice(0, 1));
+      // 개운 문단 자리 — 보완 후보 1순위 기운의 대응(방향 · 색 · 숫자 · 장소)을 근거에서 그대로 옮긴 자리 표시(실제 AI가 이 자리를 풀어 쓴다)
+      const element = fortifyPrimaryOf(payload.evidence);
+      const f = element ? ELEMENT_FORTUNE[element] : null;
+      const fortune = f ? `${M} 개운 문단 자리예요. 방향은 ${f.direction}, 색은 ${f.colors[0]}, 숫자는 ${f.numbers[0]}과 ${f.numbers[1]}, 장소는 ${f.places[0]}처럼 실제 AI가 근거를 읽고 풀어 써요.` : null;
       return {
         ...base,
-        paragraphs: [para(0), para(1)],
+        paragraphs: fortune ? [para(0), fortune] : [para(0), para(1)],
         years: years.map((p) => ({ year: p.ref.slice(1), theme: `${M} ${p.label} 한 줄 자리` })),
         scenarios: [{ when: `${M} 지금의 모습이 그대로 이어지면`, then: "이어지는 전개를 가능성으로 쓰는 자리예요. 지금 모습이 이어지면 비슷하게 흘러갈 수 있어요." }],
-        evidence: [saju[0].id, ...periodIds.slice(0, 1)],
+        evidence: [saju[0].id, ...(element ? ["saju.fortify"] : []), ...periodIds.slice(0, 1)],
       };
     }
     if (plan.no === 7 && payload.context) {

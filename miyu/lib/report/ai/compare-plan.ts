@@ -91,7 +91,7 @@ export function planStage(opts: { stage: string; capKrw: number; personas: Perso
   const ref = referenceFor(opts.now);
   const rows: PlanRow[] = [];
   for (const p of opts.personas) {
-    const evidence = buildEvidence(p.input, ref);
+    const evidence = buildEvidence(p.input, ref, { fortune: opts.variant === "story-7" });
     const [system, user] = promptsFor(opts.variant ?? "reading-v1", evidence, ref.iso, p.input.context);
     const inputTokens = estimateInputTokens([system, user]);
     for (const c of opts.candidates) {
@@ -277,7 +277,7 @@ export async function runStage(opts: {
       const outputTokens = usage.reduce((n, u) => n + (u.outputTokens ?? 0), 0);
       if (first?.inputTokens) {
         const ref = referenceFor(opts.now);
-        const est = estimateInputTokens(promptsFor(variant, buildEvidence(persona.input, ref), ref.iso, persona.input.context));
+        const est = estimateInputTokens(promptsFor(variant, buildEvidence(persona.input, ref, { fortune: variant === "story-7" }), ref.iso, persona.input.context));
         ratios.push(first.inputTokens / est);
       }
       let depth: CompareRun["depth"] = null;

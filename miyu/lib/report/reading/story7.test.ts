@@ -15,19 +15,19 @@ import type { StoryDraftV1 } from "./types.ts";
 
 const REF = { year: 2026, month: 10, iso: "2026-10-17" };
 const PERSONAS = buildPersonas(10);
-const EVIDENCE = PERSONAS.map((p) => buildEvidence(p.input, REF));
+const EVIDENCE = PERSONAS.map((p) => buildEvidence(p.input, REF, { fortune: true }));
 const proxy = (file: string): unknown => JSON.parse(readFileSync(join(import.meta.dirname, "..", "..", "..", "docs", "samples", "story7-proxy", file), "utf8"));
 
-test("7개 대주제: 번호 1~7 · 운영자가 정한 제목 그대로 · 근거를 소유하는 장 5 + 앞 장을 엮는 장 2", () => {
+test("7개 대주제: 번호 1~7 · 운영자가 정한 제목 그대로 · 근거를 소유하는 장 6 + 앞 장을 엮는 장 1(7번)", () => {
   assert.deepEqual(STORY7_SECTIONS.map((s) => s.no), [1, 2, 3, 4, 5, 6, 7]);
   assert.deepEqual(STORY7_SECTIONS.map((s) => s.title), ["나는 어떤 사람일까?", "나의 강점과 약점", "연애와 애착", "인간관계와 인연", "일과 재물", "앞으로의 운과 변화", "미유의 종합 조언"]);
   assert.equal(new Set(STORY7_SECTIONS.map((s) => s.id)).size, 7);
-  assert.deepEqual(STORY7_SECTIONS.filter((s) => s.kind === "synthesis").map((s) => s.no), [2, 7]);
+  assert.deepEqual(STORY7_SECTIONS.filter((s) => s.kind === "synthesis").map((s) => s.no), [7]);
   for (const s of STORY7_SECTIONS) {
     assert.ok(s.question.length >= 20 && s.repeatGuard && s.includes.length > 0, `${s.no}`);
     // 엮는 장만 "새로 보태야 할 것"을 갖는다 — 자기 근거가 없는 장이 앞 장을 다시 쓰지 않게 하는 조건이다
     assert.equal(Boolean(s.mustAdd), s.kind === "synthesis", `${s.no}: mustAdd`);
-    assert.ok(s.maxParagraphs >= 1 && s.maxParagraphs <= 4, `${s.no}: 문단 상한`);
+    assert.ok(s.maxParagraphs >= 1 && s.maxParagraphs <= 5, `${s.no}: 문단 상한`);
   }
   assert.equal(new Set(STORY7_SECTIONS.map((s) => s.question)).size, 7, "장마다 다른 질문");
   // 일과 재물은 한 대주제 안의 소제목으로 구분한다
@@ -41,7 +41,7 @@ test("28문항 장면은 s01~s28 28개가 한 장에만 배분된다", () => {
   assert.equal(Object.keys(STORY7_SCENE_OWNER).length, 28);
 });
 
-test("엮는 장(2 · 7)은 근거를 소유하지 않는다", () => {
+test("엮는 장(7번)은 근거를 소유하지 않는다", () => {
   for (const s of STORY7_SECTIONS.filter((x) => x.kind === "synthesis")) {
     assert.deepEqual(s.sajuOwns, [], `${s.no}`);
     assert.equal(s.personalTopics.length, 0, `${s.no}`);
@@ -67,19 +67,19 @@ test("7개 대주제 배정: 소유한 근거는 한 장에만, 빌린 근거는
     assert.equal(new Set(ownedAll).size, ownedAll.length, `${p.id}: 같은 근거를 두 장이 소유했다`);
     for (const [key, ids] of Object.entries(a.borrowed)) for (const id of ids) assert.ok(ownedAll.includes(id) && !a.owned[key].includes(id), `${p.id} ${key}: 빌림 ${id}`);
     const m = measureLayout(EVIDENCE[i], slotsOf7());
-    assert.equal(m.need, 5);
+    assert.equal(m.need, 6);
     assert.equal(m.borrowTotal, Object.values(a.borrowed).flat().length);
   });
 });
 
-test("사주 근거 소유자: 시기(6)와 구조(1)는 모든 인물에게 있고, 인간관계(4)는 신살(귀인)을 소유한다고 적지 않았다 · 같은 사주 근거를 두 장이 소유하지 않는다", () => {
+test("사주 근거 소유자: 시기(6)와 구조(1)는 모든 인물에게 있고, 인간관계(4)는 육친(saju.kin)을 소유하며 신살(귀인)을 계산했다고 적지 않았다 · 같은 사주 근거를 두 장이 소유하지 않는다", () => {
   const rows = EVIDENCE.map((ev) => sajuCoverage(ev));
   for (const r of rows) {
     assert.ok(r.find((x) => x.no === 1)!.count > 0);
     assert.ok(r.find((x) => x.no === 6)!.count > 0);
   }
   const people = STORY7_SECTIONS.find((s) => s.no === 4)!;
-  assert.ok(people.sajuOwns.every((re) => /tengod|relation/.test(re.source)));
+  assert.ok(people.sajuOwns.every((re) => /tengod|relation|kin/.test(re.source)));
   assert.match(people.moreSaju ?? "", /귀인/);
   assert.match(people.moreSaju ?? "", /가족/);
   for (const ev of EVIDENCE) for (const e of ev.filter((x) => x.source === "saju" && !x.uncertain)) assert.ok(owners7(e).length <= 1, `${e.id}: 소유자 ${owners7(e)}`);

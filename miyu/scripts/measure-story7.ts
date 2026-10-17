@@ -23,7 +23,7 @@ if (inputsAt >= 0) {
   const dir = process.argv[inputsAt + 1];
   if (!dir) throw new Error("--inputs 뒤에 폴더를 적어 주세요.");
   for (const id of ["P01", "P03"]) {
-    const ev = buildEvidence(personas.find((x) => x.id === id)!.input, ref);
+    const ev = buildEvidence(personas.find((x) => x.id === id)!.input, ref, { fortune: true });
     mkdirSync(join(dir, `${id}-s7`), { recursive: true });
     writeFileSync(join(dir, `${id}-s7`, "instructions.txt"), `# 작성 지시문\n\n${STORY7_SYSTEM_PROMPT}\n\n# 자료\n\n${buildStory7UserMessage(ev, ref.iso)}\n`);
   }
@@ -61,7 +61,7 @@ push();
 push("| 인물 | 응답 근거 수 | 영역 셋: 최소 요구 · 빌림 · 못 채움 | 7개 대주제: 최소 요구 · 빌림 · 못 채움 · 소유 0인 장 | MBTI를 쓸 수 있는 장(영역 / 7개) |");
 push("| --- | --- | --- | --- | --- |");
 const areaRows = personas.map((p) => measureLayout(buildEvidence(p.input, ref), slotsOfAreas()));
-const s7Rows = personas.map((p) => measureLayout(buildEvidence(p.input, ref), slotsOf7()));
+const s7Rows = personas.map((p) => measureLayout(buildEvidence(p.input, ref, { fortune: true }), slotsOf7()));
 personas.forEach((p, i) => {
   const a = areaRows[i];
   const t = s7Rows[i];
@@ -90,7 +90,7 @@ push("## 2. 사주 근거를 소유하는 대주제 — 이 사람의 그 장에
 push();
 push("| 대주제 | 소유 근거 평균 | 하나도 없는 인물 | **사주도 응답도 소유 0인 인물**(그 장을 풀 자기 근거가 아예 없다) | 비고 |");
 push("| --- | --- | --- | --- | --- |");
-const sajuRows = personas.map((p) => sajuCoverage(buildEvidence(p.input, ref)));
+const sajuRows = personas.map((p) => sajuCoverage(buildEvidence(p.input, ref, { fortune: true })));
 const sajuNote: Record<number, string> = {
   1: "일간 · 오행 · 구조(월령 · 통근 · 강약 후보) — 모든 사람에게 있음",
   3: "배우자 별 · 배우자 자리 + 일지가 낀 합 · 충(엔진이 일지를 낀 합 · 충에만 `relationship` 주제를 붙인다)",
@@ -111,7 +111,7 @@ push("## 3. 처음부터 소유자가 둘 이상인 근거(가상 인물 10명�
 push();
 const multi = new Map<string, { owners: number[]; n: number }>();
 for (const p of personas) {
-  for (const e of buildEvidence(p.input, ref)) {
+  for (const e of buildEvidence(p.input, ref, { fortune: true })) {
     if (e.uncertain) continue;
     const o = owners7(e);
     if (o.length < 2) continue;
@@ -176,7 +176,7 @@ if (cases.length > 0) {
   push("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const c of cases) {
     const raw = JSON.parse(readFileSync(c.path, "utf8"));
-    const ev = buildEvidence(personas.find((x) => x.id === c.id)!.input, ref);
+    const ev = buildEvidence(personas.find((x) => x.id === c.id)!.input, ref, { fortune: c.tag !== "v1" });
     let pieces: TextPiece[];
     let format: string;
     const cites = new Map<string, Set<string>>();

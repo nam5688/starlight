@@ -7,6 +7,7 @@ import { referenceFor } from "../../report/ai/compare-plan.ts";
 import { buildEvidence } from "../../report/ai/generator.ts";
 import { calculateSaju } from "../manseryeok-engine.ts";
 import type { SajuOk } from "../engine.ts";
+import { fortuneEvidence } from "./fortune.ts";
 import { sajuEvidence } from "./rules.ts";
 import { RULE_META, RULE_META_VERSION, ruleFor } from "./rule-meta.ts";
 
@@ -24,9 +25,10 @@ function collectIds() {
     });
     if (r.status !== "ok") continue;
     for (const e of sajuEvidence(r as SajuOk, { reference: ref, gender: n % 5 === 0 ? null : n % 2 ? "male" : "female" })) ids.add(e.id);
+    for (const e of fortuneEvidence(r as SajuOk)) ids.add(e.id);
   }
   const personas = buildPersonas(10);
-  for (const p of personas) for (const e of buildEvidence(p.input, referenceFor(new Date("2026-10-12T03:00:00Z")))) ids.add(e.id);
+  for (const p of personas) for (const e of buildEvidence(p.input, referenceFor(new Date("2026-10-12T03:00:00Z")), { fortune: true })) ids.add(e.id);
   return [...ids];
 }
 

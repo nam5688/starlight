@@ -191,14 +191,15 @@ test("본인 입력 내보내기는 켠 사람이 직접 적고 개발 서버일
 
 // ───── 7개 대주제(story-7) 본인 입력 시험 — 승인 범위 · 입력 확인 · 호출 한 번 · 읽기 전 지표 ─────
 
-test("승인 범위: story7-own은 story-7 · 본인 입력 한 건 · 후보 A · 기존 상한(1,234.04원) 그대로 · 아직 실행하지 않았다 — 호출 1회의 최악은 상한 안이다", async () => {
+test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 기존 상한(1,234.04원) 그대로 · 1차(지시문 0.2)를 마치고 2차(지시문 0.3) 한 건이 남았다 — 호출 1회의 최악은 상한 안이다", async () => {
   const own = COMPARE_STAGES.find((s) => s.name === "story7-own")!;
   assert.equal(own.capKrw, 6000, "기존 승인 총액 그대로");
   assert.equal(own.restrict?.runCeilingKrw, 1234.04, "기존 1회 상한 그대로(올리지 않았다)");
   assert.equal(own.restrict?.variant, "story-7");
   assert.equal(own.restrict?.persona, "OWN");
-  assert.equal(own.restrict?.runsApproved, 1);
-  assert.equal(own.restrict?.runsDone, 0, "실제 호출은 운영자 PC에서 한다 — 클라우드에서는 하지 않았다");
+  assert.equal(own.restrict?.runsApproved, 2, "1차 마침 + 운영자 지시(2026-10-17)로 2차 한 건");
+  assert.equal(own.restrict?.runsDone, 1, "1차는 운영자 PC에서 실행했다 — 2차도 운영자 PC에서 한다(클라우드에서는 호출하지 않는다)");
+  assert.match(own.restrict?.lastRun ?? "", /202원/);
   const built = await ownReportInput(CAPTURE, NOW);
   assert.ok(built.ok);
   if (!built.ok) return;
@@ -212,8 +213,9 @@ test("승인 범위: story7-own은 story-7 · 본인 입력 한 건 · 후보 A 
   assert.ok(checkStageRestriction(own, { ...ok, only: "B" }).length > 0);
   assert.ok(checkStageRestriction(own, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 막힌다");
   assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 1234.05 }).length > 0, "상한을 넘으면 막힌다");
-  // 승인된 한 건을 쓰고 나면 새 실행은 막힌다(운영자가 다시 승인해 runsApproved를 올린 뒤에만)
-  assert.ok(checkStageRestriction({ restrict: { ...own.restrict!, runsDone: 1 } }, ok).some((m) => /이미 실행/.test(m)));
+  // 승인된 횟수를 쓰고 나면 새 실행은 막힌다(운영자가 다시 승인해 runsApproved를 올린 뒤에만)
+  assert.deepEqual(checkStageRestriction({ restrict: { ...own.restrict!, runsDone: 1 } }, ok), []);
+  assert.ok(checkStageRestriction({ restrict: { ...own.restrict!, runsDone: 2 } }, ok).some((m) => /이미 실행/.test(m)));
 });
 
 test("입력 확인 글(story-7): 같은 근거 · 지시문으로 만들고 어떤 지시문인지 밝힌다", async () => {

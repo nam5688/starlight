@@ -77,6 +77,39 @@ function structureRules(): RuleMeta[] {
   ];
 }
 
+/**
+ * 사주 풀이 재료 보강(fortune.ts, 2026-10-17 운영자 방향: 미유는 사주풀이가 중심 — 직업운 · 재물복 · 연애운 · 인복 · 개운법을 응답이 없어도 사주 근거로 끝까지 풀 수 있게 한다).
+ * 십성 개수 세기 · 오행 개수 세기 · 표 조회는 계산이고, 육친 대응 · 일의 계열 · 재물 읽기 · 오행 대응(방향 · 색 · 수 · 장소)은 전통 해석을 단순화한 초안이다 — 원전과 대조하지 못했고 전문가 검토 전이다.
+ * 격국 · 용신 · 희신 · 기신 · 신살 · 십이운성은 만들지 않았다(보완 후보는 원국 오행 개수와 태어난 계절만으로 정한 단순화이며 필요한 기운을 판정한 것이 아니다).
+ */
+const FORTUNE_EXCEPTIONS = [
+  "출생 시각을 모르면 시주 없이 센다(자리 수가 줄어든다)",
+  "격국 · 용신 · 희신 · 기신 · 신살 · 십이운성을 정하는 데 쓰지 않는다 — 이 근거는 풀이의 재료일 뿐이다",
+  "개수만으로 좋고 나쁨 · 성패 · 실제 있었던 일을 정하지 않는다",
+  "점수 · 퍼센트로 환산하지 않고, 어떤 자리 · 개수 때문에 그렇게 읽었는지를 근거 문장에 남긴다",
+];
+const SRC_FORTUNE = "전통 명리(육친론 · 십성 해석 · 오행 대응)의 일반적인 서술을 단순화한 초안. 원전과 대조하지 못했고 학파별 세부 기준 차이는 확인하지 못했다. 오행의 방향 · 계절 · 색과 하도의 생수 · 성수(목 3 · 8, 화 2 · 7, 토 5 · 10, 금 4 · 9, 수 1 · 6)는 널리 알려진 대응이지만 문헌에서 직접 확인하지 못했다. 해석 규칙의 문헌 근거는 확인하지 못했다.";
+const fortune = (m: { id: string; title: string; match: RegExp; calculation: string; interpretation: string; conditions: string[]; exceptions?: string[] }): RuleMeta => ({
+  kind: "saju",
+  review: "unreviewed",
+  version: "0.1",
+  source: SRC_FORTUNE,
+  ...m,
+  // 이 계산은 개수 세기와 표 조회라 외부 엔진과의 교차 검증 대상이 아니다 — 이 저장소의 단위 테스트(fortune.test.ts)로 확인한다
+  calculation: m.calculation + " 이 계산은 외부 엔진과의 교차 검증 대상이 아니라 이 저장소의 단위 테스트(fortune.test.ts)로 확인한다.",
+  exceptions: [...(m.exceptions ?? []), ...FORTUNE_EXCEPTIONS],
+});
+function fortuneRules(): RuleMeta[] {
+  return [
+    fortune({ id: "fortune-sipsung", title: "십성 분포 한눈에(다섯 갈래의 자리 수와 월주의 십성)", match: /^saju\.sipsung$/, calculation: "만세력 엔진이 계산한 일간 기준 십신(천간 · 지지 정기)을 비겁 · 식상 · 재성 · 관성 · 인성 다섯 그룹으로 모아 자리 수와 위치를 센다(일간 자신은 세지 않는다).", interpretation: "많은 그룹은 힘을 쓰는 방식의 바탕, 월주의 십성은 사회 · 일에서 처음 드러나는 모습, 없는 그룹은 그 기운이 들어오는 시기에 그 주제가 크게 느껴지는 것으로 읽는다. 능력 부족으로 풀지 않는다.", conditions: ["항상 만든다"] }),
+    fortune({ id: "fortune-career", title: "일의 계열 읽기(십성 분포 → 어울리는 일의 방향)", match: /^saju\.career$/, calculation: "십성 그룹 자리 수에서 가장 많은 쪽과 그다음 쪽을 정하고(같으면 인성 · 비겁 · 식상 · 재성 · 관성 순), 식상 → 재성 · 관성 + 인성 · 인성 + 식상 · 비겁 > 재성 조합이 있는지 센다.", interpretation: "식상은 표현 · 기술 · 창작, 관성은 조직 · 규칙 · 책임, 재성은 현실 실무 · 영업 · 사업 · 자산, 인성은 배움 · 연구 · 자격, 비겁은 독립 · 협업 · 경쟁이 있는 일의 계열로 읽는다. 직업 하나를 정하거나 성공을 보장하지 않는다.", conditions: ["항상 만든다"], exceptions: ["동률이면 정한 순서(인성 · 비겁 · 식상 · 재성 · 관성)로 앞쪽을 가장 많은 쪽으로 쓴다 — 학파의 기준이 아닌 단순화다"] }),
+    fortune({ id: "fortune-wealth", title: "재물 읽기(재성 · 식상 · 비겁 · 관성의 구조)", match: /^saju\.wealth$/, calculation: "재성(정재 · 편재) · 식상 · 비겁 · 관성의 자리 수와 일간을 돕는 자리 · 덜어내는 자리 수(structure.ts)를 센다.", interpretation: "정재는 꾸준히 모으는 돈, 편재는 여러 갈래 · 한 번에 움직이는 돈, 식상 → 재성은 결과물이 돈으로 이어지는 흐름, 비겁 > 재성은 나누고 쓰는 돈이 큰 구조, 재성이 일간을 돕는 쪽보다 많으면 감당하기 어려워 나가기 쉬운 구조로 읽는다. 부자 · 가난을 정하지 않는다.", conditions: ["항상 만든다(재성이 없으면 없다고 적는다)"], exceptions: ["소득 · 소비 습관 · 저축은 입력받지 않았다 — 구조의 읽기이지 이 사람의 돈 습관이 아니다", "투자 · 대출 · 부동산 결정의 근거로 쓰지 않는다"] }),
+    fortune({ id: "fortune-kin", title: "육친 읽기(인복 · 가족 · 친구 · 동료)", match: /^saju\.kin$/, calculation: "십성 그룹을 전통 육친 대응(인성 어머니 · 윗사람 · 스승 / 재성 · 편재 아버지 · 현실의 지원 / 비겁 형제 · 친구 · 동료 / 관성 상사 / 식상 후배)으로 옮겨 자리 수를 세고, 년주 · 월주의 십성과 도움을 주는 쪽(인성 + 비겁)이 천간에 드러난 수를 센다.", interpretation: "도움을 주는 쪽이 천간에 드러나거나 자리가 든든하면 도움 받는 인연 이야기로 읽고, 보완 후보 기운의 성향을 가진 사람을 가까이 두면 균형이 맞는다고 읽는다. 가족 관계의 좋고 나쁨 · 실제 있었던 일 · 가족 구성을 정하지 않는다.", conditions: ["항상 만든다"], exceptions: ["년주 · 월주가 절기 경계에 걸려 달라질 수 있으면 uncertain으로 표시해 해석에 쓰지 않는다", "가족 정보는 입력받지 않았다 — 자녀 · 출산 이야기는 하지 않는다", "년주 · 월주를 조상 · 부모의 자리로 읽는 것은 전통 해석 한 가지이며 학파마다 다르다"] }),
+    fortune({ id: "fortune-partner", title: "인연의 경향(배우자 자리로 읽는 편한 상대의 분위기 · 큰 방향 · 오래 가는 관계의 조건)", match: /^saju\.partner$/, calculation: "일지(배우자 자리)의 십신 그룹을 정하고(partner.ts의 규칙과 같다), 성별을 입력했다면 배우자 별(여성 원국 관성 · 남성 원국 재성)의 자리 수를 센다.", interpretation: "일지의 십신 그룹에 따라 편하게 느끼기 쉬운 상대의 분위기와 오래 가는 관계에서 중요하게 여기기 쉬운 것을 읽고, 나이는 연상 · 또래 · 연하 쪽의 큰 방향까지만 읽는다. 구체적인 나이 · 직업 · 마음 · 만나는 날짜는 읽지 않는다.", conditions: ["항상 만든다(나이 방향은 PARTNER_AGE_DIRECTION이 켜져 있을 때만 쓴다)"], exceptions: ["일주가 절기 경계 · 자시 관법에 걸려 달라질 수 있으면 uncertain으로 표시해 해석에 쓰지 않는다", "나이 방향은 인연 풀이 중 근거가 가장 약하다(partner-age 규칙 참고) — 끄는 스위치는 lib/config/product.ts의 PARTNER_AGE_DIRECTION"] }),
+    fortune({ id: "fortune-fortify", title: "개운(보완 후보 기운과 전통 오행 대응 — 방향 · 색 · 수(數) · 장소 · 습관 · 가까이 둘 사람)", match: /^saju\.fortify$/, calculation: "원국 글자(지장간 제외)의 오행 개수에서 없거나 1개뿐인 기운을 개수가 적은 순으로 고르고(모두 2개 이상이면 가장 적은 기운, 동률은 일간을 돕는 쪽부터), 겨울 · 여름 태생이면 계절을 보완하는 기운을 그다음 후보로 더한다. 무료 화면의 보완 아이템(items.ts)이 적게 나타난 기운을 고르는 기준과 같다.", interpretation: "부족한 기운을 생활에서 보태는 상징적인 개운법으로, 그 기운의 방향 · 계절 · 색 · 수(數) · 장소 · 습관 · 어울리는 사람의 성향을 전통 오행 대응으로 소개한다. 실제 효과나 재물 · 건강의 변화를 보장하지 않는다.", conditions: ["항상 만든다"], exceptions: ["보완 후보는 개수와 계절만으로 정한 단순화이며 필요한 기운을 판정한 것이 아니다", "월주가 절기 경계에 걸려 달라질 수 있으면 계절 보완 후보는 만들지 않는다", "개인별 계산 없이 색 · 방향 · 숫자를 임의로 정하지 않는다 — 같은 원국이면 늘 같은 결과다"] }),
+  ];
+}
+
 export const RULE_META: RuleMeta[] = [
   saju({ id: "daymaster", title: "일간의 비유(십간 물상)", match: /^saju\.daymaster$/, interpretation: "일간 10종을 큰 나무 · 촛불 · 바위 같은 자연물에 비유해 성향의 방향을 한 줄로 읽는다.", conditions: ["일간(태어난 날의 천간) 10종 각각에 한 문장"], exceptions: ["일주는 날짜로 정해지지만 자시 관법(야자시 · 조자시)에 따라 달라질 수 있어, 그 경우 saju.uncertain.jasi-school로 알린다"] }),
   saju({ id: "element-many", title: "오행이 두드러짐", match: /^saju\.element\.[목화토금수]\.many$/, interpretation: "한 오행이 원국 글자 중 3개 이상이면 그 기운(목 성장 · 화 표현 · 토 안정 · 금 기준 · 수 생각)이 두드러진다고 읽는다.", conditions: ["원국 글자(지장간 제외)에서 같은 오행 3개 이상 — 4개 이상이면 strong, 3개면 moderate"], exceptions: [...COMMON_EXCEPTIONS, "지장간 속 오행은 세지 않는다(학파마다 기준이 달라 엔진 결과로 단정하지 않음)"] }),
@@ -97,6 +130,7 @@ export const RULE_META: RuleMeta[] = [
   saju({ id: "seun", title: "세운(해마다의 흐름)", match: /^saju\.seun\.\d{4}$/, interpretation: "기준 연도부터 3년의 세운 천간 · 지지가 어느 십신 그룹인지로 그해의 주제를 읽는다.", conditions: ["기준 날짜의 연도부터 3년"], exceptions: [...COMMON_EXCEPTIONS, "세운은 날짜만으로 정해져 같은 해를 다시 열어도 바뀌지 않는다", "시기 해석은 실제 사건을 알려 주지 않는다"] }),
   saju({ id: "seun-relation", title: "세운 지지와 원국의 관계", match: /^saju\.seun\.\d{4}\.(year|month|day|hour)\.(천간합|육합|반합|충|형)$/, interpretation: "세운 지지가 원국 기둥과 맺는 합 · 충 · 형으로 그해에 해당 영역의 주제가 두드러지는 지점을 읽는다.", conditions: ["세운 지지와 원국 지지의 관계가 있을 때 — 항상 weak"] }),
   ...structureRules(),
+  ...fortuneRules(),
   {
     id: "survey-direction", title: "응답 경향(개발용 문항)", match: /^survey\.(novelty|caution|sensitivity|persistence|anxiety|avoidance)\.(high|low)$/, kind: "survey",
     calculation: "개발용 예시 문항(status: dev-example) 응답을 0~100으로 환산한 값. 백분위 · 정확도가 아니다.",

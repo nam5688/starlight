@@ -109,7 +109,8 @@ function directionConflict(name: string, byId: Map<string, Evidence>): string | 
  * 화면에 보이는 글(읽는 순서)에서 사주 용어 사용을 확인해 오류 목록을 돌려준다.
  * 근거 목록은 이 리포트를 쓰는 데 건네는 evidence 전체이며, 어떤 용어를 이 사람의 것으로 쓸 수 있는지를 정한다.
  */
-export function checkTermUse(texts: { where: string; text: string }[], evidence: Evidence[]): string[] {
+export function checkTermUse(texts: { where: string; text: string }[], evidence: Evidence[], o: { perSentenceMax?: number } = {}): string[] {
+  const sentenceMax = o.perSentenceMax ?? TERM_LIMITS.perSentenceMax;
   const errors: string[] = [];
   const usable = (ev: Evidence | undefined) => Boolean(ev) && !ev!.uncertain;
   const byId = new Map(evidence.map((e) => [e.id, e]));
@@ -160,7 +161,7 @@ export function checkTermUse(texts: { where: string; text: string }[], evidence:
           }
         }
       }
-      if (distinct.size > TERM_LIMITS.perSentenceMax) errors.push(`${where}: 한 문장에 사주 용어가 ${distinct.size}개(${[...distinct].join(" · ")}) — 용어를 나열하지 말고 한 문장에 ${TERM_LIMITS.perSentenceMax}개까지만, 풀이 속에서 쓰세요.`);
+      if (distinct.size > sentenceMax) errors.push(`${where}: 한 문장에 사주 용어가 ${distinct.size}개(${[...distinct].join(" · ")}) — 용어를 나열하지 말고 한 문장에 ${sentenceMax}개까지만, 풀이 속에서 쓰세요.`);
     }
   }
   return errors;

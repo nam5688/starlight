@@ -62,8 +62,8 @@ const answerLabel = (v: number | undefined) => LIKERT_OPTIONS.find((o) => o.valu
  */
 export function describeOwnInput(opts: { input: ReportInput; capture: OwnCapture; now: Date; /** 어떤 지시문으로 보내는가(기본 story-v1) */ variant?: "story-v1" | "story-7" }): { markdown: string; evidence: Evidence[]; systemChars: number; userChars: number; estInputTokens: number } {
   const ref = referenceFor(opts.now);
-  const evidence = buildEvidence(opts.input, ref);
   const variant = opts.variant ?? "story-v1";
+  const evidence = buildEvidence(opts.input, ref, { fortune: variant === "story-7" });
   const [system, user] = promptsFor(variant, evidence, ref.iso, opts.input.context);
   const estInputTokens = estimateInputTokens([system, user]);
   const info = opts.capture.info;

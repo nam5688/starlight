@@ -190,3 +190,16 @@ export const PROMO_RULES: { re: RegExp; why: string }[] = [
 ];
 
 export const ADVICE_RULES: { re: RegExp; why: string }[] = [...CONFIRMED_CHOICE_RULES, ...GUARANTEE_RULES, ...PROMO_RULES];
+
+/**
+ * 7개 대주제(story-7)의 보장 규칙 — 전통 개운 풀이(행운의 색 · 방향 · 숫자 · 장소 · 개운법)와 재물복 · 연애운 · 인복 같은 전통 해석을 허용한다(운영자 2026-10-17: "전통적인 사주 해석이나 개운법이라는 이유만으로 글을 불합격시키지 마").
+ * 막는 것은 효과나 결과를 **보장하는** 말(반드시 · 틀림없이 · 보장)과 액운 · 부적 · 행운의 날짜 · 복권 번호처럼 점치는 상품화, 출산 · 자녀 예언이다. 중대한 선택 확정(CONFIRMED_CHOICE_RULES)과 다른 상품 안내(PROMO_RULES)는 그대로다.
+ * 이전 형식(reading-v1 · story-v1 · 채팅 · 맛보기)은 위의 GUARANTEE_RULES(행운의 숫자 · 개운법 · 운이 트여요 전면 금지)를 그대로 쓴다.
+ */
+export const GUARANTEE_RULES_TRADITIONAL: { re: RegExp; why: string }[] = [
+  GUARANTEE_RULES[0],
+  { re: /(?:액운|나쁜 기운|살)(?:을|이)\s*(?:막아|막는|물리|쫓|풀어|없애)|부적(?:을|이)|행운의\s*(?:날|날짜)|로또|복권/, why: "액운 · 부적 · 행운의 날짜 · 복권 번호" },
+  { re: /(?:반드시|틀림없이|무조건|확실히)[^.!?]{0,24}(?:부자|재물|재산|수입|돈이|돈을|건강|병이|합격|성공|운이)/, why: "개운 · 재물 · 건강의 결과를 보장하는 표현" },
+  { re: /(?:부자|재물|재산|수입|돈|건강|병|합격|성공|운)[^.!?]{0,14}(?:보장|확정)(?!하지|되지|할 수 없|은 아니|하진|되진|해 주지)/, why: "개운 · 재물 · 건강의 결과를 보장하는 표현" },
+];
+export const ADVICE_RULES_TRADITIONAL: { re: RegExp; why: string }[] = [...CONFIRMED_CHOICE_RULES, ...GUARANTEE_RULES_TRADITIONAL, ...PROMO_RULES];

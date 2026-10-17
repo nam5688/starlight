@@ -8,9 +8,9 @@
 //  · 키는 .env.local의 ANTHROPIC_API_KEY — 이 스크립트는 값을 출력하지 않는다.
 //
 // 사용 (miyu 폴더, PowerShell):
-//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2636.26            # 드라이런(호출 없음): 입력 확인 파일 만들기 + 비용 · 승인 범위 점검 (기본: --variant story-7)
-//   node scripts/run-own-story.ts --rehearsal --already-spent-krw 2636.26                      # 리허설(모의 글 · 키 · 비용 없음): 같은 흐름 · 파일 · 화면을 끝까지 시험
-//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2636.26 --execute --approved-cap-krw 6000 --approved-on 2026-10-17   # 실제 호출 1회
+//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2839            # 드라이런(호출 없음): 입력 확인 파일 만들기 + 비용 · 승인 범위 점검 (기본: --variant story-7)
+//   node scripts/run-own-story.ts --rehearsal --already-spent-krw 2839                      # 리허설(모의 글 · 키 · 비용 없음): 같은 흐름 · 파일 · 화면을 끝까지 시험
+//   node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 2839 --execute --approved-cap-krw 6000 --approved-on 2026-10-17   # 실제 호출 1회
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { AI_CANDIDATES, COMPARE_STAGES } from "../lib/config/ai-candidates.ts";

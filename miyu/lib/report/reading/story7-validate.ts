@@ -1,17 +1,20 @@
 // 7개 대주제(story-7, AI 초안)의 형식 검사 — 장 7개가 순서대로 있는가 · 근거 ID · 글자와 문장 수 · 장마다 문단 수 상한 · 근거를 소유하는 장의 개인 성향 근거 연결 · MBTI 쓰임 · 시기 이야기는 6번에만 · 5번의 일 / 재물 소제목 · 쉬운 말 · 금지 표현.
 // 영역별 이야기(story-validate.ts)와 같은 글 규칙(textIssues)과 없는 기운 · 십성 풀이(absenceErrors) · 작성 과정 말하기(PROCESS_TALK)를 쓰고, 운영자 확정(2026-10-17) 내용을 코드로 막는다:
 //  · 재물은 모든 리포트에 있다 — 돈 이야기가 비면 막는다. 재성 하나로 돈복을 판정하지 않고, 직접 묻지 않은 소비 · 저축 · 투자 습관은 사실처럼 쓰지 않고 조건형 · 질문으로만 쓴다.
-//  · 4번은 입력받지 않은 가족 이야기와 근거 없는 귀인 · 사람복을 쓰지 않는다. 7번의 조언은 2~3가지이고 알려 준 고민이 없으면 고민을 지어내지 않는다.
+//  · 4번의 가족 · 인복 · 귀인 이야기는 전통 육친 대응으로 읽는 조건형 풀이까지만 쓴다(운영자 2026-10-17 — 가족 구성 · 있었던 일을 아는 것처럼 쓰지 않는다). 7번의 조언은 2~3가지이고 알려 준 고민이 없으면 고민을 지어내지 않는다.
+//  · 6번은 근거 목록의 개운(`saju.fortify`) 대응 — 방향 · 색 · 숫자 · 장소 — 을 본문이 말해야 하고, 그 기운의 대응과 다르게 쓰면 막는다(개인별 계산 없이 임의로 배정하지 않는다). 전통 개운법 · 재물복 · 연애운은 허용하고 효과를 보장하는 말만 막는다.
+// 반복의 기준(운영자 2026-10-17): 낱말 · 성향 · 명리 요소가 여러 번 나왔다는 이유만으로 막지 않는다. 같은 명리 요소가 다른 장에서 다른 해석 · 새 정보를 주는 것은 허용하고, 앞 장의 결론을 새 정보 없이 되풀이하는지는 사람이 읽고 판단한다(코드가 가르지 못한다).
 // 한계: 낱말 · 길이 · 표지를 세는 검사다 — 같은 결론을 말만 바꿔 되풀이하는 것 · 근거를 제대로 풀었는지 · 9,900원을 낼 만한지는 못 가른다(사람이 읽는 평가가 본다, docs/real-ai-evaluation-rubric.md).
 import type { Evidence } from "../evidence.ts";
 import { checkVoice, voiceErrors, type VoiceReport } from "../style/voice.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
-import { READING_LIMITS as L, TERM_LIMITS } from "./plan.ts";
-import { FIRST_PARAGRAPH_TERMS_MAX, MONEY_WORDS, PERIOD_TALK, PERSONAL_REUSE, PROCESS_TALK, TASK_IMPERATIVE, TASK_PER_AREA_MAX } from "./story-plan.ts";
+import { ADVICE_RULES_TRADITIONAL, READING_LIMITS as L } from "./plan.ts";
+import { fortifyPrimaryOf, fortuneMentions, ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
+import { MONEY_WORDS, PERIOD_TALK, PROCESS_TALK, TASK_IMPERATIVE } from "./story-plan.ts";
 import { chunkSizes, splitSentences } from "./story-motif.ts";
 import { absenceErrors } from "./story-validate.ts";
 import { story7Evidence } from "./story7-evidence.ts";
-import { CONDITIONAL_MARK, FAMILY_CLAIM, LUCK_PERSON, MONEY_HABIT, STORY7_FORMULA_BUDGET, STORY7_LIMITS as S, STORY7_MBTI_MIN, STORY7_MBTI_NOS, STORY7_OWNER_NOS, STORY7_SECTIONS, WEALTH_FATE } from "./story7-plan.ts";
+import { CONDITIONAL_MARK, FAMILY_CLAIM, MONEY_HABIT, STORY7_FORMULA_BUDGET, STORY7_LIMITS as S, STORY7_MBTI_MIN, STORY7_MBTI_NOS, STORY7_OWNER_NOS, STORY7_PERSONAL_REUSE, STORY7_SECTIONS, STORY7_TASK_MAX, STORY7_TERMS, TRADITION_MARK, WEALTH_FATE } from "./story7-plan.ts";
 import { distinctTerms } from "./terms.ts";
 import type { Story7DraftV1, Story7SectionDraft } from "./types.ts";
 import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./validate.ts";
@@ -159,12 +162,12 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
       const n = countSentences(v);
       if (n > S.paragraph.sentencesMax) errors.push(`${where}: ${n}문장 (${S.paragraph.sentencesMax}문장 이하로 묶어 주세요)`);
       const terms = distinctTerms(v);
-      if (terms.length > TERM_LIMITS.perParagraphMax) errors.push(`${where}: 한 문단에 사주 용어가 ${terms.length}개(${terms.join(" · ")}) — 문단 하나에서 새 개념을 여럿 배우지 않게 ${TERM_LIMITS.perParagraphMax}개까지만 쓰고, 나머지는 쉬운 말로 바꾸세요.`);
+      if (terms.length > STORY7_TERMS.perParagraphMax) errors.push(`${where}: 한 문단에 사주 용어가 ${terms.length}개(${terms.join(" · ")}) — 문단 하나에서 새 개념을 여럿 배우지 않게 ${STORY7_TERMS.perParagraphMax}개까지만 쓰고, 나머지는 쉬운 말로 바꾸세요.`);
     }
   };
 
   // 핵심 문장 · 첫 화면 카드 — 공유용 카드 이미지에 그대로 실리므로 이름을 쓰지 않는다
-  text(d.headline, "headline", L.headline.min, L.headline.max);
+  text(d.headline, "headline", S.headline.min, S.headline.max);
   for (const [k, label] of [["strength", "내가 강한 포인트"], ["caution", "내가 힘들 수 있는 포인트"]] as const) {
     const c = d.cards?.[k];
     if (!c) {
@@ -216,15 +219,16 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
     }
     sectionTexts.set(plan.no, paragraphs.join("\n"));
 
-    // 첫 문단은 이 사람이 어떤 사람인지 일상의 말로 — 사주 용어는 둘째 문단부터(6번 시기 장은 대운 · 세운을 풀이와 함께 써야 하므로 제외)
+    // 첫 문단은 결론을 쉬운 말로 먼저 — 사주 용어는 풀이를 붙여 둘까지(사주에서 출발하는 풀이라 0에서 넓혔다, 6번 시기 장은 대운 · 세운을 풀이와 함께 써야 하므로 제외)
     if (plan.no !== 6 && isString(paragraphs[0])) {
       const firstTerms = distinctTerms(paragraphs[0]);
-      if (firstTerms.length > FIRST_PARAGRAPH_TERMS_MAX) errors.push(`${w}: 첫 문단에 사주 용어(${firstTerms.join(" · ")})를 쓰지 않습니다 — 이 장의 모습을 일상의 말로 먼저 쓰고, 그렇게 읽은 이유(사주)는 둘째 문단부터 쓰세요.`);
+      if (firstTerms.length > STORY7_TERMS.firstParagraphMax) errors.push(`${w}: 첫 문단에 사주 용어(${firstTerms.join(" · ")})가 ${firstTerms.length}개 — 첫 문단은 이 장의 결론을 쉬운 말로 먼저 쓰고 용어는 ${STORY7_TERMS.firstParagraphMax}개까지만, 나머지는 둘째 문단부터 쓰세요.`);
     }
-    errors.push(...absenceErrors(paragraphs, w));
+    errors.push(...absenceErrors(paragraphs, w, { relaxed: true }));
     if (isString(s.headline) && paragraphs.some((t) => t.includes(s.headline.trim()))) errors.push(`${w}: 문단이 제목을 그대로 되풀이합니다 — 제목은 본문을 다 쓴 뒤의 결론이고 문단은 그 연결을 풀어 쓰는 글입니다.`);
     const tasks = paragraphs.reduce((n, p) => n + p.split(/(?<=[.!?])\s+/).filter((x) => TASK_IMPERATIVE.test(x)).length, 0);
-    if (tasks > TASK_PER_AREA_MAX) errors.push(`${w}: "~해 보세요" 같은 행동 과제 문장이 ${tasks}개 — 한 장에 ${TASK_PER_AREA_MAX}개까지만 두고 구체적인 실천은 7번 장의 조언(actions)에 모으세요.`);
+    const taskMax = plan.no === 6 ? STORY7_TASK_MAX[6] : STORY7_TASK_MAX.default;
+    if (tasks > taskMax) errors.push(`${w}: "~해 보세요" 같은 행동 과제 문장이 ${tasks}개 — 이 장에는 ${taskMax}개까지만 두고 구체적인 실천은 7번 장의 조언(actions)에 모으세요.`);
     if (plan.no !== 6) {
       for (const [where, t] of [[`${w}.headline`, s.headline], ...paragraphs.map((p, i) => [`${w}.paragraphs[${i}]`, p] as const)] as const) {
         if (isString(t) && PERIOD_TALK.test(t)) errors.push(`${where}: 시기 이야기("${PERIOD_TALK.exec(t)![0]}")는 6번 "앞으로의 운과 변화" 장에만 씁니다 — 이 장에서는 시기를 말하지 않고, 같은 이야기를 두 번 풀지 않습니다.`);
@@ -265,6 +269,18 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
     }
     if ((STORY7_OWNER_NOS as readonly number[]).includes(plan.no)) for (const id of cited) if (personalIds.has(id) && id !== "self.mbti") usedIn.set(id, [...(usedIn.get(id) ?? []), plan.no]);
 
+    // 6번 — 개운(방향 · 색 · 숫자 · 장소): 근거 목록의 보완 후보 1순위 기운의 전통 대응을 본문이 말해야 한다(개인별 계산 없이 임의로 배정하지 않는다)
+    if (plan.no === 6) {
+      const element = fortifyPrimaryOf(evidence);
+      if (element) {
+        const f = ELEMENT_FORTUNE[element];
+        if (!cited.includes("saju.fortify")) errors.push(`${w}.evidence: 개운 풀이의 근거(saju.fortify)를 달아 주세요.`);
+        const m = fortuneMentions(paragraphs.join("\n"), element);
+        const missing = [m.direction ? "" : `방향(${f.direction})`, m.color ? "" : `색(${f.colors.join(" · ")})`, m.number ? "" : `숫자(${f.numbers.join(" · ")})`, m.place ? "" : "장소(자주 머무는 환경)"].filter(Boolean);
+        if (missing.length) errors.push(`${w}: 개운 풀이(행운의 색 · 방향 · 숫자 · 장소)에서 ${missing.join(" · ")}이(가) 빠졌습니다 — 근거 목록의 보완 후보 1순위 ${element}(${f.image}) 기운의 전통 대응을 그대로 쓰세요: 방향 ${f.direction}, 색 ${f.colors.join(" · ")}, 숫자 ${f.numbers.join(" · ")}, 장소 ${f.places.join(" · ")}. 임의로 다른 기운의 색 · 방향 · 숫자를 쓰지 않습니다.`);
+      }
+    }
+
     // 6번 — 가까운 세 해 · 응답으로 본 가능성
     if (plan.no === 6) {
       list<{ year: string; theme: string }>(s.years, `${w}.years`, refs.length ? S.years.min : 0, S.years.max).forEach((y, i) => {
@@ -284,8 +300,8 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
 
   // 같은 개인 성향 근거(MBTI 제외)를 근거를 소유하는 장 셋 이상이 앞세우지 않는다 — 한 가지 응답이 모든 장을 끌고 가면 글 전체가 한 모티프의 되풀이가 된다
   const nonMbti = personal.filter((e) => e.id !== "self.mbti");
-  if (nonMbti.length >= PERSONAL_REUSE.minPoolToCheck) {
-    for (const [id, nos] of usedIn) if (nos.length > PERSONAL_REUSE.maxAreas) errors.push(`sections: 개인 성향 근거 ${id}를 ${nos.length}개 장(${nos.join(" · ")}번)이 앞세웠습니다 — 같은 응답이 모든 장을 끌고 가면 글이 한 가지 모티프의 되풀이가 됩니다. ${PERSONAL_REUSE.maxAreas}개 장까지만 쓰고, 나머지 장은 그 장에 맞닿는 다른 근거에서 출발하세요(사용자 메시지 sections[].personalEvidence가 장마다 나눠 준 것).`);
+  if (nonMbti.length >= STORY7_PERSONAL_REUSE.minPoolToCheck) {
+    for (const [id, nos] of usedIn) if (nos.length > STORY7_PERSONAL_REUSE.maxAreas) errors.push(`sections: 개인 성향 근거 ${id}를 ${nos.length}개 장(${nos.join(" · ")}번)이 앞세웠습니다 — 같은 응답이 거의 모든 장을 끌고 가면 글이 한 가지 모티프의 되풀이가 됩니다. ${STORY7_PERSONAL_REUSE.maxAreas}개 장까지만 쓰고, 나머지 장은 그 장에 맞닿는 사주 근거에서 출발하세요(사용자 메시지 sections[].personalEvidence가 장마다 나눠 준 것).`);
   }
   if (mbtiAvailable && mbtiSections < STORY7_MBTI_MIN) errors.push(`sections: 입력한 MBTI(self.mbti)를 ${STORY7_MBTI_NOS.join(" · ")}번 장 가운데 ${STORY7_MBTI_MIN}곳 이상에 연결해 주세요 (지금 ${mbtiSections}곳). 맞닿는 곳에서 한 장에 한 번, 알파벳 글자 없이 "입력해 주신 성향"으로.`);
 
@@ -320,14 +336,15 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   for (const { where, text: t } of texts) {
     const hit = PROCESS_TALK.exec(t);
     if (hit) errors.push(`${where}: 작성 과정을 말하는 문장("${t.slice(Math.max(0, hit.index - 8), hit.index + hit[0].length).trim().slice(0, 50)}")은 쓰지 않습니다 — 쓸 것이 없으면 그 이야기를 하지 않고, 쓸 수 있는 근거로 이 사람의 모습을 풀어 쓰세요.`);
-    const family = FAMILY_CLAIM.exec(t);
-    if (family) errors.push(`${where}: 가족("${family[0]}") 이야기는 입력받은 것이 없어 쓰지 않습니다 — 가족 구성 · 가족과 있었던 일을 아는 것처럼 쓰지 않고, 연애 밖의 관계는 친구 · 동료 · 협력 장면의 경향으로만 쓰세요.`);
-    const luck = LUCK_PERSON.exec(t);
-    if (luck) errors.push(`${where}: "${luck[0]}"은 귀인 · 인복을 계산하는 신살을 아직 계산하지 않아 쓰지 않습니다 — 사람 사이의 경향은 근거 목록의 십성 · 합 · 충과 응답에서 읽히는 것까지만 쓰세요.`);
+    // 가족 이야기는 전통 육친 대응으로 읽는 조건형까지만 — 가족 구성 · 가족과 있었던 일을 아는 것처럼 쓰지 않는다(운영자 2026-10-17: 가족 인연은 풀이하되 없는 사건을 만들지 않는다)
+    for (const sentence of t.split(/(?<=[.!?])\s+/)) {
+      const family = FAMILY_CLAIM.exec(sentence);
+      if (family && !CONDITIONAL_MARK.test(sentence) && !TRADITION_MARK.test(sentence)) errors.push(`${where}: "${sentence.slice(0, 40)}…" — 가족("${family[0]}") 이야기는 입력받은 것이 없으므로 사실처럼 쓰지 않습니다 — "전통에서는 ~로 읽어요 · ~기 쉬워요 · ~일 수 있어요"처럼 사주에서 읽은 경향과 조건으로 쓰세요(가족 구성 · 가족과 있었던 일 · 관계의 좋고 나쁨을 정하지 않습니다).`);
+    }
     const fate = WEALTH_FATE.exec(t);
-    if (fate) errors.push(`${where}: 재물의 운명을 판정하는 말("${fate[0]}")을 쓰지 않습니다 — 재성 하나로 돈복을 정하지 않고, 근거가 말하는 범위(돈 앞의 선택 · 재물 주제가 두드러지는 조건)까지만 쓰세요.`);
+    if (fate) errors.push(`${where}: 재물의 결과를 확정하는 말("${fate[0]}")을 쓰지 않습니다 — 재물복 · 돈이 들어오고 나가는 양상은 근거(saju.wealth)가 읽는 구조까지 조건형으로 쓰고, 부자가 된다 · 평생 가난하다처럼 결과를 정하지 않습니다.`);
   }
-  errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext) }));
+  errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext), adviceRules: ADVICE_RULES_TRADITIONAL, perSentenceMax: STORY7_TERMS.perSentenceMax }));
   for (const { where, text: t } of texts) if (TYPE_CODE.test(t)) errors.push(`${where}: 알파벳 유형 코드("${TYPE_CODE.exec(t)![0]}")를 쓰지 않습니다 — 입력한 MBTI는 "입력해 주신 성향"으로 부릅니다.`);
   // 미유 문체 — 분명한 위반만 실패로 센다(나머지는 고쳐 쓰기 안내로 생성기가 따로 부탁한다)
   errors.push(...voiceErrors(checkVoice(texts, { blockOf: story7BlockOf })));
