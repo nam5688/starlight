@@ -83,13 +83,13 @@ node --env-file=.env.local scripts/run-ai-compare.ts --stage story-p01 --variant
 ### ② 사주 궁합 (가상 쌍 C1)
 
 ```powershell
-node --env-file=.env.local scripts/run-compat-live.ts --stage compat-saju-p1 --already-spent-krw <2468 + ①에서 쓴 금액> --execute --approved-cap-krw 6000 --approved-on 2026-10-17
+node --env-file=.env.local scripts/run-compat-live.ts --stage compat-saju-p1 --already-spent-krw <3108 + ①에서 쓴 금액> --execute --approved-cap-krw 6000 --approved-on 2026-10-17
 ```
 
 ### ③ 리포트 궁합 (가상 인물 P01 · P02)
 
 ```powershell
-node --env-file=.env.local scripts/run-compat-live.ts --stage compat-pair-p1 --already-spent-krw <2468 + ① + ②에서 쓴 금액> --execute --approved-cap-krw 6000 --approved-on 2026-10-17
+node --env-file=.env.local scripts/run-compat-live.ts --stage compat-pair-p1 --already-spent-krw <3108 + ① + ②에서 쓴 금액> --execute --approved-cap-krw 6000 --approved-on 2026-10-17
 ```
 
 ## 4. 글 전문을 읽는 방법 (자동 검사 통과 ≠ 합격)
@@ -160,7 +160,7 @@ node --env-file=.env.local scripts/run-compat-live.ts --stage compat-pair-p1 --a
 | --- | --- |
 | 달라진 것 | 지시문 `story-7-prompt-0.4`(0.3의 사주 중심 + 출생 시각을 모를 때의 범위 · 사주 모습과 응답의 일치 · 차이 설명, `docs/birth-time-unknown-v1.md`) · 지시문 `story-7-prompt-0.3`의 변경(사주 중심) · 근거 목록에 사주 풀이 재료 여섯 가지(`saju.sipsung · career · wealth · kin · partner · fortify`) · 검사 완화(전통 해석 · 개운법 허용 · 용어 · 문단 · 핵심 문장 한도 넓힘 · 반복은 낱말 횟수로 막지 않음). 입력 파일 · 22문항 · 실행 명령은 8장과 같다 |
 | 드라이런 어림(가상 입력 기준 — 운영자 입력은 다를 수 있다) | 입력 약 6만 토큰(어림) · 평소 약 390원 · **호출 1회 최악 약 639원**(상한 1,234.04원 안) · (참고) 재작성까지 가는 최악 약 1,367원은 상한을 넘는다 — **이번 시험은 재작성을 하지 않아 해당 없음이며, 재작성을 하려면 운영자가 상한을 다시 확인해야 한다** |
-| `--already-spent-krw` | **2839** (이전 실행의 누적액, 반올림해 높게 적는다) |
+| `--already-spent-krw` | **2839** (이 실행을 할 때의 누적액 — 실행했고, 이제 누적은 3,108원이다) |
 | 읽기 | `npm.cmd run dev` → `http://localhost:3000/dev/live/<결과 폴더 이름>` — 무료 리포트와 7개 대주제 심층 리포트를 나란히, 형식 검사에 걸렸어도 원문 전문 · 입력 확인 · 읽기 전 지표 |
 | 읽을 때 볼 것 | ① 장마다 **새로 알게 되는 사주 정보**가 있는가(일간 · 오행 · 십성 / 매력 · 쓴소리 / 연애운 · 잘 맞는 상대 / 인복 · 가족 · 곁에 둘 사람 / 직업운 · 재물복 / 개운) ② 6번의 방향 · 색 · 숫자 · 장소가 근거(`input-check.md`의 `saju.fortify`)의 대응과 같은가 ③ 계산하지 않은 신살 · 십이운성 · 격국 · 용신을 쓰지 않았는가 ④ 응답을 되풀이하지 않고 사주 풀이를 구체화하는가 ⑤ 같은 마무리 · 문장 끝이 몰리지 않는가 ⑥ 가족 · 재물에서 없는 사건을 만들지 않았는가 |
 | 하지 않는 것 | 다음 호출(재작성 · 사주 궁합 · 리포트 궁합 · 28문항)과 **글을 읽기 전의 지시문 수정**을 하지 않는다. 판매 스위치 · 운영 DB · 실결제 · Production 배포는 건드리지 않는다 |
@@ -168,3 +168,21 @@ node --env-file=.env.local scripts/run-compat-live.ts --stage compat-pair-p1 --a
 **확인한 것(클라우드 · 모의 모델 · 대리 작성기)**: 근거 여섯 가지 시험 10개(손으로 센 기대값 · 150개 날짜 · 불확실한 기둥 · 판정 이름 없음) · story-7 제품 경로 시험 · 전체 단위 시험 · 리허설(모의 글)로 결과 폴더가 만들어지는 것. **지시문 0.3의 실제 AI 글은 한 번도 읽어 보지 못했다(검증되지 않음).**
 
 **출생시간 미상 실행의 확인(클라우드 · 모의 모델)**: `--birth-time-unknown` 드라이런 · 리허설이 끝까지 돌고(근거 42개 · 시각 미상 근거 `saju.hour.unknown` · 입력 확인 파일에 "시주 없음"과 세 기둥 기준 문장) 시험 13개(근거 · 검사 · 조립 · 독립 대조)가 통과한다. **실제 AI의 미상 글은 한 번도 읽어 보지 못했다(검증되지 않음).**
+
+## 10. 2차 실행 결과(지시문 0.4 · 출생 시각 미상, 2026-10-17 운영자 PC) · 호출 없이 다시 검사하기
+
+**결과(기록값)**: 호출 1회 · 실제 **269원**(입력 45,213 · 출력 6,217토큰 · 46.9초) · 누적 **3,108원**(승인 총액 6,000원, 남은 2,892원) · 형식 검사 불통과 — 걸린 이유는 "JSON 형식이 아닙니다"뿐이라 **글 내용은 검사를 받아 보지도 못했다**. 원문 전문(6,763자)은 `pilot-data\ai-compare\story7-own-20261017-171215\attempts\round1.txt`에 저장돼 있다. **이 승인(story7-own 2회)은 모두 썼다 — 새 실행은 운영자가 다시 승인해야 한다**(코드 `runsDone` 2, 드라이런은 계속 된다).
+
+**원인(원문을 읽어 확인한 것 — 추정이 아니다)**: ① 출력이 6,217토큰이라 최대 24,000토큰의 4분의 1이다 — **잘린 것이 아니다**(처음 의심한 "한도에 닿아 잘림"은 틀렸다). ② 글은 7개 장 · 근거 · 시기 표 · 조언 행동 3개가 모두 있었다. ③ 그런데 JSON의 닫는 괄호 `]}` 둘이 빠져 있었고(파일 길이 6,763자 지점에서 파서가 멈춘다), ④ 조언 행동(actions)이 지시문("sections 바깥")과 달리 **7번 장 객체 안**에 들어 있었다. 코드는 JSON을 읽지 못하면 이유를 가리지 않고 같은 문구로 바꿔 기록해서 이유가 가려졌다.
+
+**고친 것(사후 수정 — 이 글을 본 뒤에 고쳤으므로 새 글이 통과한다는 증거가 아니다)**: `extractJson`이 끝의 닫는 괄호만 빠진 글에 **닫는 괄호만 보충**한다(글자는 바꾸거나 지우지 않는다 · 끊긴 문자열 · 쉼표나 콜론에서 끊긴 글 · 짝이 어긋난 글 · 6개를 넘게 빠진 글은 그대로 실패). `normalizeStory7Draft`가 7번 장 안의 actions를 **위치만** sections 바깥으로 옮긴다(바깥에 이미 있으면 건드리지 않음). 보충한 글도 같은 형식 · 근거 · 문체 검사를 그대로 거치므로 장 · 문단 · 근거가 빠진 글은 통과하지 못한다. 시험 `generator.test.ts` · `story7-product.test.ts`.
+
+**호출 없이(0원) 같은 글을 같은 검사에 넣어 보기 — 운영자 PC, `miyu` 폴더**
+
+```powershell
+node scripts/recheck-own-draft.ts pilot-data\ai-compare\story7-own-20261017-171215 --birth-time-unknown
+```
+
+- 키 · 승인 값이 필요 없고 AI를 부르지 않는다. 결과 폴더 안에 `recheck.md`(검사 결과 + 읽기 전 지표)와 `readable-rechecked.md`(읽는 순서로 풀어 쓴 글, 내용은 그대로)를 만든다.
+- 화면에 "끝의 닫는 괄호 2개를 보충했다 · actions를 바깥으로 옮겼다"가 나오고, 이어서 검사 **통과/불통과와 걸린 항목**이 나온다. 걸린 항목이 오탐인지는 글을 읽은 사람이 판단한다(지난 시험에서는 검사가 틀린 경우가 많았다).
+- **이 검사는 글을 받은 뒤에 한 것이다.** 통과해도 "AI가 형식 검사를 통과했다"는 뜻이 아니고 생성기가 저장한 리포트도 아니다 — 판매에는 쓰지 않는다.

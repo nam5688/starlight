@@ -276,6 +276,31 @@ test("문단 나눔 보정: 문장 수 한도(4문장)를 넘은 문단은 문�
   assert.equal(story7Paragraphs(section(normalizeStory7Draft(e), 2)).length, 3);
 });
 
+test("조언 행동 위치 보정: 7번 장 안에 들어 있는 actions는 위치만 sections 바깥으로 옮기고 글자는 그대로 — 바깥에 이미 있거나 다른 장에 있으면 건드리지 않는다", () => {
+  type Nested = { actions?: unknown; sections: { no: number; actions?: unknown }[] };
+  const d = clone(mockDraft());
+  const original = JSON.stringify(d.actions);
+  // 2026-10-17 실제 AI 글의 모양: 조언 행동이 7번 장 객체 안에 있고 sections 바깥에는 없다
+  const nested = clone(d) as unknown as Nested;
+  nested.sections.find((s) => s.no === 7)!.actions = nested.actions;
+  delete nested.actions;
+  const fixed = normalizeStory7Draft(nested);
+  assert.equal(JSON.stringify(fixed.actions), original, "행동의 글자 · 근거 · 순서는 그대로다");
+  assert.equal(fixed.sections.find((s) => s.no === 7)!.actions, undefined, "옮긴 행동은 7번 장에서 빠진다(같은 글이 두 곳에 있지 않다)");
+  assert.equal(nested.actions, undefined, "입력은 바꾸지 않는다");
+  assert.ok(nested.sections.find((s) => s.no === 7)!.actions, "입력의 7번 장에는 그대로 있다");
+  assert.deepEqual(validateStory7Draft(fixed, P01_EVIDENCE), validateStory7Draft(d, P01_EVIDENCE), "보정한 글은 처음부터 바깥에 있던 글과 같은 검사 결과를 받는다");
+  // 바깥에 이미 목록이 있으면 안쪽 것을 옮기지 않는다
+  const both = clone(d) as unknown as Nested;
+  both.sections.find((s) => s.no === 7)!.actions = [{ title: "안쪽", detail: "안쪽 행동", evidence: [] }];
+  assert.equal(JSON.stringify(normalizeStory7Draft(both).actions), original);
+  // 7번이 아닌 장의 actions는 옮기지 않는다
+  const other = clone(d) as unknown as Nested;
+  delete other.actions;
+  other.sections.find((s) => s.no === 6)!.actions = JSON.parse(original);
+  assert.equal(normalizeStory7Draft(other).actions, undefined);
+});
+
 // ───── 조립 · 저장 모양 ─────
 
 const assembled = () => assembleStory7({ draft: mockDraft(), evidence: P01_EVIDENCE, input: P01.input, reference: { ...REF, iso: "2026-10-17" }, promptVersion: "x", ruleVersions: [] });

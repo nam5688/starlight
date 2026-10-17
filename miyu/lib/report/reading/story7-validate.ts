@@ -71,13 +71,27 @@ export const story7BlockOf = (where: string): string => {
 };
 export const STORY7_MOTIF_BLOCKS = { of: story7BlockOf, main: STORY7_SECTIONS.map((s) => `s${s.no}`) };
 
+/** 섹션 객체에서 actions 칸만 뺀 사본(입력은 바꾸지 않는다) */
+function withoutActions<S extends object>(section: S): S {
+  const copy = { ...section } as Record<string, unknown>;
+  delete copy.actions;
+  return copy as S;
+}
+
 /**
  * 문장 수 한도를 넘은 문단을 문단 나눔만 바꿔 둘 이상으로 나눈다(문장은 한 글자도 바꾸지 않는다) — 한 문단 때문에 글 전체를 버리지 않으려고.
  * 나눈 조각이 최소 글자 수에 못 미치거나 장의 문단 수 상한을 넘기면 그 장은 건드리지 않는다(검사가 이유를 알려 준다). 입력은 바꾸지 않는다.
+ * 또 하나: 조언 행동(actions)을 sections 바깥이 아니라 7번 장 안에 넣은 글은 **위치만** sections 바깥으로 옮긴다(행동의 글자 · 근거는 그대로 — 실제 AI 시험 2026-10-17에서
+ * 7번 장 안에 넣은 글이 나왔다. 지시문은 바깥이라고 두 번 적었지만 모델이 안쪽에 놓았다). 바깥 actions가 이미 목록이면 건드리지 않는다.
  */
 export function normalizeStory7Draft<T>(raw: T): T {
   const d = raw as Partial<Story7DraftV1> | null;
   if (!d || typeof d !== "object" || !Array.isArray(d.sections)) return raw;
+  type WithActions = { actions?: unknown };
+  const nested = Array.isArray(d.actions)
+    ? undefined
+    : d.sections.find((s) => s && typeof s === "object" && Number(s.no) === 7 && Array.isArray((s as WithActions).actions));
+  const liftedActions = nested ? ((nested as WithActions).actions as Story7DraftV1["actions"]) : undefined;
   const split = (paragraphs: unknown): unknown => {
     if (!Array.isArray(paragraphs) || !paragraphs.every(isString)) return paragraphs;
     const next: string[] = [];
@@ -97,8 +111,10 @@ export function normalizeStory7Draft<T>(raw: T): T {
     }
     return next;
   };
-  const sections = d.sections.map((s) => {
-    if (!s || typeof s !== "object") return s;
+  const sections = d.sections.map((section) => {
+    if (!section || typeof section !== "object") return section;
+    // 옮긴 행동은 7번 장에서 빼 같은 글이 두 곳에 있지 않게 한다
+    const s = section === nested ? withoutActions(section) : section;
     const plan = STORY7_SECTIONS.find((x) => x.no === Number(s.no));
     if (!plan) return s;
     if (Array.isArray(s.parts)) {
@@ -109,7 +125,7 @@ export function normalizeStory7Draft<T>(raw: T): T {
     const paragraphs = split(s.paragraphs);
     return Array.isArray(paragraphs) && paragraphs.length <= plan.maxParagraphs ? { ...s, paragraphs } : s;
   });
-  return { ...d, sections } as T;
+  return { ...d, sections, ...(liftedActions ? { actions: liftedActions } : {}) } as T;
 }
 
 /**

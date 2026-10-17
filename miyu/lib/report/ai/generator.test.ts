@@ -8,7 +8,7 @@ import { isPersonalV2, type ReportInput } from "../generator.ts";
 import { buildUserMessage } from "../v2/prompt.ts";
 import type { ReportDraftV2 } from "../v2/types.ts";
 import { validateDraft } from "../v2/validate.ts";
-import { buildEvidence, createAiReportGenerator, extractJson } from "./generator.ts";
+import { buildEvidence, closeMissingBrackets, createAiReportGenerator, extractJson, extractJsonLoose } from "./generator.ts";
 import { composeMockDraft, createMockModel } from "./mock-model.ts";
 import { ModelCallError, type TextModel } from "./model.ts";
 import { glossaryFor } from "../../saju/glossary.ts";
@@ -127,6 +127,29 @@ test("성별이 없으면 대운 근거 없이 세운만 시기로 쓴다", asyn
 test("JSON 꺼내기: 앞뒤 설명 · 코드 블록이 붙어도 읽는다", () => {
   assert.deepEqual(extractJson('설명입니다\n```json\n{"a": 1}\n```'), { a: 1 });
   assert.throws(() => extractJson("JSON 없음"));
+});
+
+test("JSON 꺼내기: 끝의 닫는 괄호만 빠진 글은 글자를 바꾸지 않고 보충하고, 그 밖의 깨진 글은 그대로 실패한다", () => {
+  // 2026-10-17 실제 AI 시험의 모양: 장 배열 · 맨 바깥 객체의 `]}` 둘만 없다
+  const cut = '{"headline":"제목","sections":[{"no":1,"paragraphs":["문장 \\"인용\\" {중괄호} 있어요."],"evidence":["a.b"]},{"no":2,"actions":[{"title":"t","evidence":["x"]}]}';
+  assert.throws(() => JSON.parse(cut));
+  const loose = extractJsonLoose(cut);
+  assert.equal(loose.closedBrackets, 2);
+  const value = loose.value as { sections: { no: number; paragraphs?: string[] }[] };
+  assert.equal(value.sections.length, 2);
+  assert.equal(value.sections[0].paragraphs?.[0], '문장 "인용" {중괄호} 있어요.', "문자열 안의 따옴표 · 괄호는 세지 않고 글은 그대로다");
+  assert.equal(closeMissingBrackets(cut)?.text, cut + "]}", "붙이는 것은 닫는 괄호뿐이다");
+  // 코드 블록 · 앞뒤 설명이 붙어도 같다
+  assert.deepEqual(extractJson('여기 있어요\n```json\n{"a":[1,2\n```'), { a: [1, 2] });
+  // 정상 글은 보충 없이 그대로
+  assert.deepEqual(extractJsonLoose('{"a":{"b":[1]}}'), { value: { a: { b: [1] } }, closedBrackets: 0 });
+  // 고치면 안 되는 글: 끊긴 문자열 · 쉼표 · 콜론에서 끊긴 글 · 짝이 어긋난 글 · 다른 오류
+  assert.throws(() => extractJson('{"a":["끊긴 문'));
+  assert.throws(() => extractJson('{"a":[1,'));
+  assert.throws(() => extractJson('{"a":'));
+  assert.throws(() => extractJson('{"a":[1}'));
+  assert.throws(() => extractJson('{"a":1 "b":2}'), "괄호가 아닌 오류는 보충으로 가리지 않는다");
+  assert.equal(closeMissingBrackets('{"a":[[[[[[[1'), null, "빠진 괄호가 너무 많으면 보충하지 않는다");
 });
 
 // ---- 형식 검사 (validateDraft) ----

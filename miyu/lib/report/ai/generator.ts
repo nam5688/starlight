@@ -87,12 +87,62 @@ export type AiGeneratorOptions = {
   adaptEvidence?: (evidence: Evidence[], input: ReportInput) => Evidence[];
 };
 
-/** 모델 응답에서 JSON 객체를 꺼낸다 (앞뒤 설명 · 코드 블록이 붙어도) */
-export function extractJson(text: string): unknown {
+/**
+ * 글이 끝난 자리에서 닫는 괄호(] · })만 빠진 JSON에 모자란 괄호를 닫아 붙인다 — 글자는 하나도 바꾸거나 지우지 않는다.
+ * 끊긴 문자열 · 쉼표나 콜론에서 끊긴 글 · 괄호 짝이 어긋난 글 · 이미 다 닫힌 글(다른 오류)은 건드리지 않고 null을 돌려준다.
+ * 실제 AI 시험(2026-10-17, 내용은 7개 장이 모두 있고 마지막 `]}` 둘만 없었다)에서 나온 형식 오류를 위한 것이며, 이 뒤에도 같은 형식 · 내용 검사를 그대로 거친다.
+ */
+export function closeMissingBrackets(text: string): { text: string; closed: number } | null {
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (const ch of text) {
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") {
+      if (stack.pop() !== ch) return null;
+    }
+  }
+  if (inString || stack.length === 0 || stack.length > 6) return null;
+  if (/[,:]\s*$/.test(text)) return null;
+  return { text: text + [...stack].reverse().join(""), closed: stack.length };
+}
+
+/** 모델 응답에서 JSON 객체를 꺼내고, 끝의 닫는 괄호만 빠졌다면 보충했는지(몇 개)도 알려 준다 */
+export function extractJsonLoose(text: string): { value: unknown; closedBrackets: number } {
   const start = text.indexOf("{");
+  if (start < 0) throw new Error("JSON을 찾지 못했습니다.");
   const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("JSON을 찾지 못했습니다.");
-  return JSON.parse(text.slice(start, end + 1));
+  let firstError: unknown = new Error("JSON을 찾지 못했습니다.");
+  if (end > start) {
+    try {
+      return { value: JSON.parse(text.slice(start, end + 1)), closedBrackets: 0 };
+    } catch (error) {
+      firstError = error;
+    }
+  }
+  const body = text.slice(start).replace(/\s*```\s*$/, "").trimEnd();
+  const closed = closeMissingBrackets(body);
+  if (closed) {
+    try {
+      return { value: JSON.parse(closed.text), closedBrackets: closed.closed };
+    } catch {
+      // 괄호만 닫아서는 읽히지 않는 글이다 — 아래에서 처음 오류를 그대로 낸다
+    }
+  }
+  throw firstError;
+}
+
+/** 모델 응답에서 JSON 객체를 꺼낸다 (앞뒤 설명 · 코드 블록이 붙어도, 끝의 닫는 괄호만 빠진 글은 보충해서) */
+export function extractJson(text: string): unknown {
+  return extractJsonLoose(text).value;
 }
 
 /** 한국 날짜 기준 연 · 월 */
