@@ -1,6 +1,6 @@
-// 12개 고정 섹션 초안(story12-plan.ts)과 지금 story-v1(영역 셋)의 **구조적 반복 압력**을 같은 방식으로 센다 — 순수 계산, AI 호출 없음.
+// 7개 대주제 초안(story7-plan.ts)과 지금 story-v1(영역 셋)의 **구조적 반복 압력**을 같은 방식으로 센다 — 순수 계산, AI 호출 없음.
 // 센 것: 응답 근거(survey · self)를 장에 나눌 때 장마다 몇 개를 가져가는지 · 근거가 모자라 다른 장의 근거를 **빌려 써야 하는** 수(= 같은 근거를 두 장에서 다시 쓰게 되는 수).
-// 지금 story-v1의 배정 함수(`personalEvidenceFor`)와 같은 알고리즘이며(시험이 같은 결과를 내는지 확인), 12개 장에는 같은 규칙을 그대로 적용한다.
+// 지금 story-v1의 배정 함수(`personalEvidenceFor`)와 같은 알고리즘이며(시험이 같은 결과를 내는지 확인), 7개 대주제에는 같은 규칙을 그대로 적용한다.
 // 한계: 이것은 글이 아니라 **근거 배분**의 어림이다 — 근거를 빌려 쓰면 반드시 반복이라는 뜻이 아니고, 빌리지 않아도 같은 낱말로 번질 수 있으며(모티프), 글에서 실제로 줄었는지는 글을 쓴 뒤 같은 검사(repeat · motif)로 비교해야 한다.
 import type { Evidence, Topic } from "../evidence.ts";
 import { findRepeatedPhrasesIn } from "./repeat.ts";
@@ -8,14 +8,14 @@ import { COMMON_STEMS } from "./story-motif.ts";
 import { MONEY_WORDS, PERIOD_TALK, STORY_AREAS } from "./story-plan.ts";
 import { visibleStoryTexts } from "./story-validate.ts";
 import { countSentences } from "./validate.ts";
-import { STORY12_SECTIONS, type Story12Section } from "./story12-plan.ts";
+import { STORY7_SECTIONS, type Story7Section } from "./story7-plan.ts";
 import type { StoryDraftV1 } from "./types.ts";
 
 export type Slot = { key: string; prefer: RegExp; personalTopics: Topic[]; borrowTopics: Topic[]; personalMin: number };
 
 export const slotsOfAreas = (): Slot[] => STORY_AREAS.map((a) => ({ key: a.id, prefer: a.prefer, personalTopics: a.personalTopics, borrowTopics: a.personalTopics, personalMin: a.personalMin }));
-export const slotsOf12 = (sections: Story12Section[] = STORY12_SECTIONS): Slot[] =>
-  sections.map((s) => ({ key: String(s.no).padStart(2, "0"), prefer: s.prefer, personalTopics: s.personalTopics, borrowTopics: s.borrowTopics, personalMin: s.personalMin }));
+export const slotsOf7 = (sections: Story7Section[] = STORY7_SECTIONS): Slot[] =>
+  sections.map((s) => ({ key: String(s.no), prefer: s.prefer, personalTopics: s.personalTopics, borrowTopics: s.borrowTopics, personalMin: s.personalMin }));
 
 export type Assignment = {
   owned: Record<string, string[]>;
@@ -85,14 +85,14 @@ export function measureLayout(evidence: Evidence[], slots: Slot[]): LayoutMeasur
   };
 }
 
-/** 12개 장 가운데 사주 근거를 소유하는 장이 자기 근거를 몇 개 갖는가 — 0이면 그 사람의 그 장은 사주 근거 없이 써야 한다 */
-export function sajuCoverage(evidence: Evidence[], sections: Story12Section[] = STORY12_SECTIONS): { no: number; count: number }[] {
+/** 7개 대주제 가운데 사주 근거를 소유하는 장이 자기 근거를 몇 개 갖는가 — 0이면 그 사람의 그 장은 사주 근거 없이 써야 한다 */
+export function sajuCoverage(evidence: Evidence[], sections: Story7Section[] = STORY7_SECTIONS): { no: number; count: number }[] {
   const saju = evidence.filter((e) => e.source === "saju" && !e.uncertain);
   return sections.filter((s) => s.sajuOwns.length > 0).map((s) => ({ no: s.no, count: saju.filter((e) => s.sajuOwns.some((re) => re.test(e.id))).length }));
 }
 
-/** 근거 하나를 "소유"하는 12개 장 번호(사주는 sajuOwns, 응답은 prefer + 주제) — 소유자가 둘 이상이면 처음부터 겹치는 근거다 */
-export function owners12(e: Evidence, sections: Story12Section[] = STORY12_SECTIONS): number[] {
+/** 근거 하나를 "소유"하는 대주제 번호(사주는 sajuOwns, 응답은 prefer + 주제) — 소유자가 둘 이상이면 처음부터 겹치는 근거다 */
+export function owners7(e: Evidence, sections: Story7Section[] = STORY7_SECTIONS): number[] {
   if (e.source === "saju") return sections.filter((s) => s.sajuOwns.some((re) => re.test(e.id))).map((s) => s.no);
   return sections.filter((s) => s.prefer.test(e.id) && e.topics.some((t) => s.personalTopics.includes(t))).map((s) => s.no);
 }
@@ -102,7 +102,7 @@ export function owners12(e: Evidence, sections: Story12Section[] = STORY12_SECTI
 /** 글 조각: block은 비교 단위(영역 · 장), where는 조각 위치(repeat.ts가 쓴다) */
 export type TextPiece = { block: string; where: string; text: string };
 
-/** story-v1 초안의 화면 글을 영역 단위로 나눈다 — 고민(focus)은 12개 장 구조에 대응하는 칸이 없어 비교에서 뺀다(입력에서도 고민을 뺐다) */
+/** story-v1 초안의 화면 글을 영역 단위로 나눈다 — 고민(focus)은 7개 대주제 입력에서도 뺐으므로 비교에서 뺀다(입력에서도 고민을 뺐다) */
 export function piecesOfStoryV1(d: StoryDraftV1): TextPiece[] {
   return visibleStoryTexts({ ...d, focus: undefined }).map((t) => {
     const m = /^areas\.([\w-]+)\./.exec(t.where);
@@ -111,19 +111,25 @@ export function piecesOfStoryV1(d: StoryDraftV1): TextPiece[] {
   });
 }
 
-export type Story12Draft = { headline: string; sections: { no: number; headline: string; paragraphs: string[]; evidence: string[] }[]; actions: { title: string; detail: string; evidence: string[] }[] };
+export type Story7Section_ = { no: number; headline: string; paragraphs?: string[]; parts?: { title: string; paragraphs: string[] }[]; evidence: string[] };
+export type Story7Draft = { headline: string; sections: Story7Section_[]; actions: { title: string; detail: string; evidence: string[] }[] };
 
-/** 12개 장 초안의 화면 글 — 12번 장의 actions는 12번 장에 넣는다 */
-export function piecesOfStory12(d: Story12Draft): TextPiece[] {
+/** 대주제 글의 문단들 — 소제목이 있는 장(5번)은 소제목별 문단을 이어서 */
+export const paragraphsOfSection = (s: Story7Section_): string[] => (s.parts ? s.parts.flatMap((p) => p.paragraphs) : (s.paragraphs ?? []));
+
+/** 7개 대주제 초안의 화면 글 — 7번 장의 actions는 7번 장에 넣는다 */
+export function piecesOfStory7(d: Story7Draft): TextPiece[] {
   const out: TextPiece[] = [{ block: "head", where: "headline", text: d.headline }];
   for (const s of d.sections) {
-    const b = `s${String(s.no).padStart(2, "0")}`;
+    const b = `s${s.no}`;
     out.push({ block: b, where: `${b}.headline`, text: s.headline });
-    s.paragraphs.forEach((p, i) => out.push({ block: b, where: `${b}.p${i}`, text: p }));
+    if (s.parts) {
+      s.parts.forEach((part, k) => part.paragraphs.forEach((p, i) => out.push({ block: b, where: `${b}.part${k}.p${i}`, text: p })));
+    } else (s.paragraphs ?? []).forEach((p, i) => out.push({ block: b, where: `${b}.p${i}`, text: p }));
   }
   d.actions.forEach((a, i) => {
-    out.push({ block: "s12", where: `s12.actions.${i}.title`, text: a.title });
-    out.push({ block: "s12", where: `s12.actions.${i}.detail`, text: a.detail });
+    out.push({ block: "s7", where: `s7.actions.${i}.title`, text: a.title });
+    out.push({ block: "s7", where: `s7.actions.${i}.detail`, text: a.detail });
   });
   return out;
 }
@@ -190,35 +196,42 @@ export function textRepetition(pieces: TextPiece[]): TextRepetition {
 }
 
 /**
- * 12개 장 글의 최소 형식 점검 — 제품 검사(story-validate)가 아니다. 12개 장 구조에는 제품 검사가 없으므로 지시문이 정한 한도(장 수 · 문단 수 · 글자 수 · 문장 수 · 시기 이야기는 11번 장에만)와
+ * 7개 대주제 글의 최소 형식 점검 — 제품 검사(story-validate)가 아니다. 7개 대주제 구조에는 제품 검사가 없으므로 지시문이 정한 한도(장 수 · 문단 수 · 글자 수 · 문장 수 · 시기 이야기는 6번 장에만)와
  * 근거 ID가 실제 목록에 있는지만 본다. 통과가 좋은 글이라는 뜻이 아니고, 걸린 것은 글을 고치지 않고 그대로 보고한다(한 번 쓴 글을 비교한다).
  */
-export function checkStory12Format(raw: unknown, evidence: Evidence[]): string[] {
+export function checkStory7Format(raw: unknown, evidence: Evidence[]): string[] {
   const errors: string[] = [];
-  const d = raw as Partial<Story12Draft> | null;
+  const d = raw as Partial<Story7Draft> | null;
   if (!d || !Array.isArray(d.sections)) return ["sections 배열이 없다"];
   const ids = new Set(evidence.map((e) => e.id));
-  if (d.sections.length !== 12) errors.push(`장이 ${d.sections.length}개다(12개여야 한다)`);
+  if (d.sections.length !== 7) errors.push(`대주제가 ${d.sections.length}개다(7개여야 한다)`);
   d.sections.forEach((s, i) => {
-    const sec = STORY12_SECTIONS[i];
+    const sec = STORY7_SECTIONS[i];
     if (!sec || s.no !== sec.no) {
-      errors.push(`${i + 1}번째 장의 no가 ${s?.no}다`);
+      errors.push(`${i + 1}번째 대주제의 no가 ${s?.no}다`);
       return;
     }
     const label = `${sec.no} ${sec.title}`;
-    const max = sec.kind === "owner" ? 3 : 2;
-    if (s.paragraphs.length < 1 || s.paragraphs.length > max) errors.push(`${label}: 문단이 ${s.paragraphs.length}개(1~${max})`);
+    const paragraphs = paragraphsOfSection(s);
+    if (sec.parts) {
+      const titles = (s.parts ?? []).map((p) => p.title);
+      if (JSON.stringify(titles) !== JSON.stringify(sec.parts)) errors.push(`${label}: 소제목이 ${JSON.stringify(titles)}다(${JSON.stringify(sec.parts)}여야 한다)`);
+    }
+    if (paragraphs.length < 1 || paragraphs.length > sec.maxParagraphs) errors.push(`${label}: 문단이 ${paragraphs.length}개(1~${sec.maxParagraphs})`);
     if (s.headline.length < 8 || s.headline.length > 34) errors.push(`${label}: 제목 ${s.headline.length}자(8~34)`);
-    s.paragraphs.forEach((p, k) => {
+    paragraphs.forEach((p, k) => {
       if (p.length < 60 || p.length > 380) errors.push(`${label} 문단 ${k + 1}: ${p.length}자(60~380)`);
       const n = countSentences(p);
       if (n > 3) errors.push(`${label} 문단 ${k + 1}: ${n}문장(3 이하)`);
-      if (sec.no !== 11 && PERIOD_TALK.test(p)) errors.push(`${label} 문단 ${k + 1}: 11번 장 밖에서 시기를 말한다`);
+      if (sec.no !== 6 && PERIOD_TALK.test(p)) errors.push(`${label} 문단 ${k + 1}: 6번 장 밖에서 시기를 말한다`);
     });
     for (const id of s.evidence ?? []) if (!ids.has(id)) errors.push(`${label}: 없는 근거 ID ${id}`);
-    if (sec.no === 10 && !s.paragraphs.some((p) => MONEY_WORDS.test(p))) errors.push(`${label}: 돈 이야기가 없다`);
+    if (sec.no === 5) {
+      const money = (s.parts ?? []).find((p) => p.title === "재물");
+      if (!money || !money.paragraphs.some((p) => MONEY_WORDS.test(p))) errors.push(`${label}: 재물 소제목에 돈 이야기가 없다`);
+    }
   });
-  if (!Array.isArray(d.actions) || d.actions.length !== 3) errors.push(`actions가 ${d.actions?.length ?? 0}개다(3개여야 한다)`);
+  if (!Array.isArray(d.actions) || d.actions.length < 2 || d.actions.length > 3) errors.push(`actions가 ${d.actions?.length ?? 0}개다(2~3개여야 한다)`);
   return errors;
 }
 

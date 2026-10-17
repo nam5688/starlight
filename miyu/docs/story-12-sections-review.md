@@ -1,5 +1,7 @@
 # 개인 심층 리포트 12개 고정 섹션 — story-v1 매핑 · 중복 · 근거 · 반복 비교 (2026-10-17)
 
+> **취소됨(운영자 2026-10-17) — 이 12개 장 안은 폐기했고 최종 구조는 7개 대주제다. 새 문서는 `story-7-sections-review.md`.** 이 문서와 `story-12-sections-measure.md` · `docs/samples/story12-proxy/`는 **취소된 안의 검토 기록**으로만 남긴다(12개 장 초안 코드 `story12-*`는 삭제했고 git 기록에서만 볼 수 있다). 아래 내용 중 7개 대주제에 그대로 이어지는 발견은 새 문서가 다시 정리했다.
+
 > 운영자 제안: "목차는 12개를 고정하고, 내용은 사람마다 다르게. 12개를 **표시**하는 것과 12개를 **길게 쓰는 것**은 다르다. 미유의 강점은 목차가 많은 것이 아니라 각 장을 읽을 때 새로 이해되는 내용이 있는 것이다."
 > 이 문서는 **구현이 아니라 검토**다. 12개 장 초안(`lib/report/reading/story12-plan.ts`)은 어디에도 연결하지 않았고(`story12.test.ts`가 확인), 화면 · 저장 · 실제 생성 · 기존 story-v1 검사 · 지시문 `story-v1-prompt-0.3`은 **바꾸지 않았다**(바꾼 것은 `story-motif.ts`의 `COMMON_STEMS`를 읽을 수 있게 내보낸 한 단어뿐). **유료 AI 호출 0회 · 운영 DB 변경 0건.**
 > 숫자는 `node scripts/measure-story12.ts --write`가 만드는 `docs/story-12-sections-measure.md`(가상 인물 10명 · 실제 사람이 아님)와 `docs/samples/story12-proxy/`의 시험용 대리 작성기 글 4편(실제 서비스 AI가 아님)에서 가져왔다.
