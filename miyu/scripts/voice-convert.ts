@@ -152,7 +152,7 @@ export function convertLine(text: string): { out: string; manual: string[] } {
 /**
  * 어미만 바꾸면 뜻이 달라지는 파일은 건드리지 않는다 — AI 지시문(말투 규칙이 "~입니다로 끝내지 않는다"처럼 합쇼체를 인용한다) · 검사 오류 · 운영자용 · 개발용 · 문항 초안 · 모의 작성기 · 법률 고지 성격의 하단 안내(plan.ts)
  */
-const NEVER = /prompt\.ts$|prompt-|drafts\/|mock-model|setup-checks|setup-status|generate-dev-report|philosophy\/|\/dev\/|telegram|ai-candidates|fake-toss|memory-repository|live-plan|render-text|reading\/plan\.ts|compat\/plan\.ts|lib\/report\/ai\/|lib\/integrations\/|\.test\.|lib\/commerce\/|lib\/saju\/interpret\/|survey-evidence|pair-evidence|pair-scene-evidence|pair-consent|tendency-v2|reconcile-service|admin-service|admin-support-service|benefit-service|server\/env\.ts|server\/capacity\.ts|lib\/report\/style\//;
+const NEVER = /prompt\.ts$|prompt-|drafts\/|mock-model|setup-checks|setup-status|generate-dev-report|philosophy\/|\/dev\/|telegram|ai-candidates|fake-toss|memory-repository|live-plan|render-text|reading\/plan\.ts|compat\/plan\.ts|lib\/report\/ai\/|lib\/integrations\/|\.test\.|lib\/commerce\/|lib\/saju\/interpret\/|survey-evidence|pair-evidence|pair-scene-evidence|pair-consent|tendency-v2|reconcile-service|admin-service|admin-support-service|benefit-service|server\/env\.ts|server\/capacity\.ts|lib\/report\/style\/|lib\/assessment\/modules\//;
 
 const rawArgs = process.argv.slice(2);
 const exceptIdx = rawArgs.indexOf("--except");
