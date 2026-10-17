@@ -183,6 +183,25 @@ export function checkApproval(stage: { name: string; capKrw: number }, guard: Bu
   if (guard.settings.capKrw > approval.approvedCapKrw) throw new Error("예산 관리기의 한도가 승인한 금액보다 큽니다.");
 }
 
+/**
+ * 승인 범위가 좁은 단계(restrict가 있는 단계)의 제한을 확인한다. 어긋나면 이유 목록을 돌려주고, 비어 있으면 통과다.
+ * 실행기가 드라이런 · 실제 호출 모두에서 부르며, 이유가 있으면 호출하지 않는다.
+ */
+export function checkStageRestriction(
+  stage: { restrict?: { variant: string; only: string; persona: string; runCeilingKrw: number; requireAlreadySpent: boolean } },
+  input: { variant: string; only: string | undefined; persona: string | undefined; alreadySpentGiven: boolean; twoRoundWorstKrw: number },
+): string[] {
+  const r = stage.restrict;
+  if (!r) return [];
+  const why: string[] = [];
+  if (input.variant !== r.variant) why.push(`이 승인은 ${r.variant} 지시문 한 가지에만 쓸 수 있습니다 (지금 ${input.variant}).`);
+  if (input.only !== r.only) why.push(`이 승인은 후보 ${r.only} 한 모델에만 쓸 수 있습니다 (--only ${r.only}를 적어야 합니다).`);
+  if (input.persona !== r.persona) why.push(`이 승인은 가상 인물 ${r.persona} 한 명에만 쓸 수 있습니다 (--persona ${r.persona}를 적어야 합니다).`);
+  if (r.requireAlreadySpent && !input.alreadySpentGiven) why.push("같은 총액 안에서 이미 쓴 금액(--already-spent-krw)을 적어야 합니다. 빠뜨리면 남은 한도가 아니라 총액으로 계산됩니다.");
+  if (input.twoRoundWorstKrw > r.runCeilingKrw) why.push(`모두 고쳐 쓰기까지 가는 최악 비용 ${Math.round(input.twoRoundWorstKrw).toLocaleString("ko-KR")}원이 승인한 상한 ${r.runCeilingKrw.toLocaleString("ko-KR")}원을 넘습니다. 실행하지 않고 운영자가 상한을 다시 확인해야 합니다.`);
+  return why;
+}
+
 export async function runStage(opts: {
   stage: { name: string; capKrw: number };
   personas: Persona[];

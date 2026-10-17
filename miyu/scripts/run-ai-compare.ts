@@ -13,6 +13,7 @@
 //   --persona P01                                                     # 가상 인물 한 명만 (원인을 볼 때 비용을 줄인다)
 //   --already-spent-krw 621                                           # 같은 단계에서 이미 쓴 금액(원). 승인 총액(3,000원)에서 빼고 남은 만큼만 하드스톱 한도로 쓴다
 //   --only A                                                          # 한 모델만(A=Claude, B=GPT). 그 모델의 키만 있으면 되고 비용은 절반 정도이며, 이름을 가린 비교는 아니다
+//   --stage story-p01 --variant story-v1 --only A --persona P01 --already-spent-krw 2097   # 운영자 승인 2026-10-17(총 4,000원): story-v1 + P01 실제 AI 1건만. 범위 · 상한을 어기면 드라이런에서도 멈춘다
 //   node --env-file=.env.local scripts/run-ai-compare.ts --stage stage-1 --execute --approved-cap-krw 3000 --approved-on 2026-10-13
 //
 // 키(.env.local): ANTHROPIC_API_KEY (후보 A) · OPENAI_API_KEY (후보 B). 값은 이 스크립트가 출력하지 않는다.
@@ -26,7 +27,7 @@ import { AI_CANDIDATES, COMPARE_STAGES } from "../lib/config/ai-candidates.ts";
 import { createAnthropicModel, createOpenAiModel } from "../lib/integrations/ai/providers.ts";
 import { BudgetGuard, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE } from "../lib/report/ai/budget.ts";
 import { buildPersonas } from "../lib/report/ai/compare-personas.ts";
-import { type CompareCandidate, type CompareVariant, planStage, runStage } from "../lib/report/ai/compare-plan.ts";
+import { type CompareCandidate, type CompareVariant, checkStageRestriction, planStage, runStage } from "../lib/report/ai/compare-plan.ts";
 import { isReadingReport } from "../lib/report/generator.ts";
 import { composeMockReading } from "../lib/report/reading/mock-model.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
@@ -64,6 +65,16 @@ console.log("- 인물 1명은 '알려 준 고민'이 있어 개인 통합 리포
 for (const c of chosen) console.log(`- 후보 ${c.key}: ${c.company} ${c.modelId} (입력 $${c.price.inputUsdPerMTok} · 출력 $${c.price.outputUsdPerMTok} / 100만 토큰) — 생각 · 추론 강도 중간`);
 console.log(`- 예상 비용(평소 수준): ${won(plan.expectedKrw)} · 모든 생성이 한 번에 끝나는 최악: ${won(plan.firstCallWorstKrw)} · 모두 고쳐 쓰기까지 가는 최악: ${won(plan.twoRoundWorstKrw)}`);
 console.log(`- 하드스톱 한도: ${won(remainingCap)}${alreadySpent > 0 ? ` (승인 총액 ${won(stage.capKrw)} − 이미 쓴 ${won(alreadySpent)})` : ""} (환율 ${settings.fxKrwPerUsd.toLocaleString("ko-KR")}원/달러 · 여유율 ${Math.round((settings.surcharge - 1) * 100)}% 가정 — 실제 청구는 제공사 콘솔에서 확인)`);
+
+// 승인 범위가 좁은 단계(예: story-p01)는 변형 · 모델 · 인물 · 이미 쓴 금액 · 최악 비용 상한을 드라이런에서도 확인한다 — 어긋나면 호출하지 않는다
+const restrictionIssues = checkStageRestriction(stage, { variant, only, persona: personaArg, alreadySpentGiven: arg("--already-spent-krw") !== undefined, twoRoundWorstKrw: plan.twoRoundWorstKrw });
+if (stage.restrict) console.log(`- 승인 범위: ${stage.restrict.variant} · 후보 ${stage.restrict.only} · 인물 ${stage.restrict.persona} 1건 · 최악 비용 상한 ${won(stage.restrict.runCeilingKrw)}`);
+if (restrictionIssues.length > 0) {
+  console.error("\n승인 범위 확인 — 실행할 수 없습니다:");
+  for (const i of restrictionIssues) console.error(`- ${i}`);
+  console.error("아무것도 호출하지 않았습니다.");
+  process.exit(1);
+}
 
 // 키가 들어갔는지(있음 · 없음)만 보여 준다 — 값은 출력하지 않고, 이 확인으로는 어떤 호출도 하지 않는다. .env.local 을 읽으려면 node --env-file=.env.local 로 실행한다
 console.log(`- 키 입력 확인: 후보 A(ANTHROPIC_API_KEY) ${process.env.ANTHROPIC_API_KEY ? "있음" : "없음"} · 후보 B(OPENAI_API_KEY) ${process.env.OPENAI_API_KEY ? "있음" : "없음"}${process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY ? "" : " (아직 키를 넣지 않았거나 --env-file=.env.local 없이 실행했습니다)"}`);
@@ -113,7 +124,9 @@ const candidates: CompareCandidate[] = chosen.map((c) => ({
   price: c.price,
   model: c.key === "A" ? createAnthropicModel({ apiKey: keys.A ?? "rehearsal", model: c.modelId, effort: "medium", ...(rehearsal ? { fetch: rehearsalFetch("anthropic") as never } : {}) }) : createOpenAiModel({ apiKey: keys.B ?? "rehearsal", model: c.modelId, effort: "medium", ...(rehearsal ? { fetch: rehearsalFetch("openai") as never } : {}) }),
 }));
-const guard = new BudgetGuard({ capKrw: remainingCap, ...settings });
+// 좁은 승인 단계는 한 번 실행의 상한(최악 비용)도 하드스톱으로 쓴다 — 총액 잔액이 더 커도 상한을 넘기는 호출은 제공사에 보내지 않는다
+const guardCap = stage.restrict ? Math.min(remainingCap, stage.restrict.runCeilingKrw) : remainingCap;
+const guard = new BudgetGuard({ capKrw: guardCap, ...settings });
 const blindSeed = Number(approvedOn.replaceAll("-", ""));
 
 let result;

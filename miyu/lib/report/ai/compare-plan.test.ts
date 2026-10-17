@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { AI_CANDIDATES, COMPARE_STAGES } from "../../config/ai-candidates.ts";
 import { BudgetGuard, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE, type ModelPrice } from "./budget.ts";
 import { buildPersonas } from "./compare-personas.ts";
-import { assignBlind, checkApproval, planStage, runStage, type CompareApproval, type CompareCandidate } from "./compare-plan.ts";
+import { assignBlind, checkApproval, checkStageRestriction, planStage, runStage, type CompareApproval, type CompareCandidate } from "./compare-plan.ts";
 import { composeMockReading } from "../reading/mock-model.ts";
 import { composeMockDraft } from "./mock-model.ts";
 import { ModelCallError, type ModelResult, type TextModel } from "./model.ts";
@@ -212,4 +212,26 @@ test("한 모델만 실행(--only): 인물마다 한 건씩 생성하고 모든 
   const both = planStage({ stage: "stage-1", capKrw: 3000, personas: buildPersonas(2), candidates: [{ key: "A", price: PRICE }, { key: "B", price: PRICE }], settings: SETTINGS, now: NOW });
   assert.equal(plan.rows.length, 2);
   assert.ok(Math.abs(plan.expectedKrw * 2 - both.expectedKrw) < 1e-6, "한 모델 비용은 두 모델의 절반");
+});
+
+test("좁은 승인 단계(story-p01): 변형 · 모델 · 인물 · 이미 쓴 금액 · 최악 비용 상한을 어기면 이유가 나오고, 맞으면 통과한다", () => {
+  const stage = COMPARE_STAGES.find((s) => s.name === "story-p01");
+  assert.ok(stage?.restrict, "story-p01 단계가 있고 제한이 있다");
+  assert.equal(stage.capKrw, 4000, "총 승인 한도 4,000원(누적 사용액 포함)");
+  assert.equal(stage.personaCount, 1);
+  assert.equal(stage.restrict.runCeilingKrw, 1204);
+  const ok = { variant: "story-v1", only: "A", persona: "P01", alreadySpentGiven: true, twoRoundWorstKrw: 1204 };
+  assert.deepEqual(checkStageRestriction(stage, ok), [], "범위 안이고 상한과 같으면 통과");
+  const has = (patch: object, word: string) => assert.ok(checkStageRestriction(stage, { ...ok, ...patch }).some((m) => m.includes(word)), word);
+  has({ variant: "reading-v1" }, "story-v1");
+  has({ only: undefined }, "후보 A");
+  has({ only: "B" }, "후보 A");
+  has({ persona: undefined }, "P01");
+  has({ persona: "P02" }, "P01");
+  has({ alreadySpentGiven: false }, "--already-spent-krw");
+  has({ twoRoundWorstKrw: 1205 }, "상한");
+  // 제한이 없는 단계는 이 확인을 하지 않는다
+  assert.deepEqual(checkStageRestriction({}, { variant: "x", only: undefined, persona: undefined, alreadySpentGiven: false, twoRoundWorstKrw: 99999 }), []);
+  // 기존 1 · 2단계는 제한이 없어 지금까지의 동작이 그대로다
+  assert.ok(COMPARE_STAGES.filter((s) => s.name !== "story-p01").every((s) => s.restrict === undefined));
 });

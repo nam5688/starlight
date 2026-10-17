@@ -53,11 +53,38 @@ export type CompareStageDef = {
   personaCount: number;
   /** 이 단계 전체의 하드스톱 한도 (원) — 예산 승인 요청 금액과 같다 */
   capKrw: number;
+  /**
+   * 승인 범위가 좁은 단계의 제한. 있으면 실행기가 이 값과 다른 변형 · 모델 · 인물 · 이미 쓴 금액 누락 · 최악 비용 초과를
+   * 드라이런에서도, 실제 호출에서도 거절한다(승인 범위를 말이 아니라 코드로 지킨다).
+   */
+  restrict?: StageRestriction;
+};
+
+export type StageRestriction = {
+  /** 쓸 수 있는 지시문 형식 */
+  variant: string;
+  /** 쓸 수 있는 후보 (A=Claude) */
+  only: "A" | "B";
+  /** 쓸 수 있는 가상 인물 */
+  persona: string;
+  /** 한 번 실행의 "모두 고쳐 쓰기까지 가는 최악" 비용 상한 (원) — 넘으면 실행하지 않고 운영자가 다시 확인한다 */
+  runCeilingKrw: number;
+  /** 같은 승인 총액 안에서 이미 쓴 금액을 반드시 적게 한다 (--already-spent-krw — 빠뜨리면 총액을 처음부터 쓰는 것처럼 계산된다) */
+  requireAlreadySpent: boolean;
 };
 
 export const COMPARE_STAGES: CompareStageDef[] = [
   { name: "stage-1", label: "1단계: 가상 인물 2명 × 후보 2개 = 생성 4건", personaCount: 2, capKrw: 3000 },
   { name: "stage-2", label: "2단계: 가상 인물 10명 × 후보 2개 = 생성 20건 (1단계 결과를 보고 따로 승인)", personaCount: 10, capKrw: 8000 },
+  // 운영자 승인 2026-10-17: AI 테스트 총 승인 한도 4,000원(누적 사용액 포함). story-v1 + 현재 지시문, 가상 인물 P01 실제 AI 1건만.
+  // 필요한 자동 재작성은 그 1건의 품질 검사 범위에서만. 다른 인물 · 궁합 AI · 리포트 궁합 · 추가 비교 생성에는 쓰지 않는다. 최대 비용이 1,204원을 넘으면 실행하지 않고 다시 확인한다.
+  {
+    name: "story-p01",
+    label: "story-v1 P01 실제 AI 1건 (운영자 승인 2026-10-17 — 총 4,000원, 누적 사용액 포함)",
+    personaCount: 1,
+    capKrw: 4000,
+    restrict: { variant: "story-v1", only: "A", persona: "P01", runCeilingKrw: 1204, requireAlreadySpent: true },
+  },
 ];
 
 /**
