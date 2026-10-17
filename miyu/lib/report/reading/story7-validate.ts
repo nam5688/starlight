@@ -14,7 +14,7 @@ import { fortifyPrimaryOf, fortuneMentions, ELEMENT_FORTUNE } from "../../saju/i
 import { hasHourUnknownEvidence } from "../../saju/interpret/hour-unknown.ts";
 import { familyPastErrors, hourUnknownErrors } from "./hour-scope.ts";
 import { MONEY_WORDS, PERIOD_TALK, PROCESS_TALK, TASK_IMPERATIVE } from "./story-plan.ts";
-import { chunkSizes, splitSentences } from "./story-motif.ts";
+import { splitSentences } from "./story-motif.ts";
 import { absenceErrors } from "./story-validate.ts";
 import { story7Evidence } from "./story7-evidence.ts";
 import { CONDITIONAL_MARK, FAMILY_CLAIM, MONEY_HABIT, STORY7_FORMULA_BUDGET, STORY7_LIMITS as S, STORY7_MBTI_MIN, STORY7_MBTI_NOS, STORY7_OWNER_NOS, STORY7_PERSONAL_REUSE, STORY7_SECTIONS, STORY7_TASK_MAX, STORY7_TERMS, TRADITION_MARK, WEALTH_FATE } from "./story7-plan.ts";
@@ -22,7 +22,18 @@ import { distinctTerms } from "./terms.ts";
 import type { Story7DraftV1, Story7SectionDraft } from "./types.ts";
 import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./validate.ts";
 
-export type Story7Validation = { ok: true; draft: Story7DraftV1 } | { ok: false; errors: string[] };
+/**
+ * 검사 결과 — errors는 BLOCK(저장하지 않고 고쳐 쓰게 한다), warnings는 WARN(저장을 막지 않고 고쳐 쓰기도 부탁하지 않으며 글을 그대로 둔 채 경고로만 보인다).
+ * ok는 BLOCK이 없다는 뜻이고, 경고가 있어도 ok일 수 있다 — "경고 없음 · 통과"는 유료 판매 합격이 아니다(운영자가 글 전문을 읽고 정한다).
+ */
+export type Story7Validation = { ok: true; draft: Story7DraftV1; warnings: string[] } | { ok: false; errors: string[]; warnings: string[] };
+
+/**
+ * WARN으로 보는 오류 문구(운영자 정책 2026-10-17 — "미유는 명리 용어를 쓰는 서비스라 용어를 쓸 때마다 풀이하게 강제하면 글이 부자연스러워진다"): 설명 없는 사주 용어 · 한 문장 / 한 문단 / 첫 문단의 용어 개수 · 용어 나열 · 문단 문장 수.
+ * 읽기 쉬운 정도의 기준이지 계산이 틀렸거나 근거 없는 내용을 쓴 것이 아니다. 나머지(없는 근거 · 계산과 반대 · 근거에 없는 판정 · 십성/오행 대응 · 없는 시주 풀이 · 사건 단정 · 장 누락 · 형식 오류)는 모두 BLOCK이다.
+ */
+const STORY7_WARN = /설명 없는 사주 용어|한 문장에 사주 용어가|한 문단에 사주 용어가|첫 문단에 사주 용어|해석 키워드 나열|\d+문장 \(\d+문장 이하로 묶어 주세요\)/;
+export const isStory7Warning = (message: string) => STORY7_WARN.test(message);
 
 const isString = (v: unknown): v is string => typeof v === "string";
 const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
@@ -79,10 +90,9 @@ function withoutActions<S extends object>(section: S): S {
 }
 
 /**
- * 문장 수 한도를 넘은 문단을 문단 나눔만 바꿔 둘 이상으로 나눈다(문장은 한 글자도 바꾸지 않는다) — 한 문단 때문에 글 전체를 버리지 않으려고.
- * 나눈 조각이 최소 글자 수에 못 미치거나 장의 문단 수 상한을 넘기면 그 장은 건드리지 않는다(검사가 이유를 알려 준다). 입력은 바꾸지 않는다.
- * 또 하나: 조언 행동(actions)을 sections 바깥이 아니라 7번 장 안에 넣은 글은 **위치만** sections 바깥으로 옮긴다(행동의 글자 · 근거는 그대로 — 실제 AI 시험 2026-10-17에서
- * 7번 장 안에 넣은 글이 나왔다. 지시문은 바깥이라고 두 번 적었지만 모델이 안쪽에 놓았다). 바깥 actions가 이미 목록이면 건드리지 않는다.
+ * 모델이 낸 글의 **위치만** 바로잡는다(글자는 한 글자도 바꾸거나 나누거나 지우지 않는다): 조언 행동(actions)을 sections 바깥이 아니라 7번 장 안에 넣은 글은 sections 바깥으로 옮긴다
+ * (실제 AI 시험 2026-10-17에서 7번 장 안에 넣은 글이 나왔다 — 지시문은 바깥이라고 두 번 적었지만 모델이 안쪽에 놓았다). 바깥 actions가 이미 목록이면 건드리지 않는다. 입력은 바꾸지 않는다.
+ * 예전에는 문장 수 한도(4문장)를 넘은 문단을 문단 나눔만 바꿔 나눴다 — 운영자 정책(2026-10-17)으로 문단 길이는 경고(WARN)만 하고 생성된 원문은 그대로 보존하므로 더 나누지 않는다.
  */
 export function normalizeStory7Draft<T>(raw: T): T {
   const d = raw as Partial<Story7DraftV1> | null;
@@ -91,41 +101,11 @@ export function normalizeStory7Draft<T>(raw: T): T {
   const nested = Array.isArray(d.actions)
     ? undefined
     : d.sections.find((s) => s && typeof s === "object" && Number(s.no) === 7 && Array.isArray((s as WithActions).actions));
-  const liftedActions = nested ? ((nested as WithActions).actions as Story7DraftV1["actions"]) : undefined;
-  const split = (paragraphs: unknown): unknown => {
-    if (!Array.isArray(paragraphs) || !paragraphs.every(isString)) return paragraphs;
-    const next: string[] = [];
-    for (const p of paragraphs as string[]) {
-      if (countSentences(p) <= S.paragraph.sentencesMax) {
-        next.push(p);
-        continue;
-      }
-      const sentences = splitSentences(p);
-      const parts: string[] = [];
-      let at = 0;
-      for (const size of chunkSizes(sentences.length, S.paragraph.sentencesMax)) {
-        parts.push(sentences.slice(at, at + size).join(" "));
-        at += size;
-      }
-      next.push(...(parts.every((x) => x.length >= S.paragraph.min && x.length <= S.paragraph.max) ? parts : [p]));
-    }
-    return next;
-  };
-  const sections = d.sections.map((section) => {
-    if (!section || typeof section !== "object") return section;
-    // 옮긴 행동은 7번 장에서 빼 같은 글이 두 곳에 있지 않게 한다
-    const s = section === nested ? withoutActions(section) : section;
-    const plan = STORY7_SECTIONS.find((x) => x.no === Number(s.no));
-    if (!plan) return s;
-    if (Array.isArray(s.parts)) {
-      const parts = s.parts.map((p) => (p && typeof p === "object" ? { ...p, paragraphs: split(p.paragraphs) } : p));
-      const total = parts.reduce((n, p) => n + (Array.isArray((p as { paragraphs?: unknown }).paragraphs) ? ((p as { paragraphs: unknown[] }).paragraphs.length) : 0), 0);
-      return total <= plan.maxParagraphs ? { ...s, parts } : s;
-    }
-    const paragraphs = split(s.paragraphs);
-    return Array.isArray(paragraphs) && paragraphs.length <= plan.maxParagraphs ? { ...s, paragraphs } : s;
-  });
-  return { ...d, sections, ...(liftedActions ? { actions: liftedActions } : {}) } as T;
+  if (!nested) return raw;
+  const liftedActions = (nested as WithActions).actions as Story7DraftV1["actions"];
+  // 옮긴 행동은 7번 장에서 빼 같은 글이 두 곳에 있지 않게 한다
+  const sections = d.sections.map((section) => (section === nested ? withoutActions(section) : section));
+  return { ...d, sections, actions: liftedActions } as T;
 }
 
 /**
@@ -139,7 +119,7 @@ export function story7VoiceReport(d: Story7DraftV1, evidence: Evidence[]): Voice
 export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { hasContext?: boolean } = {}): Story7Validation {
   const errors: string[] = [];
   const d = raw as Partial<Story7DraftV1> | null;
-  if (!d || typeof d !== "object") return { ok: false, errors: ["JSON 객체가 아닙니다."] };
+  if (!d || typeof d !== "object") return { ok: false, errors: ["JSON 객체가 아닙니다."], warnings: [] };
   const known = new Map(evidence.map((e) => [e.id, e]));
   const refs = periodRefs(evidence);
   const years = new Set(refs.filter((r) => r.ref.startsWith("y")).map((r) => r.ref.slice(1)));
@@ -371,5 +351,8 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   // 미유 문체 — 분명한 위반만 실패로 센다(나머지는 고쳐 쓰기 안내로 생성기가 따로 부탁한다)
   errors.push(...voiceErrors(checkVoice(texts, { blockOf: story7BlockOf })));
 
-  return errors.length ? { ok: false, errors: [...new Set(errors)].slice(0, 30) } : { ok: true, draft: d as Story7DraftV1 };
+  const all = [...new Set(errors)];
+  const warnings = all.filter(isStory7Warning);
+  const blocks = all.filter((m) => !isStory7Warning(m));
+  return blocks.length ? { ok: false, errors: blocks.slice(0, 30), warnings } : { ok: true, draft: d as Story7DraftV1, warnings };
 }

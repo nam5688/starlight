@@ -21,7 +21,7 @@ import { story7DepthSource } from "../reading/story7-assemble.ts";
 import { story7Evidence } from "../reading/story7-evidence.ts";
 import { piecesOfStory7, textRepetition, type Story7Draft } from "../reading/story7-measure.ts";
 import { STORY7_SECTIONS } from "../reading/story7-plan.ts";
-import { STORY7_MOTIF_BLOCKS, story7Paragraphs, story7VoiceReport, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
+import { normalizeStory7Draft, STORY7_MOTIF_BLOCKS, story7Paragraphs, story7VoiceReport, validateStory7Draft, visibleStory7Texts } from "../reading/story7-validate.ts";
 import { type VoiceReport } from "../style/voice.ts";
 import type { Story7DraftV1, StoryDraftV1 } from "../reading/types.ts";
 import { buildEvidence } from "./generator.ts";
@@ -184,7 +184,9 @@ export function reviewOwnDraft(raw: unknown, evidence: Evidence[], hasContext = 
  * 장마다 연결한 근거(사주 · 응답 · MBTI)와 같은 응답이 몇 장에 쓰였는지 · 재물 소제목 · 조언 개수. 말을 바꿔 되풀이한 문장 · 근거를 제대로 풀었는지 · 새로 알게 해 주는가 ·
  * 연애 · 일 · 재물이 서로 다른 이야기인지 · 9,900원을 낼 만한지는 낱말로 셀 수 없어 글 전문을 직접 읽어야 한다.
  */
-export function reviewStory7Draft(raw: unknown, evidence: Evidence[], hasContext = false): string {
+export function reviewStory7Draft(rawInput: unknown, evidence: Evidence[], hasContext = false): string {
+  // 생성기가 검사 직전에 하는 위치 보정(7번 장 안의 actions를 바깥으로 — 글자는 바꾸지 않는다)을 같은 함수로 적용한다
+  const raw = normalizeStory7Draft(rawInput);
   const lines: string[] = [];
   const push = (s = "") => lines.push(s);
   push("# 읽기 전 보조 지표 — 7개 대주제 (코드 · 합격 판정 아님)");
@@ -192,15 +194,23 @@ export function reviewStory7Draft(raw: unknown, evidence: Evidence[], hasContext
   const draft = raw as Story7DraftV1;
   const byId = new Map(evidence.map((e) => [e.id, e]));
   const v = validateStory7Draft(raw, evidence, { hasContext });
-  push("## 1. 형식 · 근거 검사");
-  if (v.ok) push("- 통과");
+  push("## 1. 형식 · 근거 검사 — BLOCK(저장하지 않음) · WARN(저장을 막지 않는 경고)");
+  if (v.ok) push("- BLOCK 없음(통과)");
   else {
     const g = groupReadingIssues(v.errors);
+    push(`- **BLOCK ${v.errors.length}건** — 저장하지 않고 고쳐 쓰게 하는 오류`);
     for (const k of Object.keys(g) as IssueClass[]) {
-      push(`- **${ISSUE_CLASS_LABEL[k]}**: ${g[k].length}건`);
+      if (g[k].length === 0) continue;
+      push(`- ${ISSUE_CLASS_LABEL[k]}: ${g[k].length}건`);
       for (const e of g[k]) push(`  - ${e}`);
     }
   }
+  if (v.warnings.length === 0) push("- WARN 없음");
+  else {
+    push(`- **WARN ${v.warnings.length}건** — 읽기 쉬운 정도의 알림(설명 없는 용어 · 용어 개수 · 문단 문장 수). 저장을 막지 않고 자동 재작성도 하지 않으며 글은 그대로 둡니다. 읽을 때 이해를 방해하는지 확인하세요.`);
+    for (const w of v.warnings) push(`  - ${w}`);
+  }
+  push("- ※ BLOCK이 없고 WARN만 있어도 유료 판매 합격이 아닙니다 — 글 전문을 읽고 운영자가 정합니다.");
   push();
   push("## 2. 장마다 분량과 연결한 근거");
   push("| 장 | 종류 | 문단 | 글자 | 사주 근거 | 응답 근거 | 입력한 MBTI |");

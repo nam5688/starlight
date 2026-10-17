@@ -82,7 +82,7 @@ export type GenerateContext = {
    * 형식 · 내용 검사에 걸린 응답의 글과 걸린 이유 (읽기 구조 생성만). 가상 인물로 하는 AI 비교에서 "왜 실패했나"를 보려는 진단용이다 —
    * 실제 고객의 글이 들어갈 수 있는 운영 경로(report-service)는 이 값을 받지 않으며 어떤 기록에도 남기지 않는다.
    */
-  onAttempt?: (attempt: { round: number; errors: string[]; text: string; /** 이 응답이 형식 검사를 통과해 리포트가 됐다(고쳐 쓴 응답이 통과한 경우 등) — 없거나 false이면 검사에 걸린 응답이다 */ accepted?: boolean }) => void;
+  onAttempt?: (attempt: { round: number; errors: string[]; text: string; /** 이 응답이 형식 검사를 통과해 리포트가 됐다(고쳐 쓴 응답이 통과한 경우 등) — 없거나 false이면 검사에 걸린 응답이다 */ accepted?: boolean; /** 통과한 응답의 경고(WARN) — 저장을 막지 않고 고쳐 쓰기도 부탁하지 않은 읽기 쉬운 정도의 알림(story-7의 용어 · 문단 길이) */ warnings?: string[] }) => void;
 };
 
 export interface ReportGenerator {

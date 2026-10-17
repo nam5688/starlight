@@ -104,6 +104,15 @@ test("검사: 시각을 모를 때 오행 · 십성의 없음 · 적음은 세 �
   assert.ok(!scopeSame.some((e) => /시주로 읽는 풀이/.test(e)), scopeSame.join("\n"));
   const readHour = errorsFor((d) => setFirst(d, 4, `시주에 놓인 식신이 표현력을 받쳐 줘요. ${PAD}`));
   assert.ok(readHour.some((e) => /시주로 읽는 풀이/.test(e)), readHour.join("\n"));
+  // 시주에 특정 기운이 "있다"고 확정하는 문장은 계속 막고, 가능성만 말하는 범위 안내("있을 수 있어요 · 있을 수도 있어요")만 허용한다
+  for (const claim of ["시주에 토 기운이 있어서 중심이 잡혀요.", "시주에 있을 거예요.", "시주에 분명 식신이 있을 수밖에 없어요.", "시주에는 인성이 있어요."]) {
+    const e = errorsFor((d) => setFirst(d, 4, `${claim} ${PAD}`));
+    assert.ok(e.some((m) => /시주로 읽는 풀이/.test(m)), `${claim}: ${e.join("\n")}`);
+  }
+  for (const hedge of ["시주에 있을 수 있어요.", "시주에도 있을 수 있어요.", "시주에 있을 수도 있어요.", "시주에 있을지도 몰라요."]) {
+    const e = errorsFor((d) => setFirst(d, 4, `세 기둥으로 보면 토 기운은 보이지 않아요(${hedge.replace(/\.$/, "")}). ${PAD}`));
+    assert.ok(!e.some((m) => /시주로 읽는 풀이/.test(m)), `${hedge}: ${e.join("\n")}`);
+  }
   const scopePrev = errorsFor((d) => setFirst(d, 4, `출생 시각을 몰라 시주를 뺀 세 기둥으로 읽었어요. 토 기운이 하나도 없어서 중심을 잡는 힘이 적게 읽혀요. ${PAD}`));
   assert.ok(!scopePrev.some((e) => /세 기둥 기준/.test(e)), scopePrev.join("\n"));
   // "그럴 수는 없어요" 같은 일상어는 오행 없음으로 세지 않는다

@@ -25,6 +25,7 @@ import { renderStory7DraftMarkdown, renderStoryDraftMarkdown } from "../lib/repo
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
 import type { Story7DraftV1, StoryDraftV1 } from "../lib/report/reading/types.ts";
 import { extractJson } from "../lib/report/ai/generator.ts";
+import { normalizeStory7Draft } from "../lib/report/reading/story7-validate.ts";
 
 const args = process.argv.slice(2);
 const arg = (name: string) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
@@ -163,6 +164,7 @@ writeFileSync(
       result: run.status === "ok" ? "ok" : "failed",
       firstPassValid: run.firstPassValid,
       failure: run.status === "ok" ? null : { code: run.errorCode, message: run.errorMessage, errors: run.attempts.flatMap((a) => a.errors).slice(0, 30) },
+      warnings: run.attempts.flatMap((a) => a.warnings ?? []),
       depth: run.depth,
     },
     null,
@@ -181,7 +183,8 @@ const safely = (what: string, fn: () => void) => {
 const lastText = run.attempts[run.attempts.length - 1]?.text;
 let draft: unknown = null;
 try {
-  draft = lastText ? extractJson(lastText) : null;
+  // 닫는 괄호만 빠진 글은 보충해 읽고(글자는 그대로), 조언 행동이 7번 장 안에 있으면 바깥으로 옮긴다 — 생성기가 검사 직전에 하는 것과 같다
+  draft = lastText ? normalizeStory7Draft(extractJson(lastText)) : null;
 } catch {
   draft = null;
 }
@@ -194,6 +197,8 @@ safely("읽는 순서로 풀어 쓴 글", () => {
 safely("읽기 전 보조 지표", () => writeFileSync(join(dir, "metrics.md"), draft ? reviewOwnDraft(draft, described.evidence) : "# 읽기 전 보조 지표\n\n- 글이 없어 지표를 만들지 못했습니다.\n"));
 
 console.log(`\n완료: ${run.status === "ok" ? "형식 검사 통과 · 글 저장됨" : "형식 검사 불통과 · 저장되지 않음(원문은 읽을 수 있습니다)"} · 호출 ${run.calls}회 · 쓴 비용 ${won(result.spentKrw)} · 누적 ${won(alreadySpent + result.spentKrw)} (승인 총액 ${won(stage.capKrw)})`);
+const warned = run.attempts.flatMap((a) => a.warnings ?? []);
+if (warned.length > 0) console.log(`경고(WARN) ${warned.length}건 — 저장을 막지 않는 읽기 쉬운 정도의 알림(용어 · 문단 길이)이라 자동으로 다시 쓰지 않았습니다. 목록은 metrics.md · cost-and-checks.json에 있습니다.`);
 if (run.status !== "ok") console.log(`걸린 이유(검사 문구, 글 내용 아님): ${run.attempts.flatMap((a) => a.errors).slice(0, 6).join(" / ") || run.errorMessage || run.errorCode || "알 수 없음"}`);
 const runId = dir.split(/[\\/]/).pop();
 console.log(`\n결과 폴더: ${dir}\n읽기: npm.cmd run dev 를 켠 뒤 http://localhost:3000/dev/live/${runId}  (무료 리포트 · 심층 리포트 · 원문 전문 · 입력 확인 · 지표)\n재작성 · 다음 시험은 자동으로 하지 않았습니다 — 글을 읽고 판단한 뒤 알려 주세요.`);

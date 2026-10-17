@@ -32,6 +32,12 @@ const errorsOf = (mutate: (d: Story7DraftV1) => void, evidence = P01_EVIDENCE, h
   const r = validateStory7Draft(d, evidence, { hasContext });
   return r.ok ? [] : r.errors;
 };
+/** 경고(WARN) — 저장을 막지 않는 읽기 쉬운 정도의 알림(BLOCK이 있어도 같이 돌려준다) */
+const warningsOf = (mutate: (d: Story7DraftV1) => void, evidence = P01_EVIDENCE, hasContext = Boolean(P01.input.context)) => {
+  const d = clone(mockDraft(evidence));
+  mutate(d);
+  return validateStory7Draft(d, evidence, { hasContext }).warnings;
+};
 const section = (d: Story7DraftV1, no: number) => d.sections.find((s) => s.no === no)!;
 /** 모의 문단 하나를 실제 글처럼 바꿔 끼운다(검사가 어떤 말에 걸리는지 보려고) */
 const setPara = (d: Story7DraftV1, no: number, text: string, at = 0) => {
@@ -179,25 +185,45 @@ test("없는 기운은 전통 해석 · 조건형이면 쓸 수 있고, 조건 �
   assert.ok(errorsOf((d) => setPara(d, 2, `${PAD} 수 기운이 없어서 쉬는 힘이 약해요.`)).some((e) => /생활 기능의 부족이나 원인/.test(e)));
 });
 
-test("사주 용어 한도: 한 문장 3개 · 한 문단 4개 · 첫 문단 2개까지(0.2까지의 2개 · 2개 · 0개에서 넓혔다) — 설명 없는 용어는 계속 막는다", () => {
-  // 한 문장에 4개 → 막는다, 3개는 통과
-  const four = errorsOf((d) => setPara(d, 2, `${PAD} 일간(나를 나타내는 글자)과 오행(다섯 기운)과 십신(관계의 갈래)과 대운(10년 시기)을 함께 풀어요.`, 1));
-  assert.ok(four.some((e) => /한 문장에 사주 용어가 4개/.test(e)), four.join("\n"));
-  const three = errorsOf((d) => setPara(d, 2, `${PAD} 일간(나를 나타내는 글자)과 오행(다섯 기운)과 십신(관계의 갈래)을 함께 풀어요.`, 1));
-  assert.ok(!three.some((e) => /한 문장에 사주 용어가/.test(e)), three.join("\n"));
-  // 한 문단에 5개 → 막는다
-  const five = errorsOf((d) => setPara(d, 2, `${PAD} 일간(나를 나타내는 글자)이 중심이에요. 오행(다섯 기운)도 있어요. 십신(관계의 갈래)도 있어요. 천간(위 글자)도 있어요. 지지(아래 글자)도 있어요.`, 1));
-  assert.ok(five.some((e) => /한 문단에 사주 용어가 5개/.test(e)), five.join("\n"));
-  // 첫 문단은 2개까지
-  const first = errorsOf((d) => setPara(d, 1, `${PAD} 월령과 일간과 오행이 이 사람의 바탕이에요.`));
-  assert.ok(first.some((e) => /첫 문단에 사주 용어\(.*\)가 3개/.test(e)), first.join("\n"));
-  assert.ok(!errorsOf((d) => setPara(d, 1, `${PAD} 일간(나를 나타내는 글자)과 오행(다섯 기운)이 이 사람의 바탕이에요.`)).some((e) => /첫 문단에 사주 용어/.test(e)));
+test("사주 용어 한도: 한 문장 3개 · 한 문단 4개 · 첫 문단 2개를 넘으면 경고(WARN)만 한다 — 저장을 막지 않고 고쳐 쓰기도 부탁하지 않는다(운영자 정책 2026-10-17)", () => {
+  // 한 문장에 4개 → 경고, 3개는 경고도 없다. BLOCK(errors)에는 들어가지 않는다
+  const fourMutation = (d: Story7DraftV1) => setPara(d, 2, `${PAD} 일간(나를 나타내는 글자)과 오행(다섯 기운)과 십신(관계의 갈래)과 대운(10년 시기)을 함께 풀어요.`, 1);
+  assert.ok(warningsOf(fourMutation).some((e) => /한 문장에 사주 용어가 4개/.test(e)), warningsOf(fourMutation).join("\n"));
+  assert.ok(!errorsOf(fourMutation).some((e) => /사주 용어/.test(e)), "용어 개수는 BLOCK이 아니다");
+  const three = (d: Story7DraftV1) => setPara(d, 2, `${PAD} 일간(나를 나타내는 글자)과 오행(다섯 기운)과 십신(관계의 갈래)을 함께 풀어요.`, 1);
+  assert.ok(!warningsOf(three).some((e) => /한 문장에 사주 용어가/.test(e)), warningsOf(three).join("\n"));
+  // 한 문단에 5개 → 경고
+  const fiveMutation = (d: Story7DraftV1) => setPara(d, 2, `${PAD} 일간(나를 나타내는 글자)이 중심이에요. 오행(다섯 기운)도 있어요. 십신(관계의 갈래)도 있어요. 천간(위 글자)도 있어요. 지지(아래 글자)도 있어요.`, 1);
+  assert.ok(warningsOf(fiveMutation).some((e) => /한 문단에 사주 용어가 5개/.test(e)), warningsOf(fiveMutation).join("\n"));
+  assert.ok(!errorsOf(fiveMutation).some((e) => /사주 용어/.test(e)));
+  // 첫 문단은 2개까지가 권장 — 넘으면 경고
+  const first = (d: Story7DraftV1) => setPara(d, 1, `${PAD} 월령과 일간과 오행이 이 사람의 바탕이에요.`);
+  assert.ok(warningsOf(first).some((e) => /첫 문단에 사주 용어\(.*\)가 3개/.test(e)), warningsOf(first).join("\n"));
+  assert.ok(!errorsOf(first).some((e) => /첫 문단에 사주 용어/.test(e)));
+  assert.ok(!warningsOf((d) => setPara(d, 1, `${PAD} 일간(나를 나타내는 글자)과 오행(다섯 기운)이 이 사람의 바탕이에요.`)).some((e) => /첫 문단에 사주 용어/.test(e)));
+  // 설명 없는 용어도 경고다 — 그 용어를 쓴 문장이 근거에 없는 판정이면 그것은 여전히 BLOCK이다(아래)
+  const plain = (d: Story7DraftV1) => setPara(d, 4, `${PAD} 재성이 두드러져서 돈의 길을 중요하게 읽어요.`);
+  assert.ok(warningsOf(plain).some((e) => /설명 없는 사주 용어\(재성\)/.test(e)), warningsOf(plain).join("\n"));
+  assert.ok(!errorsOf(plain).some((e) => /설명 없는 사주 용어/.test(e)), "용어 설명 누락은 BLOCK이 아니다");
+  // 경고만 있는 글은 통과(ok)이고 경고가 함께 온다 — 통과가 판매 합격은 아니다
+  const warnOnly = clone(mockDraft());
+  setPara(warnOnly, 4, `${PAD} 재성이 두드러져서 돈의 길을 중요하게 읽어요.`);
+  const r = validateStory7Draft(warnOnly, P01_EVIDENCE, { hasContext: Boolean(P01.input.context) });
+  assert.ok(r.ok && r.warnings.length > 0, JSON.stringify(r.ok ? r.warnings : r.errors));
+  // BLOCK로 남는 것: 근거 목록에 없는 판정(격국 · 용신) · 있는 근거를 쓰지 않는 척 하는 것 — 용어 설명을 붙여도 막는다
+  const verdict = errorsOf((d) => setPara(d, 2, `${PAD} 이 사람의 용신은 수(물)로 읽혀요 그래서 물가에서 힘이 나요.`));
+  assert.ok(verdict.some((e) => /근거 목록에 없는 판정\(용신\)/.test(e)), verdict.join("\n"));
 });
 
-test("문단은 4문장까지, 핵심 문장은 46자까지(0.2까지의 3문장 · 40자는 실제 AI 글이 걸렸다)", () => {
+test("문단은 4문장을 넘으면 경고(WARN)만 하고(6~7문장도 저장을 막지 않는다), 핵심 문장은 46자까지다(길이는 BLOCK)", () => {
   const s4 = "첫째 문장은 이렇게 쓰고 있어요. 둘째 문장은 이렇게 이어져요. 셋째 문장도 이어서 써요. 넷째 문장으로 마무리해요 그래서 길이는 충분해요.";
-  assert.ok(!errorsOf((d) => setPara(d, 4, s4)).some((e) => /문장 \(/.test(e)));
-  assert.ok(errorsOf((d) => setPara(d, 4, `${s4} 다섯째 문장이 더 있어요.`)).some((e) => /5문장 \(4문장 이하로 묶어 주세요\)/.test(e)));
+  assert.ok(!warningsOf((d) => setPara(d, 4, s4)).some((e) => /문장 \(/.test(e)));
+  const s5 = (d: Story7DraftV1) => setPara(d, 4, `${s4} 다섯째 문장이 더 있어요.`);
+  assert.ok(warningsOf(s5).some((e) => /5문장 \(4문장 이하로 묶어 주세요\)/.test(e)));
+  assert.ok(!errorsOf(s5).some((e) => /문장 \(/.test(e)), "문장 수는 BLOCK이 아니다");
+  const s7 = (d: Story7DraftV1) => setPara(d, 4, `${s4} 다섯째 문장이 더 있어요. 여섯째 문장도 있어요. 일곱째 문장까지 이어져요.`);
+  assert.ok(warningsOf(s7).some((e) => /7문장/.test(e)));
+  assert.ok(!errorsOf(s7).some((e) => /문장 \(/.test(e)));
   const ok46 = "가".repeat(46);
   assert.ok(!errorsOf((d) => { d.headline = ok46; }).some((e) => /headline: 길이/.test(e)));
   assert.ok(errorsOf((d) => { d.headline = `${ok46}가`; }).some((e) => /headline: 길이 47자 \(10~46자\)/.test(e)));
@@ -256,24 +282,16 @@ test("6번: 계산된 해만, 가능성으로 쓰고 시기 근거를 달아야 
   assert.ok(errorsOf((d) => { section(d, 6).evidence = [section(d, 6).evidence[0]]; }).some((e) => /시기 근거\(period가 있는 ID\)가 없습니다/.test(e)));
 });
 
-test("문단 나눔 보정: 문장 수 한도(4문장)를 넘은 문단은 문장은 그대로 두고 문단만 나눈다 — 장의 문단 수 상한을 넘기면 건드리지 않는다", () => {
+test("원문 보존: 문장 수 한도를 넘은 문단도 나누거나 바꾸지 않는다 — 경고(WARN)로만 알린다(운영자 정책 2026-10-17)", () => {
   const d = clone(mockDraft());
-  const sentence = "이 문장은 문단을 나눌 때 한 글자도 바뀌지 않아야 하는 문장이에요.";
-  const five = (tag: string) => [sentence, ...["둘째", "셋째", "넷째", "다섯째"].map((n) => sentence.replace("이 문장은", `${n} ${tag} 문장은`))].join(" ");
-  section(d, 1).paragraphs = [five("가")];
-  const before = story7Paragraphs(section(d, 1)).join(" ");
+  const sentence = "이 문장은 문단을 나누지 않고 그대로 두어야 하는 문장이에요.";
+  const five = ["첫째", "둘째", "셋째", "넷째", "다섯째"].map((n) => sentence.replace("이 문장은", `${n} 문장은`)).join(" ");
+  section(d, 1).paragraphs = [five];
   const fixed = normalizeStory7Draft(d);
-  assert.equal(story7Paragraphs(section(fixed, 1)).length, 2);
-  assert.equal(story7Paragraphs(section(fixed, 1)).join(" "), before);
-  assert.equal(story7Paragraphs(section(d, 1)).length, 1, "입력은 바꾸지 않는다");
-  // 4문장은 그대로 둔다(한도 안)
-  const four = clone(mockDraft());
-  section(four, 1).paragraphs = [five("가").split(" ").slice(0, -0).join(" ").split(/(?<=[.])\s/).slice(0, 4).join(" ")];
-  assert.equal(story7Paragraphs(section(normalizeStory7Draft(four), 1)).length, 1);
-  // 2번은 문단 상한이 3개라 5문장 문단 셋을 나누면 6개가 되어 넘친다 → 그대로
-  const e = clone(mockDraft());
-  section(e, 2).paragraphs = [five("가"), five("나"), five("다")];
-  assert.equal(story7Paragraphs(section(normalizeStory7Draft(e), 2)).length, 3);
+  assert.deepEqual(fixed, d, "문단을 나누지 않고 글도 바꾸지 않는다(actions 위치 보정만 한다)");
+  assert.equal(story7Paragraphs(section(fixed, 1)).length, 1);
+  const r = validateStory7Draft(fixed, P01_EVIDENCE, { hasContext: Boolean(P01.input.context) });
+  assert.ok(r.warnings.some((e) => /5문장/.test(e)), r.warnings.join("\n"));
 });
 
 test("조언 행동 위치 보정: 7번 장 안에 들어 있는 actions는 위치만 sections 바깥으로 옮기고 글자는 그대로 — 바깥에 이미 있거나 다른 장에 있으면 건드리지 않는다", () => {
@@ -376,6 +394,60 @@ test("생성기: 첫 초안이 검사에 걸리면 이유를 주고 한 번 고�
   await assert.rejects(() => once.generate(P01.input, { onAttempt: (a) => attempts.push(a) }), /리포트 형식 검사 실패/);
   assert.equal(attempts.length, 1);
   assert.ok(attempts[0].text.length > 0);
+});
+
+/** 모의 초안을 고쳐서(경고만 생기게 · 닫는 괄호를 빼서 …) 그대로 돌려주는 모델 — 호출 수를 센다 */
+const scriptedModel = (make: (draft: Story7DraftV1) => string) => {
+  const model = {
+    provider: "mock",
+    model: "mock-scripted",
+    calls: 0,
+    async complete(req: { messages: { role: string; content: string }[] }) {
+      model.calls++;
+      return { text: make(clone(composeMockStory7(req.messages[0].content))), model: "mock-scripted" };
+    },
+  };
+  return model;
+};
+
+test("생성기: 경고(WARN)만 있는 글은 고쳐 쓰기를 부르지 않고 원문 그대로 리포트가 된다 — 경고는 시도 기록에 남는다(운영자 정책 2026-10-17)", async () => {
+  const model = scriptedModel((d) => {
+    // 4문장을 넘는 문단 + 설명 없는 용어 — 둘 다 읽기 쉬운 정도의 경고일 뿐이다
+    const para = "재성이 두드러져서 돈의 길을 중요하게 읽어요. 둘째 문장은 이렇게 이어서 써요. 셋째 문장도 이어서 써요. 넷째 문장으로 이어요. 다섯째 문장이 하나 더 있어요. 여섯째 문장으로 마무리해요 그래서 길이는 충분해요.";
+    const s4 = d.sections.find((x) => x.no === 4)!;
+    s4.paragraphs = [para, ...(s4.paragraphs ?? []).slice(1)];
+    return JSON.stringify(d);
+  });
+  const attempts: { round: number; errors: string[]; text: string; accepted?: boolean; warnings?: string[] }[] = [];
+  const gen = createAiReportGenerator({ model, format: "story-7", now: () => NOW });
+  const report = (await gen.generate(P01.input, { onAttempt: (a) => attempts.push(a) })) as ReturnType<typeof assembleStory7>;
+  assert.equal(report.layout, "story7");
+  assert.equal(model.calls, 1, "경고만으로는 AI를 다시 부르지 않는다");
+  const accepted = attempts.find((a) => a.accepted)!;
+  assert.ok(accepted && accepted.errors.length === 0);
+  assert.ok((accepted.warnings ?? []).some((w) => /문장 \(/.test(w)), (accepted.warnings ?? []).join("\n"));
+  assert.ok((accepted.warnings ?? []).some((w) => /설명 없는 사주 용어/.test(w)));
+  assert.ok(report.blocks.some((b) => (b.details ?? []).concat(b.summary ?? "").some((t) => t.includes("여섯째 문장으로 마무리해요"))), "글은 나누거나 바꾸지 않고 그대로 저장된다");
+});
+
+test("생성기: 끝의 닫는 괄호가 빠지고 조언 행동이 7번 장 안에 들어간 글도(글자는 그대로) 한 번의 호출로 리포트가 된다 — 내용이 빠진 글은 그대로 실패한다", async () => {
+  const nestedAndCut = (d: Story7DraftV1) => {
+    const asObj = d as unknown as { actions?: unknown; sections: { no: number; actions?: unknown }[] };
+    asObj.sections.find((x) => x.no === 7)!.actions = asObj.actions;
+    delete asObj.actions;
+    return JSON.stringify(d).slice(0, -2); // 맨 끝의 `]}` 둘이 빠진 2026-10-17 실제 글의 모양
+  };
+  const model = scriptedModel(nestedAndCut);
+  const attempts: { round: number; errors: string[]; text: string; accepted?: boolean }[] = [];
+  const report = (await createAiReportGenerator({ model, format: "story-7", maxRepairs: 0, maxRetries: 0, now: () => NOW }).generate(P01.input, { onAttempt: (a) => attempts.push(a) })) as ReturnType<typeof assembleStory7>;
+  assert.equal(report.layout, "story7");
+  assert.equal(model.calls, 1);
+  assert.ok(report.actions.length >= 2, "조언 행동이 바깥으로 옮겨져 저장된다");
+  assert.ok(attempts[0].accepted, "받아들인 응답으로 기록된다");
+  assert.throws(() => JSON.parse(attempts[0].text), "원문은 괄호가 빠진 그대로 남는다(고치지 않는다)");
+  // 7번 장이 통째로 빠진 글은 괄호를 닫아도 내용 검사(BLOCK)가 막는다
+  const lost = scriptedModel((d) => JSON.stringify({ ...d, sections: d.sections.filter((x) => x.no !== 7) }).slice(0, -1));
+  await assert.rejects(() => createAiReportGenerator({ model: lost, format: "story-7", maxRepairs: 0, maxRetries: 0, now: () => NOW }).generate(P01.input, {}), /리포트 형식 검사 실패/);
 });
 
 test("신규 생성 기본 형식은 한 곳(REPORT_GENERATION)에서 정하고 한 줄로 되돌릴 수 있다", () => {

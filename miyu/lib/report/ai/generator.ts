@@ -322,7 +322,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
         const kit: {
           message: string;
           repair: (errors: string[]) => string;
-          validate: (parsed: unknown) => { ok: true; draft: AnyDraft } | { ok: false; errors: string[] };
+          validate: (parsed: unknown) => { ok: true; draft: AnyDraft; /** BLOCK이 아닌 경고(WARN) — 고쳐 쓰기를 부탁하지 않고 글을 그대로 둔다 */ warnings?: string[] } | { ok: false; errors: string[] };
           depthErrors: (draft: AnyDraft) => string[];
           /** 형식은 맞지만 고쳐 쓰기를 부탁할 반복 안내(되풀이 구절 · 한 낱말의 번짐) — 비어 있으면 그대로 받는다 */
           repeatNotes: (draft: AnyDraft) => string[];
@@ -422,7 +422,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
           }
           done("ok");
           // 통과한 응답의 원문도 남긴다 — 첫 응답(검사에 걸림) · 고쳐 쓴 응답(통과)을 각각 보관할 수 있게
-          ctx.onAttempt?.({ round, errors: [], text: result.text, accepted: true });
+          ctx.onAttempt?.({ round, errors: [], text: result.text, accepted: true, ...(checked.warnings?.length ? { warnings: checked.warnings } : {}) });
           return kit.assemble(checked.draft);
         }
         if (softFallback) return kit.assemble(softFallback);
