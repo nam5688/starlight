@@ -10,7 +10,7 @@ import type { Evidence } from "../evidence.ts";
 import { checkVoice, voiceErrors, type VoiceReport } from "../style/voice.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
 import { ADVICE_RULES_TRADITIONAL, READING_LIMITS as L } from "./plan.ts";
-import { fortifyPrimaryOf, fortuneMentions, ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
+import { fortifyCandidatesOf, fortuneMentions, ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
 import { hasHourUnknownEvidence } from "../../saju/interpret/hour-unknown.ts";
 import { familyPastErrors, hourUnknownErrors } from "./hour-scope.ts";
 import { MONEY_WORDS, PERIOD_TALK, PROCESS_TALK, TASK_IMPERATIVE } from "./story-plan.ts";
@@ -38,6 +38,8 @@ const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isStrin
 /** 알파벳 네 글자 유형 코드 — 본문에 쓰지 않는다(입력한 MBTI는 "입력해 주신 성향"으로 부른다) */
 const TYPE_CODE = /(?<![A-Za-z])[EI][NS][TF][JP](?![A-Za-z])/i;
 /** 본문이 입력한 MBTI를 실제로 쓰고 있는가 — 근거 ID만 달고 본문에는 쓰지 않는 것을 막는 어림 */
+/** 동점인 보완 후보를 하나로 정해 말하는 표현 — 개수가 같으면 어느 쪽이 먼저인지 가릴 근거가 없다(운영자 2026-10-18) */
+export const FORTIFY_TIE_VERDICT = /최우선|1순위|가장 필요한 기운|꼭 필요한 기운|반드시 보완|먼저 보완해야/;
 const MBTI_MENTION = /입력(?:해|하)?\s*(?:주신|신|하신)|알려\s*주신|MBTI/;
 
 /** 장의 문단 목록 — 소제목이 있는 장은 소제목 순서대로 이어 붙인다 */
@@ -265,15 +267,25 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
     }
     if ((STORY7_OWNER_NOS as readonly number[]).includes(plan.no)) for (const id of cited) if (personalIds.has(id) && id !== "self.mbti") usedIn.set(id, [...(usedIn.get(id) ?? []), plan.no]);
 
-    // 6번 — 개운(방향 · 색 · 숫자 · 장소): 근거 목록의 보완 후보 1순위 기운의 전통 대응을 본문이 말해야 한다(개인별 계산 없이 임의로 배정하지 않는다)
+    // 6번 — 개운(방향 · 색 · 숫자 · 장소): 근거 목록의 보완 후보 기운의 전통 대응을 본문이 말해야 한다(개인별 계산 없이 임의로 배정하지 않는다).
+    // 개수가 같은 후보가 둘 이상이면(동점) 그중 한 기운의 대응을 모두 말하면 되고, 어느 쪽을 최우선 · 가장 필요한 기운으로 정해 말하지 않는다.
     if (plan.no === 6) {
-      const element = fortifyPrimaryOf(evidence);
-      if (element) {
-        const f = ELEMENT_FORTUNE[element];
+      const candidates = fortifyCandidatesOf(evidence);
+      if (candidates.length > 0) {
+        const body = paragraphs.join("\n");
         if (!cited.includes("saju.fortify")) errors.push(`${w}.evidence: 개운 풀이의 근거(saju.fortify)를 달아 주세요.`);
-        const m = fortuneMentions(paragraphs.join("\n"), element);
-        const missing = [m.direction ? "" : `방향(${f.direction})`, m.color ? "" : `색(${f.colors.join(" · ")})`, m.number ? "" : `숫자(${f.numbers.join(" · ")})`, m.place ? "" : "장소(자주 머무는 환경)"].filter(Boolean);
-        if (missing.length) errors.push(`${w}: 개운 풀이(행운의 색 · 방향 · 숫자 · 장소)에서 ${missing.join(" · ")}이(가) 빠졌습니다 — 근거 목록의 보완 후보 1순위 ${element}(${f.image}) 기운의 전통 대응을 그대로 쓰세요: 방향 ${f.direction}, 색 ${f.colors.join(" · ")}, 숫자 ${f.numbers.join(" · ")}, 장소 ${f.places.join(" · ")}. 임의로 다른 기운의 색 · 방향 · 숫자를 쓰지 않습니다.`);
+        const per = candidates.map((el) => ({ el, f: ELEMENT_FORTUNE[el], m: fortuneMentions(body, el) }));
+        const complete = per.some((x) => x.m.direction && x.m.color && x.m.number && x.m.place);
+        if (!complete) {
+          const x = per[0];
+          const missing = [x.m.direction ? "" : `방향(${x.f.direction})`, x.m.color ? "" : `색(${x.f.colors.join(" · ")})`, x.m.number ? "" : `숫자(${x.f.numbers.join(" · ")})`, x.m.place ? "" : "장소(자주 머무는 환경)"].filter(Boolean);
+          const list = per.map((y) => `${y.el}(${y.f.image}) 방향 ${y.f.direction}, 색 ${y.f.colors.join(" · ")}, 숫자 ${y.f.numbers.join(" · ")}, 장소 ${y.f.places.join(" · ")}`).join(" / ");
+          errors.push(`${w}: 개운 풀이(행운의 색 · 방향 · 숫자 · 장소)에서 ${missing.join(" · ")}이(가) 빠졌습니다 — 근거 목록의 보완 후보(${candidates.join(" · ")}) 기운의 전통 대응을 그대로 쓰세요: ${list}. 임의로 다른 기운의 색 · 방향 · 숫자를 쓰지 않습니다.`);
+        }
+        if (candidates.length > 1) {
+          const verdict = FORTIFY_TIE_VERDICT.exec(body);
+          if (verdict) errors.push(`${w}: 보완 후보 ${candidates.join(" · ")}은(는) 개수가 같은 동점 후보라 "${verdict[0]}"처럼 하나를 먼저 · 가장 필요한 기운으로 정해 말할 수 없어요 — 둘 다 같은 무게의 후보로 소개하세요(개수만으로 우선순위를 가릴 수 없다고 근거에 적혀 있어요).`);
+        }
       }
     }
 

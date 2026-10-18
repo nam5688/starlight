@@ -25,6 +25,8 @@ export type ElementFortune = {
   numbers: [number, number];
   places: string[];
   habits: string[];
+  /** 이 기운의 느낌 한 줄 — 개운 근거 문구가 특정 행동 대신 쓰는 말(리포트가 습관 하나를 가볍게 고를 때의 방향, 같은 행동 조언이 장마다 되풀이되지 않게) */
+  feel: string;
   /** 이 기운의 성향을 가진 사람 — "가까이 두면 균형이 맞는다"고 읽는 전통 해석 */
   people: string;
 };
@@ -34,11 +36,11 @@ export type ElementFortune = {
  * 장소 · 습관 · 사람의 성향은 이 대응을 생활에 옮긴 미유의 정리(초안)다. 색 · 소재 · 습관은 보완 아이템(lib/saju/items.ts)과 같은 말을 쓴다.
  */
 export const ELEMENT_FORTUNE: Record<FiveElement, ElementFortune> = {
-  목: { image: "나무", direction: "동쪽", season: "봄", colors: ["초록", "청록", "연두"], numbers: [3, 8], places: ["숲길 · 공원 · 식물이 많은 곳", "나무가 보이는 창가"], habits: ["아침에 10분 걷기", "새로 배우고 싶은 것을 한 줄 적기"], people: "새로운 시도를 응원하고 성장 · 계획을 함께 이야기해 주는 사람" },
-  화: { image: "불", direction: "남쪽", season: "여름", colors: ["빨강", "주황", "따뜻한 노랑"], numbers: [2, 7], places: ["햇볕이 잘 드는 곳", "따뜻한 조명이 있는 공간 · 사람 소리가 있는 활기 있는 곳"], habits: ["하루에 한 번 마음을 말로 표현하기", "땀이 나는 운동"], people: "밝고 표현이 풍부해 분위기를 따뜻하게 만드는 사람" },
-  토: { image: "흙", direction: "중앙(가운데)", season: "환절기(늦여름)", colors: ["베이지", "황토", "갈색"], numbers: [5, 10], places: ["흙길 · 낮은 산 · 텃밭처럼 안정감 있는 곳", "정돈된 집과 책상"], habits: ["같은 시간에 식사하고 자기", "하루 일정에 쉬는 시간 넣기"], people: "차분하고 중심이 잡혀 서로의 사이를 중재해 주는 사람" },
-  금: { image: "쇠", direction: "서쪽", season: "가을", colors: ["흰색", "은색", "회색"], numbers: [4, 9], places: ["탁 트이고 정돈된 공간", "물건이 제자리에 있는 깔끔한 곳 · 높은 곳의 전망"], habits: ["마감 시간 정하기", "거절할 때 쓸 문장 하나 정해 두기"], people: "기준이 분명하고 약속과 정리를 잘 지키는 사람" },
-  수: { image: "물", direction: "북쪽", season: "겨울", colors: ["검정", "남색", "짙은 파랑"], numbers: [1, 6], places: ["강 · 호수 · 바다처럼 물가가 가까운 곳", "조용하고 차분한 공간"], habits: ["잠들기 전 10분 읽기나 명상", "충분히 자고 쉬는 날 정해 두기"], people: "생각이 깊고 차분하게 들어 주는 사람" },
+  목: { image: "나무", direction: "동쪽", season: "봄", colors: ["초록", "청록", "연두"], numbers: [3, 8], places: ["숲길 · 공원 · 식물이 많은 곳", "나무가 보이는 창가"], habits: ["아침에 10분 걷기", "새로 배우고 싶은 것을 한 줄 적기"], feel: "뻗어 나가고 새로 시작하는 느낌", people: "새로운 시도를 응원하고 성장 · 계획을 함께 이야기해 주는 사람" },
+  화: { image: "불", direction: "남쪽", season: "여름", colors: ["빨강", "주황", "따뜻한 노랑"], numbers: [2, 7], places: ["햇볕이 잘 드는 곳", "따뜻한 조명이 있는 공간 · 사람 소리가 있는 활기 있는 곳"], habits: ["하루에 한 번 마음을 말로 표현하기", "땀이 나는 운동"], feel: "밝고 드러내는 느낌", people: "밝고 표현이 풍부해 분위기를 따뜻하게 만드는 사람" },
+  토: { image: "흙", direction: "중앙(가운데)", season: "환절기(늦여름)", colors: ["베이지", "황토", "갈색"], numbers: [5, 10], places: ["흙길 · 낮은 산 · 텃밭처럼 안정감 있는 곳", "정돈된 집과 책상"], habits: ["같은 시간에 식사하고 자기", "하루 일정에 쉬는 시간 넣기"], feel: "안정되고 중심을 잡는 느낌", people: "차분하고 중심이 잡혀 서로의 사이를 중재해 주는 사람" },
+  금: { image: "쇠", direction: "서쪽", season: "가을", colors: ["흰색", "은색", "회색"], numbers: [4, 9], places: ["탁 트이고 정돈된 공간", "물건이 제자리에 있는 깔끔한 곳 · 높은 곳의 전망"], habits: ["마감 시간 정하기", "거절할 때 쓸 문장 하나 정해 두기"], feel: "정돈되고 매듭짓는 느낌", people: "기준이 분명하고 약속과 정리를 잘 지키는 사람" },
+  수: { image: "물", direction: "북쪽", season: "겨울", colors: ["검정", "남색", "짙은 파랑"], numbers: [1, 6], places: ["강 · 호수 · 바다처럼 물가가 가까운 곳", "조용하고 차분한 공간"], habits: ["잠들기 전 10분 읽기나 명상", "충분히 자고 쉬는 날 정해 두기"], feel: "고요하고 쉬어 가는 느낌", people: "생각이 깊고 차분하게 들어 주는 사람" },
 };
 
 /** 본문이 그 기운의 대응을 실제로 말하는지 알아보는 낱말 — 방향 · 색 · 장소는 낱말로, 수(數)는 숫자(앞뒤에 다른 숫자가 없는 것)로 센다 */
@@ -53,6 +55,8 @@ export const FORTUNE_WORDS: Record<FiveElement, { direction: RegExp; color: RegE
 export type Fortify = {
   counts: Record<FiveElement, number>;
   primary: { element: FiveElement; count: number };
+  /** 1순위와 개수가 같은 기운(동점) — 1순위는 같은 입력이 늘 같은 결과를 내도록 TIE_ORDER로 정한 값이라 동점이면 어느 쪽이 먼저라고 말하지 않는다(운영자 2026-10-18). 동점이 없으면 빈 배열 */
+  tied: FiveElement[];
   /** 그다음 후보 — 개수가 적은 쪽 하나와 계절 보완(조후) 후보, 합쳐 둘까지 */
   others: { element: FiveElement; count: number; reason: "적음" | "계절" }[];
 };
@@ -86,14 +90,29 @@ export function fortifyOf(saju: SajuOk): Fortify {
     const johu = analyzeStructure({ dayMaster: saju.dayMaster.stem, pillars: saju.pillars.map((p) => ({ key: p.key, stem: p.stem, branch: p.branch })) }).johu;
     if (johu && johu.need !== primary && !others.some((o) => o.element === johu.need) && counts[johu.need] <= 1) others.push({ element: johu.need, count: counts[johu.need], reason: "계절" });
   }
-  return { counts, primary: { element: primary, count: counts[primary] }, others };
+  const tied = pool.filter((e) => e !== primary && counts[e] === counts[primary]);
+  return { counts, primary: { element: primary, count: counts[primary] }, tied, others };
 }
 
-/** 근거 목록의 개운 근거(fact)에서 1순위 보완 후보를 꺼낸다 — 검사가 본문이 그 기운의 대응(방향 · 색 · 숫자 · 장소)을 말하는지 확인할 때 쓴다 */
-export function fortifyPrimaryOf(evidence: Pick<Evidence, "id" | "fact" | "uncertain">[]): FiveElement | null {
+/** 보완 후보 기운들 — 동점이면 동점인 기운 모두(대응을 같은 무게로 소개), 아니면 1순위 하나 */
+export const fortifyCandidates = (f: Pick<Fortify, "primary" | "tied">): FiveElement[] => [f.primary.element, ...f.tied];
+
+/**
+ * 근거 목록의 개운 근거(fact)에서 보완 후보를 꺼낸다 — "보완 후보 1순위: X(" 하나, 또는 동점이면 "보완 후보 동점(…): X(…) · Y(…)" 모두.
+ * 검사가 본문이 그 기운의 대응(방향 · 색 · 숫자 · 장소)을 말하는지 확인할 때 쓴다.
+ */
+export function fortifyCandidatesOf(evidence: Pick<Evidence, "id" | "fact" | "uncertain">[]): FiveElement[] {
   const e = evidence.find((x) => x.id === "saju.fortify" && !x.uncertain);
-  const m = e && /보완 후보 1순위: ([목화토금수])\(/.exec(e.fact);
-  return m ? (m[1] as FiveElement) : null;
+  if (!e) return [];
+  const tie = /보완 후보 동점\([^)]*\): ((?:[목화토금수]\([^)]*\)(?: · )?)+)/.exec(e.fact);
+  if (tie) return [...tie[1].matchAll(/([목화토금수])\(/g)].map((m) => m[1] as FiveElement);
+  const one = /보완 후보 1순위: ([목화토금수])\(/.exec(e.fact);
+  return one ? [one[1] as FiveElement] : [];
+}
+
+/** 보완 후보 가운데 앞의 하나 — 동점이면 그중 첫 기운(우선순위가 아니라 표시 순서). 후보를 모두 봐야 하는 검사는 fortifyCandidatesOf를 쓴다 */
+export function fortifyPrimaryOf(evidence: Pick<Evidence, "id" | "fact" | "uncertain">[]): FiveElement | null {
+  return fortifyCandidatesOf(evidence)[0] ?? null;
 }
 
 /** 본문이 1순위 보완 기운의 대응을 말하는가 — 방향 · 색 · 수(數) · 장소 각각 */
@@ -216,7 +235,7 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     source: "saju",
     topics: ["relationship"],
     strength: "weak",
-    fact: `관계 자리(전통 육친 대응, 일간 기준 십성${hu ? ", 시주 없음 — 년주 · 월주 · 일주 기준이며 시주(자녀와 이어지는 자리)는 읽지 않음" : ""}): 인성 ${counts.인성.n}자리(어머니 · 윗사람 · 스승 — ${nameText("인성", counts.인성)}) / 비겁 ${counts.비겁.n}자리(형제 · 친구 · 동료) / 재성 ${counts.재성.n}자리(아버지 · 현실의 지원 — 편재 ${jaeNames["편재"] ?? 0} · 정재 ${jaeNames["정재"] ?? 0}) / 관성 ${counts.관성.n}자리(직장 상사 · 조직의 윗사람) / 식상 ${counts.식상.n}자리(후배 · 아랫사람) / ${pillarText(saju, "year") ?? "년주 없음"}(조상 · 어린 시절 바깥 환경 자리) / ${pillarText(saju, "month") ?? "월주 없음"}(부모 · 형제 · 성장 환경 자리) / 도움을 주는 쪽(인성 + 비겁) ${helperTop}자리, 천간에 드러난 것 ${exposedHelpers}곳 / 가까이 두면 균형이 맞는 사람의 분위기(보완 후보 ${fortify.primary.element} 기운의 성향): ${ELEMENT_FORTUNE[fortify.primary.element].people}`,
+    fact: `관계 자리(전통 육친 대응, 일간 기준 십성${hu ? ", 시주 없음 — 년주 · 월주 · 일주 기준이며 시주(자녀와 이어지는 자리)는 읽지 않음" : ""}): 인성 ${counts.인성.n}자리(어머니 · 윗사람 · 스승 — ${nameText("인성", counts.인성)}) / 비겁 ${counts.비겁.n}자리(형제 · 친구 · 동료) / 재성 ${counts.재성.n}자리(아버지 · 현실의 지원 — 편재 ${jaeNames["편재"] ?? 0} · 정재 ${jaeNames["정재"] ?? 0}) / 관성 ${counts.관성.n}자리(직장 상사 · 조직의 윗사람) / 식상 ${counts.식상.n}자리(후배 · 아랫사람) / ${pillarText(saju, "year") ?? "년주 없음"}(조상 · 어린 시절 바깥 환경 자리) / ${pillarText(saju, "month") ?? "월주 없음"}(부모 · 형제 · 성장 환경 자리) / 도움을 주는 쪽(인성 + 비겁) ${helperTop}자리, 천간에 드러난 것 ${exposedHelpers}곳 / 가까이 두면 균형이 맞는 사람의 분위기(${fortify.tied.length ? `보완 후보 동점 ${fortifyCandidates(fortify).join(" · ")} 기운의 성향` : `보완 후보 ${fortify.primary.element} 기운의 성향`}): ${fortify.tied.length ? fortifyCandidates(fortify).map((e) => `${e} — ${ELEMENT_FORTUNE[e].people}`).join(" / ") : ELEMENT_FORTUNE[fortify.primary.element].people}`,
     cue: "전통 육친론은 십성을 사람 사이의 관계로도 읽습니다 — 인성은 어머니 · 윗사람 · 스승, 재성(특히 편재)은 아버지 · 현실의 지원, 비겁은 형제 · 친구 · 동료, 관성은 직장 상사 · 조직의 윗사람, 식상은 후배 · 아랫사람으로 대응합니다. 월주를 부모 · 형제와 성장 환경의 자리로, 년주를 조상과 어린 시절 바깥 환경의 자리로 보기도 합니다. 도움을 주는 쪽(인성 · 비겁)이 천간에 드러나거나 자리가 든든하면 도움 받는 인연(인복) 이야기로 읽고, 보완 후보 기운의 성향을 가진 사람을 가까이 두면 균형이 맞는다고 읽습니다. 개수와 자리만으로 가족 관계의 좋고 나쁨 · 실제 있었던 일 · 가족 구성을 정하지 않으며 입력받은 가족 정보는 없습니다. 자녀 · 출산에 관한 이야기는 하지 않습니다.",
     ...(kinUncertain ? { uncertain: true } : {}),
   });
@@ -234,16 +253,25 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     ...(partner.dayUncertain ? { uncertain: true } : {}),
   });
 
-  // 6) 개운 — 보완 후보 기운과 전통 오행 대응(방향 · 색 · 수 · 장소)
-  const f = ELEMENT_FORTUNE[fortify.primary.element];
-  const otherText = fortify.others.map((o) => `${o.element}(${o.count}개 — ${o.reason === "계절" ? "계절 보완" : "적음"})`).join(", ");
+  // 6) 개운 — 보완 후보 기운과 전통 오행 대응(방향 · 색 · 수 · 장소). 개수가 같은 후보가 있으면(동점) 어느 쪽이 먼저라고 하지 않고 같은 무게의 후보로 둘 다 싣는다(운영자 2026-10-18)
+  const cands = fortifyCandidates(fortify);
+  const tie = fortify.tied.length > 0;
+  const nonTied = fortify.others.filter((o) => !cands.includes(o.element));
+  const otherText = nonTied.map((o) => `${o.element}(${o.count}개 — ${o.reason === "계절" ? "계절 보완" : "적음"})`).join(", ");
+  const countText = (e: FiveElement) => (fortify.counts[e] === 0 ? (hu ? "세 기둥에 없음 — 시주에 있을 수 있음" : "원국에 없음") : `${fortify.counts[e]}개로 가장 적음`);
+  const mapping = (e: FiveElement) => {
+    const m = ELEMENT_FORTUNE[e];
+    return `${e}(${m.image}) 기운은 방향 ${m.direction}, 계절 ${m.season}, 색 ${m.colors.join(" · ")}, 수(數) ${m.numbers.join(" · ")}, 어울리는 장소와 환경 ${m.places.join(" · ")}에 해당한다고 봅니다.`;
+  };
+  const feelText = cands.map((e) => `${e}은(는) ${ELEMENT_FORTUNE[e].feel}`).join(", ");
+  const habitNote = `생활 속 습관은 이 사람의 일상에 맞춰 한 가지를 가볍게 곁들이는 정도로 소개하고(${feelText}), 특정 행동을 정해 주거나 다른 장에서 한 행동 조언을 되풀이하지 않습니다.`;
   out.push({
     id: "saju.fortify",
     source: "saju",
     topics: ["personality"],
     strength: hu ? "weak" : "moderate",
-    fact: `오행 개수(${hu ? "세 기둥(시주 제외) 글자 기준" : "원국 글자 기준"}, 지장간 제외): ${FIVE_ELEMENTS.map((e) => `${e} ${fortify.counts[e]}`).join(" · ")} / 일간 ${dm.stem}${dm.element} / 보완 후보 1순위: ${fortify.primary.element}(${fortify.primary.count === 0 ? (hu ? "세 기둥에 없음 — 시주에 있을 수 있음" : "원국에 없음") : `${fortify.primary.count}개로 가장 적음`})${otherText ? ` · 그다음 후보: ${otherText}` : ""} / 보완 후보는 ${hu ? "세 기둥 " : "원국 "}개수와 태어난 계절만으로 정한 단순화이며 이 사람에게 꼭 필요한 기운을 판정한 것이 아님${hu ? " / 시주를 몰라 시주를 알면 후보가 달라질 수 있음 — 후보로 가볍게 곁들임" : ""}`,
-    cue: `전통 오행 대응에서 ${fortify.primary.element}(${f.image}) 기운은 방향 ${f.direction}, 계절 ${f.season}, 색 ${f.colors.join(" · ")}, 수(數) ${f.numbers.join(" · ")}, 어울리는 장소와 환경 ${f.places.join(" · ")}에 해당한다고 봅니다. 부족한 기운을 생활에서 보태는 상징적인 개운법으로, 색은 옷 · 소품 · 화면 배경으로, 방향은 산책이나 앉는 자리로, 수(數)는 즐겨 쓰는 번호로, 장소는 자주 머무는 환경으로 옮겨 소개하는 경우가 많고 습관으로는 ${f.habits.join(" · ")} 같은 것을 꼽습니다.${fortify.others.map((o) => ` 그다음 후보 ${o.element}(${ELEMENT_FORTUNE[o.element].image}) 기운은 방향 ${ELEMENT_FORTUNE[o.element].direction}, 색 ${ELEMENT_FORTUNE[o.element].colors.join(" · ")}, 수(數) ${ELEMENT_FORTUNE[o.element].numbers.join(" · ")}에 해당합니다.`).join("")} 이 대응은 전통의 상징이며 실제 효과나 재물 · 건강의 변화를 보장하지 않고, 물건을 새로 사야 한다는 뜻도 아닙니다. 이미 가진 것으로 가볍게 먼저 해 볼 수 있습니다.${hu ? " 출생 시각을 모르는 사람의 보완 후보는 세 기둥 기준이라 시주에 따라 달라질 수 있어 확정하지 않고 가볍게 곁들입니다." : ""}`,
+    fact: `오행 개수(${hu ? "세 기둥(시주 제외) 글자 기준" : "원국 글자 기준"}, 지장간 제외): ${FIVE_ELEMENTS.map((e) => `${e} ${fortify.counts[e]}`).join(" · ")} / 일간 ${dm.stem}${dm.element} / ${tie ? `보완 후보 동점(개수가 같아 우선순위를 가릴 수 없는 같은 후보): ${cands.map((e) => `${e}(${countText(e)})`).join(" · ")}` : `보완 후보 1순위: ${fortify.primary.element}(${countText(fortify.primary.element)})`}${otherText ? ` · 그다음 후보: ${otherText}` : ""} / 보완 후보는 ${hu ? "세 기둥 " : "원국 "}개수와 태어난 계절만으로 정한 단순화이며 이 사람에게 꼭 필요한 기운을 판정한 것이 아님${tie ? " — 동점인 후보를 최우선 · 가장 필요한 기운처럼 하나로 정해 말하지 않음" : ""}${hu ? " / 시주를 몰라 시주를 알면 후보가 달라질 수 있음 — 후보로 가볍게 곁들임" : ""}`,
+    cue: `전통 오행 대응에서 ${tie ? `${cands.join(" · ")} 기운은 개수가 같아 어느 쪽이 먼저라고 가릴 수 없는 같은 후보입니다(하나를 가장 필요한 기운으로 정하지 않고 둘 다 후보로 소개합니다). ${cands.map(mapping).join(" ")}` : mapping(fortify.primary.element)} 부족한 기운을 생활에서 보태는 상징적인 개운법으로, 색은 옷 · 소품 · 화면 배경으로, 방향은 산책이나 앉는 자리로, 수(數)는 즐겨 쓰는 번호로, 장소는 자주 머무는 환경으로 옮겨 소개하는 경우가 많습니다. ${habitNote}${nonTied.map((o) => ` 그다음 후보 ${o.element}(${ELEMENT_FORTUNE[o.element].image}) 기운은 방향 ${ELEMENT_FORTUNE[o.element].direction}, 색 ${ELEMENT_FORTUNE[o.element].colors.join(" · ")}, 수(數) ${ELEMENT_FORTUNE[o.element].numbers.join(" · ")}에 해당합니다.`).join("")} 이 대응은 전통의 상징이며 실제 효과나 재물 · 건강의 변화를 보장하지 않고, 물건을 새로 사야 한다는 뜻도 아닙니다. 이미 가진 것으로 가볍게 먼저 해 볼 수 있습니다.${hu ? " 출생 시각을 모르는 사람의 보완 후보는 세 기둥 기준이라 시주에 따라 달라질 수 있어 확정하지 않고 가볍게 곁들입니다." : ""}`,
   });
 
   return out;

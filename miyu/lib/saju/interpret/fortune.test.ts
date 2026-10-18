@@ -6,7 +6,7 @@ import type { FiveElement, SajuOk } from "../engine.ts";
 import { FIVE_ELEMENTS } from "../engine.ts";
 import { itemSuggestions } from "../items.ts";
 import { calculateSaju } from "../manseryeok-engine.ts";
-import { ELEMENT_FORTUNE, FORTUNE_EVIDENCE_ID, fortifyOf, fortifyPrimaryOf, fortuneEvidence, fortuneMentions } from "./fortune.ts";
+import { ELEMENT_FORTUNE, FORTUNE_EVIDENCE_ID, fortifyCandidates, fortifyCandidatesOf, fortifyOf, fortifyPrimaryOf, fortuneEvidence, fortuneMentions } from "./fortune.ts";
 import { ruleFor } from "./rule-meta.ts";
 import { analyzeStructure } from "./structure.ts";
 
@@ -174,4 +174,58 @@ test("가장 많은 십성이 동점이면 한쪽만 가장 많다고 쓰지 않
     }
   }
   assert.ok(tied >= 1 && single >= 1, `동점 ${tied}건 · 단독 ${single}건을 모두 확인했다`);
+});
+
+// ───── 보완 후보 동점(운영자 2026-10-18) — 1순위 계산은 그대로이고 말하는 방식만 바꾼다 ─────
+
+const tieChart = calculateSaju({ year: 1980, month: 4, day: 14, calendar: "solar", isLeapMonth: false, birthTime: null, gender: "female" }) as SajuOk;
+
+test("보완 후보 동점: 계산(1순위)은 바뀌지 않고, 개수가 같은 후보가 tied에 들어가며, 근거는 둘을 같은 무게의 후보로 적고 1순위라고 정하지 않는다", () => {
+  const f = fortifyOf(tieChart);
+  // 1순위는 같은 입력이 늘 같은 결과를 내도록 정한 TIE_ORDER 값 그대로(전문가 검토 전까지 규칙을 바꾸지 않는다)
+  assert.equal(f.primary.element, "목");
+  assert.deepEqual(f.tied, ["수"]);
+  assert.equal(f.counts.목, 0);
+  assert.equal(f.counts.수, 0);
+  assert.deepEqual(fortifyCandidates(f), ["목", "수"]);
+  const ev = byId(fortuneEvidence(tieChart), "saju.fortify");
+  assert.match(ev.fact, /보완 후보 동점\(개수가 같아 우선순위를 가릴 수 없는 같은 후보\): 목\(세 기둥에 없음 — 시주에 있을 수 있음\) · 수\(세 기둥에 없음 — 시주에 있을 수 있음\)/);
+  assert.doesNotMatch(ev.fact, /보완 후보 1순위/);
+  assert.match(ev.fact, /동점인 후보를 최우선 · 가장 필요한 기운처럼 하나로 정해 말하지 않음/);
+  // 두 후보의 방향 · 색 · 숫자 · 장소가 모두 근거에 있다
+  for (const el of ["목", "수"] as const) {
+    const m = ELEMENT_FORTUNE[el];
+    assert.ok(ev.cue.includes(`방향 ${m.direction}`) && ev.cue.includes(m.colors.join(" · ")) && ev.cue.includes(m.numbers.join(" · ")) && ev.cue.includes(m.places.join(" · ")), el);
+  }
+  assert.match(ev.cue, /같은 후보입니다\(하나를 가장 필요한 기운으로 정하지 않고/);
+  // 근거 목록에서 후보를 모두 꺼낸다(앞의 하나는 우선순위가 아니라 표시 순서)
+  assert.deepEqual(fortifyCandidatesOf(fortuneEvidence(tieChart)), ["목", "수"]);
+  assert.equal(fortifyPrimaryOf(fortuneEvidence(tieChart)), "목");
+  // 육친 근거의 "가까이 두면 균형이 맞는 사람"도 동점이면 후보 모두의 성향을 적는다
+  const kin = byId(fortuneEvidence(tieChart), "saju.kin").fact;
+  assert.match(kin, /보완 후보 동점 목 · 수 기운의 성향\): 목 — .* \/ 수 — /);
+});
+
+test("보완 후보가 하나뿐인 사주는 예전 형식(1순위) 그대로이고 동점 표기가 없다", () => {
+  const f = fortifyOf(chart);
+  assert.deepEqual(f.tied, []);
+  const ev = byId(fortuneEvidence(chart), "saju.fortify");
+  assert.match(ev.fact, /보완 후보 1순위: 수\(원국에 없음\)/);
+  assert.doesNotMatch(ev.fact, /동점/);
+  assert.deepEqual(fortifyCandidatesOf(fortuneEvidence(chart)), ["수"]);
+});
+
+test("개운 근거 문구는 특정 행동 예시(습관)를 싣지 않는다 — '마감 시간 정하기 · 거절할 때 쓸 문장' 같은 행동이 여러 장의 같은 행동 조언으로 되풀이되는 것을 막는다(운영자 2026-10-18)", () => {
+  const habits = FIVE_ELEMENTS.flatMap((e) => ELEMENT_FORTUNE[e].habits);
+  let seen = 0;
+  for (const c of [chart, tieChart, calculateSaju({ year: 1996, month: 3, day: 29, calendar: "solar", isLeapMonth: false, birthTime: "10:30", gender: "female" }) as SajuOk]) {
+    const ev = byId(fortuneEvidence(c), "saju.fortify");
+    for (const h of habits) assert.ok(!ev.cue.includes(h), `${h} 가 개운 근거에 있다`);
+    assert.match(ev.cue, /특정 행동을 정해 주거나 다른 장에서 한 행동 조언을 되풀이하지 않습니다/);
+    for (const el of fortifyCandidates(fortifyOf(c))) assert.ok(ev.cue.includes(ELEMENT_FORTUNE[el].feel), `${el} 느낌`);
+    seen++;
+  }
+  assert.equal(seen, 3);
+  // 무료 화면의 보완 아이템(items.ts)은 같은 습관 표를 그대로 쓴다 — 이번에 바꾸지 않았다
+  assert.ok(ELEMENT_FORTUNE.금.habits.includes("마감 시간 정하기"));
 });

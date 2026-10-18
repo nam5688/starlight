@@ -3,7 +3,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { REPORT_GENERATION } from "../../config/product.ts";
-import { ELEMENT_FORTUNE, fortifyPrimaryOf } from "../../saju/interpret/fortune.ts";
+import type { SajuOk } from "../../saju/engine.ts";
+import { calculateSaju } from "../../saju/manseryeok-engine.ts";
+import { ELEMENT_FORTUNE, fortifyCandidatesOf, fortifyPrimaryOf, fortuneEvidence } from "../../saju/interpret/fortune.ts";
 import { buildPersonas } from "../ai/compare-personas.ts";
 import { buildEvidence, createAiReportGenerator } from "../ai/generator.ts";
 import { createMockModel } from "../ai/mock-model.ts";
@@ -55,7 +57,7 @@ test("지시문: 7개 대주제와 운영자 확정(재물 항상 · 7번 B안 �
   assert.match(STORY7_SYSTEM_PROMPT, /고민이 없으면.*고민을 지어내지 않고/);
   assert.match(STORY7_SYSTEM_PROMPT, /2~3개/);
   assert.match(STORY7_SYSTEM_PROMPT, /계속 ~라면 ~/);
-  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.4");
+  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.5");
   assert.equal(STORY7_FORMAT, "story-7");
   // 사주 중심 방향: 사주풀이가 중심 · 응답이 부족해도 풀이를 비우지 않음 · 전통 개운법 허용 · 반복의 기준 · 계산하지 않은 판정 금지
   assert.match(STORY7_SYSTEM_PROMPT, /\[미유의 방향 — 사주풀이가 중심이고/);
@@ -166,6 +168,41 @@ test("6번 개운: 보완 후보 1순위 기운의 방향 · 색 · 숫자 · �
   // 근거 목록에 보완 후보가 없으면(이전 형식 근거) 이 검사는 하지 않는다
   const noFortify = buildEvidence(P01.input, REF);
   assert.equal(fortifyPrimaryOf(noFortify), null);
+});
+
+test("6번 개운 — 보완 후보가 동점이면 한 후보의 대응을 모두 말하면 통과하고, 다른 후보만 말해도 통과하며, 하나를 1순위 · 최우선으로 정해 말하면 막는다(운영자 2026-10-18)", () => {
+  const tieChart = calculateSaju({ year: 1980, month: 4, day: 14, calendar: "solar", isLeapMonth: false, birthTime: null, gender: "female" }) as SajuOk;
+  const tie = fortuneEvidence(tieChart).find((e) => e.id === "saju.fortify")!;
+  const evidence = P01_EVIDENCE.map((e) => (e.id === "saju.fortify" ? { ...e, fact: tie.fact, cue: tie.cue } : e));
+  assert.deepEqual(fortifyCandidatesOf(evidence), ["목", "수"]);
+  const say = (el: "목" | "수") => {
+    const f = ELEMENT_FORTUNE[el];
+    return `${PAD} 방향은 ${f.direction.replace(/\(.*\)/, "")} 쪽, ${f.colors[0]} 소품, 숫자 ${f.numbers[0]}과 ${f.numbers[1]}, ${f.places[0]} 같은 곳을 가볍게 해 보세요.`;
+  };
+  const fortifyErrors = (text: string) => errorsOf((d) => { section(d, 6).paragraphs![1] = text; }, evidence).filter((e) => /개운|saju\.fortify|동점/.test(e));
+  // 첫 후보 · 둘째 후보 어느 쪽의 대응이든 네 가지를 모두 말하면 통과
+  assert.deepEqual(fortifyErrors(say("목")), []);
+  assert.deepEqual(fortifyErrors(say("수")), []);
+  // 둘 다 소개해도 통과(한 기운은 네 가지, 다른 후보는 방향 · 색)
+  assert.deepEqual(fortifyErrors(`${say("수")} 같은 수로 적은 목 기운은 동쪽과 초록 계열로 곁들여도 좋아요.`), []);
+  // 어느 쪽도 네 가지를 채우지 못하면 후보 둘의 대응을 안내한다
+  const partial = fortifyErrors(`${PAD} 방향은 북쪽이고 동쪽도 좋아요 색은 남색이고 초록도 좋아요.`);
+  assert.ok(partial.some((e) => /보완 후보\(목 · 수\) 기운의 전통 대응을 그대로 쓰세요/.test(e)), partial.join("\n"));
+  // 동점인 후보를 하나로 정해 말하면 막는다
+  for (const verdict of ["수 기운이 최우선으로 필요한 기운이에요.", "목이 가장 필요한 기운이라 먼저 챙기세요.", "보완 후보 1순위는 수예요."]) {
+    const e = fortifyErrors(`${say("수")} ${verdict}`);
+    assert.ok(e.some((x) => /동점 후보라/.test(x)), `${verdict}: ${e.join("\n")}`);
+  }
+  // 하나뿐인 후보(동점이 아닐 때)에는 이 검사가 걸리지 않는다 — 예전 형식 그대로
+  const el = fortifyPrimaryOf(P01_EVIDENCE)!;
+  const f = ELEMENT_FORTUNE[el];
+  const single = errorsOf((d) => { section(d, 6).paragraphs![1] = `${PAD} 방향은 ${f.direction.replace(/\(.*\)/, "")} 쪽, ${f.colors[0]} 소품, 숫자 ${f.numbers[0]}과 ${f.numbers[1]}, ${f.places[0]} 같은 곳으로 가볍게 보태 보세요.`; });
+  assert.ok(!single.some((e) => /동점/.test(e)), single.join("\n"));
+  // 지시문은 동점 소개를 알려 주고, 근거 문구가 만들던 특정 행동 예시는 싣지 않는다
+  assert.match(STORY7_SYSTEM_PROMPT, /동점\(개수가 같아 우선순위를 가릴 수 없는 같은 후보\)으로 둘 이상 적혀 있으면/);
+  assert.match(STORY7_SYSTEM_PROMPT, /첫 문장은 이 장의 핵심 사주풀이 결론/);
+  assert.match(STORY7_SYSTEM_PROMPT, /같은 행동 조언\(같은 습관 · 같은 문장 정하기\)을 장마다 되풀이하지 않는다/);
+  assert.doesNotMatch(STORY7_SYSTEM_PROMPT, /마감 시간 정하기|거절할 때 쓸 문장/);
 });
 
 test("전통 개운법 허용: 행운의 숫자 · 방향 · 색은 쓸 수 있고, 효과 · 결과를 보장하는 말과 액운 · 부적 · 행운의 날짜 · 복권 번호만 막는다", () => {
@@ -377,10 +414,10 @@ test("조립: 7번 장의 알려 준 고민은 지어내지 않는다 — 고민
 test("생성기: story-7은 같은 흐름(초안 → 형식 검사 → 조립)으로 리포트를 만들고 지시문 버전을 남긴다 · 이전 형식 기본값은 그대로", async () => {
   const model = createMockModel({});
   const gen = createAiReportGenerator({ model, format: "story-7", now: () => NOW });
-  assert.match(gen.version, /story-7-prompt-0\.4/);
+  assert.match(gen.version, /story-7-prompt-0\.5/);
   const report = (await gen.generate(P01.input, {})) as ReturnType<typeof assembleStory7>;
   assert.equal(report.layout, "story7");
-  assert.equal(report.generated?.promptVersion, "story-7-prompt-0.4");
+  assert.equal(report.generated?.promptVersion, "story-7-prompt-0.5");
   assert.equal(model.calls, 1);
   const legacy = createAiReportGenerator({ model: createMockModel({}), now: () => NOW });
   assert.match(legacy.version, /reading-v1-prompt-0\.13/);

@@ -174,7 +174,7 @@ export const STORY7_SCENE_OWNER: Record<string, number> = Object.fromEntries(STO
 
 export const STORY7_FORMAT = "story-7";
 /** 지시문 버전 — 0.3은 사주 중심 풀이로 방향을 고정한 판이고, 0.4는 출생 시각을 모르는 사람의 풀이 범위(세 기둥 기준 · 시주 풀이 금지)와 사주 모습 · 응답의 일치 · 차이 설명을 더한 판이다(운영자 2026-10-17). 0.2까지의 실제 AI 글(1건)은 형식 검사를 통과하지 못했고 0.3 · 0.4로는 아직 한 번도 시험하지 못했다(검증되지 않음) */
-export const STORY7_PROMPT_VERSION = "story-7-prompt-0.4";
+export const STORY7_PROMPT_VERSION = "story-7-prompt-0.5";
 
 /** 글자 · 문장 수 한도 — 7개 대주제는 장마다 소유한 근거 수에 맞춰 문단 수 상한(`maxParagraphs`)이 달라지고, 나머지 한도는 영역별 이야기(story-v1)와 같은 값이다 */
 export const STORY7_LIMITS = {
