@@ -11,7 +11,7 @@ import { branchRelations } from "../relations.ts";
 import { GROUP_OF, type Group } from "../structure.ts";
 import { DATA_NOTES } from "./data.ts";
 import { AHEAD_YEARS } from "./select.ts";
-import { buildCards, cardsToEvidence, evaluateFrames, FRAME_HIT_RATE, FRAMES, frameCardsOf, renderCard, surveyAxesOf } from "./index.ts";
+import { buildCards, evaluateFrames, FRAME_HIT_RATE, FRAMES, frameCardsOf, renderCard, surveyAxesOf } from "./index.ts";
 
 type Stem = Parameters<typeof getTenGod>[0];
 type Branch = Parameters<typeof getBranchTenGod>[1];
@@ -268,7 +268,8 @@ test("구조 프레임 L1 · W2 · W4 · W7 · R3: 조건을 다시 세어 발�
     const has = (id: string) => r.evaluation.hits.some((h) => h.frame.id === id);
     assert.equal(has("W2"), c.비겁 >= 3 && c.재성 >= 1 && c.관성 <= 1, `W2 ${JSON.stringify(c)}`);
     assert.equal(has("W7"), c.인성 >= 3 && c.재성 <= 1 && c.식상 <= 1, `W7 ${JSON.stringify(c)}`);
-    assert.equal(has("W5"), c.식상 >= 2 && c.재성 <= 1 && c.비겁 >= 2, `W5 ${JSON.stringify(c)}`);
+    // W5는 근거가 불분명해(자체조합) 쓰지 않는다 — 조건이 맞아도 발동하지 않는다
+    assert.equal(has("W5"), false, `W5 ${JSON.stringify(c)}`);
     if (s.gender) {
       const star: Group = s.gender === "female" ? "관성" : "재성";
       const dayBranch = s.pillars.find((p) => p.key === "day")!.branch;
@@ -295,7 +296,9 @@ test("명중률 표: 새로 센 값과 표의 값이 크게 다르지 않다(구
   const N = SAMPLE.length;
   const rs = SAMPLE.map((s) => frameCardsOf(s, { reference: REF }).evaluation);
   for (const f of FRAMES) rate[f.id] = rs.filter((e) => e.hits.some((h) => h.frame.id === f.id)).length / N;
-  for (const f of FRAMES) assert.ok(Math.abs(rate[f.id] - FRAME_HIT_RATE[f.id]) <= 0.1, `${f.id}: 표 ${FRAME_HIT_RATE[f.id]} · 센 값 ${rate[f.id].toFixed(2)}`);
+  // 쓰지 않는 프레임(자체조합 W5 · R1 · R2)은 한 번도 나오지 않는다
+  for (const f of FRAMES.filter((x) => x.grade === "자체조합")) assert.equal(rate[f.id], 0, `${f.id}: 쓰지 않는 프레임이 발동함`);
+  for (const f of FRAMES.filter((x) => x.grade !== "자체조합")) assert.ok(Math.abs(rate[f.id] - FRAME_HIT_RATE[f.id]) <= 0.1, `${f.id}: 표 ${FRAME_HIT_RATE[f.id]} · 센 값 ${rate[f.id].toFixed(2)}`);
   // 시기 프레임을 뺀 구조 프레임은 거의 모두에게 나오지 않는다(변별력)
   for (const f of FRAMES.filter((x) => x.kind === "structure")) assert.ok(rate[f.id] < 0.6, `${f.id}: 너무 흔함 ${rate[f.id].toFixed(2)}`);
 });
@@ -316,11 +319,11 @@ test("고정 가상 인물 다섯: 발동 프레임과 선택된 이야기 — �
     };
   });
   assert.deepEqual(got, [
-    { n: "A", hits: "L6,W8,R4,R5,R6", love: "- - L6:luck:계유 대운 -", wealth: "- - W8:luck:임신 대운 -", past: "R6:갑술 대운 + R4:신미 대운", cards: "ch3-love-timing,ch5-wealth-timing,ch6-past" },
-    { n: "B", hits: "L2,L3,L6,W1,W8,R1,R4,R5", love: "L3 L2 L6:year:2005년 을유 -", wealth: "W1 - W8:year:2019년 기해 W8:year:2028년 무신", past: "R5:병인 대운 + R4:정묘 대운", cards: "ch3-love-structure,ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
-    { n: "C", hits: "L6,W1,W8,R1,R4,R5,R6", love: "- - L6:year:2012년 임진 -", wealth: "W1 - W8:year:2020년 경자 W8:luck:경자 대운", past: "R4:무술 대운 + R6:기해 대운", cards: "ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
-    { n: "D", hits: "L2,L4,L6,W1,W8,R1,R3,R4,R5", love: "L4 L2 L6:year:2022년 임인 -", wealth: "W1 - W8:year:2025년 을사 W8:luck:갑오 대운", past: "R3:임진 대운 + R5:신묘 대운", cards: "ch3-love-structure,ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
-    { n: "E", hits: "L4,L6,W3,W8,R1,R2,R3,R5", love: "L4 - L6:luck:정유 대운 L6:year:2027년 정미", wealth: "W3 - W8:year:2023년 계묘 -", past: "R2:병신 대운 + R3:무술 대운", cards: "ch3-love-structure,ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
+    { n: "A", hits: "L6,W8,R4,R5,R6", love: "- - L6:luck:계유 대운 -", wealth: "- - W8:luck:임신 대운 -", past: "R6:갑술 대운", cards: "ch3-love-timing,ch5-wealth-timing,ch6-past" },
+    { n: "B", hits: "L2,L3,L6,W1,W8,R4,R5", love: "L3 L2 L6:year:2005년 을유 -", wealth: "W1 - W8:year:2019년 기해 W8:year:2028년 무신", past: "R5:병인 대운", cards: "ch3-love-structure,ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
+    { n: "C", hits: "L6,W1,W8,R4,R5,R6", love: "- - L6:year:2012년 임진 -", wealth: "W1 - W8:year:2020년 경자 W8:luck:경자 대운", past: "R4:무술 대운", cards: "ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
+    { n: "D", hits: "L2,L4,L6,W1,W8,R3,R4,R5", love: "L4 L2 L6:year:2022년 임인 -", wealth: "W1 - W8:year:2025년 을사 W8:luck:갑오 대운", past: "R3:임진 대운", cards: "ch3-love-structure,ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
+    { n: "E", hits: "L4,L6,W3,W8,R3,R5", love: "L4 - L6:luck:정유 대운 L6:year:2027년 정미", wealth: "W3 - W8:year:2023년 계묘 -", past: "R3:무술 대운", cards: "ch3-love-structure,ch3-love-timing,ch5-wealth-structure,ch5-wealth-timing,ch6-past" },
   ]);
   // 다섯 명의 (연애 · 재물 · 과거) 선택이 모두 다르다
   assert.equal(new Set(got.map((g) => `${g.love}|${g.wealth}|${g.past}`)).size, 5);
@@ -336,7 +339,7 @@ test("카드: 근거 추적(규칙 버전 · 프레임 · 계산 사실 · 시�
     for (const card of cards.cards) {
       assert.ok(card.trace.length >= 1);
       for (const t of card.trace) {
-        assert.equal(t.ruleVersion, "saju-frames-0.1-draft");
+        assert.equal(t.ruleVersion, "saju-frames-0.2-draft");
         assert.ok(t.facts.length >= 1 && t.frameId && t.frameName);
         assert.ok(t.basis === "chart" || t.basis === "universal");
         if (t.unit) {
@@ -362,11 +365,9 @@ test("근거가 없으면 카드를 만들지 않고 이유를 남긴다(거짓 
   assert.deepEqual(noLuck.cards, []);
 });
 
-test("AI 근거 변환(아직 연결하지 않은 어댑터): 근거마다 ID · 사실 · 단서가 있고 판정 이름이 없으며 시기 근거에는 기간이 있다", () => {
+test("AI 근거 변환: 근거마다 ID · 사실 · 단서가 있고 판정 이름이 없으며 시기 근거에는 기간과 만 나이 범위가 있다", () => {
   for (const p of PEOPLE) {
-    const { cards } = frameCardsOf(p.saju, { reference: REF, survey: p.survey });
-    const ev = cardsToEvidence(cards.cards);
-    assert.ok(ev.length >= cards.cards.length);
+    const { evidence: ev } = frameCardsOf(p.saju, { reference: REF, survey: p.survey });
     assert.equal(new Set(ev.map((e) => e.id)).size, ev.length, `${p.n}: ID가 겹침`);
     for (const e of ev) {
       assert.match(e.id, /^saju\.frame\./);
@@ -374,11 +375,16 @@ test("AI 근거 변환(아직 연결하지 않은 어댑터): 근거마다 ID ·
       assert.ok(e.fact.length > 5 && e.cue.length > 20 && e.topics.length >= 1);
       assert.ok(!/격국|용신|희신|기신|신살|십이운성/.test(e.fact + e.cue));
       assert.notEqual(e.strength, "strong");
+      if (/^saju\.frame\.(?:L6|W8|R\d)\./.test(e.id)) {
+        assert.ok(e.period && e.ageWindows?.length === 1, `${e.id}: 기간 · 나이 범위`);
+        assert.ok(e.ageWindows![0].from <= e.ageWindows![0].to, `${e.id}: 나이 범위 순서`);
+      }
     }
     assert.ok(ev.some((e) => e.period), `${p.n}: 시기 근거에 기간이 없다`);
   }
   assert.deepEqual(surveyAxesOf([{ id: "survey.anxiety.high" }, { id: "survey.ei.low" }, { id: "saju.void" }, { id: "self.mbti" }]), { anxiety: "high", ei: "low" });
 });
+
 
 test("다양성: 무작위 명식 400명에서 선택된 이야기 지문(구조 · 과거 시기 · 앞으로 시기)이 거의 겹치지 않는다", () => {
   const rs = SAMPLE.map((s) => frameCardsOf(s, { reference: REF }));
@@ -422,10 +428,12 @@ test("발동 조건 · 쓰는 데이터: 프레임마다 조건 줄이 둘 이�
   }
 });
 
-test("확보 상태 표: AI 근거에 없는 데이터를 있다고 적지 않는다 — 지난 대운 · 지난 세운은 엔진 ✔ · AI ✘", () => {
+test("확보 상태 표: 지난 대운 · 지난 세운은 엔진 ✔이고 AI에는 프레임이 고른 시기만 건네진다(△) — 전체 목록을 건넸다고 적지 않는다", () => {
   assert.equal(DATA_NOTES["luck-past"].engine, "✔");
-  assert.equal(DATA_NOTES["luck-past"].ai, "✘");
-  assert.equal(DATA_NOTES["year-past"].ai, "✘");
-  // 과거 회고 프레임은 모두 지난 시기 데이터를 쓴다 — AI 근거에 연결하기 전에는 AI가 지난 대운 · 세운을 받지 못한다
+  assert.equal(DATA_NOTES["luck-past"].ai, "△");
+  assert.equal(DATA_NOTES["year-past"].ai, "△");
+  assert.match(DATA_NOTES["luck-past"].note, /전체 목록을 건네지는 않는다/);
+  // 과거 회고 프레임은 모두 지난 시기 데이터를 쓴다
   for (const f of FRAMES.filter((x) => x.area === "past")) assert.ok(f.data.includes("luck-past"), `${f.id}: 지난 대운을 쓰지 않음`);
 });
+

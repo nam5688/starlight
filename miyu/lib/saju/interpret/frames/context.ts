@@ -5,7 +5,7 @@ import type { PillarKey, SajuOk } from "../../engine.ts";
 import { yearGanji } from "../../yearly.ts";
 import { branchRelations } from "../relations.ts";
 import { analyzeStructure, GROUP_OF, type Group } from "../structure.ts";
-import type { FrameContext, FramePillar, FrameUnit } from "./types.ts";
+import { audienceOf, type FrameContext, type FramePillar, type FrameUnit } from "./types.ts";
 
 type Stem = Parameters<typeof getTenGod>[0];
 type Branch = Parameters<typeof getBranchTenGod>[1];
@@ -31,13 +31,15 @@ export function surveyAxesOf(evidence: { id: string }[]): Record<string, "high" 
 export type ContextOptions = {
   reference: { year: number; month: number };
   survey?: Record<string, "high" | "low">;
+  /** 리포트 입력의 성별 — 없으면 계산 결과에 적힌 성별을 쓴다(둘 다 없으면 배우자 별을 쓰는 프레임은 발동하지 않는다) */
+  gender?: "male" | "female" | null;
 };
 
 /** 계산 결과에서 프레임 재료를 만든다. 계산에 실패한 결과(성별 없음 등)는 있는 만큼만 채운다 */
 export function buildFrameContext(saju: SajuOk, opts: ContextOptions): FrameContext {
   const dm = saju.dayMaster.stem;
   const st = analyzeStructure({ dayMaster: dm, pillars: saju.pillars.map((p) => ({ key: p.key, stem: p.stem, branch: p.branch })) });
-  const gender = saju.gender ?? null;
+  const gender = opts.gender ?? saju.gender ?? null;
   const star: Group | null = gender === "female" ? "관성" : gender === "male" ? "재성" : null;
   const visible = zero();
   const stems = zero();
@@ -86,9 +88,13 @@ export function buildFrameContext(saju: SajuOk, opts: ContextOptions): FrameCont
   }
 
   const birthYear = saju.solarDate.year;
+  const birthMonth = saju.solarDate.month;
+  /** 그 달의 만 나이 — 생일의 일은 따지지 않으므로 "무렵"으로만 말한다(연도 차이만 쓰면 최대 한 살 크게 나온다) */
+  const ageAt = (y: number, m: number) => y - birthYear - (m < birthMonth ? 1 : 0);
+  const ymOf = (s: string): [number, number] => [Number(s.slice(0, 4)), Number(s.slice(5, 7))];
   const ref = opts.reference;
   const refYm = `${ref.year}-${String(ref.month).padStart(2, "0")}`;
-  const unit = (kind: FrameUnit["kind"], label: string, stem: string, branch: string, ageFrom: number, ageTo: number, from: string, to: string): FrameUnit => {
+  const unit = (kind: FrameUnit["kind"], label: string, stem: string, branch: string, from: string, to: string): FrameUnit => {
     const stemGod = getTenGod(dm as Stem, stem as Stem);
     const branchGod = getBranchTenGod(dm as Stem, branch as Branch);
     const rel: FrameUnit["rel"] = {};
@@ -100,24 +106,23 @@ export function buildFrameContext(saju: SajuOk, opts: ContextOptions): FrameCont
       kind, label, stem, branch, stemGod, branchGod,
       stemGroup: (GROUP_OF[stemGod] as Group) ?? null,
       branchGroup: (GROUP_OF[branchGod] as Group) ?? null,
-      ageFrom, ageTo, from, to, rel,
+      ageFrom: ageAt(...ymOf(from)), ageTo: ageAt(...ymOf(to)), from, to, rel,
       position: to < refYm ? "past" : from <= refYm ? "current" : "future",
     };
   };
-  const luck: FrameUnit[] = (saju.luck?.periods ?? []).map((p) =>
-    unit("luck", `${p.stem}${p.branch} 대운`, p.stem, p.branch, Number(p.from.slice(0, 4)) - birthYear, Number(p.to.slice(0, 4)) - birthYear, p.from, p.to),
-  );
+  const luck: FrameUnit[] = (saju.luck?.periods ?? []).map((p) => unit("luck", `${p.stem}${p.branch} 대운`, p.stem, p.branch, p.from, p.to));
   const years: FrameUnit[] = [];
   // 세운은 만 8세 무렵부터 올해 + 2년까지(근거 목록의 "올해부터 3년"과 같은 끝)
   for (let y = birthYear + 8; y <= ref.year + 2; y++) {
     const g = yearGanji(y);
-    years.push(unit("year", `${y}년 ${g.stem}${g.branch}`, g.stem, g.branch, y - birthYear, y - birthYear, `${y}-01`, `${y}-12`));
+    years.push(unit("year", `${y}년 ${g.stem}${g.branch}`, g.stem, g.branch, `${y}-01`, `${y}-12`));
   }
 
+  const refAge = ageAt(ref.year, ref.month);
   const uncertain = [...new Set(saju.notes.filter((n) => n.kind === "jeolgi-day" || n.kind === "near-boundary" || n.kind === "jasi-school").flatMap((n) => n.pillars))];
 
   return {
-    gender, star, dayMaster: dm, hourKnown: !saju.hourPillarOmitted, birthYear, age: ref.year - birthYear, reference: ref, uncertain,
+    gender, star, dayMaster: dm, hourKnown: !saju.hourPillarOmitted, birthYear, birthMonth, age: refAge, audience: audienceOf(refAge), reference: ref, uncertain,
     pillars, visible, stems, anywhere, godCount, starOnStem, starOnBranch, starInHidden,
     monthGroup: st.month.jeonggi.group as Group,
     monthExposed: st.exposed.map((e) => GROUP_OF[getTenGod(dm as Stem, e.stem as Stem)] as Group).filter(Boolean),

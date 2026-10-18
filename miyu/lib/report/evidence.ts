@@ -27,6 +27,11 @@ export type Evidence = {
   cue: string;
   /** 시기 근거일 때 기간 (양력 연-월) */
   period?: { from: string; to: string; label: string };
+  /**
+   * 시기 근거일 때 그 기간의 만 나이 범위(생일의 일은 따지지 않아 "무렵"으로만 말한다) — 지난 대운 · 세운을 "만 N세 무렵"으로 풀 때 글이 이 범위 안에서만 나이를 말하게 한다.
+   * 대운 하나는 범위 하나, 여러 대운을 묶은 개요는 대운마다 범위 하나씩이다.
+   */
+  ageWindows?: { from: number; to: number }[];
   /** 학파 · 경계 때문에 확실하지 않은 근거 — 해석에 쓰지 말고 안내만 한다 */
   uncertain?: boolean;
 };

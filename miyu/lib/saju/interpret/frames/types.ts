@@ -9,7 +9,12 @@ export const AREA_LABEL: Record<FrameArea, string> = { love: "연애 · 배우�
 
 /** structure: 원국 구조로 발동 / timing: 대운 · 세운 시기로 발동(인스턴스 = 어느 시기에 났는가) */
 export type FrameKind = "structure" | "timing";
+export type FrameGrade = "통설" | "단순화" | "자체조합";
 export type Gender = "male" | "female";
+export type Audience = "adult" | "teen" | "child";
+
+/** 연령대 구분 — 만 19세 이상 연애 · 배우자 · 결혼 풀이 / 만 16~18세 호감 · 관계 경험 중심(결혼 · 배우자 확정 풀이 제한) / 만 16세 미만 또래 관계 중심 */
+export const audienceOf = (age: number): Audience => (age >= 19 ? "adult" : age >= 16 ? "teen" : "child");
 
 /** 대운 한 칸 또는 세운 한 해 */
 export type FrameUnit = {
@@ -23,7 +28,7 @@ export type FrameUnit = {
   branchGod: string;
   stemGroup: Group | null;
   branchGroup: Group | null;
-  /** 만 나이(생년 기준 어림 — "무렵"으로만 말한다) */
+  /** 시기가 시작하는 달과 끝나는 달의 만 나이(생일의 일은 따지지 않는다 — "무렵"으로만 말한다) */
   ageFrom: number;
   ageTo: number;
   /** 양력 연-월 */
@@ -42,7 +47,11 @@ export type FrameContext = {
   dayMaster: string;
   hourKnown: boolean;
   birthYear: number;
+  birthMonth: number;
+  /** 기준 연-월의 만 나이(생일의 일은 따지지 않아 "무렵"으로만 말한다) */
   age: number;
+  /** 읽는 사람의 연령대 — 만 19세 이상 adult / 만 16~18세 teen / 만 16세 미만 child (운영자 2026-10-18) */
+  audience: Audience;
   reference: { year: number; month: number };
   /** 절기 경계 · 야자시 관법 때문에 달라질 수 있는 기둥 — 그 기둥에 기대는 근거는 쓰지 않는다 */
   uncertain: PillarKey[];
@@ -149,6 +158,13 @@ export type FrameDef = {
   minAge?: number;
   /** 필요한 데이터 — 없으면 발동하지 않는다 */
   needs: ("gender" | "luck")[];
+  /**
+   * 해석 근거의 성격(미유 판단 — 전문가 검토 전) — 통설: 전통에서 이름이 있는 구조를 그대로 / 단순화: 통설 구조를 한두 조건으로 줄인 것 / 자체조합: 통설 이름이 없고 미유가 조건을 조합한 것.
+   * 자체조합은 AI 근거로 쓰지 않는다(운영자 2026-10-18: 근거가 불분명한 프레임은 쓰지 말고 제외 사유를 기록한다).
+   */
+  grade: FrameGrade;
+  /** 그렇게 매긴 이유 한두 문장 — 제외한 프레임은 제외 사유다 */
+  gradeNote: string;
   /** 발동 조건(사람이 읽는 줄 — 모두 동시에 맞아야 한다. `check`와 같은 기준이며 문서에 그대로 실린다) */
   condition: string[];
   /** 쓰는 데이터 키 — `data.ts`의 DATA_NOTES에서 엔진 계산 여부 · AI 근거로 건네지는지를 확인한다 */
@@ -169,4 +185,5 @@ export type ResponseLink = {
   note: string;
 } | null;
 
-export const FRAME_RULE_VERSION = "saju-frames-0.1-draft";
+/** 0.2(2026-10-18): AI 근거 연결 · 자체조합 프레임(W5 · R1 · R2) 제외 · 정확한 만 나이 · 연령대 분기 · 기본 풀이 층 */
+export const FRAME_RULE_VERSION = "saju-frames-0.2-draft";

@@ -64,7 +64,7 @@ const FORBIDDEN_ALWAYS = ["확정된 사건처럼 말하지 않는다", "정확�
 
 const windowOf = (i: FrameInstance, clip?: number): string => {
   const u = i.unit;
-  if (u.kind === "year") return `${u.from.slice(0, 4)}년 무렵(만 ${u.ageFrom}세)`;
+  if (u.kind === "year") return `${u.from.slice(0, 4)}년 무렵(${u.ageFrom === u.ageTo ? `만 ${u.ageFrom}세` : `만 ${u.ageFrom}~${u.ageTo}세`})`;
   const a = Math.max(i.ageFrom, 0);
   const b = clip !== undefined ? Math.min(i.ageTo, clip) : i.ageTo;
   return a === b ? `만 ${a}세 무렵` : `만 ${a}~${b}세 무렵`;
@@ -173,11 +173,11 @@ export function buildCards(c: FrameContext, sel: Selection): CardSet {
   if (sel.love) {
     add(structureCard(c, sel.love, 3, "ch3-love-structure"), "3장 연애 · 인연의 모양", "발동한 연애 구조 프레임이 없음");
     add(timingCard(c, sel.love, 3, "ch3-love-timing"), "3장 연애 · 인연이 움직이는 시기", "배우자 별 × 일지 관계가 겹친 시기가 없음");
-  } else if (c.gender) skipped.push({ card: "3장 연애", reason: "발동한 연애 프레임이 없음" });
+  } else if (c.gender) skipped.push({ card: "3장 연애", reason: c.audience === "child" ? "만 16세 미만은 연애 풀이 대신 또래 관계 중심으로 읽음(기본 풀이 근거 base-peer)" : "발동한 연애 프레임이 없음(기본 풀이 근거 base-love가 위치와 운으로 읽음)" });
   if (sel.wealth) {
     add(structureCard(c, sel.wealth, 5, "ch5-wealth-structure"), "5장 재물 · 재물복의 모양", "발동한 재물 구조 프레임이 없음");
     add(timingCard(c, sel.wealth, 5, "ch5-wealth-timing"), "5장 재물 · 수입 · 일이 움직이는 시기", "재성 × 월지 관계가 겹친 시기가 없음");
-  } else skipped.push({ card: "5장 재물", reason: "발동한 재물 프레임이 없음" });
+  } else skipped.push({ card: "5장 재물", reason: c.audience === "child" ? "만 16세 미만은 재물 구조 · 시기 프레임을 쓰지 않음" : "발동한 재물 프레임이 없음(기본 풀이 근거 base-wealth가 위치와 운으로 읽음)" });
   add(pastCard(c, sel.past), "6장 과거 회고", "과거 회고를 쓸 수 있는 나이가 아니거나 근거가 없음");
   return { cards, skipped };
 }

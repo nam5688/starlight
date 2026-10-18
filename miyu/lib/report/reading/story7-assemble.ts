@@ -50,10 +50,12 @@ export function assembleStory7(o: AssembleStory7Options): IntegratedReadingRepor
     const hourNote = plan.no === 1 && saju.status === "ok" && saju.hourPillarOmitted ? HOUR_UNKNOWN_CAVEAT : null;
     const caveat = [STORY7_CAVEAT[plan.blockId]?.(name), hourNote].filter(Boolean).join(" ") || undefined;
     const cited = s.evidence.length > 0 ? s.evidence : ownerEvidence;
+    // 만 16세 미만은 3번 장이 연애 대신 또래 관계 풀이라 장 이름도 맞춘다(목차 번호 · 위치는 그대로, 운영자 확인 항목)
+    const topic = plan.no === 3 && evidence.some((e) => e.id === "saju.frame.audience.child") ? "또래 관계와 애착" : plan.title;
     return {
       id: plan.blockId,
       group,
-      topic: plan.title,
+      topic,
       headline: s.headline,
       summary: paragraphs[0],
       details: paragraphs.slice(1),

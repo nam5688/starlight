@@ -111,6 +111,22 @@ function fortuneRules(): RuleMeta[] {
   ];
 }
 
+/**
+ * 명리 조합 해석 프레임(frames/, 2026-10-18 운영자 승인으로 story-7에 연결) — 새 명리 계산 규칙이 아니다. 이미 계산된 값(십성 자리 수 · 월령 · 일간 방향 · 일지와 다른 기둥의 합 · 충 · 형 · 대운 · 세운의 십성)을
+ * 둘 이상 겹쳐 "조합이 발동했는가"를 정하고, 그 조합이 전통에서 읽히는 의미 범위를 키워드로 건넨다. 결론 문장은 없고 AI가 근거 안에서 쓴다. 조건 · 임계값(자리 수 3 이상 등)은 전통 해석을 단순화한 미유의 설계 가설이며
+ * 원전과 대조하지 못했고 전문가 검토 전이다. 근거 수준(통설 · 단순화 · 자체조합)은 프레임마다 catalog에 적고, 자체조합(R1 · R2 · W5)은 근거가 불분명해 쓰지 않는다.
+ */
+const FRAME_CALC = "만세력 엔진이 계산한 원국 십성 · 지장간 · 월령 · 일간 방향(structure.ts) · 합 · 충 · 형(relations.ts) · 대운 · 세운(manseryeok, yearly.ts)을 프레임 재료로 모았다. 새 계산 규칙은 없고, 재료 값은 docs/saju-engine.md의 교차 검증 범위(만세력 · 십신 · 합충형 · 대운 · 세운)에서 확인한 것을 그대로 쓴다. 만 나이는 출생 연-월과 시기의 연-월로 센 어림(생일의 일은 따지지 않는다)이다.";
+function frame(m: { id: string; title: string; match: RegExp; interpretation: string; conditions: string[]; exceptions: string[] }): RuleMeta {
+  return { kind: "saju", calculation: FRAME_CALC, source: SRC_TRADITION, review: "unreviewed", version: "0.2", ...m };
+}
+export const FRAME_RULE_META: RuleMeta[] = [
+  frame({ id: "frame-structure", title: "조합 해석 프레임 — 구조(연애 L1~L5 · 재물 W1~W7)", match: /^saju\.frame\.(?:L[1-5]|W[1-7])$/, interpretation: "서로 다른 사실 둘 이상(예: 배우자 별이 천간에 드러남 + 일지 합)이 겹칠 때만 발동하는 조합을 전통에서 읽는 의미 범위(키워드)와 좋은 면 · 어려운 면으로 건넨다. 결론 문장은 없다.", conditions: ["프레임마다 발동 조건이 다르다 — docs/saju-frames-v1.md", "성별이 없으면 배우자 별을 쓰는 연애 프레임은 발동하지 않는다", "만 16세 미만은 쓰지 않고, 만 16~18세는 연애 L2~L5만 쓴다"], exceptions: ["월주 · 일주 등 기대는 기둥이 절기 경계 · 자시 관법으로 달라질 수 있으면 그 프레임은 근거에서 뺀다", "자체조합(W5)은 근거가 불분명해 쓰지 않는다", "응답은 프레임이 있는지를 바꾸지 않는다 — 앞세울 얼굴과 일치 · 차이 설명만 바꾼다"] }),
+  frame({ id: "frame-timing", title: "조합 해석 프레임 — 시기(연애 L6 · 재물 W8 · 과거 회고 R3~R6)", match: /^saju\.frame\.(?:L6|W8|R[1-6])\.[^.\s]+$/, interpretation: "지난 · 지금 · 앞으로의 대운 · 세운이 원국과 만나는 조합(배우자 별 운 + 일지 합충, 재성 운 + 월지 합충, 결핍 십성이 대운에 들어옴)을 그 무렵 두드러졌을(두드러질) 주제의 가능성으로 건넨다. 근거에 만 나이 범위(ageWindows)와 연-월 기간(period)을 함께 담는다.", conditions: ["성별을 입력해 대운을 계산했을 때만", "과거는 현재 나이까지만, 연애 만 16세 이후 · 재물 만 17세 이후 · 과거 회고 프레임별 나이 하한 이후만", "앞으로는 지금과 열 해 안에 시작하는 시기까지만", "같은 시기는 연애 · 재물 · 과거 회고 가운데 한 곳에서만 쓴다"], exceptions: ["정확한 날짜 · 금액 · 사건을 말하지 않는다 — 나이대 창과 가능성으로만", "출생 시각을 모르면 대운이 바뀌는 달이 달라질 수 있어 연도 무렵으로만 말한다", "R1 · R2는 근거가 불분명해 쓰지 않는다"] }),
+  frame({ id: "frame-base", title: "기본 풀이(프레임이 없는 곳을 위치와 운으로 읽는 근거)", match: /^saju\.frame\.base-(?:love|wealth|past|peer)$/, interpretation: "배우자 별 · 재성의 위치(천간 · 지지 · 지장간 · 없음), 일지의 합 · 충 · 형, 월지의 십성, 지금 · 다음 대운이 그 주제를 들이는지, 지난 대운의 십성 그룹을 적는다. 특별한 조합이 발동하지 않았다고 근거에 밝히며 조합이 있는 것처럼 쓰지 않는다.", conditions: ["연애 구조 이야기가 없으면 base-love(만 16세 이상) · 재물 구조 이야기가 없으면 base-wealth(만 16세 이상) · 과거 회고 시기 프레임이 둘 미만이면 base-past · 만 16세 미만은 base-peer"], exceptions: ["위치와 운의 사실을 모은 것이며 새 판정이 아니다", "지난 시기에 실제로 무슨 일이 있었는지는 알 수 없다 — 가능성으로만"] }),
+  frame({ id: "frame-audience", title: "연령대 안내(만 19세 미만의 풀이 범위)", match: /^saju\.frame\.audience\.(?:teen|child)$/, interpretation: "만 16~18세는 호감 · 관계 경험 중심, 만 16세 미만은 또래 관계 중심으로 풀이 범위를 줄인다. 결혼 · 배우자 · 인연의 나이 방향 풀이는 쓰지 않는다.", conditions: ["만 19세 미만일 때만(출생 연-월과 기준 연-월로 센 만 나이)"], exceptions: ["이 근거는 풀이의 범위를 정하는 기록이며 새로운 명리 판정이 아니다", "실제 연애 · 관계 경험을 사실처럼 쓰지 않는다"] }),
+];
+
 export const RULE_META: RuleMeta[] = [
   saju({ id: "daymaster", title: "일간의 비유(십간 물상)", match: /^saju\.daymaster$/, interpretation: "일간 10종을 큰 나무 · 촛불 · 바위 같은 자연물에 비유해 성향의 방향을 한 줄로 읽는다.", conditions: ["일간(태어난 날의 천간) 10종 각각에 한 문장"], exceptions: ["일주는 날짜로 정해지지만 자시 관법(야자시 · 조자시)에 따라 달라질 수 있어, 그 경우 saju.uncertain.jasi-school로 알린다"] }),
   saju({ id: "element-many", title: "오행이 두드러짐", match: /^saju\.element\.[목화토금수]\.many$/, interpretation: "한 오행이 원국 글자 중 3개 이상이면 그 기운(목 성장 · 화 표현 · 토 안정 · 금 기준 · 수 생각)이 두드러진다고 읽는다.", conditions: ["원국 글자(지장간 제외)에서 같은 오행 3개 이상 — 4개 이상이면 strong, 3개면 moderate"], exceptions: [...COMMON_EXCEPTIONS, "지장간 속 오행은 세지 않는다(학파마다 기준이 달라 엔진 결과로 단정하지 않음)"] }),
@@ -156,6 +172,7 @@ export const RULE_META: RuleMeta[] = [
     calculation: "본인이 입력한 4글자(검사 점수가 아님). 글자가 가리키는 선호의 방향은 일상의 말로 풀어 근거 문구에 붙인다(직접 쓴 한 줄 풀이, 공식 검사 설명이 아님).", interpretation: "본인이 알고 있는 자기 인식 참고값이다. 사주에서 읽은 성향이 이 사람에게 어떤 장면으로 나타나는지 구체화하는 데 쓰고(핵심 성향 · 가까운 관계 · 일 영역에서) 행동의 원인으로 단정하지 않으며 사주 · 응답과 다를 때 덮어쓰지 않는다 — 응답이 먼저이고 다르면 차이가 나타나는 상황으로 쓴다.",
     source: "사용자 입력.", conditions: ["MBTI를 입력한 경우 — 항상 weak"], exceptions: ["자체 응답으로 MBTI를 환산하지 않는다", "공식 MBTI 검사 결과가 아니다", "알파벳 글자를 이유로 쓰지 않는다(\"INFJ라서\" 금지)", "시기 · 운 때문에 성향이 바뀐다고 쓰지 않는다"], review: "unreviewed", version: "0.2",
   },
+  ...FRAME_RULE_META,
 ];
 
 

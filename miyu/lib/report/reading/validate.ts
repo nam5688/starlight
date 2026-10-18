@@ -103,6 +103,28 @@ export function allowedYearsOf(evidence: Evidence[]): Set<string> {
   return years;
 }
 
+/** 근거(Evidence.ageWindows)가 허용한 만 나이 범위 */
+export type AgeWindow = { from: number; to: number };
+
+const AGE_RANGE = /만\s*(\d{1,2})(?:\s*[~\-–]\s*(\d{1,2}))?\s*세/g;
+const AGE_DECADE = /(\d)0대(?!표)(?:\s*(초반|중반|후반))?/g;
+
+/**
+ * 근거가 허용한 나이 범위 안의 나이 표현("만 24~28세 무렵" · "20대 중반")을 지운 글을 돌려준다 — 남은 글에 나이가 있으면 근거에 없는 나이다.
+ * 지난 대운 · 세운을 만 나이 범위로 풀 때만 쓴다(story-7의 6번 장). 범위 밖의 나이 · "N살" · 서른 같은 우리말 나이는 지우지 않는다.
+ */
+export function stripAllowedAges(text: string, windows: AgeWindow[]): string {
+  const within = (n: number) => windows.some((w) => n >= w.from && n <= w.to);
+  const overlaps = (lo: number, hi: number) => windows.some((w) => w.from <= hi && w.to >= lo);
+  return text
+    .replace(AGE_RANGE, (m, a: string, b?: string) => (within(Number(a)) && (b === undefined || within(Number(b))) ? "" : m))
+    .replace(AGE_DECADE, (m, d: string, part?: string) => {
+      const base = Number(d) * 10;
+      const [lo, hi] = part === "초반" ? [base, base + 3] : part === "중반" ? [base + 4, base + 6] : part === "후반" ? [base + 7, base + 9] : [base, base + 9];
+      return overlaps(lo, hi) ? "" : m;
+    });
+}
+
 /**
  * 화면에 보이는 모든 글에 같은 규칙을 적용하는 확인 — 사주 용어 사용 · 해석 키워드 나열 · 점수 · 원인 좁히기 · 응답 읽어 주기 · 풀이마다 붙는 경고 · 자료 없음 말 · 나이 · 금지 표현 ·
  * 결정 대행 · 계산되지 않은 해 · 같은 문장 반복. 이전 읽기 구조(validateReadingDraft)와 영역별 이야기(story-validate.ts)가 같이 쓴다 — 두 형식의 기준이 갈라지지 않게 한 곳에 둔다.
@@ -118,6 +140,9 @@ export function textIssues(
     adviceRules?: { re: RegExp; why: string }[];
     /** 한 문장에 쓸 수 있는 서로 다른 사주 용어 수 — 기본 TERM_LIMITS.perSentenceMax */
     perSentenceMax?: number;
+    /** 근거가 허용한 만 나이 범위 — 있으면 ageWhere가 참인 글 조각에서만 이 범위 안의 나이 표현을 허용한다(story-7의 6번 장) */
+    ageWindows?: AgeWindow[];
+    ageWhere?: (where: string) => boolean;
   },
 ): string[] {
   const errors: string[] = [];
@@ -132,7 +157,8 @@ export function textIssues(
     if (echo.test(t)) errors.push(`${where}: 응답을 그대로 읽어 주는 말("${echo.exec(t)![0]}")을 쓰지 않습니다 — 사주에서 읽은 성향이 이 사람에게 어떤 장면으로 나타나는지로 풀어 쓰세요.`);
     if (HEDGE_REPEAT.test(t)) errors.push(`${where}: 풀이마다 "사주만으로는 알 수 없어요" 같은 경고를 붙이지 않습니다 — 조건("~할 때는")으로 풀이 안에 녹이세요(한계 안내는 한곳에 모읍니다).`);
     if (NO_DATA_TEXT.test(t)) errors.push(`${where}: 응답이나 자료가 없다는 말("${NO_DATA_TEXT.exec(t)![0]}")을 본문에 쓰지 않습니다 — 응답 근거가 없는 주제는 사주 근거만으로 풀이를 끝까지 쓰세요(필요한 안내는 코드가 한곳에 붙입니다).`);
-    if (AGE_TEXT.test(t)) errors.push(`${where}: 나이를 쓰지 않습니다.`);
+    const ageText = o.ageWindows && o.ageWhere?.(where) ? stripAllowedAges(t, o.ageWindows) : t;
+    if (AGE_TEXT.test(ageText)) errors.push(`${where}: ${o.ageWindows && o.ageWhere?.(where) ? "근거에 적힌 나이 범위 밖의 나이를 쓰지 않습니다(\"만 N~M세 무렵\" 또는 \"20대 중반 무렵\"처럼 근거에 적힌 범위 안에서만)." : "나이를 쓰지 않습니다."}`);
     for (const f of FORBIDDEN) if (f.re.test(t)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
     for (const f of o.adviceRules ?? ADVICE_RULES) if (f.re.test(t)) errors.push(`${where}: 쓰지 않는 표현 (${f.why})`);
     for (const y of t.match(/(?<![\d.])(?:19|20)\d{2}(?![\d.])/g) ?? []) if (!allowedYears.has(y)) errors.push(`${where}: 계산되지 않은 해 ${y}`);

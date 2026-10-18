@@ -17,14 +17,14 @@ export const DATA_NOTES: Record<string, DataNote> = {
   strength: { label: "일간 방향(받는 쪽 · 덜 받는 쪽 · 갈림)", engine: "✔", ai: "✔", note: "강약 후보. 점수가 아니라 월령 · 뿌리 · 세력 세 요소의 방향 기록이다(신강 · 신약 판정이 아니다). saju.structure.strength 근거와 같다." },
   roots: { label: "일간의 뿌리(통근)", engine: "✔", ai: "✔", note: "saju.structure.roots 근거와 같은 계산. 전문가 검토 전 초안 기준이다." },
   "luck-current": { label: "현재 대운 · 다음 대운", engine: "✔", ai: "✔", note: "AI 근거에 현재 · 다음 대운이 있다. 대운이 바뀌는 달은 시각 미상이면 정확하지 않아 연 단위 무렵으로만 말한다." },
-  "luck-past": { label: "지난 대운(간지 · 시작 · 끝 · 나이)", engine: "✔", ai: "✘", note: "엔진은 대운 전체 목록을 계산하지만 AI 근거에는 지난 대운이 없다. 과거 회고 프레임이 쓰는 핵심 데이터이며 연결하려면 근거 어댑터가 필요하다." },
+  "luck-past": { label: "지난 대운(간지 · 시작 · 끝 · 나이)", engine: "✔", ai: "△", note: "엔진은 대운 전체 목록을 계산한다. 2026-10-18부터 프레임이 고른 지난 대운(연애 · 재물 · 과거 회고 몇 개와 지난 대운 개요)을 period와 만 나이 범위(ageWindows)와 함께 AI 근거로 건넨다 — 전체 목록을 건네지는 않는다." },
   "year-current": { label: "올해부터 3년의 세운", engine: "✔", ai: "✔", note: "AI 근거에 올해부터 3년이 있다." },
-  "year-past": { label: "지난 세운(만 8세 이후)", engine: "✔", ai: "✘", note: "세운 간지는 연도로 계산한다(yearly.ts). 과거 회고 프레임이 쓰며 AI 근거에는 없다." },
-  "luck-rel": { label: "대운 · 세운 지지 × 원국 지지의 합 · 충 · 형", engine: "△", ai: "✘", note: "관계 계산(branchRelations)은 있지만 시기별로 원국에 대어 보는 모음은 이 프레임 계층이 처음 만든다(새 규칙이 아니라 기존 함수 재사용)." },
+  "year-past": { label: "지난 세운(만 8세 이후)", engine: "✔", ai: "△", note: "세운 간지는 연도로 계산한다(yearly.ts). 프레임이 고른 지난 세운만 연도 · 만 나이 범위와 함께 AI 근거로 건넨다 — 모든 해를 건네지는 않는다." },
+  "luck-rel": { label: "대운 · 세운 지지 × 원국 지지의 합 · 충 · 형", engine: "△", ai: "△", note: "관계 계산(branchRelations)은 있지만 시기별로 원국에 대어 보는 모음은 이 프레임 계층이 처음 만든다(새 규칙이 아니라 기존 함수 재사용)." },
   "luck-god": { label: "대운 · 세운의 천간 · 지지 십성", engine: "✔", ai: "△", note: "일간 기준 십성(getTenGod · getBranchTenGod). AI 근거의 현재 · 다음 대운에는 있고 지난 시기는 없다." },
   uncertain: { label: "흔들리는 기둥(절기 경계 · 야자시 관법)", engine: "✔", ai: "△", note: "엔진 notes에서 읽는다. 그 기둥에 기대는 근거는 프레임에서 뺀다. AI 근거에는 uncertain 표시로 일부만 전달된다." },
   "hour-unknown": { label: "출생 시각 미상(시주 없음)", engine: "✔", ai: "✔", note: "세 기둥으로만 계산하고 시주를 쓰지 않는다. 시각 미상이면 대운 전환은 연 단위 무렵으로만 말한다." },
-  age: { label: "현재 만 나이(기준일 − 출생 연도)", engine: "△", ai: "✘", note: "출생 연도와 기준일에서 어림으로 센다. 생일 전후를 가르지 않아 ±1세 오차가 있다 — 그래서 모든 시기는 '만 N세 무렵'으로만 말한다." },
+  age: { label: "만 나이(출생 연-월과 기준 연-월)", engine: "△", ai: "✔", note: "출생 연-월과 시기의 연-월로 센다. 생일의 일은 따지지 않아 한 살 안쪽의 어림이 남는다 — 그래서 모든 시기는 '만 N세 무렵'으로만 말하고, AI 근거에는 ageWindows(범위)로 건넨다." },
   survey: { label: "설문 응답(뚜렷한 방향만)", engine: "✔", ai: "✔", note: "survey.<축>.<high|low> 근거에서 읽는다. 프레임이 있고 없음에는 쓰지 않고 앞세울 얼굴과 일치 · 차이 표시에만 쓴다." },
 };
 

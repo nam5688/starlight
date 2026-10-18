@@ -5,6 +5,8 @@
 
 import { PARTNER_AGE_DIRECTION } from "../../config/product.ts";
 import { fortuneEvidence } from "../../saju/interpret/fortune.ts";
+import { adaptEvidenceForAudience } from "../../saju/interpret/frames/audience.ts";
+import { frameCardsOf, surveyAxesOf } from "../../saju/interpret/frames/index.ts";
 import { hourUnknownEvidence } from "../../saju/interpret/hour-unknown.ts";
 import { sajuEvidence, SAJU_RULE_VERSION } from "../../saju/interpret/rules.ts";
 import { filledFields, topicLabel } from "../../personalization/context.ts";
@@ -157,11 +159,14 @@ function seoulYm(d: Date) {
  */
 export function buildEvidence(input: Pick<ReportInput, "saju" | "gender" | "summary" | "knownMbti">, reference: { year: number; month: number }, o: { fortune?: boolean } = {}): Evidence[] {
   if (input.saju.status !== "ok") throw new Error("사주 계산 결과가 없어 리포트를 만들 수 없습니다.");
-  return [
-    ...sajuEvidence(input.saju, { reference, gender: input.gender ?? null }),
-    ...(o.fortune ? [...hourUnknownEvidence(input.saju), ...fortuneEvidence(input.saju, { ageDirection: PARTNER_AGE_DIRECTION.enabled })] : []),
-    ...surveyEvidence(input.summary, input.knownMbti),
-  ];
+  const survey = surveyEvidence(input.summary, input.knownMbti);
+  const saju = sajuEvidence(input.saju, { reference, gender: input.gender ?? null });
+  if (!o.fortune) return [...saju, ...survey];
+  // 7개 대주제(story-7)만: 사주 풀이 재료 + 명리 조합 해석 프레임 근거(지난 · 지금 · 앞으로의 대운 · 세운을 만 나이 범위와 함께, 운영자 2026-10-18).
+  // 프레임을 고르는 데 응답은 쓰이지 않는다 — 응답은 근거의 "응답 연결" 문장만 바꾼다. 만 19세 미만은 배우자 · 결혼 풀이를 빼고 연령대 안내를 더한다.
+  const frames = frameCardsOf(input.saju, { reference, gender: input.gender ?? null, survey: surveyAxesOf(survey) });
+  const readings = [...saju, ...hourUnknownEvidence(input.saju), ...fortuneEvidence(input.saju, { ageDirection: PARTNER_AGE_DIRECTION.enabled })];
+  return [...adaptEvidenceForAudience(readings, frames.ctx.audience), ...frames.evidence, ...survey];
 }
 
 function fillName(draft: ReportDraftV2, name: string): ReportDraftV2 {

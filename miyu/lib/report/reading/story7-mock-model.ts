@@ -22,6 +22,8 @@ export function composeMockStory7(userMessage: string): Story7DraftV1 {
   const hasMbti = usable.some((e) => e.id === "self.mbti");
   // 입력한 MBTI는 맞닿는 장(1 · 3 · 5번) 가운데 둘 이상에 연결해야 한다 — 번호 순서대로 앞의 둘에 단다
   let mbtiLeft = hasMbti ? 2 : 0;
+  // 만 16세 미만이면 3번 장의 제목에 연애 말을 쓰지 않는다(또래 관계 중심 — 검사가 막는다)
+  const child = payload.evidence.some((e) => e.id === "saju.frame.audience.child");
 
   const sections: Story7SectionDraft[] = STORY7_SECTIONS.map((plan) => {
     const mine = payload.sections.find((s) => s.no === plan.no);
@@ -37,7 +39,7 @@ export function composeMockStory7(userMessage: string): Story7DraftV1 {
     };
     const base: Story7SectionDraft = {
       no: plan.no,
-      headline: `${M} ${plan.title}`,
+      headline: `${M} ${child && plan.no === 3 ? "친구 · 또래 관계" : plan.title}`,
       evidence: owner ? [sajuId, ...personal, ...(mbti ? ["self.mbti"] : [])] : [],
     };
     if (plan.parts) return { ...base, parts: plan.parts.map((title, i) => ({ title, paragraphs: [para(i, title)] })) };

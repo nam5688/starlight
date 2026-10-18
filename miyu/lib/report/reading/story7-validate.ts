@@ -17,11 +17,12 @@ import { MONEY_WORDS, PERIOD_TALK, PROCESS_TALK, TASK_IMPERATIVE } from "./story
 import { splitSentences } from "./story-motif.ts";
 import { absenceErrors } from "./story-validate.ts";
 import { story7Evidence } from "./story7-evidence.ts";
-import { CONDITIONAL_MARK, FAMILY_CLAIM, MONEY_HABIT, STORY7_FORMULA_BUDGET, STORY7_LIMITS as S, STORY7_MBTI_MIN, STORY7_MBTI_NOS, STORY7_OWNER_NOS, STORY7_PERSONAL_REUSE, STORY7_SECTIONS, STORY7_TASK_MAX, STORY7_TERMS, TRADITION_MARK, WEALTH_FATE } from "./story7-plan.ts";
+import { CONDITIONAL_MARK, FAMILY_CLAIM, MONEY_HABIT, PAST_EVENT_CLAIM, STORY7_FORMULA_BUDGET, STORY7_LIMITS as S, STORY7_MBTI_MIN, STORY7_MBTI_NOS, STORY7_OWNER_NOS, STORY7_PERSONAL_REUSE, STORY7_SECTIONS, STORY7_TASK_MAX, STORY7_TERMS, TRADITION_MARK, WEALTH_FATE } from "./story7-plan.ts";
 import { distinctTerms } from "./terms.ts";
 import { isTermWarning, splitWarnings } from "./warn-policy.ts";
 import type { Story7DraftV1, Story7SectionDraft } from "./types.ts";
 import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./validate.ts";
+import { audienceErrors, audienceOfEvidence } from "./audience-scope.ts";
 
 /**
  * 검사 결과 — errors는 BLOCK(저장하지 않고 고쳐 쓰게 한다), warnings는 WARN(저장을 막지 않고 고쳐 쓰기도 부탁하지 않으며 글을 그대로 둔 채 경고로만 보인다).
@@ -37,6 +38,8 @@ const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isStrin
 
 /** 알파벳 네 글자 유형 코드 — 본문에 쓰지 않는다(입력한 MBTI는 "입력해 주신 성향"으로 부른다) */
 const TYPE_CODE = /(?<![A-Za-z])[EI][NS][TF][JP](?![A-Za-z])/i;
+/** 과거를 가리키는 말 — 나이 범위 · 연도 · "그 무렵" · "지난 시기" */
+const PAST_ANCHOR = /만\s*\d{1,2}|(?<![\d.])(?:19|20)\d{2}\s*년|그 무렵|그때|그 시기|지난 |지나온|지나간|[1-9]0대/;
 /** 본문이 입력한 MBTI를 실제로 쓰고 있는가 — 근거 ID만 달고 본문에는 쓰지 않는 것을 막는 어림 */
 const MBTI_MENTION = /입력(?:해|하)?\s*(?:주신|신|하신)|알려\s*주신|MBTI/;
 
@@ -355,7 +358,20 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   // 가족에게 있었던 일을 지난 사실로 쓰지 않는다(입력받은 가족 정보 없음) · 출생 시각을 모를 때는 세 기둥 기준 범위 · 시주 풀이 금지 · 신강/신약 금지(hour-scope.ts)
   errors.push(...familyPastErrors(texts));
   if (hasHourUnknownEvidence(evidence)) errors.push(...hourUnknownErrors(texts));
-  errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext), adviceRules: ADVICE_RULES_TRADITIONAL, perSentenceMax: STORY7_TERMS.perSentenceMax }));
+  // 지난 시기를 사실처럼 쓰지 않는다 — 지난 대운 · 세운의 연애 · 일 · 재물 이야기는 사주에서 읽은 가능성이지 입력받은 사건이 아니다(운영자 2026-10-18).
+  //   과거를 가리키는 말(나이 범위 · 연도 · 그 무렵 · 지난 시기)과 사건 동사가 함께 있고 조건형 · 전통 해석 표지가 없는 문장을 막는다
+  for (const { where, text: t } of texts) {
+    for (const sentence of t.split(/(?<=[.!?])\s+/)) {
+      if (PAST_ANCHOR.test(sentence) && PAST_EVENT_CLAIM.test(sentence) && !CONDITIONAL_MARK.test(sentence) && !TRADITION_MARK.test(sentence)) {
+        errors.push(`${where}: "${sentence.slice(0, 40)}…" — 지난 시기에 실제로 있었던 일은 입력받은 것이 없어요. "~했을 수 있어요 · ~했을 가능성이 있어요 · 전통에서는 ~로 읽어요"처럼 사주에서 읽은 가능성으로 쓰세요.`);
+      }
+    }
+  }
+  // 읽는 사람이 만 19세 미만이면 어른의 관계 풀이를 쓰지 않는다(근거 목록의 saju.frame.audience.*)
+  errors.push(...audienceErrors(texts, audienceOfEvidence(evidence)));
+  // 지난 대운 · 세운은 근거에 적힌 만 나이 범위 안에서만 말한다(6번 장 — 그 밖의 장은 시기를 말하지 않는다)
+  const ageWindows = evidence.filter((e) => !e.uncertain).flatMap((e) => e.ageWindows ?? []);
+  errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext), adviceRules: ADVICE_RULES_TRADITIONAL, perSentenceMax: STORY7_TERMS.perSentenceMax, ageWindows, ageWhere: (w) => w.startsWith("sections.6.") }));
   for (const { where, text: t } of texts) if (TYPE_CODE.test(t)) errors.push(`${where}: 알파벳 유형 코드("${TYPE_CODE.exec(t)![0]}")를 쓰지 않습니다 — 입력한 MBTI는 "입력해 주신 성향"으로 부릅니다.`);
   // 미유 문체 — 분명한 위반만 실패로 센다(나머지는 고쳐 쓰기 안내로 생성기가 따로 부탁한다)
   errors.push(...voiceErrors(checkVoice(texts, { blockOf: story7BlockOf })));

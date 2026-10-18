@@ -94,7 +94,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     includes: ["연애운 · 배우자 자리", "잘 맞는 상대의 분위기와 큰 방향(연상 · 또래 · 연하 쪽)", "연애 성향 · 애정 표현 · 친밀감", "갈등과 화해(애착)"],
     question: "배우자 자리와 합 · 충이 말하는 연애의 모습과 어떤 분위기의 상대가 편한가, 그리고 가까운 사람 앞에서 마음을 주고 표현하는 방식 · 거리의 속도 · 어긋났을 때 확인하고 회복하는 순서",
     repeatGuard: "애착 유형 이름을 쓰지 않고 한 문항으로 단정하지 않는다. 친구 · 가족 · 동료 이야기는 4번에서 쓴다(연애 풀이를 다시 쓰지 않는다). 상대의 구체적인 나이 · 직업 · 마음 · 만나는 날짜 · 결혼 여부와 시기는 쓰지 않는다",
-    sajuOwns: [/^saju\.spouse-/, /^saju\.partner$/, /^saju\.relation\.(?:day-[a-z]+|[a-z]+-day)\./],
+    sajuOwns: [/^saju\.spouse-/, /^saju\.partner$/, /^saju\.relation\.(?:day-[a-z]+|[a-z]+-day)\./, /^saju\.frame\.(?:L[1-5]|base-love|base-peer|audience\.(?:teen|child))$/],
     prefer: /^survey\.(anxiety|avoidance|closeness|sensitivity)/, personalTopics: ["love", "marriage", "relationship"], borrowTopics: ["love", "relationship"], personalMin: 1, maxParagraphs: 4,
     scenes: ["s15", "s16", "s17", "s18", "s19", "s20", "s21", "s24"],
     code: ["인연의 경향(partner.ts — 연상 · 또래 · 연하 쪽, 코드가 계산)", "연애운이 강해지는 달 달력(months.ts · 성별 필요)"],
@@ -124,7 +124,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     question: "이 사주가 말하는 일의 계열과 힘이 잘 쓰이는 조건(역할 · 권한 · 속도 · 협업 · 평가 기준), 그리고 돈이 들어오는 길과 나가기 쉬운 길(재물복의 구조) — 명리 근거가 말하는 범위까지",
     repeatGuard: "일 소제목과 재물 소제목이 같은 응답(신중함 · 생활 방식)을 되풀이하지 않는다 — 재물은 돈이 들어오고 나가는 구조로만 쓴다. 적성을 직업 하나로 단정하거나 성공 · 부자를 보장하지 않는다. 투자 · 대출 · 부동산 · 창업 권유 금지",
     parts: ["일", "재물"],
-    sajuOwns: [/^saju\.tengod\.(식상|관성|재성)/, /^saju\.combo\./, /^saju\.(career|wealth)$/],
+    sajuOwns: [/^saju\.tengod\.(식상|관성|재성)/, /^saju\.combo\./, /^saju\.(career|wealth)$/, /^saju\.frame\.(?:W[1-7]|base-wealth)$/],
     prefer: /^survey\.(sn|tf|jp|novelty|caution|persistence)\./, personalTopics: ["work", "money"], borrowTopics: ["work", "money"], personalMin: 1, maxParagraphs: 5,
     scenes: ["s03", "s05", "s13", "s23", "s25", "s27", "s28"],
     code: ["재물 · 소비 흐름 달력(months.ts — 사건이 아닌 주제 표시)"],
@@ -136,10 +136,10 @@ export const STORY7_SECTIONS: Story7Section[] = [
   },
   {
     no: 6, id: "timing", blockId: "flow", navLabel: "앞으로의 운", title: "앞으로의 운과 변화", kind: "owner",
-    includes: ["계산된 대운 · 세운 시기 풀이", "행운의 색 · 방향 · 숫자 · 장소", "일상에서 활용하는 개운법"],
-    question: "계산된 대운 · 세운이 지금과 가까운 앞으로 어떤 주제를 두드러지게 하는가, 이 사람이 그 시기를 어떻게 받아들일까 — 그리고 부족한 기운을 생활에서 보태는 전통 개운법(보완 기운의 방향 · 색 · 숫자 · 장소 · 습관)은 무엇인가",
-    repeatGuard: "시기 이야기(대운 · 세운 · 올해 · 연도)는 이 장에만 쓴다 — 다른 장에서 다시 말하지 않는다(PERIOD_TALK 규칙 유지). 근거 없는 연도 · 사건 예언 금지. 개운법은 근거 목록의 보완 기운(`saju.fortify`)의 대응만 일관되게 쓰고 임의로 색 · 방향 · 숫자를 바꾸지 않으며, 재산 증가 · 건강 회복 · 투자 성공을 보장하지 않는다",
-    sajuOwns: [/^saju\.(daeun|seun)\./, /^saju\.fortify$/], prefer: NEVER, personalTopics: [], borrowTopics: [], personalMin: 0, maxParagraphs: 5, scenes: [],
+    includes: ["지나온 시기 회고(지난 대운 · 세운에서 읽히는 연애 · 일 · 재물 · 성장의 주제 — 근거에 적힌 나이 범위 안에서 가능성으로)", "계산된 대운 · 세운 시기 풀이(지금과 앞으로)", "행운의 색 · 방향 · 숫자 · 장소", "일상에서 활용하는 개운법"],
+    question: "지나온 시기에는 어떤 주제가 두드러졌을 수 있고(근거에 적힌 나이 범위 안에서, 가능성으로), 지금과 가까운 앞으로는 어떤 주제가 두드러지는가 — 연애 · 일 · 재물의 흐름이 하나의 이야기로 이어지게. 이 사람이 그 시기를 어떻게 받아들일까 — 그리고 부족한 기운을 생활에서 보태는 전통 개운법(보완 기운의 방향 · 색 · 숫자 · 장소 · 습관)은 무엇인가",
+    repeatGuard: "시기 이야기(대운 · 세운 · 올해 · 연도 · 지난 시기의 나이 범위)는 이 장에만 쓴다 — 다른 장에서 다시 말하지 않는다(PERIOD_TALK 규칙 유지). 3번 · 5번에서 푼 연애 · 재물 구조는 다시 해설하지 않고 시기와 이어지는 결론만 쓴다. 지난 시기는 확인된 사건이 아니라 가능성으로만 쓰고, 근거에 적힌 나이 · 연도 밖의 나이 · 연도와 근거 없는 사건 예언은 금지. 개운법은 근거 목록의 보완 기운(`saju.fortify`)의 대응만 일관되게 쓰고 임의로 색 · 방향 · 숫자를 바꾸지 않으며, 재산 증가 · 건강 회복 · 투자 성공을 보장하지 않는다",
+    sajuOwns: [/^saju\.(daeun|seun)\./, /^saju\.fortify$/, /^saju\.frame\.(?:L6|W8|R[1-6])\./, /^saju\.frame\.base-past$/], prefer: NEVER, personalTopics: [], borrowTopics: [], personalMin: 0, maxParagraphs: 6, scenes: [],
     code: ["큰 흐름 타임라인(luckTimeline)", "월별 달력(months.ts)"],
     from: ["flow"],
     duplicate: { with: [7], why: "7번의 실천 조언이 시기 · 개운법을 다시 말하면 반복이다" },
@@ -173,8 +173,8 @@ export const STORY7_SCENE_OWNER: Record<string, number> = Object.fromEntries(STO
 // ── 제품 연결에 쓰는 값 (지시문 · 검사 · 조립 · 모의 작성기 · 시험이 같은 값을 쓴다) ──
 
 export const STORY7_FORMAT = "story-7";
-/** 지시문 버전 — 0.3은 사주 중심 풀이로 방향을 고정한 판이고, 0.4는 출생 시각을 모르는 사람의 풀이 범위(세 기둥 기준 · 시주 풀이 금지)와 사주 모습 · 응답의 일치 · 차이 설명을 더한 판이다(운영자 2026-10-17). 0.2까지의 실제 AI 글(1건)은 형식 검사를 통과하지 못했고 0.3 · 0.4로는 아직 한 번도 시험하지 못했다(검증되지 않음) */
-export const STORY7_PROMPT_VERSION = "story-7-prompt-0.5";
+/** 지시문 버전 — 0.6은 명리 조합 해석 프레임 근거(지난 · 지금 · 앞으로의 대운 · 세운과 만 나이 범위)와 기본 풀이 · 연령대 범위를 연결한 판이다(운영자 2026-10-18, 실제 AI로 시험하지 못했다). 0.3은 사주 중심 풀이로 방향을 고정한 판이고, 0.4는 출생 시각을 모르는 사람의 풀이 범위(세 기둥 기준 · 시주 풀이 금지)와 사주 모습 · 응답의 일치 · 차이 설명을 더한 판이다(운영자 2026-10-17). 0.2까지의 실제 AI 글(1건)은 형식 검사를 통과하지 못했고 0.3 · 0.4로는 아직 한 번도 시험하지 못했다(검증되지 않음) */
+export const STORY7_PROMPT_VERSION = "story-7-prompt-0.6";
 
 /** 글자 · 문장 수 한도 — 7개 대주제는 장마다 소유한 근거 수에 맞춰 문단 수 상한(`maxParagraphs`)이 달라지고, 나머지 한도는 영역별 이야기(story-v1)와 같은 값이다 */
 export const STORY7_LIMITS = {
@@ -234,6 +234,12 @@ export const WEALTH_FATE = /(?:큰\s*)?부자가\s*(?:돼|될|되|된)|가난(?:
 export const MONEY_HABIT = /저축|소비|지출|씀씀이|투자|통장|지갑|돈 관리|돈을 쓰/;
 /** 조건형 · 질문 · 전통 해석 표지 — 돈 습관 · 가족 문장에 이 표지가 없으면 습관 · 사실을 단정한 것으로 본다(어림) */
 export const CONDITIONAL_MARK = /(?:수 있|기 쉬|듯해|(?:면|라면|다면|으면) |때는|때에는|경우|살펴볼|볼 만|[?]|일 수|곳이에요|쪽에 가깝|가능성|편이라면|전통|읽혀요|읽어요|읽을 수|봐요|보는 해석|해석에서)/;
+
+/**
+ * 지난 일을 사실로 말하는 문장 — 지난 시기의 연애 · 일 · 재물 이야기는 사주에서 읽은 가능성이지 입력받은 사건이 아니다(운영자 2026-10-18).
+ * "헤어졌을 수 있어요"처럼 조건형 · 전통 해석 표지가 있는 문장은 허용하고, 표지 없이 "만 21세에 헤어졌어요"라고 쓴 문장을 막는다(어림).
+ */
+export const PAST_EVENT_CLAIM = /(?:헤어졌|이별했|결혼했|이혼했|사귀었|사귀게 됐|만났|만나게 됐|퇴사했|그만뒀|합격했|취직했|입사했|이직했|창업했|이사했|전학했|입학했|졸업했|승진했|돈을 잃|손해를 봤|빚을 졌|큰돈을 벌었|크게 벌었)/;
 
 /** 코드가 붙이는 한 줄 안내 — AI가 "자료가 없어요"를 쓰지 않게 하려고 자료가 실제로 없는 곳(상대 · 가족 · 동료 · 돈 응답)만 여기서 밝힌다 */
 /** 6번 장(앞으로의 운과 변화)의 개운 풀이에 한 번만 붙는 안내 — 문장마다 붙이지 않고 코드가 한곳에 붙인다(운영자 2026-10-17: 풀이의 분위기를 깨지 않게) */

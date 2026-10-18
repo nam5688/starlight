@@ -16,7 +16,21 @@ export type Evaluation = {
   unavailable: { frameId: string; reason: string }[];
   /** 절기 경계 · 야자시 관법으로 흔들리는 기둥에 기대서 뺀 프레임 · 시기 */
   excluded: { frameId: string; reason: string }[];
+  /** 쓰지 않기로 한 프레임 — 근거가 불분명해서(자체조합) 또는 읽는 사람의 연령대에 맞지 않아서. 평가하지 않고 이유만 남긴다 */
+  held: { frameId: string; reason: string }[];
 };
+
+/** 만 16~18세에게 쓰는 연애 프레임 — 관계 구조만(결혼 · 배우자 확정 풀이와 인연 시기 풀이는 제한한다) */
+const TEEN_LOVE = ["L2", "L3", "L4", "L5"];
+
+/** 이 읽는 사람에게 쓰지 않는 프레임이면 이유를 돌려준다(연령대 · 근거 수준) */
+export function heldReasonOf(frame: FrameDef, audience: FrameContext["audience"]): string | null {
+  if (frame.grade === "자체조합") return `근거가 불분명해 쓰지 않음 — ${frame.gradeNote}`;
+  if (frame.area === "love" && audience === "child") return "만 16세 미만은 연애 구조 프레임을 쓰지 않고 또래 관계 중심으로 읽음";
+  if (frame.area === "love" && audience === "teen" && !TEEN_LOVE.includes(frame.id)) return "만 16~18세는 결혼 · 배우자 확정 풀이와 인연 시기 풀이를 제한해 관계 구조 프레임만 씀";
+  if (frame.area === "wealth" && audience === "child") return "만 16세 미만은 재물 구조 · 시기 프레임을 쓰지 않음";
+  return null;
+}
 
 const PILLAR_NAME: Record<string, string> = { year: "년주", month: "월주", day: "일주", hour: "시주" };
 
@@ -25,7 +39,13 @@ export function evaluateFrames(c: FrameContext): Evaluation {
   const hits: EvaluatedHit[] = [];
   const unavailable: Evaluation["unavailable"] = [];
   const excluded: Evaluation["excluded"] = [];
+  const held: Evaluation["held"] = [];
   for (const frame of FRAMES) {
+    const reason = heldReasonOf(frame, c.audience);
+    if (reason) {
+      held.push({ frameId: frame.id, reason });
+      continue;
+    }
     if (frame.needs.includes("gender") && !c.gender) {
       unavailable.push({ frameId: frame.id, reason: "성별 정보가 없어 배우자 별을 쓰는 프레임은 발동하지 않음" });
       continue;
@@ -44,14 +64,16 @@ export function evaluateFrames(c: FrameContext): Evaluation {
     // 시기 프레임은 흔들리는 기둥에 기댄 시기만 뺀다
     let hit = raw;
     if (raw.instances) {
-      const keep = raw.instances.filter((i) => !i.uses.some((k) => c.uncertain.includes(k)));
-      if (keep.length !== raw.instances.length) excluded.push({ frameId: frame.id, reason: `흔들리는 기둥에 기댄 시기 ${raw.instances.length - keep.length}곳을 뺌` });
+      // 나이 하한 이전에 끝난 시기는 과거든 앞으로든 쓰지 않는다(예: 만 17세 이전에 끝난 수입 · 일 시기)
+      const keep = raw.instances.filter((i) => !i.uses.some((k) => c.uncertain.includes(k)) && !(frame.minAge && i.unit.ageTo < frame.minAge));
+      const shakyCount = raw.instances.filter((i) => i.uses.some((k) => c.uncertain.includes(k))).length;
+      if (shakyCount) excluded.push({ frameId: frame.id, reason: `흔들리는 기둥에 기댄 시기 ${shakyCount}곳을 뺌` });
       if (!keep.length) continue;
       hit = { ...raw, instances: keep };
     }
     hits.push({ frame, hit, level: hit.facts.length >= 3 ? "moderate" : "weak" });
   }
-  return { hits, unavailable, excluded };
+  return { hits, unavailable, excluded, held };
 }
 
 /** 응답 연결 — 프레임의 설문 연결 중 응답에서 뚜렷하게 읽힌 첫 항목. 없으면 null(관련 없는 응답을 억지로 넣지 않는다) */
@@ -178,11 +200,21 @@ function universalScenes(age: number): string[] {
 const POSITIVE_FIRST: Tone2 = "positive";
 type Tone2 = "positive" | "hard" | "mixed";
 
-/** 과거 회고(6장) — 연애 · 재물 이야기에 이미 쓴 시기는 빼고, 소재 갈래가 다른 시기를 최대 둘 고른다. 첫째가 어려운 쪽이면 둘째는 긍정 시기를 먼저 찾는다 */
-export function pastStoryOf(c: FrameContext, ev: Evaluation, used: Set<string>): PastStory {
-  const pool = ev.hits.flatMap((h) => (h.hit.instances ?? []).map((instance) => ({ frame: h.frame, instance, score: 0 }))).filter((p) => timeOf(p.frame, p.instance) === "past");
+/** 지난 시기를 말하는 근거의 전체 상한 — 연애 · 재물의 지난 시기와 과거 회고를 합쳐 셋까지(여섯 장이 시기 이야기로 번지지 않게) */
+export const PAST_TOTAL_MAX = 3;
+
+/**
+ * 과거 회고(6장) — 연애 · 재물 이야기에 이미 쓴 시기는 빼고, 소재 갈래가 다른 시기를 고른다. 연애 · 재물의 지난 시기와 합쳐 PAST_TOTAL_MAX개까지(`already` = 이미 고른 지난 시기 수).
+ * 연애 · 재물 시기 프레임(L6 · W8)은 이미 그 장의 이야기로 건넸으므로 과거 회고 프레임(R)에서 먼저 고르고, R이 하나도 없을 때만 남은 L6 · W8 시기를 쓴다. 첫째가 어려운 쪽이면 둘째는 긍정 시기를 먼저 찾는다
+ */
+export function pastStoryOf(c: FrameContext, ev: Evaluation, used: Set<string>, already = 0): PastStory {
+  const all = ev.hits.flatMap((h) => (h.hit.instances ?? []).map((instance) => ({ frame: h.frame, instance, score: 0 }))).filter((p) => timeOf(p.frame, p.instance) === "past");
+  const limit = Math.max(1, Math.min(2, PAST_TOTAL_MAX - already));
+  const retro = all.filter((p) => p.frame.area === "past");
+  const pool = retro.some((p) => !used.has(p.instance.unit.label)) ? retro : all;
   const first = pickPast(c, pool, used);
   if (!first) return { basis: "universal", picks: [], universal: universalScenes(c.age) };
+  if (limit < 2) return { basis: "chart", picks: [first], universal: [] };
   const used2 = new Set(used);
   used2.add(first.instance.unit.label);
   const others = pool.filter((p) => p.instance.strand !== first.instance.strand);
@@ -193,8 +225,9 @@ export function pastStoryOf(c: FrameContext, ev: Evaluation, used: Set<string>):
 
 export function selectStories(c: FrameContext, ev: Evaluation): Selection {
   const used = new Set<string>();
-  const love = c.gender ? areaStory(c, ev, "love", used) : null;
-  const wealth = areaStory(c, ev, "wealth", used);
-  const past = pastStoryOf(c, ev, used);
+  const love = c.gender && c.audience !== "child" ? areaStory(c, ev, "love", used) : null;
+  const wealth = c.audience === "child" ? null : areaStory(c, ev, "wealth", used);
+  const already = [love?.past, wealth?.past].filter(Boolean).length;
+  const past = pastStoryOf(c, ev, used, already);
   return { love, wealth, past };
 }

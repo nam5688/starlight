@@ -27,7 +27,8 @@ test("7개 대주제: 번호 1~7 · 운영자가 정한 제목 그대로 · 근�
     assert.ok(s.question.length >= 20 && s.repeatGuard && s.includes.length > 0, `${s.no}`);
     // 엮는 장만 "새로 보태야 할 것"을 갖는다 — 자기 근거가 없는 장이 앞 장을 다시 쓰지 않게 하는 조건이다
     assert.equal(Boolean(s.mustAdd), s.kind === "synthesis", `${s.no}: mustAdd`);
-    assert.ok(s.maxParagraphs >= 1 && s.maxParagraphs <= 5, `${s.no}: 문단 상한`);
+    // 6번은 지나온 시기 회고 · 지금과 앞으로 · 개운까지 한 흐름이라 6까지 (2026-10-18)
+    assert.ok(s.maxParagraphs >= 1 && s.maxParagraphs <= 6, `${s.no}: 문단 상한`);
   }
   assert.equal(new Set(STORY7_SECTIONS.map((s) => s.question)).size, 7, "장마다 다른 질문");
   // 일과 재물은 한 대주제 안의 소제목으로 구분한다
