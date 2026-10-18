@@ -278,3 +278,60 @@ node scripts/recheck-own-draft.ts <새 결과 폴더> --birth-time-unknown
 
 **`.env.local`의 AI_APPROVED_FROM · THROUGH를 바꿀 때(앱의 AI 연결용 승인 기간, 2026-10-18 확인)**: 승인 기간은 양 끝 포함 **7일 이하**여야 하고(`lib/report/chat/approval.ts`의 `checkApprovalShape`), 가드는 **FROM 이후의 사용 기록만** "지금까지 쓴 금액"으로 센다(`approvalSince`). 그래서 THROUGH만 FROM + 6일까지 늘리는 것은 안전하지만, **FROM을 뒤로 옮기면 이미 쓴 금액이 장부에서 빠져 한도가 사실상 초기화된다** — 승인 총액을 넘기는 효과가 생기므로 FROM · AI_APPROVED_KRW · AI_APPROVED_CALLS는 운영자의 명시적 재승인 없이 바꾸지 않는다. `scripts/run-own-story.ts`(개인 심층 3차 시험)는 이 변수들을 쓰지 않고 `--approved-on` 날짜를 쓴다.
 
+
+## 13. 개인 심층 4차 시험(지시문 0.6 · 프레임 연결) — 운영자 승인 2026-10-18 · **아직 호출하지 않았다**
+
+**상태: 승인 기록 완료 · 실제 호출은 운영자 PC에서만 한다(클라우드 세션에는 API 키가 없다).** 운영자 승인(2026-10-18): claude-sonnet-5-5 · 지시문 `story-7-prompt-0.6` · 3차와 동일한 본인 입력 · 출생 시각 미상 · **신규 호출 정확히 1회 · 자동 재작성 · 재시도 금지** · 이번 호출 비용 상한 **800원** · 누적 총 6,000원 · 이미 쓴 3,388원(남은 2,612원) · 사주 해석 엔진 · 프롬프트를 더 수정하지 않는다 · 이 1회 이외의 호출은 승인하지 않는다 · 운영 DB 변경 · 실결제 · Production 배포 없음. 코드 기록(`lib/config/ai-candidates.ts`의 `story7-own`): `runsApproved` 4 · `runsDone` 3(운영자 PC에서 실행한 뒤 4로 올린다) · `runCeilingKrw` 800.
+
+**0원 드라이런 결과(클라우드, 운영자 본인 입력 파일 기준, 호출 0회)**
+
+| 항목 | 값 |
+| --- | --- |
+| 근거 | 49개(프레임 근거 포함) · 입력 약 73,900토큰(어림) |
+| 예상 비용(평소 수준, 재지 않은 어림) | 436원 (3차 실제 280원) |
+| 호출 1회 최악(출력을 최대 24,000토큰까지 썼을 때) | **683원** — 상한 800원 안(여유 117원). 3차 승인의 700원 그대로였다면 여유 17원뿐이었다 |
+| 한도 | 6,000원 − 3,388원 = 남은 2,612원 |
+| 승인 범위 | story-7 · 후보 A · 본인 입력 · 승인된 실행 **3/4회 마침** — 통과 |
+| 이 환경의 키 | 없음 → 실제 호출 불가(정상, 운영자 PC에서 실행) |
+
+**운영자 PC에서(PowerShell, `Desktop\starlight-work\miyu`)**
+
+1. 최신 코드 반영(`.env.local` · `pilot-data`는 git이 건드리지 않는다):
+
+```powershell
+cd $HOME\Desktop\starlight-work\miyu
+git pull origin claude/miyu-claude-code-setup-klw8ms
+Select-String -Path lib\report\reading\story7-plan.ts -Pattern "story-7-prompt-0.6"
+Select-String -Path lib\config\ai-candidates.ts -Pattern "runsApproved: 4"
+```
+
+   두 줄이 각각 한 줄씩 나와야 한다.
+
+2. 0원 드라이런(호출 없음) — **이 PC의 입력으로 한 번 더 확인**:
+
+```powershell
+node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3388 --birth-time-unknown
+```
+
+   화면에 "승인된 실행 **3/4회** 마침", "호출 1회 최악"이 **800원 이하**, "키 입력 확인"이 정상으로 나오고 "호출하지 않았습니다 (드라이런)"으로 끝나야 한다. **최악이 800원을 넘거나 "승인 범위 확인 — 실행할 수 없습니다"가 나오면 실행하지 말고 그 화면을 알려 주세요.**
+
+3. (드라이런이 정상일 때만) 실제 1회:
+
+```powershell
+node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3388 --birth-time-unknown --execute --approved-cap-krw 6000 --approved-on 2026-10-18
+```
+
+4. 읽기 · 검사 · 3차와 비교(호출 0회). `<3차 폴더>`는 `story7-own-20261018-033746`, `<새 폴더>`는 3번 끝에 화면에 나오는 새 결과 폴더:
+
+```powershell
+node scripts/recheck-own-draft.ts pilot-data\ai-compare\<새 폴더> --birth-time-unknown
+node scripts/compare-own-runs.ts pilot-data\ai-compare\<3차 폴더> pilot-data\ai-compare\<새 폴더> --birth-time-unknown
+npm.cmd run dev
+```
+
+   - **원문 전문 보존**: 결과 폴더의 `attempts\round1.txt`가 AI가 준 그대로의 원문이다(고치지 않는다).
+   - **7개 장 확인 · BLOCK/WARN 구분**: `recheck.md`의 "검사 결과"(BLOCK = 저장하지 않는 오류, WARN = 저장을 막지 않는 경고).
+   - **읽기 쉬운 새 글 전체**: `http://localhost:3000/dev/live/<새 폴더 이름>`(무료 · 심층 나란히) 또는 결과 폴더의 `readable-rechecked.md`.
+   - **3차와 비교**: `compare-with-<3차 폴더>.md` — 장별 글자 수 · BLOCK/WARN · 조언 낱말 · 각 장의 첫 문장 · **4-2장: 과거 공감 · 연애 · 배우자운 · 재물운 · 시기별 풀이(나이 표기 · 연도)를 세고 처음 나온 문장을 나란히** 보인다(낱말을 센 어림이며 어느 글이 좋은지는 읽어서 정한다).
+
+**시험 뒤에 하지 않는 것**: 재작성 · 재시도 · 추가 호출 · 지시문 · 프레임 · 검사 수정. 새 글이 충분하다고 운영자가 판단하면 개인 심층 콘텐츠(지시문 0.6 · 프레임 17개)를 동결한다. 출시를 막는 실제 오류(명리 계산 오류 · 근거 없는 사건 단정 · 나이 범위 어긋남)만 그 오류만 최소 수정한다. 이 시험의 결과 폴더는 운영자 PC의 `pilot-data`에만 있고(저장소에 올라가지 않는다) 클라우드 세션은 읽지 못한다 — 글 평가는 운영자가 읽고 정한다.

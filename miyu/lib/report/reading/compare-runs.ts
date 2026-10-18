@@ -22,7 +22,26 @@ export type RunMetrics = {
   fortify: { candidates: string[]; spoken: Record<string, { direction: boolean; color: boolean; number: boolean; place: boolean }>; tieVerdict: string | null };
   /** 대운 문장에 연도 + 월이 함께 있는가(시각 미상이면 BLOCK) */
   daeunMonthClaims: number;
+  /** 운영자가 4차에서 보려는 네 가지(2026-10-18) — 과거 공감 · 연애 · 배우자운 · 재물운 · 시기별 풀이를 낱말 · 표현으로 센 어림 */
+  focus: Focus;
 };
+
+export type FocusPart = { /** 해당 장(또는 전체)의 글자 수 */ chars: number; /** 해당 표현이 있는 문장 수 */ hits: number; /** 처음 나온 문장 몇 개(앞 90자) */ examples: string[] };
+export type Focus = {
+  /** 과거를 짚는 공감 문장(전체) — "그 무렵 · 지나온 · ~했을 수 있어요" 같은 표현 */
+  past: FocusPart;
+  /** 연애 · 배우자 이야기 문장(전체), 글자 수는 3번 장 */
+  love: FocusPart;
+  /** 재물 이야기 문장(전체), 글자 수는 5번 장 */
+  wealth: FocusPart;
+  /** 시기별 풀이 — 글자 수는 6번 장, hits는 전체 글의 "만 N세" 표기 수 */
+  timing: FocusPart & { years: number; luck: number };
+};
+
+const PAST_MARK = /(그 무렵|그때|지나온|지나 온|지난 |돌아보|했을 (?:거예요|수|가능성)|였을 (?:거예요|수|가능성)|던 때|기억에)/;
+const LOVE_MARK = /(배우자|연애|인연|애정|이성|짝)/;
+const WEALTH_MARK = /(재물|돈|수입|재성|재운|저축|벌어|벌이)/;
+const AGE_MARK = /만 \d+(?:~\d+)?세/g;
 
 const sentencesOf = (t: string) => t.match(/[^.!?。\n]+[.!?。]?/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
 
@@ -70,7 +89,20 @@ export function runMetrics(draft: Story7DraftV1, evidence: Evidence[], opts: { h
   for (const el of candidates) spoken[el] = fortuneMentions(body6, el);
   const verdict = candidates.length > 1 ? FORTIFY_TIE_VERDICT.exec(joined)?.[0] ?? null : null;
   const daeunMonthClaims = all.filter((x) => /대운/.test(x.text)).flatMap((x) => sentencesOf(x.text)).filter((s) => /대운/.test(s) && /\d{4}년\s?\d{1,2}월/.test(s)).length;
-  return { totalChars: joined.length, chapters, block: v.ok ? [] : v.errors, warn: v.warnings, adviceWords, repeatedPhrases, personalReuse, fortify: { candidates, spoken, tieVerdict: verdict }, daeunMonthClaims };
+  const allSentences = sentencesOf(joined);
+  const part = (mark: RegExp, chars: number): FocusPart => {
+    const hit = allSentences.filter((x) => mark.test(x));
+    return { chars, hits: hit.length, examples: hit.slice(0, 2).map((x) => x.slice(0, 90)) };
+  };
+  const chars = (no: number) => chapters.find((c) => c.no === no)?.chars ?? 0;
+  const ages = joined.match(AGE_MARK) ?? [];
+  const focus: Focus = {
+    past: part(PAST_MARK, joined.length),
+    love: part(LOVE_MARK, chars(3)),
+    wealth: part(WEALTH_MARK, chars(5)),
+    timing: { chars: chars(6), hits: ages.length, examples: ages.slice(0, 4), years: (body6.match(/\d{4}년/g) ?? []).length, luck: (body6.match(/대운|세운/g) ?? []).length },
+  };
+  return { totalChars: joined.length, chapters, block: v.ok ? [] : v.errors, warn: v.warnings, adviceWords, repeatedPhrases, personalReuse, fortify: { candidates, spoken, tieVerdict: verdict }, daeunMonthClaims, focus };
 }
 
 /** 두 번의 글을 같은 지표로 나란히 — 마크다운(저장소에 올라가지 않는 결과 폴더에 쓴다) */
@@ -105,6 +137,22 @@ export function renderRunComparison(a: { label: string; metrics: RunMetrics }, b
   L.push("| 장 | 이전 첫 문장 | 새 글 첫 문장 |", "| --- | --- | --- |");
   const cell = (s: string) => (s ? s.replace(/\|/g, "/").slice(0, 90) : "(없음)");
   for (let i = 0; i < STORY7_SECTIONS.length; i++) L.push(`| ${STORY7_SECTIONS[i].no}번 | ${cell(A.chapters[i].firstSentence)} | ${cell(B.chapters[i].firstSentence)} |`);
+  L.push("\n## 4-2. 이번 시험에서 보려는 네 가지 — 과거 공감 · 연애 · 배우자운 · 재물운 · 시기별 풀이 (낱말 · 표현을 센 어림)\n");
+  L.push("숫자는 해당 표현이 든 문장 수 · 장의 글자 수입니다. 많다고 좋은 풀이는 아니며, 아래 문장을 읽고 사람이 판단합니다.\n");
+  L.push("| 보는 것 | 이전 | 새 글 |", "| --- | --- | --- |");
+  L.push(`| 과거를 짚는 공감 문장 | ${A.focus.past.hits}문장 | ${B.focus.past.hits}문장 |`);
+  L.push(`| 연애 · 배우자운 (3번 장 글자 수 · 관련 문장) | ${A.focus.love.chars}자 · ${A.focus.love.hits}문장 | ${B.focus.love.chars}자 · ${B.focus.love.hits}문장 |`);
+  L.push(`| 재물운 (5번 장 글자 수 · 관련 문장) | ${A.focus.wealth.chars}자 · ${A.focus.wealth.hits}문장 | ${B.focus.wealth.chars}자 · ${B.focus.wealth.hits}문장 |`);
+  L.push(`| 시기별 풀이 (6번 장 글자 수) | ${A.focus.timing.chars}자 | ${B.focus.timing.chars}자 |`);
+  L.push(`| 시기별 — 전체 글의 "만 N세" 표기 · 6번 장의 연도 · 대운/세운 말 | ${A.focus.timing.hits}곳 · ${A.focus.timing.years}곳 · ${A.focus.timing.luck}곳 | ${B.focus.timing.hits}곳 · ${B.focus.timing.years}곳 · ${B.focus.timing.luck}곳 |`);
+  const ex = (label: string, f: (m: RunMetrics) => string[]) => {
+    L.push(`\n**${label} — 처음 나온 문장**`);
+    for (const [who, m] of [["이전", A], ["새 글", B]] as const) L.push(`- ${who}: ${f(m).length ? f(m).map((x) => `"${x.replace(/\|/g, "/")}"`).join(" / ") : "(없음)"}`);
+  };
+  ex("과거 공감", (m) => m.focus.past.examples);
+  ex("연애 · 배우자운", (m) => m.focus.love.examples);
+  ex("재물운", (m) => m.focus.wealth.examples);
+  ex("시기별 풀이(나이 표기)", (m) => m.focus.timing.examples);
   L.push("\n## 5. 개운(6번 장) — 보완 후보와 본문\n");
   const fort = (m: RunMetrics) => (m.fortify.candidates.length === 0 ? "근거 없음" : m.fortify.candidates.map((e) => `${e}: ${Object.entries(m.fortify.spoken[e]).filter(([, v]) => v).map(([k]) => ({ direction: "방향", color: "색", number: "숫자", place: "장소" })[k as "direction"]).join("·") || "대응 말 없음"}`).join(" / "));
   L.push(`- 후보와 본문이 말한 대응: 이전 ${fort(A)} / 새 글 ${fort(B)}`);
