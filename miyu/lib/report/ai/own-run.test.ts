@@ -191,10 +191,10 @@ test("본인 입력 내보내기는 켠 사람이 직접 적고 개발 서버일
 
 // ───── 7개 대주제(story-7) 본인 입력 시험 — 승인 범위 · 입력 확인 · 호출 한 번 · 읽기 전 지표 ─────
 
-test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 그대로 · 3차(지시문 0.5) 한 건은 운영자 승인(2026-10-18)으로 1회 상한 644원 — 승인된 3회 중 2회를 마쳤고 호출 1회의 최악은 상한 안이다", async () => {
+test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 그대로 · 3차(지시문 0.5) 한 건은 운영자 승인(2026-10-18)으로 1회 상한 700원(644원에서 재승인) — 승인된 3회 중 2회를 마쳤고 호출 1회의 최악은 상한 안이다", async () => {
   const own = COMPARE_STAGES.find((s) => s.name === "story7-own")!;
   assert.equal(own.capKrw, 6000, "기존 승인 총액 그대로");
-  assert.equal(own.restrict?.runCeilingKrw, 644, "3차 승인(2026-10-18): 이번 호출 상한 644원 — 이전 승인의 1,234.04원보다 낮췄다");
+  assert.equal(own.restrict?.runCeilingKrw, 700, "3차 승인(2026-10-18) 재승인: 이번 호출 상한 700원(처음 644원 — 드라이런 최악 648.2원이 넘어 운영자가 다시 정했다)");
   assert.equal(own.restrict?.variant, "story-7");
   assert.equal(own.restrict?.persona, "OWN");
   assert.equal(own.restrict?.runsApproved, 3, "1차 · 2차를 마쳤고 3차 한 건을 운영자가 신규 호출로 승인했다(2026-10-18)");
@@ -209,10 +209,12 @@ test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6
   const ok = { variant: "story-7", only: "A", persona: "OWN", alreadySpentGiven: true, twoRoundWorstKrw: plan.firstCallWorstKrw, execute: true } as const;
   // 이 시험 입력(시험용 고정 응답)의 최악 — 운영자 본인 입력의 값은 운영자 PC의 0원 드라이런이 보여 준다(644원을 넘으면 실행하지 않는다)
   assert.ok(plan.firstCallWorstKrw < 700, `호출 1회의 최악 ${plan.firstCallWorstKrw}`);
+  // 운영자 본인 입력의 드라이런 최악(648.2원)은 처음 상한 644원을 넘어 거절됐고 700원 재승인 안에서는 통과한다
+  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 648.2 }), [], "본인 입력의 드라이런 최악 648.2원은 700원 상한 안이다");
   // 승인이 남아 있으면(2/3) 범위 안에서 실제 호출이 통과하고, 상한은 반올림 없이 그대로 비교한다
-  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 643.99 }), [], "승인 범위 안이면 통과한다");
-  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 644 }), [], "상한과 같으면 통과한다");
-  assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 644.01 }).length > 0, "상한을 0.01원만 넘어도 막힌다 — 실행하지 않고 운영자에게 알린다");
+  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 699.99 }), [], "승인 범위 안이면 통과한다");
+  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 700 }), [], "상한과 같으면 통과한다");
+  assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 700.01 }).length > 0, "상한을 0.01원만 넘어도 막힌다 — 실행하지 않고 운영자에게 알린다");
   assert.ok(checkStageRestriction(own, { ...ok, variant: "story-v1" }).length > 0, "다른 지시문은 안 된다");
   assert.ok(checkStageRestriction(own, { ...ok, persona: "P01" }).length > 0, "다른 인물은 안 된다");
   assert.ok(checkStageRestriction(own, { ...ok, only: "B" }).length > 0);
