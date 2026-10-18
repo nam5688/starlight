@@ -227,6 +227,10 @@ test("이름: 있으면 채우고(따옴표도 안전) 없으면 호칭을 지�
   assert.equal(JSON.parse(fillNameInJson(JSON.stringify("{name} 님은 신중해요"), '서"윤\\')), '서"윤\\ 님은 신중해요');
   assert.equal(JSON.parse(fillNameInJson(JSON.stringify("{name} 님은 신중한 편이에요. {name}님의 하루는 느려요."), "")), "신중한 편이에요. 하루는 느려요.");
   assert.equal(JSON.parse(fillNameInJson(JSON.stringify("{name}"), "  ")), "");
+  // 호칭을 지워도 문장의 뜻이 바뀌지 않는다 — "님만 아는 일"은 "본인만 아는 일"로
+  assert.equal(JSON.parse(fillNameInJson(JSON.stringify("실제로 어땠는지는 {name} 님만 아는 일이에요."), "")), "실제로 어땠는지는 본인만 아는 일이에요.");
+  assert.equal(JSON.parse(fillNameInJson(JSON.stringify("실제로 어땠는지는 {name} 님만 아는 일이에요."), "서윤")), "실제로 어땠는지는 서윤 님만 아는 일이에요.");
+  assert.equal(JSON.parse(fillNameInJson(JSON.stringify("이 이야기는 {name} 님도 느끼실 거예요."), "")), "이 이야기는 본인도 느끼실 거예요.");
   assert.equal(honorific("서윤"), "서윤 님");
   assert.equal(honorific(" "), "");
 });
@@ -306,4 +310,42 @@ test("같은 글에서 없는 기운을 생활 말로 원인 풀이하면 장 �
     "{name} 님은 돈을 다루는 감각이 없어서 돈 관리가 서툴러요. 앞에 나서서 챙기기보다 실속을 먼저 보는 편이에요. 좋은 기회가 와도 알아보는 데 시간이 걸려요.";
   const blocks = blocksOf(d);
   assert.ok(blocks.some((m) => m.includes("생활 기능의 부족이나 원인")), blocks.join("\n"));
+});
+
+// ───── 편집 시안을 이름 처리까지 거친 고객 표시본으로 — 가상 이름(서윤)과 이름 없음 ─────
+
+const SIAN_1 =
+  "{name} 님은 한번 마음먹은 일을 천천히 키워 가는 쪽이에요. 시작하고 키우는 힘과 안정시키고 이어 가는 힘이 넉넉해서 계획을 세워 꾸준히 이어 가는 데 강해요. 기준을 세워 딱 잘라 정리하거나 한 걸음 물러나 쉬는 일은 그 주제가 크게 느껴지는 시기에 더 의식하게 될 수 있어요. 입력해 주신 성향까지 함께 보면 혼자 정리하는 시간이 있어야 편해지는 모습으로도 나타날 수 있어요.";
+const SIAN_5 =
+  "{name} 님의 돈은 눈에 띄게 불어나기보다 조용히 쌓이다가 때가 되면 모습을 드러내는 쪽에 가까워요. 앞에 나서서 챙기기보다 실속을 먼저 보는 편이라, 좋은 기회가 와도 알아보는 데 시간이 걸려 내 몫을 놓칠 수 있어요. 평소에도 앞서 나서기보다 한 번 더 살피는 모습이 이 모양과 이어져요.";
+const SIAN_6 =
+  "만 25~26세 무렵에는 가까운 관계에서 의미 있는 변화가 있었을 가능성이 있어요. 관계가 자리를 잡거나 거리를 다시 정하게 되는 시기로 읽히는데, 실제로 어땠는지는 {name} 님만 아는 일이에요. 만 30~31세 무렵에는 일하는 환경이나 수입의 형태가 달라졌을 수 있어요. 지금 지나는 10년 단위의 큰 시기(만 29~39세 무렵)는 그때 시도한 것이 자리를 잡아 가기 좋은 때이고, 입력해 주신 성향대로 새 기회는 한 번 더 살핀 뒤 고르는 편이면 잘 맞아요.";
+
+function displayStrings(name: string): string[] {
+  const d = mockDraft();
+  section(d, 1).paragraphs![0] = SIAN_1;
+  section(d, 5).parts!.find((p) => p.title === "재물")!.paragraphs[0] = SIAN_5;
+  section(d, 6).paragraphs![0] = SIAN_6;
+  const report = assembleStory7({ draft: d, evidence: EVIDENCE, input: { ...P01.input, nickname: name }, reference: { ...REF, iso: "2026-10-17" }, promptVersion: "x", ruleVersions: [] });
+  const strings: string[] = [];
+  JSON.stringify(report, (_k, v) => (typeof v === "string" ? (strings.push(v), v) : v));
+  return strings;
+}
+
+test("편집 시안 세 장을 조립하면 가상 이름(서윤)은 호칭으로, 이름 없음은 호칭 없이 — 어느 쪽에도 {name} · 빈 '님'이 없다", () => {
+  for (const name of ["서윤", ""]) {
+    const strings = displayStrings(name);
+    for (const s of strings) {
+      assert.doesNotMatch(s, /\{name\}/, s.slice(0, 40));
+      assert.doesNotMatch(s, /(?:^|[^가-힣A-Za-z0-9])님(?![가-힣])/, `빈 호칭 '님'이 남았다: ${s.slice(0, 60)}`);
+    }
+  }
+  const named = displayStrings("서윤");
+  assert.ok(named.some((s) => s.startsWith("서윤 님은 한번 마음먹은 일을 천천히 키워 가는 쪽이에요.")));
+  assert.ok(named.some((s) => s.startsWith("서윤 님의 돈은 눈에 띄게 불어나기보다")));
+  assert.ok(named.some((s) => s.includes("실제로 어땠는지는 서윤 님만 아는 일이에요.")));
+  const blank = displayStrings("");
+  assert.ok(blank.some((s) => s.startsWith("한번 마음먹은 일을 천천히 키워 가는 쪽이에요.")));
+  assert.ok(blank.some((s) => s.startsWith("돈은 눈에 띄게 불어나기보다")));
+  assert.ok(blank.some((s) => s.includes("실제로 어땠는지는 본인만 아는 일이에요.")));
 });
