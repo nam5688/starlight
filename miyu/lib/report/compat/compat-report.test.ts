@@ -6,9 +6,9 @@ import test from "node:test";
 import { cardOf } from "../../compat/simple.ts";
 import type { SajuOk } from "../../saju/engine.ts";
 import { compatOf } from "../../saju/interpret/compat.ts";
-import { compatExtraEvidence, compatFortifyElementsOf } from "../../saju/interpret/compat-extra.ts";
+import { compatExtraEvidence, compatFortifyElementsOf, compatFortifyHasTie } from "../../saju/interpret/compat-extra.ts";
 import { compatTimingOf } from "../../saju/interpret/compat-timing.ts";
-import { ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
+import { ELEMENT_FORTUNE, fortifyOf } from "../../saju/interpret/fortune.ts";
 import { calculateSaju } from "../../saju/manseryeok-engine.ts";
 import { ModelCallError, type ModelRequest, type ModelResult, type TextModel } from "../ai/model.ts";
 import { assembleCompatReport, nameText } from "./assemble.ts";
@@ -119,7 +119,7 @@ test("무료와 유료의 일치: 새 근거(compat.chart · fortify)는 유료 
   for (const e of extra) assert.doesNotMatch(`${e.fact} ${e.cue}`, /격국|용신|희신|기신|신살|십이운성/, e.id);
   // 개운 근거는 보완 후보 1순위 기운의 전통 대응(방향 · 색 · 수)을 그대로 담는다
   const elements = compatFortifyElementsOf(extra);
-  assert.ok(elements.length >= 1 && elements.length <= 2);
+  assert.ok(elements.length >= 1);
   for (const el of elements) {
     const f = ELEMENT_FORTUNE[el];
     const cue = extra[1].cue;
@@ -321,6 +321,44 @@ test("오행 조화 · 개운: 2번 장은 두 사람의 오행 분포 근거를
   }
   // 근거에 개운 근거가 없으면(가장 작은 입력) 요구하지 않는다
   assert.deepEqual(errorsOf(draftOf()), []);
+});
+
+test("개운 동점(운영자 2026-10-18): 보완 후보의 개수가 같으면 1순위로 정하지 않고 같은 무게의 후보로 둘 다 싣는다 — 계산 규칙은 그대로이고 동점이 없으면 예전 형식 그대로", () => {
+  // 동점이 없는 쌍은 "보완 후보 1순위" 그대로 — 동점은 흔해서(PAIRS[0]도 동점이 있다) 동점이 없는 두 사람을 찾아 쓴다
+  const noTie = [person(1994, 11, 7, "08:40"), person(1996, 3, 29), person(1990, 5, 17), person(2001, 1, 9), person(1999, 12, 24), person(1985, 7, 3), person(1992, 2, 20)].filter((p) => fortifyOf(p).tied.length === 0);
+  assert.ok(noTie.length >= 2, "동점이 없는 사람 둘을 찾는다");
+  const plain = fullOf(noTie[0], noTie[1]);
+  const plainEv = plain.evidence.find((e) => e.id === "compat.fortify")!;
+  assert.match(plainEv.fact, /^보완 후보 1순위\(/);
+  assert.doesNotMatch(plainEv.fact, /동점/);
+  assert.equal(compatFortifyHasTie(plain.evidence), false);
+  // 동점인 사람(1980-04-14 시각 미상은 목 · 수가 모두 없다)이 있는 쌍
+  const tieA = person(1980, 4, 14, null);
+  const f = fortifyOf(tieA);
+  assert.equal(f.primary.element, "목", "1순위 계산은 그대로");
+  assert.deepEqual(f.tied, ["수"]);
+  const x = fullOf(tieA, person(1994, 11, 2));
+  const ev = x.evidence.find((e) => e.id === "compat.fortify")!;
+  assert.match(ev.fact, /^보완 후보\(오행 개수와 태어난 계절로 정한 단순화\): A님 목\(木, 없음\) · 수\(水, 없음\) — 동점\(개수가 같아 우선순위를 가릴 수 없는 같은 후보\)/);
+  assert.doesNotMatch(ev.fact, /1순위/);
+  assert.match(ev.cue, /같은 무게로 소개하고, 하나를 최우선 · 가장 필요한 기운으로 정하지 않습니다/);
+  assert.equal(compatFortifyHasTie(x.evidence), true);
+  const els = compatFortifyElementsOf(x.evidence);
+  assert.ok(els.includes("목") && els.includes("수"), els.join(","));
+  // 근거의 대응은 후보 모두의 방향 · 색 · 숫자 · 장소를 싣는다
+  for (const el of ["목", "수"] as const) {
+    const m = ELEMENT_FORTUNE[el];
+    assert.ok(ev.cue.includes(m.direction) && ev.cue.includes(m.colors[0]) && ev.cue.includes(String(m.numbers[0])), el);
+  }
+  // 모의 글은 통과하고, 동점 후보를 하나로 정해 말하면 막는다(어느 후보의 대응이든 셋 이상 말하면 통과)
+  const ok = draftOf(x);
+  assert.deepEqual(errorsWith(ok, x.evidence), []);
+  const d = clone(ok);
+  const advice = sec(d, "advice");
+  advice.paragraphs = [`${advice.paragraphs[0]} 수 기운이 최우선으로 필요한 기운이에요.`, ...advice.paragraphs.slice(1)];
+  assert.match(errorsWith(d, x.evidence).join("\n"), /동점 후보가 있어 "최우선"처럼 하나를 먼저/);
+  // 같은 문장이라도 동점이 없는 근거에서는 이 검사가 걸리지 않는다(그 쌍의 개운 대응 검사는 따로 걸릴 수 있다)
+  assert.doesNotMatch(errorsWith(d, plain.evidence).join("\n"), /동점 후보/);
 });
 
 test("출생 시각을 모르는 사람이 있으면: 근거에 세 기둥 기준이 적히고(weak), 없음 · 적음에 범위를 밝히게 하며 시주 풀이 · 신강/신약 · 가족사 단정을 막는다", () => {

@@ -10,7 +10,7 @@ import type { Evidence } from "../evidence.ts";
 import { checkVoice, voiceErrors, type VoiceReport } from "../style/voice.ts";
 import { CONTEXT_ATTRIBUTION, overlap } from "../v2/validate.ts";
 import { ADVICE_RULES_TRADITIONAL, READING_LIMITS as L } from "./plan.ts";
-import { fortifyCandidatesOf, fortuneMentions, ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
+import { fortifyCandidatesOf, fortuneMentions, ELEMENT_FORTUNE, FORTIFY_TIE_VERDICT } from "../../saju/interpret/fortune.ts";
 import { hasHourUnknownEvidence } from "../../saju/interpret/hour-unknown.ts";
 import { familyPastErrors, hourUnknownErrors } from "./hour-scope.ts";
 import { MONEY_WORDS, PERIOD_TALK, PROCESS_TALK, TASK_IMPERATIVE } from "./story-plan.ts";
@@ -38,8 +38,6 @@ const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isStrin
 /** 알파벳 네 글자 유형 코드 — 본문에 쓰지 않는다(입력한 MBTI는 "입력해 주신 성향"으로 부른다) */
 const TYPE_CODE = /(?<![A-Za-z])[EI][NS][TF][JP](?![A-Za-z])/i;
 /** 본문이 입력한 MBTI를 실제로 쓰고 있는가 — 근거 ID만 달고 본문에는 쓰지 않는 것을 막는 어림 */
-/** 동점인 보완 후보를 하나로 정해 말하는 표현 — 개수가 같으면 어느 쪽이 먼저인지 가릴 근거가 없다(운영자 2026-10-18) */
-export const FORTIFY_TIE_VERDICT = /최우선|1순위|가장 필요한 기운|꼭 필요한 기운|반드시 보완|먼저 보완해야/;
 const MBTI_MENTION = /입력(?:해|하)?\s*(?:주신|신|하신)|알려\s*주신|MBTI/;
 
 /** 장의 문단 목록 — 소제목이 있는 장은 소제목 순서대로 이어 붙인다 */

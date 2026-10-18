@@ -110,6 +110,9 @@ export function fortifyCandidatesOf(evidence: Pick<Evidence, "id" | "fact" | "un
   return one ? [one[1] as FiveElement] : [];
 }
 
+/** 동점인 보완 후보를 하나로 정해 말하는 표현 — 개수가 같으면 어느 쪽이 먼저인지 가릴 근거가 없다(운영자 2026-10-18, 개인 리포트 · 궁합이 같은 기준을 쓴다) */
+export const FORTIFY_TIE_VERDICT = /최우선|1순위|가장 필요한 기운|꼭 필요한 기운|반드시 보완|먼저 보완해야/;
+
 /** 보완 후보 가운데 앞의 하나 — 동점이면 그중 첫 기운(우선순위가 아니라 표시 순서). 후보를 모두 봐야 하는 검사는 fortifyCandidatesOf를 쓴다 */
 export function fortifyPrimaryOf(evidence: Pick<Evidence, "id" | "fact" | "uncertain">[]): FiveElement | null {
   return fortifyCandidatesOf(evidence)[0] ?? null;

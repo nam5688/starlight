@@ -5,7 +5,7 @@
 import type { Evidence } from "../../report/evidence.ts";
 import type { FiveElement, SajuOk } from "../engine.ts";
 import { FIVE_ELEMENTS } from "../engine.ts";
-import { ELEMENT_FORTUNE, fortifyOf } from "./fortune.ts";
+import { ELEMENT_FORTUNE, fortifyCandidates, fortifyOf } from "./fortune.ts";
 import type { CompatResult } from "./compat.ts";
 
 export const COMPAT_EXTRA_VERSION = "compat-extra-0.1-draft";
@@ -51,29 +51,39 @@ export function compatExtraEvidence(sa: SajuOk, sb: SajuOk, result: CompatResult
   // 2) 함께 쓸 수 있는 개운 — 각자의 보완 후보(오행 개수 + 태어난 계절의 단순화)와 그 기운의 전통 대응. 개인별 계산 없이 임의로 배정하지 않는다
   const fa = fortifyOf(sa);
   const fb = fortifyOf(sb);
-  const ea = fa.primary.element;
-  const eb = fb.primary.element;
+  // 개수가 같은 후보(동점)는 하나를 1순위로 정하지 않고 같은 무게의 후보로 둘 다 싣는다(개인 리포트와 같은 기준, 운영자 2026-10-18) — 계산 규칙(fortifyOf)은 그대로다
+  const cands = [fortifyCandidates(fa), fortifyCandidates(fb)];
+  const anyTie = fa.tied.length > 0 || fb.tied.length > 0;
   const cnt = (n: number) => (n === 0 ? "없음" : `${n}개로 가장 적음`);
   const tag = (x: (typeof people)[number]) => (x.s.hourPillarOmitted ? "(세 기둥 기준)" : "");
-  const elements = [...new Set([ea, eb])];
+  const personText = (x: (typeof people)[number], f: typeof fa, list: FiveElement[]) =>
+    `${NAME[x.key]} ${list.map((e) => `${e}(${ELEMENT_HANJA[e]}, ${cnt(f.counts[e])})`).join(" · ")}${f.tied.length ? " — 동점(개수가 같아 우선순위를 가릴 수 없는 같은 후보)" : ""}${tag(x)}`;
+  const elements = [...new Set([...cands[0], ...cands[1]])];
+  const sameSet = cands[0].length === cands[1].length && cands[0].every((e) => cands[1].includes(e));
   out.push({
     id: "compat.fortify",
     source: "saju",
     topics: ["relationship", "personality"],
     strength: weak ? "weak" : "moderate",
-    fact: `보완 후보 1순위(오행 개수와 태어난 계절로 정한 단순화): ${NAME.a} ${ea}(${ELEMENT_HANJA[ea]}, ${cnt(fa.primary.count)})${tag(people[0])} / ${NAME.b} ${eb}(${ELEMENT_HANJA[eb]}, ${cnt(fb.primary.count)})${tag(people[1])} / ${ea === eb ? `두 사람의 1순위가 같아 함께 보태기 좋은 기운: ${ea}` : "두 사람의 1순위가 달라 각자의 기운을 함께 쓸 수 있음"}`,
-    cue: `전통 오행 대응 — ${elements.map(correspondence).join(" / ")}. 부족한 기운을 생활에서 보태는 상징적인 개운법으로, 두 사람이 함께 머무는 공간 · 만나는 장소 · 소품의 색 · 산책하는 방향 · 즐겨 쓰는 번호로 옮겨 소개하는 경우가 많습니다. 필요한 기운을 판정한 것이 아니며 실제 효과나 관계의 변화를 보장하지 않고, 이미 가진 것으로 가볍게 먼저 해 볼 수 있습니다.${unknownHour ? " 출생 시각을 모르는 사람의 후보는 세 기둥 기준이라 시주에 따라 달라질 수 있어 가볍게 곁들입니다." : ""}${hourShaky ? " 시주가 바뀌는 시각에 가까운 사람이 있어 후보가 달라질 수 있습니다." : ""}`,
+    fact: `${anyTie ? "보완 후보" : "보완 후보 1순위"}(오행 개수와 태어난 계절로 정한 단순화): ${personText(people[0], fa, cands[0])} / ${personText(people[1], fb, cands[1])} / ${sameSet ? `두 사람의 ${anyTie ? "후보" : "1순위"}가 같아 함께 보태기 좋은 기운: ${cands[0].join(" · ")}` : `두 사람의 ${anyTie ? "후보" : "1순위"}가 달라 각자의 기운을 함께 쓸 수 있음`}`,
+    cue: `전통 오행 대응 — ${elements.map(correspondence).join(" / ")}. 부족한 기운을 생활에서 보태는 상징적인 개운법으로, 두 사람이 함께 머무는 공간 · 만나는 장소 · 소품의 색 · 산책하는 방향 · 즐겨 쓰는 번호로 옮겨 소개하는 경우가 많습니다.${anyTie ? " 동점으로 적힌 후보는 개수가 같아 어느 쪽이 먼저라고 가릴 수 없는 같은 후보이므로 같은 무게로 소개하고, 하나를 최우선 · 가장 필요한 기운으로 정하지 않습니다." : ""} 필요한 기운을 판정한 것이 아니며 실제 효과나 관계의 변화를 보장하지 않고, 이미 가진 것으로 가볍게 먼저 해 볼 수 있습니다.${unknownHour ? " 출생 시각을 모르는 사람의 후보는 세 기둥 기준이라 시주에 따라 달라질 수 있어 가볍게 곁들입니다." : ""}${hourShaky ? " 시주가 바뀌는 시각에 가까운 사람이 있어 후보가 달라질 수 있습니다." : ""}`,
     ...(uncertain ? { uncertain: true } : {}),
   });
   return out;
 }
 
-/** 근거 목록의 개운 근거에서 두 사람의 1순위 기운을 꺼낸다(중복 제거) — 검사가 본문이 그 기운의 대응을 말하는지 확인할 때 쓴다 */
+/** 근거 목록의 개운 근거에서 두 사람의 보완 후보 기운을 꺼낸다(중복 제거, 동점이면 동점인 기운 모두) — 검사가 본문이 그 기운의 대응을 말하는지 확인할 때 쓴다 */
 export function compatFortifyElementsOf(evidence: Pick<Evidence, "id" | "fact" | "uncertain">[]): FiveElement[] {
   const e = evidence.find((x) => x.id === "compat.fortify" && !x.uncertain);
   if (!e) return [];
-  const found = [...e.fact.matchAll(/(?:A님|B님) ([목화토금수])\(/g)].map((m) => m[1] as FiveElement);
+  const found = [...e.fact.matchAll(/(?:A님|B님) ([^/]+)/g)].flatMap((person) => [...person[1].matchAll(/([목화토금수])\(/g)].map((m) => m[1] as FiveElement));
   return [...new Set(found)];
 }
+
+/** 두 사람 가운데 보완 후보가 동점(개수가 같은 후보)인 사람이 있는가 — 있으면 본문이 하나를 최우선 · 가장 필요한 기운으로 정해 말하지 못한다 */
+export const compatFortifyHasTie = (evidence: Pick<Evidence, "id" | "fact" | "uncertain">[]): boolean => {
+  const e = evidence.find((x) => x.id === "compat.fortify" && !x.uncertain);
+  return Boolean(e && /동점\(개수가 같아/.test(e.fact));
+};
 
 export const COMPAT_EXTRA_ID = /^compat\.(chart|fortify)$/;

@@ -3,8 +3,8 @@
 // 2026-10-17 운영자 확정: 전통 해석 · 개운법은 허용하고 보장하는 말만 막는다 · 명리 풀이를 위해 용어 한도를 넓혔다 · **반복은 낱말 횟수 · 구절 되풀이만으로 저장을 막지 않는다**(같은 구절 · 같은 말로 여는 문단은 읽기 전 지표로만 보고, 새 정보 없이 결론을 되풀이하는지는 사람이 읽고 판단한다).
 // 출생 시각을 모르는 사람이 있으면(근거 compat.chart에 "세 기둥(시주 제외)") 오행 · 십성의 없음 · 적음은 범위를 밝히게 하고 시주 풀이(자녀 · 말년) · 신강/신약은 막는다(reading/hour-scope.ts).
 // 한계: 낱말 · 길이 · 표지를 센 어림이다. 말을 바꿔 쓴 속마음 단정 · 관계의 좋고 나쁨 판정은 못 찾는다 — 지시문(prompt.ts)과 사람이 읽는 평가가 본다. 좋은 글의 보증이 아니다.
-import { compatFortifyElementsOf } from "../../saju/interpret/compat-extra.ts";
-import { fortuneMentions } from "../../saju/interpret/fortune.ts";
+import { compatFortifyElementsOf, compatFortifyHasTie } from "../../saju/interpret/compat-extra.ts";
+import { FORTIFY_TIE_VERDICT, fortuneMentions } from "../../saju/interpret/fortune.ts";
 import type { Evidence } from "../evidence.ts";
 import { familyPastErrors, hourUnknownErrors } from "../reading/hour-scope.ts";
 import { ADVICE_RULES_TRADITIONAL } from "../reading/plan.ts";
@@ -223,6 +223,10 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: Co
       }
       const said = Object.values(kinds).filter(Boolean).length;
       if (elements.length > 0 && said < 3) errors.push(`${where}: 개운 풀이에서 방향 · 색 · 숫자 · 장소 가운데 ${said}개만 말했습니다 — 근거(compat.fortify)에 적힌 보완 후보 기운(${elements.join(" · ")})의 대응을 셋 이상 그대로 쓰세요(빠진 것: ${Object.entries(kinds).filter(([, v]) => !v).map(([k]) => k).join(" · ")}).`);
+      if (compatFortifyHasTie(evidence)) {
+        const verdict = FORTIFY_TIE_VERDICT.exec(body);
+        if (verdict) errors.push(`${where}: 보완 후보 가운데 개수가 같은 동점 후보가 있어 "${verdict[0]}"처럼 하나를 먼저 · 가장 필요한 기운으로 정해 말할 수 없어요 — 같은 무게의 후보로 소개하세요(근거 compat.fortify에 적혀 있어요).`);
+      }
     }
     if (isIds(s.evidence)) for (const id of new Set(s.evidence)) reuse.set(id, (reuse.get(id) ?? new Set()).add(plan.id));
   }
