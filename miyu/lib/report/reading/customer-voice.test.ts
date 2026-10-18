@@ -10,11 +10,12 @@ import test from "node:test";
 import { buildPersonas } from "../ai/compare-personas.ts";
 import { buildEvidence } from "../ai/generator.ts";
 import { customerVoiceLeaks, customerVoiceMessage } from "./customer-voice.ts";
-import { HOUR_SCOPE_MARK, hourUnknownErrors, NONE_CLAIM } from "./hour-scope.ts";
+import { HOUR_SCOPE_MARK, hourUnknownErrors, NONE_CLAIM, NONE_CLAIM_WITH_LIFE } from "./hour-scope.ts";
 import { LIFE_ABSENT_SOURCE, LIFE_POWER_SOURCE, LIFE_WORDS7, lifeWordsPrompt } from "./life-words.ts";
 import { fillNameInJson, honorific } from "./name-fill.ts";
 import { JARGON } from "./plan.ts";
 import { renderStory7DraftMarkdown } from "./render-draft.ts";
+import { ABSENCE_MAPPING } from "./story-plan.ts";
 import { absenceErrors } from "./story-validate.ts";
 import { assembleStory7, fillStory7Name } from "./story7-assemble.ts";
 import { composeMockStory7 } from "./story7-mock-model.ts";
@@ -169,8 +170,9 @@ test("BLOCK 정책은 낮추지 않았다 — 용어를 쓴 옛 단정은 그대
 
 // ───── 생활 말로 옮긴 "없음 · 부족" 문장 — 오탐 · 우회 ─────
 
-const absent = (s: string) => absenceErrors([s], "w", { relaxed: true }).length > 0;
-const noneClaim = (s: string) => hourUnknownErrors([{ where: "w", text: s }]).length > 0;
+// 생활 말 확장은 story-7 검사에만 켠다(lifeWords) — story-7이 부르는 모양 그대로
+const absent = (s: string) => absenceErrors([s], "w", { relaxed: true, lifeWords: true }).length > 0;
+const noneClaim = (s: string) => hourUnknownErrors([{ where: "w", text: s }], { lifeWords: true }).length > 0;
 
 test("없는 기운 단정: 표현 예시의 말을 따라 쓴 단정은 막는다", () => {
   for (const s of [
@@ -217,7 +219,48 @@ test("출생 시각 미상: 생활 말로 옮긴 '없음 · 적음'도 범위 �
 test("정규식 확장은 용어 쪽 동작을 바꾸지 않는다 — 번역 어구가 없는 글의 검사 결과는 같다", () => {
   assert.ok(NONE_CLAIM.test("식상이 없어요"));
   assert.ok(!NONE_CLAIM.test("그럴 수는 없어요"));
+  assert.ok(NONE_CLAIM_WITH_LIFE.test("식상이 없어요"));
+  assert.ok(!NONE_CLAIM_WITH_LIFE.test("그럴 수는 없어요"));
   assert.ok(LIFE_POWER_SOURCE.length > 0 && LIFE_ABSENT_SOURCE.length > 0);
+});
+
+// ───── 범위: 생활 말 확장은 story-7에만 — story-v1 · 궁합(기본 호출)은 변경 전(99da1f1) 판정 그대로 ─────
+
+// 변경 전 정규식 원문(커밋 99da1f1의 story-plan.ts · hour-scope.ts)을 그대로 고정해 둔다 — 기본 호출이 이 정규식에서 벗어나면 이 시험이 깨진다
+const BEFORE_ABSENCE_KIND = /(?:[목화토금수]\s*(?:\([^)]*\))?\s*기운|[목화토금수]\([^)]*\)|비겁|식상|재성|관성|인성|비견|겁재|식신|상관|편재|정재|편관|정관|편인|정인)/;
+const BEFORE_NONE_CLAIM = /(?:[목화토금수]\s*(?:\([^)]{1,8}\)\s*)?(?:기운|오행)|비겁|식상|재성|관성|인성)[^.!?]{0,16}(?:없(?:어|는|다|습니다|고|으|음)|0개|하나도|비어|비었|전혀|적(?:어요|은|게|다|습니다)|부족)/;
+
+test("범위: 기본 호출이 쓰는 정규식은 변경 전과 글자까지 같다 — 생활 말 확장은 별도 정규식으로만 있다", () => {
+  assert.equal(ABSENCE_MAPPING.kind.source, BEFORE_ABSENCE_KIND.source);
+  assert.equal(NONE_CLAIM.source, BEFORE_NONE_CLAIM.source);
+  assert.notEqual(ABSENCE_MAPPING.kindWithLife.source, ABSENCE_MAPPING.kind.source);
+  assert.notEqual(NONE_CLAIM_WITH_LIFE.source, NONE_CLAIM.source);
+});
+
+test("범위: 같은 생활 말 문장이 story-7(lifeWords)에서는 BLOCK이고 기본 호출(story-v1 · 궁합)에서는 변경 전처럼 통과한다", () => {
+  for (const s of ["돈을 다루는 감각이 없어서 돈 관리가 어려워요.", "물의 기운이 없어서 쉬어 가는 힘이 약해요.", "밀고 가는 힘이 보이지 않아서 시작을 못 해요."]) {
+    assert.equal(absenceErrors([s], "w").length, 0, `기본: ${s}`);
+    assert.equal(absenceErrors([s], "w", { relaxed: true }).length, 0, `기본(relaxed): ${s}`);
+    assert.ok(absenceErrors([s], "w", { relaxed: true, lifeWords: true }).length > 0, `story-7: ${s}`);
+  }
+  for (const s of ["돈을 다루는 감각은 보이지 않아요.", "물의 기운이 적어요.", "밀고 가는 힘이 하나도 없어요.", "물의 기운이 적은 편이에요."]) {
+    assert.equal(hourUnknownErrors([{ where: "w", text: s }]).length, 0, `기본: ${s}`);
+    assert.ok(hourUnknownErrors([{ where: "w", text: s }], { lifeWords: true }).length > 0, `story-7: ${s}`);
+  }
+});
+
+test("범위: 기존 전문용어 BLOCK은 기본 호출과 story-7 모두에서 그대로 유지된다", () => {
+  for (const lifeWords of [false, true]) {
+    for (const s of ["재성이 없어서 돈 관리가 약해요.", "수 기운이 없어서 쉬는 힘이 없어요."]) {
+      assert.ok(absenceErrors([s], "w", { relaxed: true, lifeWords }).length > 0, `lifeWords=${lifeWords}: ${s}`);
+    }
+    // 조건형 문장을 풀어 주지 않는 story-v1 모드(relaxed 아님)에서도 용어판은 그대로 막는다
+    assert.ok(absenceErrors(["식상은 보이지 않아서, 결과물을 먼저 내보이는 일은 부담이 되기 쉬울 수 있어요."], "w", { lifeWords }).length > 0, `lifeWords=${lifeWords}`);
+    for (const s of ["식상이 없어요.", "재성이 적어요.", "토 기운이 하나도 없어서 중심이 흔들려요."]) {
+      assert.ok(hourUnknownErrors([{ where: "w", text: s }], { lifeWords }).length > 0, `lifeWords=${lifeWords}: ${s}`);
+    }
+    assert.equal(hourUnknownErrors([{ where: "w", text: "출생 시각을 몰라 확인되는 범위에서는 식상이 보이지 않아요." }], { lifeWords }).length, 0);
+  }
 });
 
 // ───── 이름 ─────

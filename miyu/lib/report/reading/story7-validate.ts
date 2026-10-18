@@ -226,7 +226,7 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
       const firstTerms = distinctTerms(paragraphs[0]);
       if (firstTerms.length > STORY7_TERMS.firstParagraphMax) errors.push(`${w}: 첫 문단에 사주 용어(${firstTerms.join(" · ")})가 ${firstTerms.length}개 — 첫 문단은 이 장의 결론을 쉬운 말로 먼저 쓰고 용어는 ${STORY7_TERMS.firstParagraphMax}개까지만, 나머지는 둘째 문단부터 쓰세요.`);
     }
-    errors.push(...absenceErrors(paragraphs, w, { relaxed: true }));
+    errors.push(...absenceErrors(paragraphs, w, { relaxed: true, lifeWords: true }));
     if (isString(s.headline) && paragraphs.some((t) => t.includes(s.headline.trim()))) errors.push(`${w}: 문단이 제목을 그대로 되풀이합니다 — 제목은 본문을 다 쓴 뒤의 결론이고 문단은 그 연결을 풀어 쓰는 글입니다.`);
     const tasks = paragraphs.reduce((n, p) => n + p.split(/(?<=[.!?])\s+/).filter((x) => TASK_IMPERATIVE.test(x)).length, 0);
     const taskMax = plan.no === 6 ? STORY7_TASK_MAX[6] : STORY7_TASK_MAX.default;
@@ -358,7 +358,7 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   }
   // 가족에게 있었던 일을 지난 사실로 쓰지 않는다(입력받은 가족 정보 없음) · 출생 시각을 모를 때는 세 기둥 기준 범위 · 시주 풀이 금지 · 신강/신약 금지(hour-scope.ts)
   errors.push(...familyPastErrors(texts));
-  if (hasHourUnknownEvidence(evidence)) errors.push(...hourUnknownErrors(texts));
+  if (hasHourUnknownEvidence(evidence)) errors.push(...hourUnknownErrors(texts, { lifeWords: true }));
   // 지난 시기를 사실처럼 쓰지 않는다 — 지난 대운 · 세운의 연애 · 일 · 재물 이야기는 사주에서 읽은 가능성이지 입력받은 사건이 아니다(운영자 2026-10-18).
   //   과거를 가리키는 말(나이 범위 · 연도 · 그 무렵 · 지난 시기)과 사건 동사가 함께 있고 조건형 · 전통 해석 표지가 없는 문장을 막는다
   for (const { where, text: t } of texts) {

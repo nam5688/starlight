@@ -388,6 +388,21 @@ test("출생 시각을 모르는 사람이 있으면: 근거에 세 기둥 기�
   assert.ok(!errorsWith(dk, known.evidence).some((e) => /세 기둥 기준/.test(e)));
 });
 
+test("출생 시각 미상 궁합 검사는 변경 전 그대로다 — 용어판 '없음'은 막고, 생활 말로 옮긴 같은 문장은 story-7 확장이 번지지 않아 통과한다", () => {
+  const [a, b] = UNKNOWN_PAIR;
+  const x = fullOf(a, b);
+  const ok = draftOf(x);
+  const errs = (text: string) => {
+    const d = clone(ok);
+    sec(d, "harmony").paragraphs[1] = `${text} ${PAD}`;
+    return errorsWith(d, x.evidence).join("\n");
+  };
+  assert.match(errs("B님에게는 토 기운이 적은 편이에요."), /세 기둥 기준/);
+  assert.match(errs("B님에게는 식상이 없어요."), /세 기둥 기준/);
+  assert.doesNotMatch(errs("B님에게는 물의 기운이 적은 편이에요."), /세 기둥 기준/);
+  assert.doesNotMatch(errs("B님은 돈을 다루는 감각이 보이지 않아요."), /세 기둥 기준/);
+});
+
 test("조립: 커플 유형 · 지수 · 계산 재료는 무료 간단 궁합(cardOf)과 같은 결과이고, 이름 자리가 바뀌며, 모의 글은 판매할 수 없다고 표시된다 — 추천 질문 · 가족 · 자녀 인연 미계산 안내 포함", () => {
   const names = { a: "슬기", b: "남수" };
   const d = clone(draftOf());

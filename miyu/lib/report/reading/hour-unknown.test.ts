@@ -120,6 +120,13 @@ test("검사: 시각을 모를 때 오행 · 십성의 없음 · 적음은 세 �
   assert.ok(!plain.some((e) => /세 기둥 기준/.test(e)), plain.join("\n"));
 });
 
+test("검사(story-7 경로): 생활 말로 옮긴 '없음 · 적음'도 세 기둥 범위가 없으면 막고, 범위를 밝히면 통과한다", () => {
+  const bad = errorsFor((d) => setFirst(d, 4, `물의 기운이 적은 편이에요. ${PAD}`));
+  assert.ok(bad.some((e) => /세 기둥 기준/.test(e)), bad.join("\n"));
+  const ok = errorsFor((d) => setFirst(d, 4, `출생 시각을 몰라 확인되는 범위에서는 물의 기운이 적은 편이에요. ${PAD}`));
+  assert.ok(!ok.some((e) => /세 기둥 기준/.test(e)), ok.join("\n"));
+});
+
 test("검사: 시각을 모르면 시주 풀이(자녀 · 말년) · 신강/신약 판정은 쓰지 않는다", () => {
   const child = errorsFor((d) => setFirst(d, 3, `자녀가 학업에서 두각을 나타낼 수 있어요. ${PAD}`));
   assert.ok(child.some((e) => /시주로 읽는 풀이/.test(e)), child.join("\n"));

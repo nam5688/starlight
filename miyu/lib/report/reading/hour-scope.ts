@@ -11,13 +11,13 @@ type Piece = { where: string; text: string };
 export const HOUR_SCOPE_MARK = /세 기둥|시주(?:를|는|가)?\s*(?:없|제외|뺀|몰라|모르)|시주에 있을 수|시[각간](?:을|은|이)?\s*(?:몰라|모르|없)|출생\s*시[각간](?:을|은|이)?\s*(?:몰라|모르|없)|여섯 글자|확인되는 범위|확인할 수 있는 범위/;
 
 /** 오행 · 십성이 없거나 적다고 말하는 문장 — 오행 이름은 "기운 · 오행"이 붙을 때만 센다("그럴 수는 없어요" 같은 말을 걸지 않으려고) */
-const NONE_CLAIM_TERM = /(?:[목화토금수]\s*(?:\([^)]{1,8}\)\s*)?(?:기운|오행)|비겁|식상|재성|관성|인성)[^.!?]{0,16}(?:없(?:어|는|다|습니다|고|으|음)|0개|하나도|비어|비었|전혀|적(?:어요|은|게|다|습니다)|부족)/;
+export const NONE_CLAIM = /(?:[목화토금수]\s*(?:\([^)]{1,8}\)\s*)?(?:기운|오행)|비겁|식상|재성|관성|인성)[^.!?]{0,16}(?:없(?:어|는|다|습니다|고|으|음)|0개|하나도|비어|비었|전혀|적(?:어요|은|게|다|습니다)|부족)/;
 /**
- * 고객용 글(2026-10-18)은 용어 대신 생활 말로 옮겨 쓰므로, 같은 "없음 · 적음" 문장이 번역된 말로 와도 범위를 요구한다 — 기존 검사에 덧붙인 것이고 용어 쪽 동작은 그대로다.
- * 번역표(life-words.ts)의 어구와 "물의 기운" 꼴만 알아본다 — 표에 없는 말로 옮긴 문장은 못 잡는다(미탐, 한계는 docs/story7-customer-voice-v1.md 4장).
+ * 고객용 글(story-7, 2026-10-18)은 용어 대신 생활 말로 옮겨 쓰므로, 같은 "없음 · 적음" 문장이 번역된 말로 와도 범위를 요구한다 — **story-7 검사만** 켠다(`hourUnknownErrors`의 `lifeWords`).
+ * 사주 궁합 · 리포트 궁합은 `NONE_CLAIM`(용어만)으로 변경 전 그대로 판정한다. 번역표(life-words.ts)의 어구와 "물의 기운" 꼴만 알아본다 — 표에 없는 말로 옮긴 문장은 못 잡는다(미탐, 한계는 docs/story7-customer-voice-v1.md 4장).
  */
 const NONE_CLAIM_LIFE = new RegExp(`(?:${LIFE_POWER_SOURCE})[^.!?]{0,16}(?:${LIFE_ABSENT_SOURCE})`);
-export const NONE_CLAIM = new RegExp(`${NONE_CLAIM_TERM.source}|${NONE_CLAIM_LIFE.source}`);
+export const NONE_CLAIM_WITH_LIFE = new RegExp(`${NONE_CLAIM.source}|${NONE_CLAIM_LIFE.source}`);
 
 /**
  * 시주로 읽는 풀이 — 자녀 · 말년 · 시주에 놓이는 것(시주를 "몰라서 읽지 않았다"고 범위를 밝히는 "시주를 · 시주는 · 시주가"는 허용).
@@ -38,12 +38,13 @@ export const FAMILY_PAST = /받지 못했|받지 못한|받지 못하고|도움�
 const sentencesOf = (t: string) => t.match(/[^.!?。\n]+[.!?。]?/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
 
 /** 출생 시각을 모를 때 글이 지켜야 할 범위 — 지키지 않은 곳마다 이유를 돌려준다 */
-export function hourUnknownErrors(texts: Piece[]): string[] {
+export function hourUnknownErrors(texts: Piece[], o: { lifeWords?: boolean } = {}): string[] {
   const out: string[] = [];
+  const noneClaim = o.lifeWords ? NONE_CLAIM_WITH_LIFE : NONE_CLAIM;
   for (const { where, text } of texts) {
     const sentences = sentencesOf(text);
     sentences.forEach((sentence, i) => {
-      if (NONE_CLAIM.test(sentence) && !HOUR_SCOPE_MARK.test(sentence) && !HOUR_SCOPE_MARK.test(sentences[i - 1] ?? "")) {
+      if (noneClaim.test(sentence) && !HOUR_SCOPE_MARK.test(sentence) && !HOUR_SCOPE_MARK.test(sentences[i - 1] ?? "")) {
         out.push(`${where}: "${sentence.slice(0, 40)}…" — 출생 시각을 몰라 오행 · 십성의 "없음 · 적음"은 시주를 뺀 세 기둥 기준이에요. 사주 전체에 없는 것처럼 쓰지 말고 "세 기둥으로 보면 ~는 보이지 않아요(시주에 있을 수 있어요)"처럼 범위를 같은 문장이나 바로 앞 문장에 밝히세요.`);
       }
     });

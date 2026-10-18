@@ -381,6 +381,13 @@ test("원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인�
   assert.ok(e3.some((x) => /flow: .*생활 기능의 부족이나 원인/.test(x)), e3.join("\n"));
 });
 
+test("영역별 이야기(story-v1)의 없는 기운 검사는 변경 전 그대로다 — 생활 말로 옮긴 같은 단정은 story-7 확장이 번지지 않아 막지 않는다", () => {
+  for (const text of ["돈을 다루는 감각이 없어서 돈 관리가 어려워요.", "물의 기운이 없어서 쉬어 가는 힘이 약해요.", "밀고 가는 힘이 보이지 않아서 시작을 못 해요."]) {
+    const e = errorsOf((d) => (d.areas[2].paragraphs[1] = `${text} 그래서 결정 앞에서 확인할 항목을 정해 두는 쪽이 편할 수 있어요 그리고 오래 이어 가요.`));
+    assert.ok(!e.some((x) => /생활 기능의 부족이나 원인/.test(x)), `${text}: ${e.join("\n")}`);
+  }
+});
+
 test("같은 개인 성향 근거를 세 영역 이상이 앞세우면 막는다 — 한 가지 응답이 모든 영역의 중심이 되는 반복을 구조로 줄인다", () => {
   const id = "survey.caution.high";
   assert.ok(P01_EVIDENCE.some((e) => e.id === id));

@@ -56,12 +56,14 @@ const TRADITION_FRAME = /(?:전통|읽혀요|읽어요|읽을 수|봐요|보는 
 /**
  * 없는 기운 · 십성을 생활 기능의 부족이나 원인으로 단정하는 문장을 찾는다. `relaxed`(7개 대주제, 운영자 2026-10-17)에서는 "전통에서는 ~로 읽어요 · ~기 쉬워요 · ~할 수 있어요"처럼
  * 전통 해석이거나 조건형인 문장은 허용하고, 조건 없이 "~가 없어서 ~가 약해요 · ~를 못 해요"로 단정한 문장만 막는다.
+ * `lifeWords`는 용어 대신 생활 말로 옮긴 문장(번역표의 어구)까지 알아본다 — story-7만 켠다. 꺼 두면(기본) 용어만 보는 변경 전 판정 그대로다.
  */
-export function absenceErrors(paragraphs: unknown[], where: string, o: { relaxed?: boolean } = {}): string[] {
+export function absenceErrors(paragraphs: unknown[], where: string, o: { relaxed?: boolean; lifeWords?: boolean } = {}): string[] {
   const out: string[] = [];
+  const kind = o.lifeWords ? ABSENCE_MAPPING.kindWithLife : ABSENCE_MAPPING.kind;
   for (const p of paragraphs.filter(isString)) {
     for (const sentence of p.split(/(?<=[.!?])\s+/)) {
-      if (!ABSENCE_MAPPING.kind.test(sentence) || !ABSENCE_MAPPING.absent.test(sentence)) continue;
+      if (!kind.test(sentence) || !ABSENCE_MAPPING.absent.test(sentence)) continue;
       if (o.relaxed && TRADITION_FRAME.test(sentence)) continue;
       const hit = ABSENCE_MAPPING.gloss.exec(sentence) ?? ABSENCE_MAPPING.causal.exec(sentence) ?? (ABSENCE_MAPPING.allowedFrame.test(sentence) ? null : ABSENCE_MAPPING.causalLoose.exec(sentence));
       if (hit) out.push(`${where}: "${sentence.slice(0, 40)}…" — 원국에 없는 기운 · 십성을 생활 기능의 부족이나 원인("${hit[0]}")으로 풀지 않습니다. 근거는 "전통 해석에서 생활에서 채우라고 권하는 경우가 많다 · 시기에 그 주제가 크게 느껴질 수 있다"까지만 말하고, 이 사람의 행동은 응답 근거로 쓰세요.`);
