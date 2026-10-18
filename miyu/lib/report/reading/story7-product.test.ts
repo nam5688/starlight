@@ -18,6 +18,7 @@ import { buildStory7UserMessage, STORY7_SYSTEM_PROMPT } from "./story7-prompt.ts
 import { normalizeStory7Draft, story7Paragraphs, story7VoiceReport, validateStory7Draft, visibleStory7Texts } from "./story7-validate.ts";
 import { availableRooms, startRoom } from "./talk-room.ts";
 import { buildTalkModel } from "./talk.ts";
+import { isTermWarning } from "./warn-policy.ts";
 import { isReadingReport, isStory7Report, isStoryReport, type Story7DraftV1 } from "./types.ts";
 
 const PERSONAS = buildPersonas(10);
@@ -264,6 +265,40 @@ test("문단은 4문장을 넘으면 경고(WARN)만 하고(6~7문장도 저장�
   const ok46 = "가".repeat(46);
   assert.ok(!errorsOf((d) => { d.headline = ok46; }).some((e) => /headline: 길이/.test(e)));
   assert.ok(errorsOf((d) => { d.headline = `${ok46}가`; }).some((e) => /headline: 길이 47자 \(10~46자\)/.test(e)));
+});
+
+test("장 제목 길이(8~40자)와 문단 최소 길이(60자)는 경고(WARN)만 하고 저장을 막지 않는다 — 글이 없거나 비어 있는 내용 누락 · 문단 최대 길이 · 없는 십성의 원인 풀이는 BLOCK 그대로(운영자 정책 2026-10-18, 3차 BLOCK 3건 판정)", () => {
+  // 길이만 맞춘 시험용 글이다(3차 실제 글에서 5번 제목 41자 · 7번 문단 52자가 저장을 막았다)
+  const title41 = "일과 돈은 차곡차곡 쌓는 방식보다 흐름을 타고 커지는 방식에 가까워요 그래서".slice(0, 41);
+  const para52 = "오늘 읽은 내용 가운데 마음에 남는 한 가지만 골라 가볍게 시작해 보세요 그것으로 충분해요 정말이에요".slice(0, 52);
+  assert.equal(title41.length, 41);
+  assert.equal(para52.length, 52);
+  // 7번 장의 첫 문단은 고민을 밝히며 시작해야 하므로(고민 입력이 있는 시험 인물) 둘째 문단을 짧게 바꾼다
+  const secondPara7 = (d: Story7DraftV1, text: string) => { const s7 = section(d, 7); s7.paragraphs = [s7.paragraphs![0], text]; };
+  const both = clone(mockDraft());
+  section(both, 5).headline = title41;
+  secondPara7(both, para52);
+  const r = validateStory7Draft(both, P01_EVIDENCE, { hasContext: Boolean(P01.input.context) });
+  assert.ok(r.ok, JSON.stringify(r.ok ? [] : r.errors));
+  assert.ok(r.warnings.some((w) => /sections\.5\(.*\)\.headline: 길이 41자 \(권장 8~40자/.test(w)), r.warnings.join("\n"));
+  assert.ok(r.warnings.some((w) => /sections\.7\(.*\)\.paragraphs\[1\]: 길이 52자 \(권장 60~420자/.test(w)), r.warnings.join("\n"));
+  // 제목이 짧아도(7자 이하) 문단이 아주 짧아도(1자 이상) 글이 있으면 경고만 한다
+  const short = (d: Story7DraftV1) => { section(d, 5).headline = "일과 돈"; secondPara7(d, "한 줄이에요."); };
+  assert.ok(warningsOf(short).some((w) => /headline: 길이 4자 \(권장 8~40자/.test(w)));
+  assert.ok(!errorsOf(short).some((e) => /길이 \d+자/.test(e)), "짧은 제목 · 짧은 문단은 BLOCK이 아니다");
+  // 내용 누락은 BLOCK 그대로 — 제목이 없거나 공백뿐 · 문단이 비어 있음 · 목록이 없음
+  assert.ok(errorsOf((d) => { section(d, 5).headline = "   "; }).some((e) => /sections\.5\(.*\)\.headline: 글이 없습니다/.test(e)));
+  assert.ok(errorsOf((d) => secondPara7(d, "")).some((e) => /sections\.7\(.*\)\.paragraphs\[1\]: 글이 없습니다/.test(e)));
+  assert.ok(errorsOf((d) => { section(d, 7).paragraphs = []; }).some((e) => /sections\.7.*paragraphs/.test(e)), "문단이 하나도 없으면 막힌다");
+  // 문단 최대 길이(420자)는 BLOCK 그대로
+  assert.ok(errorsOf((d) => setPara(d, 4, "가".repeat(421))).some((e) => /길이 421자 \(60~420자\)/.test(e)));
+  // 없는 십성(정재)을 생활 기능의 부족이나 원인으로 풀면 계속 BLOCK — 전통 해석 · 조건형은 허용
+  const cause = errorsOf((d) => setPara(d, 5, `${PAD} 정재가 원국에 없어서 돈을 모으기 어려워요.`));
+  assert.ok(cause.some((e) => /생활 기능의 부족이나 원인/.test(e)), cause.join("\n"));
+  assert.ok(!errorsOf((d) => setPara(d, 5, `${PAD} 정재가 원국에 없으면 전통에서는 월급처럼 꾸준한 수입보다 변동이 있는 돈에 마음이 간다고 읽어요.`)).some((e) => /생활 기능의 부족이나 원인/.test(e)));
+  // 길이 경고만 있는 글을 BLOCK 목록에 섞지 않는다 — 표지는 개인 · 궁합 검사가 같은 파일을 쓴다
+  assert.ok(isTermWarning("sections.5(일과 재물).headline: 길이 41자 (권장 8~40자 — 경고만 하고 저장은 막지 않습니다)"));
+  assert.ok(!isTermWarning("headline: 길이 47자 (10~46자)"), "핵심 문장 길이는 BLOCK 그대로");
 });
 
 test("시기 이야기는 6번에만 쓴다 — 다른 장 · 카드 · 조언에 올해 · 대운 · 연도를 쓰면 막는다", () => {

@@ -126,13 +126,15 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   const personalIds = new Set(personal.map((e) => e.id));
   const mbtiAvailable = personal.some((e) => e.id === "self.mbti");
 
-  const text = (v: unknown, where: string, min: number, max: number): v is string => {
-    if (!isString(v)) {
+  // soft: 길이 한도를 넘거나 모자라도 글이 있으면 경고(WARN)만 한다(운영자 정책 2026-10-18 — 제목이 한 글자 길거나 문단이 몇 글자 짧다고 고객 리포트를 저장하지 못하게 하지 않는다).
+  //   글이 아예 없거나 비어 있으면(내용 누락)은 soft여도 BLOCK이다.
+  const text = (v: unknown, where: string, min: number, max: number, soft: { min?: boolean; max?: boolean } = {}): v is string => {
+    if (!isString(v) || v.trim().length === 0) {
       errors.push(`${where}: 글이 없습니다.`);
       return false;
     }
     const len = v.trim().length;
-    if (len < min || len > max) errors.push(`${where}: 길이 ${len}자 (${min}~${max}자)`);
+    if (len < min || len > max) errors.push(`${where}: 길이 ${len}자 (${(len < min ? soft.min : soft.max) ? `권장 ${min}~${max}자 — 경고만 하고 저장은 막지 않습니다` : `${min}~${max}자`})`);
     return true;
   };
   const checkIds = (v: unknown, where: string, opt: { required?: boolean; needSaju?: boolean; period?: boolean } = {}) => {
@@ -154,7 +156,7 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
     return v as T[];
   };
   const paragraph = (v: unknown, where: string) => {
-    if (text(v, where, S.paragraph.min, S.paragraph.max)) {
+    if (text(v, where, S.paragraph.min, S.paragraph.max, { min: true })) {
       const n = countSentences(v);
       if (n > S.paragraph.sentencesMax) errors.push(`${where}: ${n}문장 (${S.paragraph.sentencesMax}문장 이하로 묶어 주세요)`);
       const terms = distinctTerms(v);
@@ -193,7 +195,7 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
       errors.push(`sections: ${plan.no}번 ${plan.title}이(가) 없습니다.`);
       continue;
     }
-    text(s.headline, `${w}.headline`, S.sectionHeadline.min, S.sectionHeadline.max);
+    text(s.headline, `${w}.headline`, S.sectionHeadline.min, S.sectionHeadline.max, { min: true, max: true });
 
     // 문단 — 소제목이 있는 5번만 parts, 나머지는 paragraphs
     let paragraphs: string[] = [];
