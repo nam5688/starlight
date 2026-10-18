@@ -65,7 +65,7 @@ export const STORY7_SECTIONS: Story7Section[] = [
     no: 1, id: "me", blockId: "tendency", navLabel: "나는 누구", title: "나는 어떤 사람일까?", kind: "owner",
     includes: ["한마디로(대표 OOO형은 코드가 붙인다)", "일간 · 일주 · 오행의 분포", "십성 구조(많은 쪽 · 없는 쪽)", "월령 · 조후처럼 근거 목록에 있는 구조", "성격 · 기질 · 입력한 MBTI로 구체화"],
     question: "이 사주의 중심 구조(일간 · 오행의 분포 · 십성이 많고 없는 쪽 · 태어난 달의 기운)가 어떤 사람을 만드는가 — 그리고 평소 행동 방식(성격 · 기질 · 입력한 MBTI)이 그 모습을 이 사람에게 어떻게 구체적으로 보이게 하는가",
-    repeatGuard: "여기서 푼 구조(일간 · 오행 · 십성의 분포)를 뒤 장에서 다시 해설하지 않는다 — 뒤 장은 그 구조가 그 장의 질문에서 새로 만드는 결론만 쓴다. 용어는 풀이를 붙여 쓰되 나열하지 않는다",
+    repeatGuard: "여기서 푼 구조(일간 · 오행 · 십성의 분포)를 뒤 장에서 다시 해설하지 않는다 — 뒤 장은 그 구조가 그 장의 질문에서 새로 만드는 결론만 쓴다. 본문에는 명리 용어를 쓰지 않고 생활 말로 옮긴다([고객이 읽는 글])",
     sajuOwns: [/^saju\.daymaster$/, /^saju\.element\./, /^saju\.structure\.(chart|hidden|month|johu)$/, /^saju\.sipsung$/, /^saju\.hour\.unknown$/],
     prefer: /^survey\.(ei|sn|tf|jp|novelty|caution)\./, personalTopics: ["personality"], borrowTopics: ["personality"], personalMin: 2, maxParagraphs: 5, scenes: ["s01", "s02", "s06", "s07", "s09", "s10"],
     code: ["대표 유형명 OOO형(personal-type.ts · 화면 스위치 꺼짐)", "럭키 지수 카드(lucky.ts · 화면 스위치 꺼짐)", "원국 표(무료 화면에 이미 있음)"],
@@ -173,8 +173,8 @@ export const STORY7_SCENE_OWNER: Record<string, number> = Object.fromEntries(STO
 // ── 제품 연결에 쓰는 값 (지시문 · 검사 · 조립 · 모의 작성기 · 시험이 같은 값을 쓴다) ──
 
 export const STORY7_FORMAT = "story-7";
-/** 지시문 버전 — 0.6은 명리 조합 해석 프레임 근거(지난 · 지금 · 앞으로의 대운 · 세운과 만 나이 범위)와 기본 풀이 · 연령대 범위를 연결한 판이다(운영자 2026-10-18, 실제 AI로 시험하지 못했다). 0.3은 사주 중심 풀이로 방향을 고정한 판이고, 0.4는 출생 시각을 모르는 사람의 풀이 범위(세 기둥 기준 · 시주 풀이 금지)와 사주 모습 · 응답의 일치 · 차이 설명을 더한 판이다(운영자 2026-10-17). 0.2까지의 실제 AI 글(1건)은 형식 검사를 통과하지 못했고 0.3 · 0.4로는 아직 한 번도 시험하지 못했다(검증되지 않음) */
-export const STORY7_PROMPT_VERSION = "story-7-prompt-0.6";
+/** 지시문 버전 — 0.7은 고객이 읽는 글을 사람의 성향 · 경험 · 관계 · 기회 이야기로 쓰게 한 판이다(운영자 조율 2026-10-18 — 본문에서 명리 용어를 빼고 내부 근거는 그대로 둠, 엔진 · 프레임 · 7개 장 · 분량 · BLOCK 정책 불변, 실제 AI로 시험하지 못했다). 0.6은 명리 조합 해석 프레임 근거(지난 · 지금 · 앞으로의 대운 · 세운과 만 나이 범위)와 기본 풀이 · 연령대 범위를 연결한 판이다(운영자 2026-10-18, 실제 AI로 시험하지 못했다). 0.3은 사주 중심 풀이로 방향을 고정한 판이고, 0.4는 출생 시각을 모르는 사람의 풀이 범위(세 기둥 기준 · 시주 풀이 금지)와 사주 모습 · 응답의 일치 · 차이 설명을 더한 판이다(운영자 2026-10-17). 0.2까지의 실제 AI 글(1건)은 형식 검사를 통과하지 못했고 0.3 · 0.4로는 아직 한 번도 시험하지 못했다(검증되지 않음) */
+export const STORY7_PROMPT_VERSION = "story-7-prompt-0.7";
 
 /** 글자 · 문장 수 한도 — 7개 대주제는 장마다 소유한 근거 수에 맞춰 문단 수 상한(`maxParagraphs`)이 달라지고, 나머지 한도는 영역별 이야기(story-v1)와 같은 값이다 */
 export const STORY7_LIMITS = {
@@ -246,7 +246,7 @@ export const PAST_EVENT_CLAIM = /(?:헤어졌|이별했|결혼했|이혼했|사�
 export const STORY7_FLOW_NOTE = "색 · 방향 · 숫자 · 장소는 전통 오행 대응에 따른 상징적인 개운법이에요. 효과를 보장하지 않고, 이미 가진 것으로 가볍게 먼저 해 볼 수 있어요.";
 
 export const STORY7_CAVEAT: Partial<Record<Story7BlockId, (name: string) => string>> = {
-  love: (name) => `상대 자료: 없음 · 이 부분은 ${name} 님의 사주와 응답만으로 읽었어요.`,
+  love: (name) => `상대 자료: 없음 · 이 부분은 ${name.trim() ? `${name.trim()} 님의 ` : ""}사주와 응답만으로 읽었어요.`,
   people: () => "친구 · 가족 · 동료와의 실제 관계를 입력받은 것은 아니에요. 사주에서 읽히는 관계의 경향과 평소 반응에서 읽은 것만 썼어요.",
   "work-money": () => "돈 부분은 소비 · 저축 습관을 직접 물은 응답이 아니라 사주의 재물 해석을 중심으로 읽었어요. 투자나 대출 결정의 근거가 아니에요.",
 };

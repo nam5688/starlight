@@ -80,7 +80,7 @@ export function buildInputs(args: { knownMbti: string | null; hasContext: boolea
     args.hasContext
       ? { name: "알려 준 고민 · 상황", status: "used", note: "알려 주신 고민은 해석의 초점과 예시를 고르는 데만 썼어요. 사주 계산은 바꾸지 않았어요.", usedIn: ["알려 주신 고민"] }
       : { name: "알려 준 고민 · 상황", status: "none", note: "입력하지 않았어요. 특정 고민 없이 쓴 종합 해석이에요.", usedIn: [] },
-    { name: "상대 자료", status: "none", note: `없어요. 관계 부분은 ${args.nickname} 님의 사주와 응답만으로 읽었어요.`, usedIn: [] },
+    { name: "상대 자료", status: "none", note: `없어요. 관계 부분은 ${args.nickname.trim() ? `${args.nickname.trim()} 님의 ` : ""}사주와 응답만으로 읽었어요.`, usedIn: [] },
     { name: "연구 통계", status: "none", note: "사용하지 않았어요.", usedIn: [] },
   );
   return out;

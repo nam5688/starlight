@@ -14,13 +14,13 @@ import type { ReportInput } from "../generator.ts";
 import { basisFor, buildInputs } from "./assemble.ts";
 import { CARD_LABEL, FLOW_CAVEAT, SCENARIO_NOTE, STATISTICS_NOTE } from "./plan.ts";
 import { STORY7_CAVEAT, STORY7_FLOW_NOTE, STORY7_SECTIONS, story7SectionOf } from "./story7-plan.ts";
+import { fillNameInJson } from "./name-fill.ts";
 import { story7Paragraphs } from "./story7-validate.ts";
 import type { IntegratedReadingReport, ReadingBlock, ReadingFlow, Story7DraftV1, Story7SectionDraft } from "./types.ts";
 
-/** 글 안의 {name}을 이름으로 바꾼다 (이름에 따옴표 · 역슬래시가 있어도 JSON이 깨지지 않게 이스케이프) */
+/** 글 안의 {name}을 이름으로 바꾼다 (이름에 따옴표 · 역슬래시가 있어도 JSON이 깨지지 않게 이스케이프). 이름이 비어 있으면 "{name} 님" 호칭을 지운다 — name-fill.ts */
 export function fillStory7Name(draft: Story7DraftV1, name: string): Story7DraftV1 {
-  const escaped = JSON.stringify(name).slice(1, -1);
-  return JSON.parse(JSON.stringify(draft).replaceAll("{name}", escaped)) as Story7DraftV1;
+  return JSON.parse(fillNameInJson(JSON.stringify(draft), name)) as Story7DraftV1;
 }
 
 export type AssembleStory7Options = {

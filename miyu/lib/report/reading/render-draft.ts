@@ -1,5 +1,6 @@
 // AI가 쓴 읽기 구조 초안(ReadingDraftV1)을 사람이 읽는 순서로 풀어 쓴다 — 운영자 검토용(저장된 리포트 화면이 아니다).
 // 검사에 걸려 저장되지 못한 글도 읽을 수 있게 하고, 원문과 검토 후 수정본을 같은 모양으로 나란히 볼 때 쓴다. 글자는 바꾸지 않고 칸 이름(괄호)만 붙인다.
+import { fillNameInJson } from "./name-fill.ts";
 import type { ReadingDraftV1, Story7DraftV1, StoryDraftV1 } from "./types.ts";
 
 const bullet = (label: string, text: unknown) => (typeof text === "string" && text.trim() ? `- ${text.trim()}  _(${label})_` : "");
@@ -65,7 +66,9 @@ export function renderStoryDraftMarkdown(d: StoryDraftV1): string {
  * 7개 대주제(story-7) 초안을 사람이 읽는 글로 — 장마다 제목 아래 문단을 이어서 보여 준다(5번은 소제목 일 · 재물, 6번은 해마다 한 줄과 가능성 표). 장 끝에 괄호로 연결한 근거 ID만 적어 어떤 자료를 이어 썼는지 볼 수 있게 한다.
  * 검사에 걸려 저장되지 못한 글도 읽을 수 있게 하는 용도라 글자는 바꾸지 않는다.
  */
-export function renderStory7DraftMarkdown(d: Story7DraftV1): string {
+export function renderStory7DraftMarkdown(draft: Story7DraftV1, o: { name?: string } = {}): string {
+  // 저장 전의 원문에는 {name} 자리표시자가 그대로 있다 — 읽는 사람 화면에 남지 않게 닉네임으로 채우고(모르면 호칭을 지우고), 글의 나머지는 바꾸지 않는다
+  const d = JSON.parse(fillNameInJson(JSON.stringify(draft), o.name ?? "")) as Story7DraftV1;
   const out: string[] = [];
   const add = (...lines: string[]) => out.push(...lines);
   add(`# ${d.headline}`, "");

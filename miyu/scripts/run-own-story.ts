@@ -190,7 +190,7 @@ try {
 }
 safely("읽는 순서로 풀어 쓴 글", () => {
   if (run.report && isReadingReport(run.report)) writeFileSync(join(dir, "readable.md"), renderReadingMarkdown(run.report));
-  else if (draft && Array.isArray((draft as { sections?: unknown }).sections)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStory7DraftMarkdown(draft as Story7DraftV1)}`);
+  else if (draft && Array.isArray((draft as { sections?: unknown }).sections)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStory7DraftMarkdown(draft as Story7DraftV1, { name: capture.info.nickname })}`);
   else if (draft && Array.isArray((draft as { areas?: unknown }).areas)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStoryDraftMarkdown(draft as StoryDraftV1)}`);
   else writeFileSync(join(dir, "readable.md"), `> 모델이 돌려준 글을 읽는 순서로 풀어 쓰지 못했습니다(JSON 모양이 아님). attempts/round1.txt 원문을 직접 읽어 주세요.\n\n${lastText ?? ""}`);
 });

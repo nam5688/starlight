@@ -18,6 +18,7 @@ import { splitSentences } from "./story-motif.ts";
 import { absenceErrors } from "./story-validate.ts";
 import { story7Evidence } from "./story7-evidence.ts";
 import { CONDITIONAL_MARK, FAMILY_CLAIM, MONEY_HABIT, PAST_EVENT_CLAIM, STORY7_FORMULA_BUDGET, STORY7_LIMITS as S, STORY7_MBTI_MIN, STORY7_MBTI_NOS, STORY7_OWNER_NOS, STORY7_PERSONAL_REUSE, STORY7_SECTIONS, STORY7_TASK_MAX, STORY7_TERMS, TRADITION_MARK, WEALTH_FATE } from "./story7-plan.ts";
+import { customerVoiceLeaks, customerVoiceMessage } from "./customer-voice.ts";
 import { distinctTerms } from "./terms.ts";
 import { isTermWarning, splitWarnings } from "./warn-policy.ts";
 import type { Story7DraftV1, Story7SectionDraft } from "./types.ts";
@@ -373,6 +374,11 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   const ageWindows = evidence.filter((e) => !e.uncertain).flatMap((e) => e.ageWindows ?? []);
   errors.push(...textIssues(texts, evidence, { allowedYears, hasContext: Boolean(opts.hasContext), adviceRules: ADVICE_RULES_TRADITIONAL, perSentenceMax: STORY7_TERMS.perSentenceMax, ageWindows, ageWhere: (w) => w.startsWith("sections.6.") }));
   for (const { where, text: t } of texts) if (TYPE_CODE.test(t)) errors.push(`${where}: 알파벳 유형 코드("${TYPE_CODE.exec(t)![0]}")를 쓰지 않습니다 — 입력한 MBTI는 "입력해 주신 성향"으로 부릅니다.`);
+  // 고객이 읽는 글에 명리 용어 · 한자 · 간지가 새어 나왔는지 — 경고(WARN)만 한다(저장을 막지 않고 BLOCK 정책은 바뀌지 않는다). 6번 개운 문단의 "물의 기운"류 한글 이름만 허용한다
+  for (const { where, text: t } of texts) {
+    const found = customerVoiceLeaks(t, { allowElementTalk: where.startsWith("sections.6.") });
+    if (found.length) errors.push(customerVoiceMessage(where, found));
+  }
   // 미유 문체 — 분명한 위반만 실패로 센다(나머지는 고쳐 쓰기 안내로 생성기가 따로 부탁한다)
   errors.push(...voiceErrors(checkVoice(texts, { blockOf: story7BlockOf })));
 
