@@ -105,6 +105,13 @@ function ym(d: { year: number; month: number }) {
   return `${d.year}-${String(d.month).padStart(2, "0")}`;
 }
 
+/**
+ * 출생 시각을 모르면 대운이 바뀌는 달이 달라진다 — 대운 시작은 출생일에서 절기까지 날수로 환산하는데 시각이 날수에 들어가기 때문이다
+ * (직접 센 값: 같은 날 00:30 · 06:30 · 12:30 · 18:30 · 23:30 출생으로 바꿔 보면 한 대운의 끝이 2032-09 · 10 · 11 · 12 · 2033-01로 달라졌다). 그래서 달을 정확히 말하지 않고 연도 "무렵"으로만 말한다.
+ */
+export const HOUR_UNKNOWN_DAEUN_NOTE = " / 출생 시각을 몰라 시작 · 끝 달은 앞뒤로 몇 달(최대 대여섯 달) 달라질 수 있음 — 연도 '무렵'으로만 말함";
+export const HOUR_UNKNOWN_DAEUN_CUE = ' 출생 시각을 모르면 대운이 바뀌는 달은 정할 수 없으니 "2032년 무렵"처럼 연도로만 말하고 월은 쓰지 않습니다.';
+
 /** 대운 한 칸 — 화면의 "지금 지나는 시기" 타임라인용 (계산 결과와 위 GROUP_RULE의 주제 이름만 쓰고 새 해석을 만들지 않는다) */
 export type LuckSlot = {
   role: "previous" | "current" | "next";
@@ -386,8 +393,8 @@ export function sajuEvidence(saju: SajuOk, input: { reference: { year: number; m
         source: "saju",
         topics: ["timing", ...GROUP_RULE[GROUP_OF[tgStem]].topics],
         strength: "moderate",
-        fact: `${label} ${p.stem}${p.branch}(${p.stemHanja}${p.branchHanja}) ${p.from}~${p.to} — 천간 ${tgStem}, 지지 ${tgBranch}`,
-        cue: `천간이 ${GROUP_OF[tgStem]}: ${GROUP_RULE[GROUP_OF[tgStem]].timing} 지지가 ${GROUP_OF[tgBranch]}: ${GROUP_RULE[GROUP_OF[tgBranch]].timing} ${plainCue(GROUP_OF[tgStem], GROUP_OF[tgBranch], "period")}`,
+        fact: `${label} ${p.stem}${p.branch}(${p.stemHanja}${p.branchHanja}) ${p.from}~${p.to} — 천간 ${tgStem}, 지지 ${tgBranch}${saju.hourPillarOmitted ? HOUR_UNKNOWN_DAEUN_NOTE : ""}`,
+        cue: `천간이 ${GROUP_OF[tgStem]}: ${GROUP_RULE[GROUP_OF[tgStem]].timing} 지지가 ${GROUP_OF[tgBranch]}: ${GROUP_RULE[GROUP_OF[tgBranch]].timing} ${plainCue(GROUP_OF[tgStem], GROUP_OF[tgBranch], "period")}${saju.hourPillarOmitted ? HOUR_UNKNOWN_DAEUN_CUE : ""}`,
         period: { from: p.from, to: p.to, label: `${label} ${p.stem}${p.branch}` },
       });
       for (const { r, key } of relationsWithChart(p.branch)) {

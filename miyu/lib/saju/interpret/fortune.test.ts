@@ -77,7 +77,7 @@ test("근거 문장(서윤): 개운은 수의 대응(북쪽 · 검정 · 1과 6 
   assert.match(fortify.cue, /효과나 재물 · 건강의 변화를 보장하지 않고/);
   const sip = byId(ev, "saju.sipsung").fact;
   assert.match(sip, /비겁 0자리 \/ 식상 3자리\(상관 3\) \/ 재성 1자리\(편재 1\) \/ 관성 0자리 \/ 인성 3자리\(정인 3\)/);
-  assert.match(sip, /가장 많은 쪽: 인성 3자리/);
+  assert.match(sip, /가장 많은 쪽: 인성 · 식상 3자리\(같은 수/); // 인성 · 식상이 같은 3자리 — 한쪽만 가장 많다고 쓰지 않는다(2026-10-18)
   assert.match(sip, /원국에 없는 쪽: 비겁 · 관성/);
   const wealth = byId(ev, "saju.wealth").fact;
   assert.match(wealth, /재성 1자리\(편재 1\)/);
@@ -87,7 +87,7 @@ test("근거 문장(서윤): 개운은 수의 대응(북쪽 · 검정 · 1과 6 
   assert.match(kin.fact, /인성 3자리\(어머니 · 윗사람 · 스승/);
   assert.match(kin.fact, /월주 갑술\(부모 · 형제 · 성장 환경 자리\)|월주 갑술 — 천간 정인 · 지지 상관\(부모 · 형제 · 성장 환경 자리\)/);
   assert.match(kin.fact, /가까이 두면 균형이 맞는 사람의 분위기\(보완 후보 수 기운의 성향\): 생각이 깊고/);
-  assert.match(byId(ev, "saju.career").fact, /가장 두드러진 쪽 인성\(3자리\)/);
+  assert.match(byId(ev, "saju.career").fact, /가장 두드러진 쪽 인성 · 식상\(같은 3자리/);
   assert.match(byId(ev, "saju.partner").fact, /배우자 자리\(일지\) 유 — /);
 });
 
@@ -151,4 +151,27 @@ test("개운 근거 읽기: 근거 목록에서 1순위 기운을 꺼내고, 본
   assert.equal(fortuneMentions("2026년 16일", "수").number, false);
   assert.equal(fortuneMentions("숫자 1과 6", "수").number, true);
   assert.equal(fortuneMentions("숫자 10", "토").number, true);
+});
+
+test("가장 많은 십성이 동점이면 한쪽만 가장 많다고 쓰지 않는다 — 십성 분포 · 일의 계열 근거(2026-10-18 실제 AI 글: 비겁 · 재성이 같은 2자리인데 비겁만 가장 많다고 씀)", () => {
+  let tied = 0;
+  let single = 0;
+  for (let y = 1980; y <= 2005 && (tied < 3 || single < 3); y++) for (let m = 1; m <= 12 && (tied < 3 || single < 3); m++) {
+    const r = calculateSaju({ year: y, month: m, day: 14, calendar: "solar", isLeapMonth: false, birthTime: null, gender: "female" });
+    if (r.status !== "ok") continue;
+    const ev = fortuneEvidence(r as SajuOk);
+    const sip = ev.find((e) => e.id === "saju.sipsung")!.fact;
+    const career = ev.find((e) => e.id === "saju.career")!.fact;
+    const m1 = /가장 많은 쪽: ([^/]+?) (\d)자리(\(같은 수[^)]*\))?/.exec(sip)!;
+    if (m1[3]) {
+      tied++;
+      assert.match(m1[1], / · /, "동점이면 갈래 이름을 모두 적는다");
+      assert.match(career, /가장 두드러진 쪽 [^/(]+ · [^/(]+\(같은 \d자리/, career);
+    } else if (single < 3) {
+      single++;
+      assert.doesNotMatch(m1[1], / · /);
+      assert.match(career, /가장 두드러진 쪽 [가-힣]+\(\d자리\) — .* \/ 그다음 /, career);
+    }
+  }
+  assert.ok(tied >= 1 && single >= 1, `동점 ${tied}건 · 단독 ${single}건을 모두 확인했다`);
 });

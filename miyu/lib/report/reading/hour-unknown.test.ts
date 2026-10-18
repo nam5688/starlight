@@ -259,3 +259,33 @@ test("같은 출생정보로 시각이 있을 때와 모를 때: 오행 개수�
   assert.ok(ELEMENT_FORTUNE[fortifyOf(withTime).primary.element]);
   assert.ok(ELEMENT_FORTUNE[fortifyOf(noTime).primary.element]);
 });
+
+test("대운이 바뀌는 달: 시각을 모르면 근거가 연도 '무렵'으로만 말하게 하고, 달을 정확히 말한 문장은 BLOCK이다(시각을 알면 그대로)", () => {
+  const dae = (ev: typeof EV_KNOWN, id: string) => ev.find((e) => e.id === id)!;
+  for (const id of ["saju.daeun.current", "saju.daeun.next"]) {
+    const u = dae(EV_UNKNOWN, id);
+    assert.match(u.fact, /출생 시각을 몰라 시작 · 끝 달은 앞뒤로 몇 달/, id);
+    assert.match(u.cue, /연도로만 말하고 월은 쓰지 않습니다/, id);
+    assert.ok(u.period, "기간 값은 그대로 있다(검사가 연도를 확인한다)");
+    const k = dae(EV_KNOWN, id);
+    assert.doesNotMatch(k.fact, /출생 시각을 몰라/, `${id}: 시각을 알면 달까지 그대로`);
+  }
+  // 직접 센 값 — 같은 날 출생 시각만 바꿔도 대운 전환 달이 몇 달 달라진다(그래서 달을 말하지 않는다)
+  const ends = new Set<string>();
+  for (const t of ["00:30", "06:30", "12:30", "18:30", "23:30"]) {
+    const r = calculateSaju({ year: 1990, month: 5, day: 17, calendar: "solar", isLeapMonth: false, birthTime: t, gender: "female" });
+    assert.equal(r.status, "ok");
+    ends.add((r as SajuOk).luck!.periods[1].to);
+  }
+  assert.ok(ends.size >= 3, `출생 시각만 바꿔도 대운 끝이 ${[...ends].join(" · ")}로 달라진다`);
+  // 검사: 대운 문장에서 "2032년 11월"처럼 달을 말하면 막고, "2032년 무렵"은 막지 않는다
+  const bad = errorsFor((d) => setFirst(d, 6, `지금은 경인 대운으로 2032년 11월까지예요. ${PAD}`));
+  assert.ok(bad.some((e) => /대운이 바뀌는 달은 정할 수 없어요/.test(e)), bad.join("\n"));
+  const badNext = errorsFor((d) => setFirst(d, 6, `다음 대운은 2032년 12월부터 시작해요. ${PAD}`));
+  assert.ok(badNext.some((e) => /대운이 바뀌는 달은 정할 수 없어요/.test(e)), badNext.join("\n"));
+  const ok = errorsFor((d) => setFirst(d, 6, `지금은 경인 대운으로 2032년 무렵까지예요. ${PAD}`));
+  assert.ok(!ok.some((e) => /대운이 바뀌는 달/.test(e)), ok.join("\n"));
+  // 대운이 아닌 문장의 날짜(세운의 한 해)는 막지 않는다
+  const year = errorsFor((d) => setFirst(d, 6, `올해 2026년 10월에는 일의 결과를 챙기는 주제가 두드러져요. ${PAD}`));
+  assert.ok(!year.some((e) => /대운이 바뀌는 달/.test(e)), year.join("\n"));
+});

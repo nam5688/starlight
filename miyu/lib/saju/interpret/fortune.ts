@@ -147,6 +147,8 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
   const groups: Group[] = ["비겁", "식상", "재성", "관성", "인성"];
   const ordered = [...groups].sort((a, b) => counts[b].n - counts[a].n || TIE_ORDER.indexOf(a) - TIE_ORDER.indexOf(b));
   const top = ordered[0];
+  /** 가장 많은 자리 수가 같은 갈래들 — 동점을 한 갈래만 "가장 많다"고 하지 않는다(2026-10-18 실제 AI 글에서 비겁 · 재성이 같은 2자리인데 비겁만 가장 많다고 쓴 일) */
+  const tops = ordered.filter((g) => counts[g].n === counts[top].n);
   const none = groups.filter((g) => counts[g].n === 0);
   const month = monthOf(saju);
   const hu = saju.hourPillarOmitted;
@@ -160,7 +162,7 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     source: "saju",
     topics: ["personality", "work"],
     strength: "moderate",
-    fact: `십성 분포(일간 ${dm.stem}${dm.element} 기준, 일간을 뺀 ${total}자리, 지지는 정기 기준${hu ? ", 시주 없음 — 세 기둥 기준" : ""}): ${groups.map((g) => nameText(g, counts[g])).join(" / ")} / 가장 많은 쪽: ${top} ${counts[top].n}자리 / ${noneLabel}: ${none.length ? none.join(" · ") : "없음"}${month ? ` / ${pillarText(saju, "month")}` : ""}`,
+    fact: `십성 분포(일간 ${dm.stem}${dm.element} 기준, 일간을 뺀 ${total}자리, 지지는 정기 기준${hu ? ", 시주 없음 — 세 기둥 기준" : ""}): ${groups.map((g) => nameText(g, counts[g])).join(" / ")} / 가장 많은 쪽: ${tops.join(" · ")} ${counts[top].n}자리${tops.length > 1 ? "(같은 수 — 한쪽만 가장 많다고 말하지 않음)" : ""} / ${noneLabel}: ${none.length ? none.join(" · ") : "없음"}${month ? ` / ${pillarText(saju, "month")}` : ""}`,
     cue: `십성은 일간과 다른 글자의 관계를 다섯 갈래로 읽는 전통 방식입니다 — 비겁은 나와 같은 기운(자기 기준 · 독립 · 동료), 식상은 내가 만들어 내는 기운(표현 · 기술 · 결과물), 재성은 내가 다루는 기운(현실 감각 · 돈과 자원), 관성은 나를 다스리는 기운(규칙 · 책임 · 조직), 인성은 나를 돕는 기운(배움 · 보살핌 · 자격)으로 봅니다. 많은 쪽은 이 사람이 힘을 쓰는 방식의 바탕으로, 월주에 놓인 십성은 사회 · 일에서 처음 드러나는 모습으로, 없는 쪽은 그 기운이 들어오는 시기에 그 주제가 크게 느껴지는 것으로 읽습니다. 개수만으로 좋고 나쁨 · 성패를 정하지 않으며, 없는 기운을 이 사람의 능력 부족으로 풀지 않습니다.${hu ? " 출생 시각을 몰라 시주를 뺀 세 기둥 기준이므로 없는 쪽을 사주 전체에 없다고 읽지 않습니다." : ""}`,
   });
 
@@ -176,7 +178,7 @@ export function fortuneEvidence(saju: SajuOk, opts: { ageDirection?: boolean } =
     source: "saju",
     topics: ["work"],
     strength: "moderate",
-    fact: `일의 계열 읽기 재료: 가장 두드러진 쪽 ${top}(${counts[top].n}자리) — ${WORK_LINE[top]} / 그다음 ${second}(${counts[second].n}자리) — ${WORK_LINE[second]} / ${month ? `월주(사회 · 일의 자리) 천간 ${month.tenGod.stem} · 지지 ${month.tenGod.branch}` : "월주 없음"} / 조합: ${combos.length ? combos.join(", ") : "눈에 띄는 조합 없음"} / ${noneLabel}: ${none.length ? none.join(" · ") : "없음"}`,
+    fact: `일의 계열 읽기 재료: ${tops.length > 1 ? `가장 두드러진 쪽 ${tops.join(" · ")}(같은 ${counts[top].n}자리 — 한쪽만 앞선다고 말하지 않음) — ${tops.map((g) => `${g}: ${WORK_LINE[g]}`).join(" / ")}` : `가장 두드러진 쪽 ${top}(${counts[top].n}자리) — ${WORK_LINE[top]} / 그다음 ${second}(${counts[second].n}자리) — ${WORK_LINE[second]}`} / ${month ? `월주(사회 · 일의 자리) 천간 ${month.tenGod.stem} · 지지 ${month.tenGod.branch}` : "월주 없음"} / 조합: ${combos.length ? combos.join(", ") : "눈에 띄는 조합 없음"} / ${noneLabel}: ${none.length ? none.join(" · ") : "없음"}`,
     cue: "전통에서 일의 방향은 십성 분포로 읽습니다 — 식상은 표현 · 기술 · 창작 · 가르침, 관성은 조직 · 공공 · 규칙과 책임, 재성은 현실 실무 · 영업 · 사업 · 자산, 인성은 배움 · 연구 · 자격 · 전문직, 비겁은 독립 · 협업 · 경쟁이 있는 일의 계열로 봅니다. 가장 많은 쪽과 월주의 십성이 일하는 방식의 바탕이고 없는 쪽은 그 기운이 들어오는 시기에 주제로 커진다고 봅니다. 직업 하나를 정하거나 성공을 보장하지 않고, 일의 계열 · 어울리는 환경 · 일하는 방식까지 읽습니다. 응답에서 읽은 평소 행동은 이 계열이 이 사람에게 어떻게 나타나는지 구체화하는 데만 씁니다.",
   });
 

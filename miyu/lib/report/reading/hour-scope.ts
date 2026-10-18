@@ -22,6 +22,9 @@ export const HOUR_TOPIC = /자녀|자식|말년|노년|노후|시주(?:에(?!(?:
 /** 신강 · 신약 판정 — 시주가 없으면 세력 요소가 한 기둥 빠진 값이라 부르지 않는다("신약 개발" 같은 일상어는 제외) */
 export const STRENGTH_VERDICT = /신강|신약(?! ?(?:개발|연구|후보|회사|임상|시험))/;
 
+/** "2032년 11월"처럼 연도와 월을 함께 쓴 말 */
+export const DAEUN_MONTH_CLAIM = /\d{4}년\s?\d{1,2}월/;
+
 /** 가족에게 있었던 일을 지나간 사실로 쓰는 말 — 입력받은 가족 정보는 없으므로 전통 해석 표지를 붙여도 지난 일로 단정하지 않는다(시주 유무와 상관없다) */
 export const FAMILY_PAST = /받지 못했|받지 못한|받지 못하고|도움을 못 받|떨어져 지냈|떨어져 자랐|일찍 떠|돌아가셨|이혼|사별|불화가 있었|사이가 나빴|외면|버림받/;
 
@@ -39,6 +42,10 @@ export function hourUnknownErrors(texts: Piece[]): string[] {
     });
     const topic = HOUR_TOPIC.exec(text);
     if (topic) out.push(`${where}: 출생 시각을 몰라 시주로 읽는 풀이("${topic[0]}")는 쓰지 않아요 — 자녀 · 말년 · 시주에 놓이는 것은 알 수 없어요. 연주 · 월주 · 일주로 읽을 수 있는 풀이만 쓰세요.`);
+    // 대운이 바뀌는 달을 정확히 말하는 문장 — 출생 시각을 모르면 그 달이 몇 달 달라지므로 연도 "무렵"으로만 말한다(근거 문구에 적혀 있다)
+    for (const sentence of sentences) {
+      if (/대운/.test(sentence) && DAEUN_MONTH_CLAIM.test(sentence)) out.push(`${where}: "${sentence.slice(0, 40)}…" — 출생 시각을 몰라 대운이 바뀌는 달은 정할 수 없어요(시각에 따라 몇 달 달라져요). "2032년 무렵"처럼 연도로만 말하고 월은 쓰지 마세요.`);
+    }
     const strength = STRENGTH_VERDICT.exec(text);
     if (strength) out.push(`${where}: 출생 시각을 몰라 강약을 "${strength[0]}"으로 부르지 않아요 — 세력이 한 기둥 빠진 값이라 시주에 따라 달라질 수 있어요. 월령을 얻었는지 · 뿌리가 있는지 같은 요소로 풀어 쓰세요.`);
   }
