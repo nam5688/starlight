@@ -191,16 +191,16 @@ test("본인 입력 내보내기는 켠 사람이 직접 적고 개발 서버일
 
 // ───── 7개 대주제(story-7) 본인 입력 시험 — 승인 범위 · 입력 확인 · 호출 한 번 · 읽기 전 지표 ─────
 
-test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 그대로 · 4차(지시문 0.6) 한 건은 운영자 승인(2026-10-18)으로 1회 상한 800원 — 3차까지 마쳤고(runsDone 3 / runsApproved 4) 4차 한 건만 남았으며 호출 1회의 최악은 상한 안이다", async () => {
+test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 그대로 · 4차(지시문 0.6) 한 건은 운영자 승인(2026-10-18)으로 1회 상한 800원 — 승인된 4회를 모두 마쳤고(runsDone 4) 새 실행은 거절되며 호출 1회의 최악은 상한 안이다", async () => {
   const own = COMPARE_STAGES.find((s) => s.name === "story7-own")!;
   assert.equal(own.capKrw, 6000, "기존 승인 총액 그대로");
   assert.equal(own.restrict?.runCeilingKrw, 800, "4차 승인(2026-10-18): 이번 호출 상한 800원(3차는 700원 — 지시문 0.6과 프레임 근거로 최악 예약액이 늘었다)");
   assert.equal(own.restrict?.variant, "story-7");
   assert.equal(own.restrict?.persona, "OWN");
   assert.equal(own.restrict?.runsApproved, 4, "1~3차를 마쳤고 4차 한 건을 운영자가 신규 호출로 승인했다(2026-10-18)");
-  assert.equal(own.restrict?.runsDone, 3, "3차를 운영자 PC에서 마쳤다(2026-10-18 · 호출 1회 · 280원) — 승인된 3회를 모두 썼다");
-  assert.match(own.restrict?.lastRun ?? "", /280원/);
-  assert.match(own.restrict?.lastRun ?? "", /3,388원/);
+  assert.equal(own.restrict?.runsDone, 4, "4차를 운영자 PC에서 마쳤다(2026-10-18 · 호출 1회 · 306.51원) — 승인된 4회를 모두 썼다");
+  assert.match(own.restrict?.lastRun ?? "", /306\.51원/);
+  assert.match(own.restrict?.lastRun ?? "", /3,694\.51원/);
   const built = await ownReportInput(CAPTURE, NOW);
   assert.ok(built.ok);
   if (!built.ok) return;
@@ -209,8 +209,8 @@ test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6
   const ok = { variant: "story-7", only: "A", persona: "OWN", alreadySpentGiven: true, twoRoundWorstKrw: plan.firstCallWorstKrw, execute: true } as const;
   // 이 시험 입력(시험용 고정 응답)의 최악 — 운영자 본인 입력의 값은 운영자 PC의 0원 드라이런이 보여 준다(상한을 넘으면 실행하지 않는다)
   assert.ok(plan.firstCallWorstKrw < 800, `호출 1회의 최악 ${plan.firstCallWorstKrw}`);
-  // 4차 한 건이 남아 있다(3/4) — 지금 기록 그대로 범위 안의 실제 호출이 통과하고, 상한은 반올림 없이 그대로 비교한다
-  const before = { restrict: { ...own.restrict! } };
+  // 4차 실행 전의 상태(승인된 4회 중 3회를 마침)로 상한 규칙을 계속 확인한다 — 지금 기록은 4/4라 실제 호출은 거절된다(아래)
+  const before = { restrict: { ...own.restrict!, runsDone: 3 } };
   assert.deepEqual(checkStageRestriction(before, { ...ok, twoRoundWorstKrw: 690.2 }), [], "프레임 연결 뒤 최악 690.2원은 800원 상한 안이다(700원 그대로였다면 여유 9.8원뿐이었다)");
   assert.deepEqual(checkStageRestriction(before, { ...ok, twoRoundWorstKrw: 799.99 }), [], "승인 범위 안이면 통과한다");
   assert.deepEqual(checkStageRestriction(before, { ...ok, twoRoundWorstKrw: 800 }), [], "상한과 같으면 통과한다");
@@ -220,7 +220,7 @@ test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6
   assert.ok(checkStageRestriction(before, { ...ok, only: "B" }).length > 0);
   assert.ok(checkStageRestriction(before, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 막힌다");
   // 승인된 4회를 모두 쓰면(runsDone 4 — 운영자가 4차를 실행한 뒤 기록으로 올린다) 실제 호출은 거절되고, 드라이런은 계속 볼 수 있다. 새 실행은 운영자가 다시 승인해 runsApproved를 올린 뒤에만
-  const after = { restrict: { ...own.restrict!, runsDone: 4 } };
+  const after = own;
   assert.ok(checkStageRestriction(after, ok).some((m) => /이미 실행/.test(m)), "승인된 4회를 쓰고 나면 새 실행은 막힌다(같은 승인으로 두 번 호출되지 않는다)");
   assert.deepEqual(checkStageRestriction(after, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
 });
