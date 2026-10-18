@@ -103,7 +103,8 @@ const recorded: TextModel = {
 };
 const generator = createAiReportGenerator({ model: withBudget(recorded, guard, candidate.price), now: () => new Date(`${approvedOn}T00:00:00+09:00`), callTimeoutMs: 300_000 });
 const usage: AiUsageSample[] = [];
-const ctx = { onUsage: (u: AiUsageSample) => usage.push(u) };
+const warned: string[] = [];
+const ctx = { onUsage: (u: AiUsageSample) => usage.push(u), onAttempt: (a: { warnings?: string[] }) => warned.push(...(a.warnings ?? [])) };
 
 let report: CompatReport | PairReport | null = null;
 let failure: { code: string; message: string; errors: string[] } | null = null;
@@ -135,6 +136,8 @@ writeFileSync(
       result: report ? "ok" : "failed",
       // 걸린 이유(검사 문구, 글 내용 아님)
       failure,
+      // 경고(WARN) — 저장을 막지 않고 자동 재작성도 하지 않은 읽기 쉬운 정도의 알림(설명 없는 용어 · 용어 개수 · 문단 문장 수)
+      warnings: warned,
     },
     null,
     2,
@@ -153,5 +156,6 @@ if (report) {
 }
 
 console.log(`\n완료: ${report ? "검사 통과" : "검사 불통과 · 저장하지 않는 결과"} · 호출 ${attempts.length}회 · 쓴 비용 ${won(spent)} (이번 실행 한도 ${won(guardCap)}${guard.halted ? " · 예산 하드스톱으로 중단" : ""})`);
+if (warned.length > 0) console.log(`- 경고(WARN) ${warned.length}건 — 저장을 막지 않는 읽기 쉬운 정도의 알림이라 자동으로 다시 쓰지 않았습니다(cost-and-checks.json의 warnings). 경고가 없어도 있어도 유료 판매 합격은 아닙니다 — 글 전문을 읽고 운영자가 정합니다.`);
 if (failure) console.log(`- 실패(${failure.code}): ${failure.message}${failure.errors.length ? ` — 걸린 항목 ${failure.errors.length}개: ${failure.errors.slice(0, 6).join(" / ")}${failure.errors.length > 6 ? " …" : ""}` : ""}`);
 console.log(`결과 폴더: ${dir} (원문은 attempts 폴더 · 읽는 글은 readable.md — 글 전문과 cost-and-checks.json 을 채팅에 붙여 보고하면 됩니다, 키는 필요 없습니다)`);

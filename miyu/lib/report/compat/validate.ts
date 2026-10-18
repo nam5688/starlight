@@ -10,12 +10,17 @@ import { familyPastErrors, hourUnknownErrors } from "../reading/hour-scope.ts";
 import { ADVICE_RULES_TRADITIONAL } from "../reading/plan.ts";
 import { findRepeatedPhrasesIn, type RepeatedPhrase } from "../reading/repeat.ts";
 import { distinctTerms } from "../reading/terms.ts";
+import { splitWarnings } from "../reading/warn-policy.ts";
 import { checkVoice, voiceErrors } from "../style/voice.ts";
 import { allowedYearsOf, countSentences, textIssues } from "../reading/validate.ts";
 import { COMPAT_LIMITS as L, COMPAT_STEP_GROUPS, hasPairResponseEvidence, hasTimingEvidence, pairSectionsFor, sectionsFor } from "./plan.ts";
 import type { CompatDraftV1 } from "./types.ts";
 
-export type CompatValidation = { ok: true; draft: CompatDraftV1; repeats: RepeatedPhrase[] } | { ok: false; errors: string[] };
+/**
+ * 검사 결과 — errors는 BLOCK(저장하지 않고 고쳐 쓰게 한다), warnings는 WARN(설명 없는 용어 · 용어 개수 · 문단 문장 수 — 저장을 막지 않고 고쳐 쓰기도 부탁하지 않으며 글은 그대로 둔다, 운영자 정책 2026-10-17).
+ * ok는 BLOCK이 없다는 뜻이고 경고가 있어도 ok일 수 있다 — 통과가 유료 판매 합격은 아니다.
+ */
+export type CompatValidation = { ok: true; draft: CompatDraftV1; repeats: RepeatedPhrase[]; warnings: string[] } | { ok: false; errors: string[]; warnings: string[] };
 
 const isString = (v: unknown): v is string => typeof v === "string";
 const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
@@ -152,7 +157,7 @@ export type CompatValidateOptions = {
 export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: CompatValidateOptions = {}): CompatValidation {
   const errors: string[] = [];
   const d = raw as Partial<CompatDraftV1> | null;
-  if (!d || typeof d !== "object") return { ok: false, errors: ["JSON 객체가 아닙니다."] };
+  if (!d || typeof d !== "object") return { ok: false, errors: ["JSON 객체가 아닙니다."], warnings: [] };
   const known = new Map(evidence.map((e) => [e.id, e]));
 
   const text = (v: unknown, where: string, min: number, max: number): v is string => {
@@ -299,6 +304,7 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: Co
     }
   }
 
-  if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, draft: d as CompatDraftV1, repeats };
+  const { blocks, warnings } = splitWarnings(errors);
+  if (blocks.length > 0) return { ok: false, errors: blocks, warnings };
+  return { ok: true, draft: d as CompatDraftV1, repeats, warnings };
 }

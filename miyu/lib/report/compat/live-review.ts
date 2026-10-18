@@ -29,8 +29,10 @@ export type LiveReview = {
   /** 근거 사용 — 글이 인용한 근거 ID 수 · 한 근거를 여러 영역이 쓴 수 · (리포트 궁합) 비교한 응답 근거 중 한 번도 인용하지 않은 것 */
   evidence: { distinctCited: number; reusedAcrossSections: string[]; pairUncited: string[]; pairCitedSections: number } | null;
   steps: { perGroup: Record<string, number>; withoutSay: number; withoutEvidence: number; /** A님 → B님과 B님 → A님 행동의 낱말 짝이 겹친 몫(높으면 같은 조언을 둘에게 한 것) */ aToBvsBToAOverlap: number | null; duplicateSays: number };
-  /** 제품 검사(validateCompatDraft)가 지금 이 글에 내는 오류 — 실제 AI 글이 저장되려면 비어 있어야 한다 */
+  /** 제품 검사(validateCompatDraft)가 지금 이 글에 내는 BLOCK 오류 — 실제 AI 글이 저장되려면 비어 있어야 한다 */
   productCheckErrors: string[] | null;
+  /** 같은 검사의 경고(WARN: 설명 없는 용어 · 용어 개수 · 문단 문장 수) — 저장을 막지 않고 자동 재작성도 하지 않는다(운영자 정책 2026-10-17) */
+  productCheckWarnings: string[] | null;
 };
 
 const words = (t: string) => t.replace(/["'“”‘’.,·!?()\[\]]/g, " ").split(/\s+/).filter(Boolean);
@@ -109,9 +111,11 @@ export function reviewLive(shape: LiveReviewShape, opts: { evidence?: Evidence[]
   };
 
   let productCheckErrors: string[] | null = null;
+  let productCheckWarnings: string[] | null = null;
   if (opts.evidence && hasIds) {
     const v = validateCompatDraft(shape, opts.evidence, { pair: opts.pair === true });
     productCheckErrors = v.ok ? [] : v.errors;
+    productCheckWarnings = v.warnings;
   }
 
   return {
@@ -125,6 +129,7 @@ export function reviewLive(shape: LiveReviewShape, opts: { evidence?: Evidence[]
     evidence,
     steps,
     productCheckErrors,
+    productCheckWarnings,
   };
 }
 
@@ -141,6 +146,7 @@ export function renderLiveReview(r: LiveReview): string {
   L.push(`- 응답 풀이 문구를 그대로 옮긴 곳: ${r.meaningEchoes.length}곳${r.meaningEchoes.length ? ` — ${r.meaningEchoes.map((e) => `${e.where} "${e.run}…"`).join(" · ")}` : ""}`);
   if (r.evidence) L.push(`- 근거: 서로 다른 근거 ${r.evidence.distinctCited}개 인용 · 여러 영역이 같이 쓴 근거 ${r.evidence.reusedAcrossSections.length}개${r.evidence.reusedAcrossSections.length ? `(${r.evidence.reusedAcrossSections.join(", ")})` : ""} · 비교한 응답 근거 중 인용하지 않은 것 ${r.evidence.pairUncited.length}개${r.evidence.pairUncited.length ? `(${r.evidence.pairUncited.join(", ")})` : ""} · 응답 근거를 인용한 영역 ${r.evidence.pairCitedSections}개`);
   L.push(`- 행동: ${Object.entries(r.steps.perGroup).map(([g, n]) => `${g} ${n}개`).join(" · ")} · 건넬 말 없음 ${r.steps.withoutSay} · 근거 없는 행동 ${r.steps.withoutEvidence} · 같은 건넬 말 ${r.steps.duplicateSays} · A님 → B님과 B님 → A님 행동의 겹침 ${r.steps.aToBvsBToAOverlap ?? "-"}`);
-  L.push(`- 제품 검사(저장 기준): ${r.productCheckErrors === null ? "근거 ID가 없는 글이라 이 도구에서는 돌리지 않았어요" : r.productCheckErrors.length === 0 ? "통과" : `불통과 ${r.productCheckErrors.length}건 — ${r.productCheckErrors.slice(0, 6).join(" / ")}`}`);
+  L.push(`- 제품 검사(저장 기준): ${r.productCheckErrors === null ? "근거 ID가 없는 글이라 이 도구에서는 돌리지 않았어요" : r.productCheckErrors.length === 0 ? "BLOCK 없음(통과 — 판매 합격은 아님)" : `BLOCK ${r.productCheckErrors.length}건 — ${r.productCheckErrors.slice(0, 6).join(" / ")}`}`);
+  if (r.productCheckWarnings && r.productCheckWarnings.length > 0) L.push(`- 경고(WARN ${r.productCheckWarnings.length}건 — 설명 없는 용어 · 용어 개수 · 문단 문장 수, 저장을 막지 않고 자동 재작성도 하지 않아요): ${r.productCheckWarnings.slice(0, 6).join(" / ")}`);
   return L.join("\n");
 }

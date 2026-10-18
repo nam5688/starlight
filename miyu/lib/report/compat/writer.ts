@@ -3,6 +3,7 @@
 // 아직 서비스에 연결하지 않았다(판매 · 저장 · 승인 가드 연결 전) — 개발용 화면과 시험에서만 쓴다.
 import type { Evidence } from "../evidence.ts";
 import type { GenerateContext } from "../generator.ts";
+import { extractJson } from "../ai/generator.ts";
 import { createModelCaller } from "../ai/model-caller.ts";
 import { ModelCallError, type ModelMessage, type TextModel } from "../ai/model.ts";
 import { buildCompatRepairMessage, buildCompatUserMessage, buildPairUserMessage, COMPAT_PROMPT_VERSION, COMPAT_SYSTEM_PROMPT, PAIR_PROMPT_VERSION, PAIR_SYSTEM_PROMPT } from "./prompt.ts";
@@ -54,16 +55,20 @@ export function createCompatWriter(opts: CompatWriterOptions): CompatWriter {
         }
         let parsed: unknown = null;
         try {
-          parsed = JSON.parse(call.result.text.slice(call.result.text.indexOf("{"), call.result.text.lastIndexOf("}") + 1));
+          // 끝의 닫는 괄호만 빠진 글은 글자를 바꾸지 않고 괄호만 보충해 읽는다(개인 심층 리포트의 실제 AI 시험 2026-10-17에서 나온 형식 오류와 같다)
+          parsed = extractJson(call.result.text);
         } catch {
           parsed = null;
         }
         const check = validateCompatDraft(parsed, input.evidence, pair ? { pair: true } : {});
         if (check.ok) {
           caller.recordResult(ctx, spec, call, "ok");
+          // 경고(WARN)만 있는 글은 고쳐 쓰기를 부르지 않고 그대로 받는다 — 경고는 시도 기록에 남는다(운영자 정책 2026-10-17)
+          ctx.onAttempt?.({ round, errors: [], text: call.result.text, accepted: true, ...(check.warnings.length ? { warnings: check.warnings } : {}) });
           return check.draft;
         }
         caller.recordResult(ctx, spec, call, "invalid", "VALIDATION");
+        ctx.onAttempt?.({ round, errors: check.errors, text: call.result.text, ...(check.warnings.length ? { warnings: check.warnings } : {}) });
         lastErrors = check.errors;
         messages.push({ role: "assistant", content: call.result.text }, { role: "user", content: buildCompatRepairMessage(check.errors) });
       }

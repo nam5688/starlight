@@ -54,7 +54,9 @@ const errorsWith = (d: unknown, evidence: typeof base.evidence) => {
   const v = validateCompatDraft(d, evidence);
   return v.ok ? [] : v.errors;
 };
+const warningsWith = (d: unknown, evidence: typeof base.evidence) => validateCompatDraft(d, evidence).warnings;
 const errorsOf = (d: unknown) => errorsWith(d, base.evidence);
+const warningsOf = (d: unknown) => warningsWith(d, base.evidence);
 const fullErrors = (d: unknown) => errorsWith(d, full.evidence);
 const sec = (d: CompatDraftV1, id: string) => d.sections.find((s) => s.id === id)!;
 /** 오행 조화 장(harmony)의 마지막 문단을 바꿔 본다 — 첫 문단은 용어 한도가 따로 있어 두 번째 문단을 쓴다 */
@@ -152,13 +154,24 @@ test("검사: 통과하는 글(조건형 · 두 분 · 장면)과 걸러야 할 
     const e = errorsOf(withParagraph(text)).join("\n");
     assert.match(e, re, text);
   }
-  // 첫 문단: 명리 풀이를 위해 용어 둘까지(풀이와 함께) 쓸 수 있고, 셋 이상은 막는다
+  // 첫 문단: 명리 풀이를 위해 용어 둘까지(풀이와 함께)가 권장이고, 셋 이상은 경고(WARN)만 한다 — 저장을 막지 않고 고쳐 쓰기도 부탁하지 않는다(운영자 정책 2026-10-17)
   const twoTerms = clone(draftOf());
   sec(twoTerms, "overview").paragraphs[0] = "A님과 B님의 일간(태어난 날의 하늘 글자)은 서로 돕는 관계로 읽혀요. 두 분이 함께 있을 때 한쪽이 다른 쪽을 받쳐 주는 장면이 자주 있을 수 있어요.";
   assert.deepEqual(errorsOf(twoTerms), []);
   const manyTerms = clone(draftOf());
   sec(manyTerms, "overview").paragraphs[0] = "A님과 B님의 일간은 서로 돕는 관계이고 천간합과 오행의 조화도 함께 읽혀요. 두 분이 함께 있을 때 한쪽이 다른 쪽을 받쳐 주는 장면이 자주 있을 수 있어요.";
-  assert.match(errorsOf(manyTerms).join("\n"), /첫 문단에 사주 용어/);
+  assert.match(warningsOf(manyTerms).join("\n"), /첫 문단에 사주 용어/);
+  assert.ok(!errorsOf(manyTerms).some((e) => /사주 용어/.test(e)), "용어 개수는 BLOCK이 아니다");
+  assert.ok(validateCompatDraft(manyTerms, base.evidence).ok, "경고만 있는 글은 통과(저장)한다 — 판매 합격은 아니다");
+  // 문단 문장 수 · 설명 없는 용어도 경고다
+  const longPara = clone(draftOf());
+  sec(longPara, "overview").paragraphs[1] = "A님과 B님은 서로 다른 속도로 움직여요. 한쪽이 먼저 정하고 다른 쪽이 따라가는 장면이 있어요. 그때 서운함이 생길 수 있어요. 말로 확인하면 풀리기 쉬워요. 다섯째 문장이 하나 더 이어져요. 여섯째 문장으로 마무리해요 그래서 길이는 충분해요.";
+  assert.match(warningsOf(longPara).join("\n"), /문장 \(4문장 이하로 묶어 주세요\)/);
+  assert.ok(!errorsOf(longPara).some((e) => /문장 \(/.test(e)));
+  // BLOCK은 그대로 — 두 사람의 속마음을 아는 것처럼 쓰거나 없는 근거를 인용하면 용어 설명을 붙여도 막는다
+  const blockMind = clone(draftOf());
+  sec(blockMind, "overview").paragraphs[1] = "A님은 속으로 B님이 떠날까 봐 늘 불안해하고 있어요. 두 분이 함께 있을 때 그 마음이 자주 드러나요.";
+  assert.ok(errorsOf(blockMind).length > 0, "속마음 단정은 BLOCK이다");
 });
 
 test("검사: 장 순서 · 없는 근거 · 근거 되풀이(다섯 장까지) · 행동 묶음 개수 · 건넬 말(따옴표 · 되풀이) · 추천 질문", () => {
@@ -370,6 +383,35 @@ test("조립: 커플 유형 · 지수 · 계산 재료는 무료 간단 궁합(c
   assert.equal(rt.sections.length, 6);
   assert.ok(rt.notes.items.includes(COMPAT_NOTES.timingUsed) && !rt.notes.items.includes(COMPAT_NOTES.timingMissing));
   assert.match(COMPAT_NOTES.timingUsed, /맞물리는 해는 계산하지 않았/);
+});
+
+test("쓰기: 경고(WARN)만 있는 글은 고쳐 쓰기를 부르지 않고 그대로 받는다 · 끝의 닫는 괄호만 빠진 글도 글자 그대로 읽는다 — 내용이 틀린 글은 계속 고쳐 쓴다(운영자 정책 2026-10-17)", async () => {
+  const input = { evidence: base.evidence, cautions: base.r.cautions };
+  const warnDraft = clone(draftOf());
+  sec(warnDraft, "overview").paragraphs[0] = "A님과 B님의 일간은 서로 돕는 관계이고 천간합과 오행의 조화도 함께 읽혀요. 두 분이 함께 있을 때 한쪽이 다른 쪽을 받쳐 주는 장면이 자주 있을 수 있어요.";
+  const once = (text: string) => {
+    const calls: ModelRequest[] = [];
+    const model: TextModel = { provider: "mock", model: "once", async complete(req) { calls.push(req); return { text, model: "once", usage: { inputTokens: 1, outputTokens: 1 } }; } };
+    return { calls, model };
+  };
+  // 경고만 — 한 번의 호출, 시도 기록에 경고가 남는다
+  const a = once(JSON.stringify(warnDraft));
+  const attempts: { round: number; errors: string[]; accepted?: boolean; warnings?: string[] }[] = [];
+  const draft = await createCompatWriter({ model: a.model, sleep: async () => {} }).write(input, { onAttempt: (x) => attempts.push(x) });
+  assert.equal(a.calls.length, 1, "경고만으로는 AI를 다시 부르지 않는다");
+  assert.equal(draft.sections[0].paragraphs[0], sec(warnDraft, "overview").paragraphs[0], "글은 그대로다");
+  assert.ok(attempts[0].accepted && (attempts[0].warnings ?? []).some((w) => /첫 문단에 사주 용어/.test(w)), JSON.stringify(attempts));
+  // 맨 끝의 `}`가 빠진 글 — 괄호만 보충해 한 번에 받는다
+  const b = once(JSON.stringify(draftOf()).slice(0, -1));
+  const repaired = await createCompatWriter({ model: b.model, sleep: async () => {} }).write(input);
+  assert.equal(b.calls.length, 1);
+  assert.equal(repaired.sections.length, 6);
+  // 속마음 단정(BLOCK)은 경고가 아니다 — 고쳐 쓰라고 다시 부른다
+  const mind = clone(draftOf());
+  sec(mind, "overview").paragraphs[1] = "A님은 속으로 B님이 떠날까 봐 늘 불안해하고 있어요. 두 분이 함께 있을 때 그 마음이 자주 드러나요.";
+  const c = once(JSON.stringify(mind));
+  await assert.rejects(createCompatWriter({ model: c.model, sleep: async () => {} }).write(input), (e: unknown) => e instanceof CompatWriteError && e.code === "INVALID");
+  assert.equal(c.calls.length, 2, "BLOCK이면 한 번 고쳐 쓰게 한다");
 });
 
 test("쓰기: 첫 글이 검사에 걸리면 이유와 함께 한 번 고쳐 쓰고, 계속 걸리면 INVALID, 호출이 실패하면 MODEL(일시 오류는 한 번 다시)", async () => {

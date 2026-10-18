@@ -19,6 +19,7 @@ import { absenceErrors } from "./story-validate.ts";
 import { story7Evidence } from "./story7-evidence.ts";
 import { CONDITIONAL_MARK, FAMILY_CLAIM, MONEY_HABIT, STORY7_FORMULA_BUDGET, STORY7_LIMITS as S, STORY7_MBTI_MIN, STORY7_MBTI_NOS, STORY7_OWNER_NOS, STORY7_PERSONAL_REUSE, STORY7_SECTIONS, STORY7_TASK_MAX, STORY7_TERMS, TRADITION_MARK, WEALTH_FATE } from "./story7-plan.ts";
 import { distinctTerms } from "./terms.ts";
+import { isTermWarning, splitWarnings } from "./warn-policy.ts";
 import type { Story7DraftV1, Story7SectionDraft } from "./types.ts";
 import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./validate.ts";
 
@@ -28,12 +29,8 @@ import { allowedYearsOf, countSentences, periodRefs, textIssues } from "./valida
  */
 export type Story7Validation = { ok: true; draft: Story7DraftV1; warnings: string[] } | { ok: false; errors: string[]; warnings: string[] };
 
-/**
- * WARN으로 보는 오류 문구(운영자 정책 2026-10-17 — "미유는 명리 용어를 쓰는 서비스라 용어를 쓸 때마다 풀이하게 강제하면 글이 부자연스러워진다"): 설명 없는 사주 용어 · 한 문장 / 한 문단 / 첫 문단의 용어 개수 · 용어 나열 · 문단 문장 수.
- * 읽기 쉬운 정도의 기준이지 계산이 틀렸거나 근거 없는 내용을 쓴 것이 아니다. 나머지(없는 근거 · 계산과 반대 · 근거에 없는 판정 · 십성/오행 대응 · 없는 시주 풀이 · 사건 단정 · 장 누락 · 형식 오류)는 모두 BLOCK이다.
- */
-const STORY7_WARN = /설명 없는 사주 용어|한 문장에 사주 용어가|한 문단에 사주 용어가|첫 문단에 사주 용어|해석 키워드 나열|\d+문장 \(\d+문장 이하로 묶어 주세요\)/;
-export const isStory7Warning = (message: string) => STORY7_WARN.test(message);
+/** WARN으로 보는 오류 문구(설명 없는 용어 · 용어 개수 · 문단 문장 수) — 궁합 풀이와 같은 표지를 쓴다(warn-policy.ts) */
+export const isStory7Warning = isTermWarning;
 
 const isString = (v: unknown): v is string => typeof v === "string";
 const isIds = (v: unknown): v is string[] => Array.isArray(v) && v.every(isString);
@@ -351,8 +348,6 @@ export function validateStory7Draft(raw: unknown, evidence: Evidence[], opts: { 
   // 미유 문체 — 분명한 위반만 실패로 센다(나머지는 고쳐 쓰기 안내로 생성기가 따로 부탁한다)
   errors.push(...voiceErrors(checkVoice(texts, { blockOf: story7BlockOf })));
 
-  const all = [...new Set(errors)];
-  const warnings = all.filter(isStory7Warning);
-  const blocks = all.filter((m) => !isStory7Warning(m));
+  const { blocks, warnings } = splitWarnings(errors);
   return blocks.length ? { ok: false, errors: blocks.slice(0, 30), warnings } : { ok: true, draft: d as Story7DraftV1, warnings };
 }
