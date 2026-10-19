@@ -85,7 +85,7 @@ export function BasicInfoStep({
             ))}
           </div>
 
-          <div className="mt-3 grid grid-cols-[1.3fr_1fr_1fr] gap-2">
+          <div className="mt-3 grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
             <div>
               <label htmlFor="birthYear" className="sr-only">
                 태어난 해
@@ -262,7 +262,7 @@ export function BasicInfoStep({
           <p id="region-help" className="mt-1 text-[14px] leading-relaxed text-ink-3">
             성향 분석에는 사용하지 않아요. 이후 장소 추천 기능에만 사용할 예정이에요.
           </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2">
             <div>
               <label htmlFor="regionProvince" className="sr-only">
                 시·도

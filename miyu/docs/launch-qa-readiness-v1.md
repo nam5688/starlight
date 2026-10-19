@@ -89,7 +89,7 @@
 
 기기 최소 구성: iPhone Safari 1대 · Android Chrome 1대 · 카카오톡 인앱 브라우저로 링크 열기 1회. 글자 크기를 크게 한 설정도 한 번.
 
-**실기기 대상 확정(운영자 2026-10-19): iPhone과 Android 모두.** 환경은 ① iPhone Safari ② iPhone 홈 화면 앱 ③ Android Chrome ④ Android 홈 화면 앱 ⑤ 카카오톡 인앱 — iPhone ⑥ 카카오톡 인앱 — Android로 나눠 같은 항목을 한 번씩 보고, 접이식 기기(Galaxy Z Fold8 · iPhone Duo)를 가진 경우 접힘 · 펼침도 본다. **출시 방식은 "웹으로 먼저 출시하고 홈 화면에 추가하면 앱처럼 열기"**(PWA 설정 · 안내 · 17개 실기기 항목 R1~R17 · 접이식 반응형 모의 검사 · 격리 스테이징 준비안: [`pwa-and-staging-plan-v1.md`](./pwa-and-staging-plan-v1.md)). **현재 테스트 · 스테이징 주소가 없어 실기기 · 홈 화면 설치 · 카카오 복귀 · 토스 결제 복귀는 모두 미실행이다.** 아래 표의 에뮬레이션 숫자는 창 크기를 바꾼 모의 검사이고 실제 폰 통과가 아니다.
+**실기기 대상 확정(운영자 2026-10-19): iPhone과 Android 모두.** 환경은 ① iPhone Safari ② iPhone 홈 화면 앱 ③ Android Chrome ④ Android 홈 화면 앱 ⑤ 카카오톡 인앱 — iPhone ⑥ 카카오톡 인앱 — Android로 나눠 같은 항목을 한 번씩 보고, 접이식 기기(Galaxy Z Fold8 · iPhone Duo)를 가진 경우 접힘 · 펼침도 본다. **출시 방식은 "웹으로 먼저 출시하고 홈 화면에 추가하면 앱처럼 열기"**(PWA 설정 · 안내 · 17개 실기기 항목 R1~R17 · 접이식 반응형 모의 검사 · 격리 스테이징 준비안: [`pwa-and-staging-plan-v1.md`](./pwa-and-staging-plan-v1.md)). **실기기 · 홈 화면 설치 · 카카오 복귀 · 토스 결제 복귀는 모두 미실행이다.** (정정 2026-10-19: 처음에는 테스트 주소가 없다고 알았으나 운영자가 계정을 확인해 기존 Vercel 프로젝트 `miutest`(https://miutest.vercel.app, Production 브랜치 = 작업 브랜치 → push마다 자동 배포)를 발견했다. 시험용인지 운영용인지 · 어느 Supabase에 붙었는지는 확인 중이라 스테이징 통과로 쓰지 않는다 — [`pwa-and-staging-plan-v1.md`](./pwa-and-staging-plan-v1.md) 6-0.) 아래 표의 에뮬레이션 숫자는 창 크기를 바꾼 모의 검사이고 실제 폰 통과가 아니다.
 
 | 번호 | 테스트 입력 | 기대 결과 | 증거 | 승인 | 상태 |
 | --- | --- | --- | --- | --- | --- |

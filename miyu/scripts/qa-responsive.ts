@@ -60,6 +60,8 @@ function measurePage() {
   const visible = (el: Element) => {
     const r = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
+    // 접어 둔 칸(details) 안 · content-visibility로 가려진 요소는 보이지 않는 것으로 본다
+    if ((el as any).checkVisibility && !(el as any).checkVisibility()) return false;
     return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && cs.display !== "none" && !el.closest("[hidden],[inert],.sr-only,[aria-hidden=true]");
   };
   const beyond: string[] = [];
@@ -77,32 +79,45 @@ function measurePage() {
   }
   if (beyond.length) problems.push(`폭 밖 요소: ${beyond.join(" | ")}`);
   if (clipped.length) problems.push(`글자 잘림 의심: ${clipped.join(" | ")}`);
-  // 눌리는 요소가 너무 작은 곳(24px 미만은 문제, 44px 미만은 참고)
+  // 눌리는 요소가 너무 작은 곳 — 24px 미만은 WCAG 2.5.8(AA)처럼 본다: 글 속 링크는 제외, 주변 24px 원 안에 다른 눌리는 요소가 없으면(간격 예외) 통과. 44px 미만은 참고만.
+  const targets = Array.from(document.querySelectorAll("button, input:not([type=hidden]), select, textarea, summary, [role=button], a")).filter(visible);
+  const boxes = targets.map((el) => ({ el, r: (el.closest("label") ?? el).getBoundingClientRect() }));
   let tiny = 0;
   let under44 = 0;
-  for (const el of Array.from(document.querySelectorAll("button, input:not([type=hidden]), select, textarea, summary, [role=button], a"))) {
-    if (!visible(el)) continue;
-    if (el.tagName === "A" && getComputedStyle(el).display === "inline" && el.closest("p, li, span, small")) continue;
-    const label = el.closest("label");
-    const box = (label ?? el).getBoundingClientRect();
-    if (box.width < 24 || box.height < 24) tiny += 1;
-    if (box.width < 44 || box.height < 44) under44 += 1;
+  const tinyList: string[] = [];
+  for (const { el, r } of boxes) {
+    if (el.tagName === "A" && getComputedStyle(el).display === "inline") continue; // 글 속 링크
+    if (r.width < 44 || r.height < 44) under44 += 1;
+    if (r.width >= 24 && r.height >= 24) continue;
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const crowded = boxes.some(({ el: other, r: o }) => {
+      if (other === el || other.contains(el) || el.contains(other)) return false;
+      const nx = Math.max(o.left, Math.min(cx, o.right));
+      const ny = Math.max(o.top, Math.min(cy, o.bottom));
+      return (nx - cx) ** 2 + (ny - cy) ** 2 < 12 ** 2;
+    });
+    if (crowded) {
+      tiny += 1;
+      if (tinyList.length < 3) tinyList.push(`${el.tagName.toLowerCase()} "${(el.textContent ?? "").trim().slice(0, 12)}" ${Math.round(r.width)}×${Math.round(r.height)}`);
+    }
   }
-  if (tiny) problems.push(`24px 미만 눌리는 요소 ${tiny}개`);
+  if (tiny) problems.push(`24px 미만이면서 가까이 붙은 눌리는 요소 ${tiny}개: ${tinyList.join(" | ")}`);
   notes.push(`44px 미만 ${under44}개(참고)`);
   return { problems, notes };
 }
 
 /** 끝까지 내렸을 때 마지막 눌리는 요소가 고정된 아래 막대에 가려지지 않는가 */
 function bottomCoverage() {
-  window.scrollTo(0, document.documentElement.scrollHeight);
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" as ScrollBehavior });
   const candidates = Array.from(document.querySelectorAll("#main a, #main button, #main input, #main summary, main a, main button")).filter((el) => {
     const r = el.getBoundingClientRect();
+    if ((el as any).checkVisibility && !(el as any).checkVisibility()) return false;
     return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden" && !el.closest("[inert],[hidden]");
   });
   const last = candidates[candidates.length - 1];
   if (!last) return { covered: false, detail: "눌리는 요소 없음" };
-  last.scrollIntoView({ block: "end" });
+  last.scrollIntoView({ block: "end", behavior: "instant" as ScrollBehavior });
   const r = last.getBoundingClientRect();
   const x = Math.min(window.innerWidth - 1, Math.max(0, r.left + r.width / 2));
   const y = Math.min(window.innerHeight - 1, Math.max(0, r.top + r.height / 2));

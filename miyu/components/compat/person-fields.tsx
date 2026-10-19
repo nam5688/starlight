@@ -62,7 +62,7 @@ export function PersonFields({
             </label>
           ))}
         </div>
-        <div className="mt-3 grid grid-cols-[1.3fr_1fr_1fr] gap-2">
+        <div className="mt-3 grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2">
           <div className="relative">
             <label htmlFor={id("year")} className="sr-only">
               태어난 해
