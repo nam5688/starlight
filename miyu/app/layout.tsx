@@ -18,8 +18,14 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   openGraph: { type: "website", siteName: "ME:U 미유", locale: "ko_KR", title: TITLE, description: DESCRIPTION },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+  // 홈 화면에 추가했을 때 앱처럼 열린다(아이콘 · 매니페스트는 app/apple-icon.png · app/manifest.ts). 상태 표시줄은 기본 모양을 쓴다.
+  appleWebApp: { capable: true, title: "ME:U 미유", statusBarStyle: "default" },
+  formatDetection: { telephone: false },
 };
 
+// viewportFit(cover)은 켜지 않았다: 켜면 화면 전체가 노치 · 홈 막대 밑까지 그려져서 모든 화면에 안전 영역 여백이 따로 필요하다.
+// 켜지 않으면 iOS · Android가 알아서 안전 영역 안에 그려 주므로 지금의 화면 배치가 그대로다(env(safe-area-inset-*)를 쓰는 곳은 켜도 되도록 이미 준비돼 있다).
+// 확대 · 글자 크기를 막지 않는다(maximumScale · userScalable 없음).
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,

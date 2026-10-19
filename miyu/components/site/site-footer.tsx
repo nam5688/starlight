@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BUSINESS_FIELDS, BUSINESS_INFO, hasSupportContact, SUPPORT_CONTACT } from "@/lib/config/business";
+import { HomeScreenTip } from "./home-screen-tip";
 
 export function SiteFooter() {
   return (
@@ -19,6 +20,7 @@ export function SiteFooter() {
             성향 질문은 어떻게 만들었나요?
           </Link>
         </p>
+        <HomeScreenTip />
         <div className="space-y-1 border-t border-line pt-4 text-[12px] leading-[1.7]">
           <p className="font-semibold text-ink-2">{BUSINESS_INFO.copyright}</p>
           <p>
