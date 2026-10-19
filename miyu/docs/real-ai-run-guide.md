@@ -496,3 +496,89 @@ git status --short
 | 승인 기록 | `runsApproved 5 / runsDone 5`(PC가 14-2의 5번 아래 줄로 올렸고 이 방이 같은 값을 코드에 기록했다) · 5/5에서 새 실행이 거절되는 것을 네트워크 없는 조회로 확인 |
 | 분량 | 전체 4,566자(4차 5,175자) — 숫자는 코드가 센 어림이다. 목표 분량 기준은 코드에 없다(장별 문단 상한 · 문단 60~420자만 있다) |
 | 이후 | 추가 유료 호출 권한 없음. 지시문 0.8 최소 보정 · 의심 문장 표 · 평가는 `story7-customer-voice-v1.md` 10장 |
+
+## 15. 개인 심층 6차 시험(지시문 0.8) — 운영자 신규 승인 2026-10-19 · 준비만 마침(이 개발 세션은 실제 호출을 하지 않았다)
+
+**승인 기록(코드 `lib/config/ai-candidates.ts`의 `story7-own`)**: `runsApproved 6 · runsDone 5`(→ 실행 뒤 `6/6`). 승인 문장: 운영자 "0.8로 800원 이내 딱 1회 더 호출해서 확인해줘. 재시도는 하지 말고 사용 기록 바로 갱신한 다음 전문 읽고 내가 원하는 느낌인지 봐줘". **이 1회만의 승인이다** — 새 실제 호출 **정확히 1회**, 자동 재작성 · 재시도 **0회**(타임아웃 · 오류 · 출력 불명이어도 다시 부르지 않는다), 이번 호출 상한 **800원 그대로**, 누적 총 승인 **6,000원 그대로**, 이미 쓴 금액 **3,998.44원**(남은 2,001.56원). `runsDone 5`와 5차까지의 비용 · 원문 기록(`lastRun`)은 되돌리지 않았다(6차를 실행한 뒤 기록으로 갱신한다). 지시문은 현재 코드의 `story-7-prompt-0.8`, 입력은 PC의 같은 본인 입력(`--birth-time-unknown`, 2~5차와 같은 조건). 다른 유료 호출 · 배포 승인이 아니다.
+
+### 15-1. 호출이 정확히 1번만 나가는지
+
+코드를 바꾸지 않았다 — 14-1의 표가 그대로 적용된다: `scripts/run-own-story.ts` 134~136행이 `repairRepeats: false · maxRepairs: 0 · maxRetries: 0`으로 부르고, `lib/integrations/ai/one-call.test.ts`(내 컴퓨터의 가짜 서버로 실제 `fetch`를 보내 서버가 받은 요청 수를 센 시험 — 정상 · 529 · 429 · 500 · 연결 끊김 · 시간 초과 모두 요청 1개)와 `own-run.test.ts`가 확인한다. 이번에 바뀐 것은 승인 횟수(5 → 6)뿐이다. **이 개발 세션의 0원 확인**: 허용 횟수가 한 번 남은 상태(`5/6`)에서 최악 비용이 800원 이하면 거절 사유가 없고, 800.01원이면 거절되며, 실행 뒤 `6/6`이면 같은 승인의 `--execute`가 거절되는 것을 시험이 확인한다. 클라우드의 같은 지시문 · 본인 입력 사본 기준 **호출 1회 최악 707원**(PC 값은 몇 원 다를 수 있다 — 800원을 넘으면 실행하지 않는다).
+
+### 15-2. Windows 실행 전 확인 (PowerShell, `$HOME\Desktop\starlight-work\miyu` — 위에서 아래로, 앞 단계가 합격이어야 다음으로)
+
+**0. (git pull 전에) 지금 상태 조회 — 네트워크 호출이 없다.** 14-2의 0번과 같은 명령. 기대: `story7-own 마친/허용: 5/5` · `실제 호출 거절됨`.
+
+**1. 승인 반영.** 작업 트리가 깨끗해야 한다(`git status --short`에 수정이 없을 것) — 수정이 있으면 지우지 말고 화면을 알려 준다.
+
+```powershell
+git pull --ff-only origin claude/miyu-claude-code-setup-klw8ms
+Select-String -Path lib\config\ai-candidates.ts -SimpleMatch "runsApproved: 6,"
+Select-String -Path lib\config\ai-candidates.ts -SimpleMatch "runsDone: 5,"
+Select-String -Path lib\report\reading\story7-plan.ts -SimpleMatch "story-7-prompt-0.8"
+```
+
+세 `Select-String`이 각각 한 줄씩 나와야 한다.
+
+**2. 상태 조회(0번과 같은 명령).** 기대: `story7-own 마친/허용: 5/6` 다음 줄 `실제 호출 허용 상태(횟수 남음)`.
+
+**3. 비용 없는 검사(호출 0, 키 불필요).**
+
+```powershell
+node --test lib/report/ai/own-run.test.ts lib/report/reading/story7-prompt-0.8.test.ts lib/report/reading/customer-voice.test.ts lib/report/reading/story7-product.test.ts lib/integrations/ai/one-call.test.ts
+```
+
+기대: 모두 통과, 실패 0(이전 5차 뒤 보고는 89개였다 — 시험 파일 수가 같으므로 같아야 한다).
+
+**4. 사전검사 = 드라이런(호출 없음, `--execute` 없음).**
+
+```powershell
+node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3998.44 --birth-time-unknown
+```
+
+**합격 기준 — 다섯 가지가 모두 맞을 때만 5번으로 간다:**
+1. `승인 범위: story-7 · 후보 A · 본인 입력 1건 · 승인된 실행 5/6회 마침`
+2. `호출 1회 최악: NNN원`에서 NNN이 **800 이하**
+3. `한도: 승인 총액 6,000원 − 이미 쓴 3,998원 = 남은 2,002원 · 1회 상한 800원`
+4. `키 입력 확인: ANTHROPIC_API_KEY 있음`
+5. 마지막 줄 `호출하지 않았습니다 (드라이런).`
+
+하나라도 다르거나 `승인 범위 확인 — 실행할 수 없습니다`가 나오면 **실행하지 말고 그 화면을 알려 준다.** 새 입력 확인 파일(`pilot-data\own-input\input-check.md`) 1절은 이제 "응답 환산값 숫자(0~100)와 MBTI 네 글자가 근거 문장 안에서 간다"고 적혀 있다 — 보내도 되는지 확인한 뒤에만 5번으로 간다.
+
+**5. 실제 호출 1회 + 곧바로 기록(한 덩어리로 붙여 넣는다 — 앞 줄이 끝나야 다음 줄이 실행된다).** 새 폴더가 있으면 호출이 나갔거나 나가려던 것이라 **안전 쪽으로 소진으로 센다.** **폴더가 없다는 것은 호출이 없었다는 증거가 아니다**(14-2의 5번과 같은 규칙) — 이 경우 소진 여부를 사람이 화면과 Anthropic 콘솔 사용량으로 판단하고, 호출이 나갔는지 확인할 수 없으면 소진으로 간주해 `runsDone`을 6으로 올린다.
+
+```powershell
+$t0 = Get-Date
+node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3998.44 --birth-time-unknown --execute --approved-cap-krw 6000 --approved-on 2026-10-19
+
+# ↓ 위 명령이 끝나면(성공 · 형식 검사 불통과 · 오류 · 시간 초과 모두) 이어서 자동으로 실행된다. 이 줄들을 지우거나 다시 붙여 넣지 않는다
+$d = Get-ChildItem pilot-data\ai-compare -Directory -Filter "story7-own-*" | Where-Object { $_.LastWriteTime -gt $t0 } | Sort-Object LastWriteTime | Select-Object -Last 1
+if ($d) {
+  $p = (Resolve-Path lib\config\ai-candidates.ts).Path
+  $txt = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
+  if (([regex]::Matches($txt, "runsDone: 5,")).Count -eq 1) { [System.IO.File]::WriteAllText($p, $txt.Replace("runsDone: 5,", "runsDone: 6,"), (New-Object System.Text.UTF8Encoding($false))); Write-Host "기록: runsDone 5 -> 6 (이 PC의 ai-candidates.ts, 커밋하지 않음)" } else { Write-Host "경고: runsDone: 5, 가 정확히 1곳이 아닙니다 — 직접 6으로 고치지 말고 화면을 알려 주세요" }
+  $line = "{0} | story7-own 6차 | {1}" -f (Get-Date -Format "s"), $d.FullName
+  $cj = Join-Path $d.FullName "cost-and-checks.json"
+  if (Test-Path $cj) { $c = Get-Content $cj -Raw -Encoding UTF8 | ConvertFrom-Json; $line += (" | calls={0} | spent={1}원 | cumulative={2}원 | result={3}" -f $c.calls, $c.spentKrw, $c.cumulativeSpentKrw, $c.result) } else { $line += " | cost-and-checks.json 없음(비용 불명 — Anthropic 콘솔 사용량 확인)" }
+  Add-Content -Encoding UTF8 pilot-data\ai-compare\RUN-LEDGER.txt $line
+  Write-Host $line
+} else { Write-Host "새 결과 폴더가 없습니다 — 호출이 없었다는 뜻이 아닙니다(연결이 끊겼거나 폴더를 쓰기 전에 멈췄을 수 있습니다). 소진 여부 불명: 같은 명령을 다시 치지 말고, 화면 출력과 Anthropic 콘솔 사용량을 확인해 알려 주세요. 화면에 '승인 범위 확인 — 실행할 수 없습니다'가 보였다면 호출 전 거절이므로 그 문구를 알려 주세요." }
+```
+
+실행 중에는 두 번째 창에서 같은 명령을 치지 않는다. **타임아웃 · 오류 · 출력 불명 · 화면이 끊김 어느 쪽이어도 같은 명령을 다시 치지 않는다.**
+
+**6. 읽기 · 검사 · 5차와 비교(호출 0).** `<새 폴더>`는 5번 마지막 줄(또는 `RUN-LEDGER.txt`)의 폴더 이름:
+
+```powershell
+node scripts/recheck-own-draft.ts pilot-data\ai-compare\<새 폴더> --birth-time-unknown
+node scripts/compare-own-runs.ts pilot-data\ai-compare\story7-own-20261019-014707 pilot-data\ai-compare\<새 폴더> --birth-time-unknown
+```
+
+원문 전문은 `pilot-data\ai-compare\<새 폴더>\attempts\round1.txt`(AI가 준 그대로, 고치지 않는다), 읽는 순서 글은 `readable.md`, 화면은 `npm.cmd run dev` 뒤 `http://localhost:3000/dev/live/<새 폴더 이름>`이다.
+
+### 15-3. 실행 뒤 이중 실행 방지 · 이 개발방이 하는 일
+
+1. 호출 직후 위 5번 아래 줄이 `runsDone 5 -> 6`을 적고(이 PC의 `ai-candidates.ts`, 커밋하지 않음) `RUN-LEDGER.txt`에 한 줄을 적는다.
+2. 상태 조회(0번 명령)를 다시 쳐서 `story7-own 마친/허용: 6/6` · `실제 호출 거절됨: 이 승인(6건)은 이미 실행했습니다`가 나오는지 본다 — 네트워크 호출이 없어 몇 번이든 안전하다.
+3. 그다음 어떤 이유로도 `--execute`를 다시 치지 않는다. 새 호출이 필요하면 운영자가 다시 승인한다.
+4. 운영자가 결과(폴더 이름 · `RUN-LEDGER.txt` 마지막 줄 · 화면의 비용)를 이 방에 전달하면 개발방이 `lastRun` · 누적 비용을 코드에 기록해 푸시한다. 그다음 PC 동기화는 14-3의 순서를 쓰되 ②의 확인 문자열 `runsDone: 5,`를 `runsDone: 6,`으로 바꾼다. 글 평가는 운영자가 읽고 정한다 — 합격 · 동결을 이 문서가 선언하지 않는다.
