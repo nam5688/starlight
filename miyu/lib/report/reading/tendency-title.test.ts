@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { TENDENCY_NAMES, TENDENCY_PHRASES, tendencyPhrase } from "../../assessment/dev-rules.ts";
 import { renderReadingMarkdown } from "./render-text.ts";
@@ -69,7 +70,7 @@ test("새 표시용 내보내기(export-readable-display.ts)는 새 파일 하�
   const rawFile = join(dir, "round1.txt");
   writeFileSync(rawFile, raw);
   const before = Object.fromEntries(readdirSync(dir).map((f) => [f, read(join(dir, f), "utf8")]));
-  const script = new URL("../../../scripts/export-readable-display.ts", import.meta.url).pathname;
+  const script = fileURLToPath(new URL("../../../scripts/export-readable-display.ts", import.meta.url));
   execFileSync(process.execPath, [script, dir], { stdio: "pipe" });
   const after = readdirSync(dir).sort();
   assert.deepEqual(after, [...Object.keys(before), "readable-display.md"].sort(), "새 파일 하나만 늘었다");
@@ -79,4 +80,34 @@ test("새 표시용 내보내기(export-readable-display.ts)는 새 파일 하�
   const empty = mkdtempSync(join(tmpdir(), "export-readable-empty-"));
   assert.throws(() => execFileSync(process.execPath, [script, empty], { stdio: "pipe" }));
   assert.deepEqual(readdirSync(empty), []);
+});
+
+test("새 표시용 내보내기는 이미 있는 파일을 덮어쓰지 않는다 — 다시 실행해도 먼저 만든 파일이 그대로이고, --out으로 다른 이름은 만들 수 있다", async () => {
+  const { mkdtempSync, writeFileSync, readFileSync: read, readdirSync } = await import("node:fs");
+  const { execFileSync, spawnSync } = await import("node:child_process");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const script = fileURLToPath(new URL("../../../scripts/export-readable-display.ts", import.meta.url));
+  const dir = mkdtempSync(join(tmpdir(), "export-readable-keep-"));
+  writeFileSync(join(dir, "report.json"), JSON.stringify(base("안정지향형")));
+  execFileSync(process.execPath, [script, dir], { stdio: "pipe" });
+  const first = read(join(dir, "readable-display.md"), "utf8");
+  // 운영자가 이미 읽고 있는 파일처럼 내용을 달리해 둔다 — 다시 실행해도 이 내용이 남아야 한다
+  const mine = `${first}\n(운영자가 이미 읽은 파일)`;
+  writeFileSync(join(dir, "readable-display.md"), mine);
+  const again = spawnSync(process.execPath, [script, dir], { encoding: "utf8" });
+  assert.notEqual(again.status, 0, "이미 있으면 실패로 끝난다");
+  assert.match(again.stderr, /이미 있어 덮어쓰지 않았습니다/);
+  assert.equal(read(join(dir, "readable-display.md"), "utf8"), mine, "기존 파일은 한 글자도 바뀌지 않았다");
+  assert.deepEqual(readdirSync(dir).sort(), ["readable-display.md", "report.json"], "다른 파일도 생기지 않았다");
+  // 다른 이름은 새로 만들 수 있다
+  const other = join(dir, "readable-display-2.md");
+  execFileSync(process.execPath, [script, dir, "--out", other], { stdio: "pipe" });
+  assert.equal(read(other, "utf8"), first, "새 이름의 파일이 만들어진다");
+  assert.equal(read(join(dir, "readable-display.md"), "utf8"), mine, "그때도 기존 파일은 그대로");
+  // --out이 이미 있는 파일(원문 · 저장된 리포트 포함)을 가리켜도 거절한다
+  const reportBefore = read(join(dir, "report.json"), "utf8");
+  const overReport = spawnSync(process.execPath, [script, dir, "--out", join(dir, "report.json")], { encoding: "utf8" });
+  assert.notEqual(overReport.status, 0);
+  assert.equal(read(join(dir, "report.json"), "utf8"), reportBefore, "저장된 리포트를 덮어쓰지 않는다");
 });

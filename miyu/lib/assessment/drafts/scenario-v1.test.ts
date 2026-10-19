@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "../modules/index.ts";
 import { BLOCK_PLAN } from "../../report/reading/plan.ts";
@@ -225,7 +226,7 @@ test("후보 장면 4개는 선택지가 중립이고 짝 장면이 실제로 �
 test("초안은 별도 버전이다: scenario-v1.ts는 다른 모듈을 불러오지 않고, 화면 · 저장 · 리포트 · 문항 기록에 연결돼 있지 않으며, 22문항을 바꾸지 않았다", () => {
   const src = readFileSync(new URL("./scenario-v1.ts", import.meta.url), "utf8");
   assert.doesNotMatch(src, /^import /m, "초안은 다른 모듈을 불러오지 않는다");
-  const root = new URL("../../../", import.meta.url).pathname;
+  const root = fileURLToPath(new URL("../../../", import.meta.url));
   const hits: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {

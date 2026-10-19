@@ -458,9 +458,9 @@ node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/repo
 git fetch origin $br
 $in = @(git show "origin/${br}:./lib/config/ai-candidates.ts" | Select-String -SimpleMatch "runsDone: 5,").Count
 if ($in -ne 1) { Write-Host "중단: 가져올 파일의 'runsDone: 5,'가 $in 줄입니다. 아무것도 바꾸지 않았습니다 — 화면을 알려 주세요" } else {
-  # ③ 로컬 사본을 따로 보관한 뒤, 가져올 쪽의 5/5 파일 한 개만 받고, 이어서 나머지를 가져온다(되돌아가는 단계 없음)
+  # ③ 로컬 사본을 따로 보관한 뒤(이름은 반드시 .ts.bak — .ts로 끝나는 이름은 타입 검사 · 린트가 코드로 읽는다), 가져올 쪽의 5/5 파일 한 개만 받고, 이어서 나머지를 가져온다(되돌아가는 단계 없음)
   New-Item -ItemType Directory -Force pilot-data | Out-Null
-  Copy-Item lib\config\ai-candidates.ts pilot-data\ai-candidates.local-5of5.bak -Force
+  Copy-Item lib\config\ai-candidates.ts pilot-data\ai-candidates.local-5of5.ts.bak -Force
   git checkout "origin/$br" -- lib/config/ai-candidates.ts
   git pull --ff-only origin $br
 }
@@ -471,7 +471,7 @@ node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/repo
 git status --short
 ```
 
-- ②에서 "중단"이 나오면 PC 파일은 그대로(`5/5`)다. ③ 도중에 문제가 생겨 ④가 5/5가 아니면 **실행 명령을 치지 말고** 보관한 사본을 `Copy-Item pilot-data\ai-candidates.local-5of5.bak lib\config\ai-candidates.ts -Force`로 되돌린 뒤 화면을 알려 준다(되돌리는 쪽이 `git checkout`이 아니라 5/5 사본이다).
+- ②에서 "중단"이 나오면 PC 파일은 그대로(`5/5`)다. ③ 도중에 문제가 생겨 ④가 5/5가 아니면 **실행 명령을 치지 말고** 보관한 사본을 `Copy-Item pilot-data\ai-candidates.local-5of5.ts.bak lib\config\ai-candidates.ts -Force`로 되돌린 뒤 화면을 알려 준다(되돌리는 쪽이 `git checkout`이 아니라 5/5 사본이다).
 - `git pull --ff-only`가 그래도 멈추면(`ai-candidates.ts`가 아닌 다른 파일을 PC에서 고쳤다는 뜻) 지우지 말고 `git status --short` 화면을 알려 준다.
 - `pilot-data`(결과 폴더 · `RUN-LEDGER.txt` · 위 사본)는 저장소에 올라가지 않는 폴더라 pull이 건드리지 않는다.
 - **확인한 것(이 개발 환경의 임시 복제본, 실제 Windows · 실제 GitHub는 아님)**: 커밋 `f240320` 상태에서 `runsDone: 5,` 한 줄만 고친 복제본을 만들고 위 ②~③을 실행 → ① 가져올 쪽 확인 통과 ② 파일은 어느 시점에도 `runsDone: 5,` ③ `git pull --ff-only` 성공 · `git status`에 수정 없음. 가져올 쪽이 아직 `4`인 경우를 만들어 ②를 실행 → "중단", 로컬 `runsDone: 5,` 그대로. PowerShell의 인코딩 · 줄 끝(CRLF) 처리는 이 환경에서 확인하지 못했다 — `git checkout`은 PC의 줄 끝 설정을 따르고 파일을 직접 쓰지 않아서 인코딩 문제를 피하도록 했지만, 실제 PC에서는 ④로 확인한다.
@@ -616,9 +616,9 @@ node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/repo
 git fetch origin $br
 $in = @(git show "origin/${br}:./lib/config/ai-candidates.ts" | Select-String -SimpleMatch "runsDone: 6,").Count
 if ($in -ne 1) { Write-Host "중단: 가져올 파일의 'runsDone: 6,'가 $in 줄입니다. 아무것도 바꾸지 않았습니다 — 화면을 알려 주세요" } else {
-  # ③ 로컬 사본을 따로 보관한 뒤, 가져올 쪽의 6/6 파일 한 개만 받고, 이어서 나머지를 가져온다(되돌아가는 단계 없음)
+  # ③ 로컬 사본을 따로 보관한 뒤(이름은 반드시 .ts.bak — .ts로 끝나는 이름은 타입 검사 · 린트가 코드로 읽는다), 가져올 쪽의 6/6 파일 한 개만 받고, 이어서 나머지를 가져온다(되돌아가는 단계 없음)
   New-Item -ItemType Directory -Force pilot-data | Out-Null
-  Copy-Item lib\config\ai-candidates.ts pilot-data\ai-candidates.local-6of6.bak -Force
+  Copy-Item lib\config\ai-candidates.ts pilot-data\ai-candidates.local-6of6.ts.bak -Force
   git checkout "origin/$br" -- lib/config/ai-candidates.ts
   git pull --ff-only origin $br
 }
@@ -629,7 +629,7 @@ node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/repo
 git status --short
 ```
 
-- ②에서 "중단"이 나오면 PC 파일은 그대로(`6/6`)다. ③ 도중에 문제가 생겨 ④가 6/6이 아니면 **실행 명령을 치지 말고** 보관한 사본을 `Copy-Item pilot-data\ai-candidates.local-6of6.bak lib\config\ai-candidates.ts -Force`로 되돌린 뒤 화면을 알려 준다.
+- ②에서 "중단"이 나오면 PC 파일은 그대로(`6/6`)다. ③ 도중에 문제가 생겨 ④가 6/6이 아니면 **실행 명령을 치지 말고** 보관한 사본을 `Copy-Item pilot-data\ai-candidates.local-6of6.ts.bak lib\config\ai-candidates.ts -Force`로 되돌린 뒤 화면을 알려 준다.
 - `git pull --ff-only`가 그래도 멈추면(`ai-candidates.ts`가 아닌 다른 파일을 PC에서 고쳤다는 뜻) 지우지 말고 `git status --short` 화면을 알려 준다.
 - ④ 뒤 `lastRun`을 인용한 거절 문구가 6차 값(316.45원 · 지시문 0.8)으로 보여야 한다 — 이전에 보고된 "거절 문구가 5차 기록을 인용한다"는 어긋남이 이 동기화로 풀린다.
 - 이후 어떤 이유로도 `--execute`를 다시 치지 않는다 · 새 호출이 필요하면 운영자가 다시 승인한다.
@@ -649,6 +649,8 @@ npm.cmd run dev
 # 브라우저: http://localhost:3000/dev/live/story7-own-20261019-025234  → "심층 리포트" 6번 장
 ```
 
-`export-readable-display.ts`는 새 파일 `readable-display.md` 하나만 만들고 `round1.txt`(원문) · `report.json` · `readable.md`는 건드리지 않는다(해시를 비교하려면 실행 전후 `Get-FileHash`). 6번 장에서 볼 것: ① 시기 칸을 누르면 풀이가 열리는지 ② 막대를 누르면 같은 칸이 열리는지 ③ 연-월(예: `2022.12`)이나 "N개월"이 없는지 ④ 개운 카드가 금 · 목 같은 무게로 보이는지. 이상하면 화면 캡처와 함께 알려 준다 — 같은 명령으로 호출이 나가지 않는다(AI 호출 코드는 이번에 바뀌지 않았고 6/6에서 `--execute`는 거절된다).
+`export-readable-display.ts`는 새 파일 `readable-display.md` 하나만 만들고 `round1.txt`(원문) · `report.json` · `readable.md`는 건드리지 않는다(해시를 비교하려면 실행 전후 `Get-FileHash`). **같은 이름의 파일이 이미 있으면 덮어쓰지 않고 멈춘다**("중단: … 이미 있어 덮어쓰지 않았습니다", 종료 코드 1 · 기존 파일은 한 글자도 그대로) — 이미 만든 `readable-display.md`는 안전하고, 다른 이름이 필요하면 `--out <새 파일 경로>`를 쓴다(그 경로에도 이미 파일이 있으면 같은 이유로 멈춘다). 6번 장에서 볼 것: ① 시기 칸을 누르면 풀이가 열리는지 ② 막대를 누르면 같은 칸이 열리는지 ③ 연-월(예: `2022.12`)이나 "N개월"이 없는지 ④ 개운 카드가 금 · 목 같은 무게로 보이는지. 이상하면 화면 캡처와 함께 알려 준다 — 같은 명령으로 호출이 나가지 않는다(AI 호출 코드는 이번에 바뀌지 않았고 6/6에서 `--execute`는 거절된다).
 
 **실제로 수행한 동기화(Windows 세션 보고 2026-10-19, 개발 환경의 임시 복제본 시험과 별개로 실제 PC에서 확인된 값)**: 이 순서 그대로 — 가져올 쪽 `ai-candidates.ts`의 `runsDone: 6,`가 정확히 한 줄인지 확인 → 로컬 고유 사본 보관 → `origin/<브랜치>`의 파일 한 개 받기 → `git pull --ff-only` — 로 끝냈고, 5/6으로 되돌린 순간은 없었다. 결과: `HEAD a368f52` · `git status` 깨끗 · 네트워크 없는 상태 조회 6/6 거절 · `lastRun` 316.45원 · 누적 4,314.89원 · `RUN-LEDGER.txt` 2행 · 원문(4 · 5 · 6차 `round1.txt`) · 6차 `readable.md` · `.env.local` 해시 불변 · `own-run` 무료 시험 14개 통과. 추가 AI 호출 0. 이후 이 파일을 건드리는 커밋이 없는 한(예: 화면 수정 커밋 `b675c75`는 `ai-candidates.ts`를 바꾸지 않았다) 그냥 `git pull --ff-only`로 충분하다.
+
+**백업 이름 정정(Windows 보고 2026-10-19)**: 먼저 만든 로컬 사본이 `.ts`로 끝나는 이름이라 타입 검사가 코드로 읽어 오류 2건이 났다. Windows에서 내용 그대로 `*.ts.bak`로 이름을 바꿔 해시가 같고 타입 검사 오류 0건임을 확인했다. 앞으로 만드는 사본은 위 명령처럼 `ai-candidates.local-6of6.ts.bak`(14-3은 `…5of5.ts.bak`) 이름을 쓴다 — `.ts`로 끝나는 사본을 만들지 않는다.
