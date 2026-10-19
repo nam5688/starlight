@@ -18,6 +18,7 @@ import { buildDevFreeSummary } from "./build-free-summary.ts";
 import { buildIdentity } from "./identity.ts";
 import { renderReadingMarkdown } from "./reading/render-text.ts";
 import { buildTalkModel } from "./reading/talk.ts";
+import { normalizeEol, readSource } from "./test-source.ts";
 import { assessmentTypeTitle, legacyTypeTitle, personalTypeTitle, resolveTypeTitle, typeTitleFor } from "./type-title.ts";
 import type { FreeSummary } from "./types.ts";
 
@@ -229,24 +230,53 @@ test("옛 모양으로 되돌리는 길: 스위치를 끄면(legacy) 저장된 �
   assert.equal(typeTitleFor({ saju: DOMINANT["관성"], summary: summaryOf(scoresToward("관성", "a")) }, "확인추구형")?.kind, "type");
 });
 
-test("연결 점검(정적): 결과 화면 · 심층 리포트 · 대화 · 관리자 보기 · 읽기용 글이 모두 단일 입구를 거치고 옛 대표 경향 이름을 직접 그리지 않는다", () => {
-  const read = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
+/** 연결 점검(정적)에 걸리는 문제 목록 — read는 저장소 기준 상대 경로의 소스를 읽어 주는 함수(줄바꿈은 LF로 정규화된 글) */
+function wiringProblems(read: (p: string) => string): string[] {
+  const bad: string[] = [];
+  const need = (ok: boolean, why: string) => {
+    if (!ok) bad.push(why);
+  };
   const results = read("app/results/[id]/page.tsx");
-  assert.match(results, /const typeTitle = assessmentTypeTitle\(assessment\)/);
+  need(/const typeTitle = assessmentTypeTitle\(assessment\)/.test(results), "결과 화면: typeTitle 단일 입구");
   for (const needle of ["<ReadingReportView report={content} typeTitle={typeTitle}", "<PersonalV2View report={content} typeTitle={typeTitle}", "<FullReportView report={content} typeTitle={typeTitle}", "buildTalkModel(content, { typeTitle,", "typeTitle: assessmentTypeTitle(assessment)", "<IdentityCard identity={identity} showType={PERSONAL_TYPE.visible}"]) {
-    assert.ok(results.includes(needle), `결과 화면: ${needle}`);
+    need(results.includes(needle), `결과 화면: ${needle}`);
   }
   const talk = read("server/talk-model.ts");
-  assert.match(talk, /const typeTitle = assessmentTypeTitle\(assessment\)/);
-  assert.ok(talk.includes("buildTalkModel(report.content, { typeTitle,") && talk.includes("    typeTitle,\n  });"), "대화: 심층 · 무료 모델이 같은 값을 쓴다");
-  const admin = read("app/admin/report/[orderNumber]/page.tsx");
-  assert.ok(admin.includes("typeTitle={view.typeTitle}"), "관리자 읽기 전용 보기도 고객이 보는 값");
-  const adminSvc = read("lib/services/admin-support-service.ts");
-  assert.ok(adminSvc.includes("renderReadingMarkdown(content, { typeTitle })"), "관리자의 복사용 글도 같은 값");
+  need(/const typeTitle = assessmentTypeTitle\(assessment\)/.test(talk), "대화: typeTitle 단일 입구");
+  need(talk.includes("buildTalkModel(report.content, { typeTitle,") && talk.includes("    typeTitle,\n  });"), "대화: 심층 · 무료 모델이 같은 값을 쓴다");
+  need(read("app/admin/report/[orderNumber]/page.tsx").includes("typeTitle={view.typeTitle}"), "관리자 읽기 전용 보기도 고객이 보는 값");
+  need(read("lib/services/admin-support-service.ts").includes("renderReadingMarkdown(content, { typeTitle })"), "관리자의 복사용 글도 같은 값");
   // 컴포넌트는 옛 이름 사전(TENDENCY_NAMES · tendencyPhrase)을 직접 읽지 않는다
   for (const f of ["components/report/reading-report-view.tsx", "components/report/summary-blocks.tsx", "components/talk/analysis-card.tsx", "components/talk/talk-view.tsx"]) {
-    assert.ok(!/TENDENCY_NAMES|tendencyPhrase/.test(read(f)), `${f}: 옛 대표 경향 사전을 직접 읽지 않는다`);
+    need(!/TENDENCY_NAMES|tendencyPhrase/.test(read(f)), `${f}: 옛 대표 경향 사전을 직접 읽지 않는다`);
   }
   // 유형을 보이는 카드는 개인 유형이 켜져 있을 때 무료 결과의 옛 ① 블록을 숨긴다
-  assert.match(read("components/report/free-preview-body.tsx"), /!PERSONAL_TYPE\.visible \?/);
+  need(/!PERSONAL_TYPE\.visible \?/.test(read("components/report/free-preview-body.tsx")), "무료 결과의 옛 ① 블록은 개인 유형이 꺼져 있을 때만");
+  return bad;
+}
+const readRepoSource = (p: string) => readSource(new URL(`../../${p}`, import.meta.url));
+
+test("연결 점검(정적): 결과 화면 · 심층 리포트 · 대화 · 관리자 보기 · 읽기용 글이 모두 단일 입구를 거치고 옛 대표 경향 이름을 직접 그리지 않는다", () => {
+  assert.deepEqual(wiringProblems(readRepoSource), []);
+});
+
+test("연결 점검(정적) CRLF 회귀: Windows(core.autocrlf=true)처럼 소스가 CRLF여도 줄바꿈을 LF로 맞춰 읽으면 같은 점검이 통과한다 — 점검을 지우지 않는다", () => {
+  const toCrlf = (text: string) => text.replace(/\r?\n/g, "\r\n");
+  // 작업 폴더의 소스가 CRLF인 상태를 흉내 낸다: 원본을 CRLF로 바꾼 글을 정규화해서 읽는다
+  assert.deepEqual(wiringProblems((p) => normalizeEol(toCrlf(readFileSync(new URL(`../../${p}`, import.meta.url), "utf8")))), []);
+  // 정규화하지 않은 CRLF 글에는 줄바꿈이 든 문자열이 없다 — 이 점검이 Windows에서 실패했던 이유를 그대로 재현한다
+  const raw = toCrlf(readFileSync(new URL("../../server/talk-model.ts", import.meta.url), "utf8"));
+  assert.ok(raw.includes("\r\n") && !raw.includes("    typeTitle,\n  });"), "CRLF 원문에서는 LF 문자열이 찾아지지 않는다");
+  assert.ok(normalizeEol(raw).includes("    typeTitle,\n  });"), "정규화하면 찾아진다");
+  // 글자는 바꾸지 않는다: 정규화한 CRLF 글은 원본(LF)과 한 글자도 다르지 않다
+  const lf = readFileSync(new URL("../../server/talk-model.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(normalizeEol(raw), lf);
+  assert.equal(normalizeEol("a\r\nb\rc\nd"), "a\nb\nc\nd");
+});
+
+test("연결 점검(정적)은 비어 있는 점검이 아니다: 연결이 끊긴 소스를 넣으면 문제를 찾아낸다", () => {
+  const broken = wiringProblems((p) => (p === "server/talk-model.ts" ? "export const x = 1;\n" : readRepoSource(p)));
+  assert.ok(broken.length >= 2, `끊긴 연결을 찾아낸다: ${broken.join(" / ")}`);
+  const brokenView = wiringProblems((p) => (p === "components/talk/talk-view.tsx" ? "const n = TENDENCY_NAMES;\n" : readRepoSource(p)));
+  assert.ok(brokenView.some((m) => m.includes("talk-view.tsx")));
 });
