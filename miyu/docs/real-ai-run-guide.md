@@ -651,6 +651,15 @@ npm.cmd run dev
 
 `export-readable-display.ts`는 새 파일 `readable-display.md` 하나만 만들고 `round1.txt`(원문) · `report.json` · `readable.md`는 건드리지 않는다(해시를 비교하려면 실행 전후 `Get-FileHash`). **같은 이름의 파일이 이미 있으면 덮어쓰지 않고 멈춘다**("중단: … 이미 있어 덮어쓰지 않았습니다", 종료 코드 1 · 기존 파일은 한 글자도 그대로) — 이미 만든 `readable-display.md`는 안전하고, 다른 이름이 필요하면 `--out <새 파일 경로>`를 쓴다(그 경로에도 이미 파일이 있으면 같은 이유로 멈춘다). 6번 장에서 볼 것: ① 시기 칸을 누르면 풀이가 열리는지 ② 막대를 누르면 같은 칸이 열리는지 ③ 연-월(예: `2022.12`)이나 "N개월"이 없는지 ④ 개운 카드가 금 · 목 같은 무게로 보이는지. 이상하면 화면 캡처와 함께 알려 준다 — 같은 명령으로 호출이 나가지 않는다(AI 호출 코드는 이번에 바뀌지 않았고 6/6에서 `--execute`는 거절된다).
 
+**새 10유형 표시용 읽기 파일이 필요할 때(과거 `readable-display.md`는 그대로 두기)** — 새 파일 이름을 `--output-file`로 정한다(짧은 이름 `--out`도 같은 뜻, `--output-file=<경로>` 꼴도 된다). 쓰기는 같은 "새로 만들 때만(`wx`)"이라 **이미 있는 파일을 가리키면 어떤 이름이든 덮어쓰지 않고 멈추고**(AI 원문 · `report.json` · `readable.md` · 과거 `readable-display.md` 포함), 이름이 없거나 서로 다른 두 이름을 주면 아무것도 만들지 않고 멈춘다. 경로를 따로 쓰지 않으면 지금 폴더에 만들어지므로 결과 폴더 안에 두려면 경로를 함께 적는다(시험 `tendency-title.test.ts`가 전후 내용을 비교한다):
+
+```powershell
+node scripts/export-readable-display.ts pilot-data\ai-compare\story7-own-20261019-025234 `
+  --output-file "pilot-data\ai-compare\story7-own-20261019-025234\readable-display-types10.md"
+notepad pilot-data\ai-compare\story7-own-20261019-025234\readable-display-types10.md
+```
+
+
 **실제로 수행한 동기화(Windows 세션 보고 2026-10-19, 개발 환경의 임시 복제본 시험과 별개로 실제 PC에서 확인된 값)**: 이 순서 그대로 — 가져올 쪽 `ai-candidates.ts`의 `runsDone: 6,`가 정확히 한 줄인지 확인 → 로컬 고유 사본 보관 → `origin/<브랜치>`의 파일 한 개 받기 → `git pull --ff-only` — 로 끝냈고, 5/6으로 되돌린 순간은 없었다. 결과: `HEAD a368f52` · `git status` 깨끗 · 네트워크 없는 상태 조회 6/6 거절 · `lastRun` 316.45원 · 누적 4,314.89원 · `RUN-LEDGER.txt` 2행 · 원문(4 · 5 · 6차 `round1.txt`) · 6차 `readable.md` · `.env.local` 해시 불변 · `own-run` 무료 시험 14개 통과. 추가 AI 호출 0. 이후 이 파일을 건드리는 커밋이 없는 한(예: 화면 수정 커밋 `b675c75`는 `ai-candidates.ts`를 바꾸지 않았다) 그냥 `git pull --ff-only`로 충분하다.
 
 **백업 이름 정정(Windows 보고 2026-10-19)**: 먼저 만든 로컬 사본이 `.ts`로 끝나는 이름이라 타입 검사가 코드로 읽어 오류 2건이 났다. Windows에서 내용 그대로 `*.ts.bak`로 이름을 바꿔 해시가 같고 타입 검사 오류 0건임을 확인했다. 앞으로 만드는 사본은 위 명령처럼 `ai-candidates.local-6of6.ts.bak`(14-3은 `…5of5.ts.bak`) 이름을 쓴다 — `.ts`로 끝나는 사본을 만들지 않는다.

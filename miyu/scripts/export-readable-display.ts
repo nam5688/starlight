@@ -1,14 +1,15 @@
-// 저장된 리포트(report.json)를 **AI를 부르지 않고(호출 0 · 비용 0원 · 키 불필요)** 읽는 순서의 글로 다시 내보낸다 — 새 파일 readable-display.md 하나만 만든다.
-// 쓰는 때: 읽기용 글(readable.md)에 화면과 달리 유형 이름(~형)이 빠져 있던 옛 파일을 새 표시 기준으로 다시 읽고 싶을 때.
-//   · 결과 폴더의 report.json과(유형 이름을 계산하려고) input.json을 읽기만 한다. attempts/round*.txt(AI 원문) · report.json · readable.md · input.json 등 기존 파일은 고치지도 덮어쓰지도 않는다.
+// 저장된 리포트(report.json)를 **AI를 부르지 않고(호출 0 · 비용 0원 · 키 불필요)** 읽는 순서의 글로 다시 내보낸다 — 새 파일 하나만 만든다(기본 이름 readable-display.md).
+// 쓰는 때: 읽기용 글(readable.md)에 화면과 달리 유형 이름(~형)이 빠져 있던 옛 파일을 새 표시 기준(나의 유형 10개 + 혼합 경향)으로 다시 읽고 싶을 때.
+//   · 결과 폴더의 report.json과(유형 이름을 계산하려고) input.json을 읽기만 한다. attempts/round*.txt(AI 원문) · report.json · readable.md · readable-display.md · input.json 등 기존 파일은 고치지도 덮어쓰지도 않는다.
 //   · 나의 유형(개인 유형 10개 + 혼합 경향)은 저장된 값이 아니라 그 입력의 사주 + 응답으로 화면과 같은 코드가 계산한다. input.json이 없으면 이름 줄만 빠지고 그 사실을 안내한다.
 //   · 형식 검사에 걸려 report.json이 없는 폴더는 이 스크립트가 아니라 `recheck-own-draft.ts`(원문에서 풀어 쓰기)를 쓴다.
 //
 // 이미 같은 이름의 파일이 있으면 **덮어쓰지 않고 멈춘다**(쓰기 방식이 "새로 만들 때만"이다 — 먼저 만든 readable-display.md도 지키고, 다른 이름을 고르는 길도 있다).
+// 새 파일 이름은 `--output-file <새 파일 경로>`(같은 뜻의 짧은 이름 `--out`도 된다, `--output-file=<경로>` 꼴도 된다)로 정한다. 경로를 따로 쓰지 않으면 현재 폴더에 만들어지니 결과 폴더 안에 두려면 폴더 경로를 함께 적는다.
 //
 // 사용 (miyu 폴더, PowerShell):
 //   node scripts/export-readable-display.ts <결과 폴더 경로>
-//   node scripts/export-readable-display.ts <결과 폴더 경로> --out <새 파일 경로>   # 이미 readable-display.md가 있을 때 다른 이름으로
+//   node scripts/export-readable-display.ts <결과 폴더 경로> --output-file "<결과 폴더 경로>\readable-display-types10.md"   # 이미 readable-display.md가 있을 때 새 이름으로
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isReadingReport } from "../lib/report/generator.ts";
@@ -16,13 +17,39 @@ import { captureForRun, ownTypeTitle, parseOwnCapture } from "../lib/report/ai/o
 import { isHourUnknown } from "../lib/report/reading/hour-text.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
 
+const USAGE = "사용: node scripts/export-readable-display.ts <결과 폴더 경로> [--output-file <새 파일 경로>]  (--out 도 같은 뜻)";
 const args = process.argv.slice(2);
-const outFlag = args.indexOf("--out");
-const outArg = outFlag >= 0 ? args[outFlag + 1] : undefined;
-const outValueAt = outFlag >= 0 ? outFlag + 1 : -1; // --out 뒤의 값은 결과 폴더로 읽지 않는다(--out이 없으면 -1이라 어느 인자도 빠지지 않는다)
-const dir = args.find((a, i) => !a.startsWith("--") && i !== outValueAt);
-if (!dir || (outFlag >= 0 && !outArg)) {
-  console.error("사용: node scripts/export-readable-display.ts <결과 폴더 경로> [--out <새 파일 경로>]");
+// 새 파일 이름 옵션: --output-file <경로> · --output-file=<경로> · --out <경로> · --out=<경로>
+const NAME_FLAGS = ["--output-file", "--out"];
+const values: string[] = [];
+const valueAt = new Set<number>();
+let flagSeen = false;
+let flagMissing = false;
+args.forEach((a, i) => {
+  for (const f of NAME_FLAGS) {
+    if (a === f) {
+      flagSeen = true;
+      if (args[i + 1] === undefined || args[i + 1].startsWith("--")) flagMissing = true;
+      else {
+        values.push(args[i + 1]);
+        valueAt.add(i + 1);
+      }
+    } else if (a.startsWith(`${f}=`)) {
+      flagSeen = true;
+      if (a.length === f.length + 1) flagMissing = true;
+      else values.push(a.slice(f.length + 1));
+    }
+  }
+});
+// 같은 옵션을 두 번 주거나 서로 다른 두 이름을 주면 어느 쪽인지 알 수 없으니 아무것도 만들지 않고 멈춘다
+if (flagMissing || new Set(values).size > 1 || values.length > 2) {
+  console.error(`중단: 새 파일 이름을 하나만 정확히 적어 주세요. 아무 파일도 만들지 않았습니다.\n${USAGE}`);
+  process.exit(2);
+}
+const outArg = values[0];
+const dir = args.find((a, i) => !a.startsWith("--") && !valueAt.has(i));
+if (!dir || (flagSeen && !outArg)) {
+  console.error(USAGE);
   process.exit(2);
 }
 const file = join(dir, "report.json");
@@ -63,7 +90,7 @@ try {
   writeFileSync(out, body, { flag: "wx" });
 } catch (e) {
   if ((e as NodeJS.ErrnoException).code === "EEXIST") {
-    console.error(`중단: ${out} 이 이미 있어 덮어쓰지 않았습니다. 기존 파일은 그대로입니다. 다른 이름으로 만들려면 --out <새 파일 경로>를 쓰세요.`);
+    console.error(`중단: ${out} 이 이미 있어 덮어쓰지 않았습니다. 기존 파일은 그대로입니다. 다른 이름으로 만들려면 --output-file <새 파일 경로>를 쓰세요.`);
     process.exit(1);
   }
   throw e;

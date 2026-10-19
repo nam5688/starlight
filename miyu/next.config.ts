@@ -6,7 +6,8 @@ const PRIVATE_HEADERS = [
   { key: "Cache-Control", value: "private, no-store, max-age=0" },
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
-const PRIVATE_PATHS = ["/results", "/my", "/checkout", "/payments", "/admin", "/auth", "/setup", "/dev", "/api", "/invite"];
+// /pair(리포트 궁합) · /compat/report(사주 궁합 결과)도 로그인한 회원의 결과 화면이다 — 2026-10-19 QA에서 프레임워크 기본값에만 기대고 있던 것을 명시했다(/compat 자체는 입력을 저장하지 않는 공개 화면이라 제외)
+const PRIVATE_PATHS = ["/results", "/my", "/checkout", "/payments", "/admin", "/auth", "/setup", "/dev", "/api", "/invite", "/pair", "/compat/report"];
 
 const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },

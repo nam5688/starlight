@@ -151,6 +151,55 @@ test("새 표시용 내보내기는 이미 있는 파일을 덮어쓰지 않는�
   assert.equal(read(join(dir, "report.json"), "utf8"), reportBefore, "저장된 리포트를 덮어쓰지 않는다");
 });
 
+test("새 파일 이름 옵션 --output-file: 새 이름으로만 만들고(--out · = 꼴도 같음), 이미 있는 파일은 어떤 이름으로 가리켜도 덮어쓰지 않으며, 이름이 모호하면 아무것도 만들지 않는다", async () => {
+  const { writeFileSync, readFileSync: read, readdirSync } = await import("node:fs");
+  const { execFileSync, spawnSync } = await import("node:child_process");
+  const { join } = await import("node:path");
+  const script = fileURLToPath(new URL("../../../scripts/export-readable-display.ts", import.meta.url));
+  const dir = await fakeCaptureDir("export-readable-outputfile-", { withInput: false });
+  execFileSync(process.execPath, [script, dir], { stdio: "pipe" });
+  const first = read(join(dir, "readable-display.md"), "utf8");
+  const mine = `${first}\n(운영자가 이미 읽은 과거 기록)`;
+  writeFileSync(join(dir, "readable-display.md"), mine);
+  const before = Object.fromEntries(readdirSync(dir).map((f) => [f, read(join(dir, f), "utf8")]));
+
+  // 1) --output-file <새 경로> : 새 이름으로 만들어지고 과거 기록은 그대로
+  const a = join(dir, "readable-display-types10.md");
+  execFileSync(process.execPath, [script, dir, "--output-file", a], { stdio: "pipe" });
+  assert.equal(read(a, "utf8"), first, "--output-file로 새 파일이 만들어진다");
+  assert.equal(read(join(dir, "readable-display.md"), "utf8"), mine, "과거 기록(readable-display.md)은 한 글자도 바뀌지 않는다");
+  // 2) 같은 이름을 다시 가리키면 덮어쓰지 않고 멈춘다
+  const again = spawnSync(process.execPath, [script, dir, "--output-file", a], { encoding: "utf8" });
+  assert.notEqual(again.status, 0);
+  assert.match(again.stderr, /이미 있어 덮어쓰지 않았습니다/);
+  assert.match(again.stderr, /--output-file/, "안내 문구도 새 옵션 이름을 말한다");
+  // 3) = 꼴과 짧은 이름도 같다
+  const b = join(dir, "readable-display-b.md");
+  execFileSync(process.execPath, [script, dir, `--output-file=${b}`], { stdio: "pipe" });
+  assert.equal(read(b, "utf8"), first);
+  const c = join(dir, "readable-display-c.md");
+  execFileSync(process.execPath, [script, dir, "--out", c], { stdio: "pipe" });
+  assert.equal(read(c, "utf8"), first);
+  // 4) 이미 있는 AI 원문 · 저장된 리포트 · 읽기용 글을 가리켜도 거절 — 내용 그대로
+  for (const name of ["report.json", "readable-display.md"]) {
+    const over = spawnSync(process.execPath, [script, dir, "--output-file", join(dir, name)], { encoding: "utf8" });
+    assert.notEqual(over.status, 0, `${name}을 가리키면 거절`);
+  }
+  // 5) 이름이 없거나 서로 다른 두 이름이면 아무 파일도 만들지 않고 멈춘다
+  const filesBefore = readdirSync(dir).sort();
+  for (const bad of [[dir, "--output-file"], [dir, "--output-file="], [dir, "--output-file", join(dir, "x1.md"), "--out", join(dir, "x2.md")], [dir, "--output-file", "--out", join(dir, "x3.md")]]) {
+    const r = spawnSync(process.execPath, [script, ...bad], { encoding: "utf8" });
+    assert.notEqual(r.status, 0, `모호한 입력은 거절: ${bad.slice(1).join(" ")}`);
+  }
+  assert.deepEqual(readdirSync(dir).sort(), filesBefore, "거절한 실행은 파일을 만들지 않았다");
+  // 6) 같은 이름을 두 옵션으로 똑같이 주는 것은 모호하지 않다
+  const d = join(dir, "readable-display-d.md");
+  execFileSync(process.execPath, [script, dir, "--output-file", d, "--out", d], { stdio: "pipe" });
+  assert.equal(read(d, "utf8"), first);
+  // 7) 기존 파일(과거 기록 · 원문 · 리포트)은 모두 처음 그대로
+  for (const [f, text] of Object.entries(before)) assert.equal(read(join(dir, f), "utf8"), text, `${f} 불변`);
+});
+
 test("개인 유형 계산 확인(own-identity.ts)은 읽기 전용이다 — 결과 폴더에 아무것도 만들지 않고, 10개 유형 이름 또는 혼합 경향 중 하나와 옛 후보 이름을 따로 보인다", async () => {
   const { mkdtempSync, writeFileSync, readFileSync: read, readdirSync } = await import("node:fs");
   const { spawnSync } = await import("node:child_process");
