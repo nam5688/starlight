@@ -497,7 +497,9 @@ git status --short
 | 분량 | 전체 4,566자(4차 5,175자) — 숫자는 코드가 센 어림이다. 목표 분량 기준은 코드에 없다(장별 문단 상한 · 문단 60~420자만 있다) |
 | 이후 | 추가 유료 호출 권한 없음. 지시문 0.8 최소 보정 · 의심 문장 표 · 평가는 `story7-customer-voice-v1.md` 10장 |
 
-## 15. 개인 심층 6차 시험(지시문 0.8) — 운영자 신규 승인 2026-10-19 · 준비만 마침(이 개발 세션은 실제 호출을 하지 않았다)
+## 15. 개인 심층 6차 시험(지시문 0.8) — 운영자 신규 승인 2026-10-19 · 운영자 PC의 Windows 세션이 정확히 1회 실행했다(이 개발 세션은 실제 호출을 하지 않았다)
+
+**상태: 실행 완료 — 승인된 6회를 모두 썼다(`runsDone 6`). 아래 15-1~15-3은 실행 전 절차의 기록이고 같은 명령을 다시 치지 않는다(15-4에 결과, Windows 동기화).**
 
 **승인 기록(코드 `lib/config/ai-candidates.ts`의 `story7-own`)**: `runsApproved 6 · runsDone 5`(→ 실행 뒤 `6/6`). 승인 문장: 운영자 "0.8로 800원 이내 딱 1회 더 호출해서 확인해줘. 재시도는 하지 말고 사용 기록 바로 갱신한 다음 전문 읽고 내가 원하는 느낌인지 봐줘". **이 1회만의 승인이다** — 새 실제 호출 **정확히 1회**, 자동 재작성 · 재시도 **0회**(타임아웃 · 오류 · 출력 불명이어도 다시 부르지 않는다), 이번 호출 상한 **800원 그대로**, 누적 총 승인 **6,000원 그대로**, 이미 쓴 금액 **3,998.44원**(남은 2,001.56원). `runsDone 5`와 5차까지의 비용 · 원문 기록(`lastRun`)은 되돌리지 않았다(6차를 실행한 뒤 기록으로 갱신한다). 지시문은 현재 코드의 `story-7-prompt-0.8`, 입력은 PC의 같은 본인 입력(`--birth-time-unknown`, 2~5차와 같은 조건). 다른 유료 호출 · 배포 승인이 아니다.
 
@@ -582,3 +584,52 @@ node scripts/compare-own-runs.ts pilot-data\ai-compare\story7-own-20261019-01470
 2. 상태 조회(0번 명령)를 다시 쳐서 `story7-own 마친/허용: 6/6` · `실제 호출 거절됨: 이 승인(6건)은 이미 실행했습니다`가 나오는지 본다 — 네트워크 호출이 없어 몇 번이든 안전하다.
 3. 그다음 어떤 이유로도 `--execute`를 다시 치지 않는다. 새 호출이 필요하면 운영자가 다시 승인한다.
 4. 운영자가 결과(폴더 이름 · `RUN-LEDGER.txt` 마지막 줄 · 화면의 비용)를 이 방에 전달하면 개발방이 `lastRun` · 누적 비용을 코드에 기록해 푸시한다. 그다음 PC 동기화는 14-3의 순서를 쓰되 ②의 확인 문자열 `runsDone: 5,`를 `runsDone: 6,`으로 바꾼다. 글 평가는 운영자가 읽고 정한다 — 합격 · 동결을 이 문서가 선언하지 않는다.
+
+### 15-4. 6차 결과(운영자 PC의 Windows 세션 보고 기준 2026-10-19) · Windows가 최종 기록을 받는 방법
+
+이 환경에는 API 키가 없어 클라우드는 호출하지 않았고 결과 폴더와 원문 파일도 보지 못했다 — 아래는 Windows 세션 보고와 운영자가 붙여 넣은 읽는 순서 글을 근거로 한다.
+
+| 항목 | 값 |
+| --- | --- |
+| 실행 전 확인 | `pull` 전 HEAD `ea7d399`·작업 트리 깨끗·상태 조회 5/5 거절·6차 폴더와 장부 없음 → `git pull --ff-only`로 `0df1ee4` → 5/6 허용 · 무료 시험 89개 통과 · 드라이런 호출 1회 최악 712원(800원 이하) · 평소 예상 466원 · 남은 2,002원 · 입력은 5차와 같은 파일 |
+| 실행 · 비용 | `--execute` **정확히 1회**(재작성 · 재시도 0) · **316.45원**(입력 59,535 · 출력 6,073토큰 · 44.5초) · 누적 **4,314.89원** · 남은 **1,685.11원** · 1회 상한 800원 · 총 6,000원 그대로 |
+| 결과 폴더 | `story7-own-20261019-025234`(운영자 PC의 `pilot-data\ai-compare`, 저장소에 올리지 않는다) |
+| 형식 검사 | **첫 응답에서 통과 · 글 저장됨** · BLOCK 0 · WARN 2(6번 장 첫째 · 둘째 문단이 5문장) · 깊이 검사 통과 · 근거 활용 비율 0.875 · 자기 반복 최대 0.083 · `{name}` 잔존 0 |
+| 원문 보존 | `round1.txt`는 닫는 괄호 보충 없이 JSON이 완전히 읽힌다 · 해시 `9FA21A2A…169F`가 재검사 전후 같다 · 5차(`6C08632A…`) · 4차(`32058B7C…`) · `.env.local`도 그대로 |
+| 승인 기록 | Windows가 호출 직후 `ai-candidates.ts` 161행을 `runsDone: 5,` → `runsDone: 6,`으로 고쳤고(커밋하지 않음, `git diff`는 이 한 줄뿐) `RUN-LEDGER.txt`에 6차 행을 썼다 · 6/6에서 `--execute`가 거절되는 것을 네트워크 없이 확인했다 |
+| 이 개발방의 기록 | 코드 `runsApproved 6 · runsDone 6`(`story7-own`) · `lastRun` = 6차의 비용 · 누적 · 폴더 · "형식 검사 첫 응답 통과" · **"문장 품질 미승인"** · 시험 `own-run.test.ts`가 6/6 거절을 확인 |
+
+**형식 검사 통과는 글의 품질 합격이 아니다.** 5차의 두 BLOCK(형제를 사실처럼 쓴 문장 · 개운 문장의 시각 범위 누락)은 사라졌고 WARN은 7 → 2가 됐지만, 운영자는 전문을 읽고 고객용 서술이 아직 미완성이라고 판단했다. 문장을 근거와 대조한 평가는 `story7-customer-voice-v1.md` 11장. **합격 · 콘텐츠 동결 · 출시 GO가 아니다 · 추가 유료 호출 권한이 없다 · 지시문 0.8의 문구를 이번에 고치지 않았다.**
+
+#### Windows 동기화 (로컬 6/6 보호 · 되돌리는 checkout 없음 — 14-3과 같은 절차, 확인 문자열만 6)
+
+Windows `ai-candidates.ts`에는 위 `runsDone: 6,` 한 줄이 커밋 없이 남아 있고, 가져올 쪽도 같은 줄과 이웃한 줄(`lastRun` · 주석)을 바꿨으므로 그냥 `git pull`하면 "local changes would be overwritten"로 멈춘다. **`git checkout -- lib\config\ai-candidates.ts`(작업 파일을 커밋된 상태로 되돌리는 것)는 하지 않는다 — 커밋된 `0df1ee4`의 파일은 `5/6`(실제 호출 허용 상태)이라, 되돌린 순간부터 pull이 끝날 때까지 이 PC가 한 번 더 호출을 허용하는 상태가 되기 때문이다.** 아래 순서는 가져올 쪽의 `6/6` 파일을 **먼저 확인**한 뒤에만 파일을 바꾸므로 어느 순간에도 `5/x`로 읽히지 않는다.
+
+```powershell
+cd $HOME\Desktop\starlight-work\miyu
+$br = "claude/miyu-claude-code-setup-klw8ms"
+
+# ① 지금 이 PC가 6/6으로 거절하는지(네트워크 호출 없음 — 기대: 마친/허용 6/6 · 실제 호출 거절됨)
+node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/report/ai/compare-plan.ts')]).then(([a,b])=>{const s=a.COMPARE_STAGES.find(x=>x.name==='story7-own');console.log('story7-own 마친/허용: '+s.restrict.runsDone+'/'+s.restrict.runsApproved+' · 1회 상한 '+s.restrict.runCeilingKrw+'원 · 총액 '+s.capKrw+'원');const w=b.checkStageRestriction(s,{variant:'story-7',only:'A',persona:'OWN',alreadySpentGiven:true,twoRoundWorstKrw:700,execute:true});console.log(w.length?'실제 호출 거절됨: '+w.join(' / '):'실제 호출 허용 상태(횟수 남음)')})" 2>$null
+
+# ② 가져오기만(작업 파일은 바뀌지 않는다) + 가져올 쪽 파일에도 runsDone: 6, 가 정확히 한 줄 있는지 확인
+git fetch origin $br
+$in = @(git show "origin/${br}:./lib/config/ai-candidates.ts" | Select-String -SimpleMatch "runsDone: 6,").Count
+if ($in -ne 1) { Write-Host "중단: 가져올 파일의 'runsDone: 6,'가 $in 줄입니다. 아무것도 바꾸지 않았습니다 — 화면을 알려 주세요" } else {
+  # ③ 로컬 사본을 따로 보관한 뒤, 가져올 쪽의 6/6 파일 한 개만 받고, 이어서 나머지를 가져온다(되돌아가는 단계 없음)
+  New-Item -ItemType Directory -Force pilot-data | Out-Null
+  Copy-Item lib\config\ai-candidates.ts pilot-data\ai-candidates.local-6of6.bak -Force
+  git checkout "origin/$br" -- lib/config/ai-candidates.ts
+  git pull --ff-only origin $br
+}
+
+# ④ 확인 — 기대: 'runsDone: 6,' 한 줄 · 마친/허용 6/6 · 실제 호출 거절됨 · git status에 수정 없음(untracked만)
+Select-String -Path lib\config\ai-candidates.ts -SimpleMatch "runsDone: 6,"
+node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/report/ai/compare-plan.ts')]).then(([a,b])=>{const s=a.COMPARE_STAGES.find(x=>x.name==='story7-own');console.log('story7-own 마친/허용: '+s.restrict.runsDone+'/'+s.restrict.runsApproved);const w=b.checkStageRestriction(s,{variant:'story-7',only:'A',persona:'OWN',alreadySpentGiven:true,twoRoundWorstKrw:700,execute:true});console.log(w.length?'실제 호출 거절됨: '+w.join(' / '):'실제 호출 허용 상태(횟수 남음)')})" 2>$null
+git status --short
+```
+
+- ②에서 "중단"이 나오면 PC 파일은 그대로(`6/6`)다. ③ 도중에 문제가 생겨 ④가 6/6이 아니면 **실행 명령을 치지 말고** 보관한 사본을 `Copy-Item pilot-data\ai-candidates.local-6of6.bak lib\config\ai-candidates.ts -Force`로 되돌린 뒤 화면을 알려 준다.
+- `git pull --ff-only`가 그래도 멈추면(`ai-candidates.ts`가 아닌 다른 파일을 PC에서 고쳤다는 뜻) 지우지 말고 `git status --short` 화면을 알려 준다.
+- ④ 뒤 `lastRun`을 인용한 거절 문구가 6차 값(316.45원 · 지시문 0.8)으로 보여야 한다 — 이전에 보고된 "거절 문구가 5차 기록을 인용한다"는 어긋남이 이 동기화로 풀린다.
+- 이후 어떤 이유로도 `--execute`를 다시 치지 않는다 · 새 호출이 필요하면 운영자가 다시 승인한다.

@@ -215,18 +215,20 @@ test("본인 입력 내보내기는 켠 사람이 직접 적고 개발 서버일
 
 // ───── 7개 대주제(story-7) 본인 입력 시험 — 승인 범위 · 입력 확인 · 호출 한 번 · 읽기 전 지표 ─────
 
-test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 · 1회 상한 800원 그대로 — 6차 한 건이 운영자 신규 승인(2026-10-19)으로 허용돼 호출 횟수가 정확히 한 번 남는다(runsApproved 6 · runsDone 5)", async () => {
+test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 · 1회 상한 800원 그대로 — 6차 한 건(운영자 신규 승인 2026-10-19)까지 마쳐 허용 횟수를 모두 썼다(runsApproved 6 · runsDone 6)", async () => {
   const own = COMPARE_STAGES.find((s) => s.name === "story7-own")!;
   assert.equal(own.capKrw, 6000, "기존 승인 총액 그대로");
   assert.equal(own.restrict?.runCeilingKrw, 800, "4차 승인(2026-10-18): 이번 호출 상한 800원(3차는 700원 — 지시문 0.6과 프레임 근거로 최악 예약액이 늘었다)");
   assert.equal(own.restrict?.variant, "story-7");
   assert.equal(own.restrict?.persona, "OWN");
   assert.equal(own.restrict?.runsApproved, 6, "기존 5회 + 6차 한 건을 운영자가 신규 호출로 승인했다(2026-10-19) — 허용 횟수는 6회뿐이다");
-  assert.equal(own.restrict?.runsDone, 5, "5차까지 운영자 PC에서 마쳤다(2026-10-19 · 호출 1회 · 303.93원) — 마친 횟수와 5차 기록(lastRun)은 되돌리지 않았다. 6차를 실행한 뒤 기록으로 올린다");
-  assert.equal(own.restrict!.runsApproved - own.restrict!.runsDone, 1, "새로 허용된 호출은 정확히 1회다");
-  assert.match(own.restrict?.lastRun ?? "", /303\.93원/);
-  assert.match(own.restrict?.lastRun ?? "", /3,998\.44원/);
-  assert.match(own.restrict?.lastRun ?? "", /지시문 0\.7/);
+  assert.equal(own.restrict?.runsDone, 6, "6차까지 운영자 PC의 Windows 세션에서 마쳤다(2026-10-19 · 호출 1회 · 316.45원 · 누적 4,314.89원) — 호출 직후 6으로 올려 6/6으로 잠갔다");
+  assert.equal(own.restrict!.runsApproved - own.restrict!.runsDone, 0, "남은 신규 호출은 없다 — 추가 유료 호출 권한이 없다");
+  assert.match(own.restrict?.lastRun ?? "", /316\.45원/);
+  assert.match(own.restrict?.lastRun ?? "", /4,314\.89원/);
+  assert.match(own.restrict?.lastRun ?? "", /지시문 0\.8/);
+  assert.match(own.restrict?.lastRun ?? "", /문장 품질 미승인/, "형식 검사 통과를 품질 합격으로 기록하지 않는다");
+  assert.match(own.restrict?.lastRun ?? "", /BLOCK 0 · WARN 2/);
   const built = await ownReportInput(CAPTURE, NOW);
   assert.ok(built.ok);
   if (!built.ok) return;
@@ -235,7 +237,7 @@ test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6
   const ok = { variant: "story-7", only: "A", persona: "OWN", alreadySpentGiven: true, twoRoundWorstKrw: plan.firstCallWorstKrw, execute: true } as const;
   // 이 시험 입력(시험용 고정 응답)의 최악 — 운영자 본인 입력의 값은 운영자 PC의 0원 드라이런이 보여 준다(상한을 넘으면 실행하지 않는다)
   assert.ok(plan.firstCallWorstKrw < 800, `호출 1회의 최악 ${plan.firstCallWorstKrw}`);
-  // 4차 실행 전의 상태(승인된 4회 중 3회를 마침)로 상한 규칙을 계속 확인한다 — 지금 기록(5/6)의 판정은 아래에서 따로 확인한다
+  // 4차 실행 전의 상태(승인된 4회 중 3회를 마침)로 상한 규칙을 계속 확인한다 — 지금 기록(6/6)의 판정은 아래에서 따로 확인한다
   const before = { restrict: { ...own.restrict!, runsDone: 3 } };
   assert.deepEqual(checkStageRestriction(before, { ...ok, twoRoundWorstKrw: 690.2 }), [], "프레임 연결 뒤 최악 690.2원은 800원 상한 안이다(700원 그대로였다면 여유 9.8원뿐이었다)");
   assert.deepEqual(checkStageRestriction(before, { ...ok, twoRoundWorstKrw: 799.99 }), [], "승인 범위 안이면 통과한다");
@@ -245,17 +247,18 @@ test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6
   assert.ok(checkStageRestriction(before, { ...ok, persona: "P01" }).length > 0, "다른 인물은 안 된다");
   assert.ok(checkStageRestriction(before, { ...ok, only: "B" }).length > 0);
   assert.ok(checkStageRestriction(before, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 막힌다");
-  // 6차 승인(runsApproved 6 · runsDone 5): 호출 1회의 최악이 800원 이하이고 나머지 조건이 맞으면 실제 호출이 한 번 남아 있다 — 같은 승인으로 두 번은 안 된다
-  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 798 }), [], "6차: 허용 횟수가 한 번 남아 있고 최악 비용이 상한 안이면 거절 사유가 없다");
-  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 800 }), [], "상한과 같으면 통과한다");
-  assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 800.01 }).length > 0, "6차도 최악 비용이 800원을 넘으면 거절된다(상한은 올리지 않았다)");
-  assert.ok(checkStageRestriction(own, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 거절된다");
-  assert.ok(checkStageRestriction(own, { ...ok, variant: "story-v1" }).length > 0, "다른 지시문 변형은 안 된다");
-  assert.ok(checkStageRestriction(own, { ...ok, persona: "P01" }).length > 0, "다른 인물은 안 된다");
-  // 6차를 마치면(runsDone 6 — 운영자가 실행한 직후 기록으로 올린다) 실제 호출은 다시 거절되고, 드라이런은 계속 볼 수 있다
-  const after6 = { restrict: { ...own.restrict!, runsDone: 6 } };
-  assert.ok(checkStageRestriction(after6, ok).some((m) => /이미 실행/.test(m)), "허용된 6회를 쓰고 나면 새 실행은 막힌다(같은 승인으로 두 번 호출되지 않는다) — 타임아웃 · 오류 · 출력 불명이어도 다시 부르지 않는다");
-  assert.deepEqual(checkStageRestriction(after6, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
+  // 실행 직전의 상태(runsApproved 6 · runsDone 5 — 6차 승인을 반영했고 아직 실행하지 않은 합성 상태): 호출 1회의 최악이 800원 이하이고 나머지 조건이 맞으면 실제 호출이 한 번 남아 있다 — 같은 승인으로 두 번은 안 된다
+  const ready6 = { restrict: { ...own.restrict!, runsDone: 5 } };
+  assert.deepEqual(checkStageRestriction(ready6, { ...ok, twoRoundWorstKrw: 798 }), [], "실행 직전(5/6): 허용 횟수가 한 번 남아 있고 최악 비용이 상한 안이면 거절 사유가 없다");
+  assert.deepEqual(checkStageRestriction(ready6, { ...ok, twoRoundWorstKrw: 800 }), [], "상한과 같으면 통과한다");
+  assert.ok(checkStageRestriction(ready6, { ...ok, twoRoundWorstKrw: 800.01 }).length > 0, "6차도 최악 비용이 800원을 넘으면 거절된다(상한은 올리지 않았다)");
+  assert.ok(checkStageRestriction(ready6, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 거절된다");
+  assert.ok(checkStageRestriction(ready6, { ...ok, variant: "story-v1" }).length > 0, "다른 지시문 변형은 안 된다");
+  assert.ok(checkStageRestriction(ready6, { ...ok, persona: "P01" }).length > 0, "다른 인물은 안 된다");
+  // 지금 기록(runsDone 6 — 6차를 마친 뒤)은 실제 호출을 거절하고, 드라이런은 계속 볼 수 있다
+  assert.ok(checkStageRestriction(own, ok).some((m) => /이미 실행/.test(m)), "허용된 6회를 쓰고 나면 새 실행은 막힌다(같은 승인으로 두 번 호출되지 않는다) — 타임아웃 · 오류 · 출력 불명이어도 다시 부르지 않는다");
+  assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 1 }).some((m) => /이미 실행/.test(m)), "비용이 아무리 작아도 6/6에서는 거절된다");
+  assert.deepEqual(checkStageRestriction(own, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
   // 승인 반영 전의 상태(runsApproved 5 · runsDone 5)에서도 실제 호출은 거절된다 — 승인을 반영하기 전에 하는 "5/5 소진 거절 확인"과 같은 판정
   const before6 = { restrict: { ...own.restrict!, runsApproved: 5, runsDone: 5 } };
   assert.ok(checkStageRestriction(before6, ok).some((m) => /이미 실행/.test(m)), "승인 반영 전(5/5)에는 새 실행이 거절된다");
