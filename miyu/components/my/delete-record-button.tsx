@@ -1,8 +1,9 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { deleteReportRecordAction } from "@/app/my/actions";
+import { useBodyScrollLock } from "./body-scroll-lock";
 
 /** 확인창 안내 문구 — 무엇이 지워지고 무엇이 남는지 (lib/services/my-service.ts의 deleteReportRecord와 DB 함수 delete_assessment_record가 하는 일과 같아야 한다) */
 export const DELETE_RECORD_COPY = {
@@ -12,6 +13,8 @@ export const DELETE_RECORD_COPY = {
   targetTitle: "삭제할 기록",
   createdPrefix: "생성일",
   lead: "삭제하면 되돌릴 수 없어요.",
+  /** 가운데 스크롤 영역의 이름 (키보드 · 보조기기로 스크롤할 수 있게 이름을 준다) */
+  bodyLabel: "삭제되는 것과 그대로 남는 것 자세히 보기",
   removedTitle: "삭제되는 것",
   removed: [
     "이 결과로 받은 리포트 본문 (무료 리포트 · 심층 리포트)",
@@ -36,22 +39,32 @@ export const DELETE_RECORD_COPY = {
   pending: "삭제하는 중…",
 } as const;
 
-function Buttons({ onCancel }: { onCancel: () => void }) {
+/** 아래 고정 줄 — 안내가 아무리 길어도 취소 · 삭제하기는 늘 화면 안에 있다 (짧은 가로 화면에서는 줄여 안내 몫을 남긴다) */
+function Buttons({ onCancel, onDone }: { onCancel: () => void; onDone: () => void }) {
   const { pending } = useFormStatus();
+  const wasPending = useRef(false);
+  // 보내기가 끝났는데 이 창이 아직 열려 있다면(이미 처리 중이라는 안내 · 기록을 찾지 못함 등 화면이 그대로 남는 경우) 창을 닫아 둔다
+  useEffect(() => {
+    if (wasPending.current && !pending) onDone();
+    wasPending.current = pending;
+  }, [pending, onDone]);
   return (
-    <div className="mt-5 grid grid-cols-2 gap-2">
+    <div
+      data-testid="delete-record-foot"
+      className="grid shrink-0 grid-cols-2 gap-2 border-t border-line px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))] [@media(max-height:480px)]:px-4 [@media(max-height:480px)]:pt-2 [@media(max-height:480px)]:pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]"
+    >
       <button
         type="button"
         onClick={onCancel}
         disabled={pending}
-        className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line-strong bg-canvas px-3 text-[15px] font-semibold text-ink hover:bg-mist disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line-strong bg-canvas px-3 text-[15px] font-semibold text-ink hover:bg-mist disabled:cursor-wait disabled:opacity-60 [@media(max-height:480px)]:min-h-10"
       >
         {DELETE_RECORD_COPY.cancel}
       </button>
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex min-h-12 items-center justify-center rounded-xl bg-caution px-3 text-[15px] font-bold text-white hover:brightness-90 disabled:cursor-wait disabled:opacity-70"
+        className="inline-flex min-h-12 items-center justify-center rounded-xl bg-caution px-3 text-[15px] font-bold text-white hover:brightness-90 disabled:cursor-wait disabled:opacity-70 [@media(max-height:480px)]:min-h-10"
       >
         {pending ? DELETE_RECORD_COPY.pending : DELETE_RECORD_COPY.confirm}
       </button>
@@ -62,18 +75,49 @@ function Buttons({ onCancel }: { onCancel: () => void }) {
 /**
  * 리포트 카드의 "기록 삭제" — 버튼을 누르면 확인창이 열리고, 확인창의 "삭제하기"를 눌러야 지워진다. 취소 · Esc · 바깥 누르기는 아무것도 지우지 않는다.
  * 네이티브 `<dialog>`라 열려 있는 동안 뒤쪽 화면은 초점과 읽기에서 빠지고 닫으면 눌렀던 버튼으로 초점이 돌아온다. 삭제 중에는 두 버튼이 잠겨 두 번 눌러도 한 번만 보낸다(서버도 한 번만 지운다).
+ *
+ * 화면 안에 들어오게 하는 구조(휴대폰 · 카카오톡 앱 안 브라우저 실기기 보고 2026-10-19: 창 전체가 스크롤돼 제목이 위로 잘렸다):
+ *  - 창 높이는 보이는 화면(`.confirm-sheet`, 동적 뷰포트 높이)을 넘지 않는다.
+ *  - 위 고정 영역(제목 · 삭제할 기록 · 경고 한 줄)과 아래 고정 영역(취소 · 삭제하기)은 스크롤되지 않고, 가운데 긴 안내(삭제되는 것 · 남는 것)만 안에서 스크롤된다.
+ *  - 열 때 브라우저는 첫 버튼(취소)에 초점을 주고 그 자리로 스크롤하므로, 열자마자 제목으로 초점을 옮겨(스크롤 없이) 제목 · 대상이 처음부터 보이게 한다. 삭제하기 버튼에 초점을 주지 않는다.
+ *  - 열려 있는 동안 뒤쪽 화면 스크롤을 막고(`useBodyScrollLock`) 닫으면 원래 스크롤 위치와 눌렀던 버튼의 초점을 되돌린다.
  */
 export function DeleteRecordButton({ assessmentId, productName, subject, created }: { assessmentId: string; /** 카드의 리포트명 (예: 심층 리포트) */ productName: string; /** 카드의 표시 이름 · 분석 대상 (예: 지민 님 · 1995. 4. 12.) */ subject: string; /** 카드의 생성일 (이미 화면에 보이는 값) */ created: string }) {
-  const ref = useRef<HTMLDialogElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   const targetId = useId();
+  const leadId = useId();
   const bodyId = useId();
-  const close = () => ref.current?.close();
+  const { lock, release } = useBodyScrollLock();
+
+  const open = () => {
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.open) return;
+    lock();
+    dialog.showModal();
+    titleRef.current?.focus({ preventScroll: true });
+  };
+  const close = () => dialogRef.current?.close();
+  // 취소 · Esc · 바깥 누르기 — 무엇이든 닫히면 스크롤 위치와 초점을 열기 전으로 되돌린다
+  const onClosed = () => {
+    release(true);
+    openerRef.current?.focus({ preventScroll: true });
+  };
+  // 보내기를 마쳤는데도 이 화면이 남아 있는 경우: 위치는 이동한 화면이 정하므로 되돌리지 않고 닫는다
+  const onDone = () => {
+    release(false);
+    const dialog = dialogRef.current;
+    if (dialog?.open) dialog.close();
+  };
+
   return (
     <>
       <button
+        ref={openerRef}
         type="button"
-        onClick={() => ref.current?.showModal()}
+        onClick={open}
         aria-haspopup="dialog"
         aria-label={`${productName}, ${subject}, ${DELETE_RECORD_COPY.button}`}
         className="inline-flex min-h-11 items-center rounded-lg px-1 text-[14px] font-semibold text-caution underline underline-offset-2 hover:text-ink"
@@ -82,32 +126,44 @@ export function DeleteRecordButton({ assessmentId, productName, subject, created
         {DELETE_RECORD_COPY.button}
       </button>
       <dialog
-        ref={ref}
+        ref={dialogRef}
         aria-labelledby={titleId}
-        aria-describedby={`${targetId} ${bodyId}`}
+        aria-describedby={`${targetId} ${leadId} ${bodyId}`}
         data-testid="delete-record-dialog"
+        onClose={onClosed}
         onClick={(e) => {
           if (e.target === e.currentTarget) close();
         }}
-        className="m-auto max-h-[90dvh] w-[min(94vw,26rem)] overflow-y-auto rounded-3xl bg-canvas p-0 text-ink shadow-pop backdrop:bg-black/40"
+        className="confirm-sheet rounded-3xl bg-canvas p-0 text-ink shadow-pop backdrop:bg-black/40"
       >
-        <form action={deleteReportRecordAction.bind(null, assessmentId)} className="px-5 pt-6 pb-5">
-          <h2 id={titleId} className="text-[20px] leading-snug font-bold">
-            {DELETE_RECORD_COPY.title}
-          </h2>
-          <div id={targetId} data-testid="delete-record-target" className="mt-3 rounded-xl bg-mist px-3.5 py-3">
-            <p className="text-[13px] font-semibold text-ink-3">{DELETE_RECORD_COPY.targetTitle}</p>
-            <p className="mt-0.5 text-[16px] leading-snug font-bold break-words">{productName}</p>
-            <p className="mt-0.5 text-[14px] leading-[1.6] break-words text-ink-2">{subject}</p>
-            {created && (
-              <p className="mt-0.5 text-[13px] leading-[1.6] text-ink-3">
-                {DELETE_RECORD_COPY.createdPrefix} {created}
-              </p>
-            )}
+        <form action={deleteReportRecordAction.bind(null, assessmentId)} className="flex min-h-0 flex-1 flex-col">
+          <div data-testid="delete-record-head" className="shrink-0 px-5 pt-5 pb-3 [@media(max-height:480px)]:px-4 [@media(max-height:480px)]:pt-3 [@media(max-height:480px)]:pb-2">
+            <h2 ref={titleRef} id={titleId} tabIndex={-1} className="text-[20px] leading-snug font-bold outline-none [@media(max-height:480px)]:text-[17px]">
+              {DELETE_RECORD_COPY.title}
+            </h2>
+            <div id={targetId} data-testid="delete-record-target" className="mt-2.5 rounded-xl bg-mist px-3.5 py-2.5 [@media(max-height:480px)]:mt-1.5 [@media(max-height:480px)]:py-1.5">
+              <p className="text-[13px] font-semibold text-ink-3 [@media(max-height:480px)]:hidden">{DELETE_RECORD_COPY.targetTitle}</p>
+              <p className="mt-0.5 text-[16px] leading-snug font-bold break-words [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:text-[14px]">{productName}</p>
+              <p className="mt-0.5 text-[14px] leading-[1.5] break-words text-ink-2 [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:text-[13px]">{subject}</p>
+              {created && (
+                <p className="mt-0.5 text-[13px] leading-[1.5] text-ink-3 [@media(max-height:480px)]:mt-0 [@media(max-height:480px)]:text-[12px]">
+                  {DELETE_RECORD_COPY.createdPrefix} {created}
+                </p>
+              )}
+            </div>
+            <p id={leadId} className="mt-2.5 text-[15px] leading-[1.5] font-semibold text-caution [@media(max-height:480px)]:mt-1.5 [@media(max-height:480px)]:text-[13px]">
+              {DELETE_RECORD_COPY.lead}
+            </p>
           </div>
-          <div id={bodyId}>
-            <p className="mt-3 text-[15px] leading-[1.65] font-semibold text-caution">{DELETE_RECORD_COPY.lead}</p>
-            <h3 className="mt-4 text-[14px] font-bold text-ink-2">{DELETE_RECORD_COPY.removedTitle}</h3>
+          <div
+            id={bodyId}
+            data-testid="delete-record-body"
+            role="region"
+            aria-label={DELETE_RECORD_COPY.bodyLabel}
+            tabIndex={0}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-line px-5 pt-3 pb-3 [@media(max-height:480px)]:px-4 [@media(max-height:480px)]:pt-2 [@media(max-height:480px)]:pb-2"
+          >
+            <h3 className="text-[14px] font-bold text-ink-2">{DELETE_RECORD_COPY.removedTitle}</h3>
             <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[14px] leading-[1.6] text-ink-2">
               {DELETE_RECORD_COPY.removed.map((t) => (
                 <li key={t}>{t}</li>
@@ -125,7 +181,7 @@ export function DeleteRecordButton({ assessmentId, productName, subject, created
               ))}
             </ul>
           </div>
-          <Buttons onCancel={close} />
+          <Buttons onCancel={close} onDone={onDone} />
         </form>
       </dialog>
     </>

@@ -154,3 +154,48 @@ dd {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * 확인창(삭제 확인 등)이 화면 안에 들어오게 하는 틀. 휴대폰 · 카카오톡 앱 안 브라우저는 주소창 · 하단 막대가 움직여 화면 높이가 바뀌므로
+ *  - 높이는 "고정된 화면 영역의 100%"(앱 안 브라우저가 뷰포트 단위를 크게 알려 줘도 넘지 않는다)와 동적 뷰포트 높이(dvh) 중 작은 쪽을 넘지 않는다.
+ *  - 안쪽은 세로 flex라 위 · 아래 고정 영역은 줄지 않고(shrink 0) 가운데 영역만 줄어들며 스크롤한다(그 영역에 min-height: 0).
+ * `[open]`일 때만 flex로 바꾼다 — 닫힌 <dialog>의 display: none을 덮어쓰면 닫아도 화면에 남는다.
+ * 안전 영역(env)은 viewport-fit=cover를 켜지 않은 지금은 0이지만, 나중에 켜도 노치 · 홈 막대에 가리지 않도록 미리 빼 둔다.
+ */
+.confirm-sheet {
+  width: min(calc(100% - 1.5rem), 26rem);
+  max-width: none;
+  max-height: calc(100% - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  margin: auto;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+@supports (height: 100dvh) {
+  .confirm-sheet {
+    max-height: min(
+      calc(100% - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+      calc(100dvh - 1.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
+    );
+  }
+}
+
+.confirm-sheet[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-height: 480px) {
+  .confirm-sheet {
+    max-height: calc(100% - 0.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  @supports (height: 100dvh) {
+    .confirm-sheet {
+      max-height: min(
+        calc(100% - 0.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)),
+        calc(100dvh - 0.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))
+      );
+    }
+  }
+}

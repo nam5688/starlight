@@ -54,15 +54,16 @@ test("지우는 버튼은 확인창 안의 '삭제하기'로만 서버 액션을
   const dialog = src.slice(src.indexOf("<dialog"), src.indexOf("</dialog>"));
   assert.match(dialog, /deleteReportRecordAction\.bind\(null, assessmentId\)/);
   assert.match(dialog, /aria-labelledby=\{titleId\}/);
-  const opener = src.slice(src.indexOf("data-testid=\"delete-record-open\"") - 400, src.indexOf("data-testid=\"delete-record-open\""));
+  const opener = src.slice(src.indexOf("data-testid=\"delete-record-open\"") - 500, src.indexOf("data-testid=\"delete-record-open\""));
   assert.match(opener, /type="button"/, "열기 버튼은 보내지 않는다");
-  assert.match(opener, /showModal\(\)/);
+  assert.match(opener, /onClick=\{open\}/);
+  assert.match(src, /dialog\.showModal\(\)/);
   assert.match(opener, /min-h-11/);
   // 어느 카드인지 확인창 맨 위에 다시 보인다: 리포트명 · 표시 이름(분석 대상) · 생성일 (영구 삭제라 다른 카드와 착각하지 않게)
-  const target = dialog.slice(dialog.indexOf('data-testid="delete-record-target"'), dialog.indexOf("<div id={bodyId}>"));
-  assert.ok(dialog.indexOf('data-testid="delete-record-target"') < dialog.indexOf("<div id={bodyId}>"), "대상 표시가 안내 문구보다 위");
+  const head = dialog.slice(dialog.indexOf('data-testid="delete-record-head"'), dialog.indexOf('data-testid="delete-record-body"'));
+  const target = dialog.slice(dialog.indexOf('data-testid="delete-record-target"'), dialog.indexOf("id={leadId}"));
   for (const part of ["{productName}", "{subject}", "{created}", "DELETE_RECORD_COPY.targetTitle", "DELETE_RECORD_COPY.createdPrefix"]) assert.ok(target.includes(part), `확인창 대상 표시에 ${part}`);
-  assert.match(dialog, /aria-describedby=\{`\$\{targetId\} \$\{bodyId\}`\}/, "보조기기도 대상을 먼저 읽는다");
+  assert.match(dialog, /aria-describedby=\{`\$\{targetId\} \$\{leadId\} \$\{bodyId\}`\}/, "보조기기도 대상 · 경고를 먼저 읽는다");
   const rows = read("components/my/report-rows.tsx");
   assert.match(rows, /<DeleteRecordButton assessmentId=\{card\.assessmentId\} productName=\{card\.productName\} subject=\{card\.subject\} created=\{formatDate\(card\.createdAt\)\} \/>/, "카드가 보여 주는 값 그대로 넘긴다");
   // 취소 · 삭제하기: 같은 크기(48px) · 보내는 중에는 둘 다 잠긴다(두 번 눌러도 한 번)
@@ -72,8 +73,49 @@ test("지우는 버튼은 확인창 안의 '삭제하기'로만 서버 액션을
   assert.equal((buttons.match(/min-h-12/g) ?? []).length, 2);
   assert.match(buttons, /type="button"[\s\S]*onClick=\{onCancel\}/);
   assert.match(buttons, /type="submit"/);
+  // 화면 안에 들어오는 구조(휴대폰 · 카카오톡 앱 안 브라우저 실기기 보고): 제목 · 삭제할 기록 · 경고 한 줄은 위 고정, 취소 · 삭제하기는 아래 고정, 긴 안내만 가운데에서 스크롤
+  assert.match(dialog, /className="confirm-sheet /, "창 높이를 화면 안으로 제한하는 틀");
+  assert.ok(dialog.indexOf('data-testid="delete-record-head"') < dialog.indexOf('data-testid="delete-record-body"'), "위 고정 영역이 안내보다 위");
+  assert.ok(head.includes("id={titleId}") && head.includes("DELETE_RECORD_COPY.title") && head.includes('data-testid="delete-record-target"') && head.includes("DELETE_RECORD_COPY.lead"), "제목 · 대상 · 경고는 스크롤되지 않는 위 영역 안");
+  assert.match(head, /shrink-0/, "위 고정 영역은 줄어들지 않는다");
+  const body = dialog.slice(dialog.indexOf('data-testid="delete-record-body"'), dialog.indexOf("<Buttons"));
+  assert.match(body, /min-h-0 flex-1 overflow-y-auto overscroll-contain/, "가운데 안내만 안에서 스크롤(min-height: 0)");
+  assert.match(body, /tabIndex=\{0\}/, "키보드로도 스크롤");
+  assert.ok(!head.includes("overflow-y-auto") && !buttons.includes("overflow-y-auto"), "위 · 아래 영역은 스크롤하지 않는다");
+  assert.match(buttons, /shrink-0/, "아래 고정 영역은 줄어들지 않는다");
+  for (const part of ["DELETE_RECORD_COPY.removedTitle", "DELETE_RECORD_COPY.removed.map", "DELETE_RECORD_COPY.keptTitle", "DELETE_RECORD_COPY.kept.map", "DELETE_RECORD_COPY.notes.map"]) assert.ok(body.includes(part), `긴 안내(스크롤 영역)에 ${part}`);
+  // 초기 포커스: 열자마자 제목(스크롤 없이) — 삭제하기 · 취소 버튼에 autofocus를 주지 않는다
+  assert.doesNotMatch(src, /autoFocus|autofocus/, "삭제 확인창에는 autofocus를 쓰지 않는다");
+  assert.match(src, /titleRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(head, /tabIndex=\{-1\}/, "제목은 코드로만 초점을 받는다");
+  // 열려 있는 동안 배경 스크롤을 막고, 닫으면 스크롤 위치 · 초점을 되돌린다 / 보내기를 마치고도 남아 있는 창은 위치 복원 없이 닫는다
+  assert.match(src, /dialog\.showModal\(\);/);
+  assert.ok(src.indexOf("lock();") < src.indexOf("dialog.showModal();"), "먼저 배경을 고정한 뒤 연다");
+  assert.match(src, /onClose=\{onClosed\}/);
+  assert.match(src, /release\(true\);\s*openerRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(src, /release\(false\);\s*const dialog = dialogRef\.current;\s*if \(dialog\?\.open\) dialog\.close\(\)/);
+  const lock = read("components/my/body-scroll-lock.ts");
+  assert.match(lock, /body\.style\.position = "fixed"/);
+  assert.match(lock, /window\.scrollTo\(0, y\)/);
+  assert.match(lock, /useLayoutEffect\(\(\) => \(\) => release\(false\), \[release\]\)/, "화면에서 사라질 때는 위치 복원 없이 푼다");
+  // 바깥 누르기는 닫기만 한다(지우지 않는다)
   // 바깥 누르기는 닫기만 한다(지우지 않는다)
   assert.match(dialog, /e\.target === e\.currentTarget\) close\(\)/);
+});
+
+test("확인창 틀(globals.css): 열렸을 때만 flex · 화면 높이를 넘지 않는다(100%와 dvh 중 작은 쪽) · 안전 영역 · 짧은 가로 화면", () => {
+  const css = read("app/globals.css");
+  const sheet = css.slice(css.indexOf(".confirm-sheet {"));
+  assert.match(sheet, /\.confirm-sheet\[open\] \{\s*display: flex;\s*flex-direction: column;/, "닫힌 <dialog>의 display: none을 덮어쓰지 않는다");
+  assert.doesNotMatch(sheet.slice(0, sheet.indexOf(".confirm-sheet[open]")).replace(/\/\*[\s\S]*?\*\//g, ""), /display:\s*flex/, "열림 상태 밖에서는 flex를 주지 않는다");
+  assert.match(sheet, /max-height: calc\(100% - 1\.5rem - env\(safe-area-inset-top, 0px\) - env\(safe-area-inset-bottom, 0px\)\)/, "dvh를 모르는 브라우저의 기준");
+  const supports = sheet.slice(sheet.indexOf("@supports (height: 100dvh)"));
+  assert.ok(supports.includes("min(") && supports.includes("calc(100% - 1.5rem") && supports.includes("calc(100dvh - 1.5rem"), "100%와 100dvh 중 작은 쪽");
+  assert.match(sheet, /overflow: hidden;/, "창 전체는 스크롤하지 않는다");
+  assert.match(sheet, /@media \(max-height: 480px\)/, "짧은 가로 화면");
+  // 위 · 아래 고정 줄은 짧은 화면에서 줄이되 버튼은 40px 아래로 내리지 않는다
+  const src = read("components/my/delete-record-button.tsx");
+  assert.equal((src.match(/\[@media\(max-height:480px\)\]:min-h-10/g) ?? []).length, 2);
 });
 
 test("확인창 문구: 무엇이 지워지고(복구 불가) 무엇이 남는지, 다시 만들지도 구매 유도도 하지 않는다는 것을 사실대로 적는다", () => {
