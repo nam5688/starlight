@@ -111,3 +111,29 @@ test("새 표시용 내보내기는 이미 있는 파일을 덮어쓰지 않는�
   assert.notEqual(overReport.status, 0);
   assert.equal(read(join(dir, "report.json"), "utf8"), reportBefore, "저장된 리포트를 덮어쓰지 않는다");
 });
+
+test("개인 유형 계산 확인(own-identity.ts)은 읽기 전용이다 — 결과 폴더에 아무것도 만들지 않고, 10개 유형 이름 또는 혼합 경향 중 하나와 옛 후보 이름을 따로 보인다", async () => {
+  const { mkdtempSync, writeFileSync, readFileSync: read, readdirSync } = await import("node:fs");
+  const { spawnSync } = await import("node:child_process");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { ASSESSMENT_MODULES } = await import("../../assessment/modules/index.ts");
+  const { PERSONAL_TYPES, MIXED_TYPE } = await import("../../assessment/personal-type.ts");
+  // 시험이 지어낸 가상 입력(실제 사람의 입력이 아니다)
+  const answers = Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items).map((it, i) => [it.id, (i % 4) + 1]));
+  const info = { nickname: "시험", calendar: "solar", isLeapMonth: false, birthYear: "1990", birthMonth: "5", birthDay: "5", birthTime: "12:00", birthTimeUnknown: false, knownMbti: "", regionProvince: "", regionDistrict: "", gender: "male" };
+  const dir = mkdtempSync(join(tmpdir(), "own-identity-"));
+  writeFileSync(join(dir, "input.json"), JSON.stringify({ info, answers, capturedAt: null }));
+  const script = fileURLToPath(new URL("../../../scripts/own-identity.ts", import.meta.url));
+  const before = Object.fromEntries(readdirSync(dir).map((f) => [f, read(join(dir, f), "utf8")]));
+  const run = spawnSync(process.execPath, [script, dir], { encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  const names = [...Object.values(PERSONAL_TYPES).map((t) => t.name), MIXED_TYPE.name];
+  const result = /④ 결과: (.+?)(?:\s{2}|\n)/.exec(run.stdout)?.[1] ?? "";
+  assert.ok(names.includes(result.trim()), `10개 유형 이름 또는 혼합 경향이어야 한다: ${result}`);
+  assert.match(run.stdout, /⑤ 지금 화면에 보이는 옛 후보 이름\(4개\): (확인추구형|거리유지형|안정지향형|탐색지향형)/);
+  assert.match(run.stdout, /스위치 꺼짐 상태 그대로/);
+  assert.deepEqual(Object.fromEntries(readdirSync(dir).map((f) => [f, read(join(dir, f), "utf8")])), before, "폴더에 파일을 만들거나 고치지 않는다");
+  const missing = spawnSync(process.execPath, [script, join(dir, "없는폴더")], { encoding: "utf8" });
+  assert.notEqual(missing.status, 0);
+});
