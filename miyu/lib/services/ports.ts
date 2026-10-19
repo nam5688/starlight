@@ -1,6 +1,7 @@
 // 서비스가 바깥(DB·결제사)과 주고받는 약속.
 // 웹(Next.js + Supabase + 토스페이먼츠)뿐 아니라 이후 다른 채널도 같은 서비스를 구현체만 바꿔 쓴다.
 
+import type { TranscriptLine } from "../report/reading/talk-transcript.ts";
 import type { CompatRelationship } from "../compat/relationship.ts";
 import type { InviteDiscountCheck } from "../commerce/invite.ts";
 import type { Answers } from "../assessment/types.ts";
@@ -41,6 +42,11 @@ export type AssessmentRecord = {
   summary: FreeSummary;
   saju: SajuResult;
   createdAt: string;
+  /**
+   * 회원이 "기록 삭제"를 확정한 시각 — 비어 있으면(null) 삭제하지 않은 기록이다. 값이 아예 없으면(undefined) 삭제 열이 아직 없는 DB(28번 전)다.
+   * 삭제한 기록은 결과 화면 · 리포트 · 구매 안내에서 다시 보이지 않고 새 리포트가 만들어지지 않는다(채팅은 이어진다). 분석 원자료는 대화를 위해 남는다.
+   */
+  recordDeletedAt?: string | null;
 };
 export type NewAssessment = Omit<AssessmentRecord, "id" | "createdAt">;
 
@@ -241,6 +247,10 @@ export type InviteRecord = { id: string; token: string; inviterUserId: string; a
 export type ChatReservation = { id: number | null };
 
 /** 대화(상담방) 저장 — 회원 · 검사 결과 · 방마다 한 줄. 눌렀던 행동 목록과 자유 질문 · 답만 담고 리포트 글은 담지 않는다 */
+/** 삭제 전에 앱이 방마다 만든 읽기용 줄 — updatedAt은 그 방을 읽을 때의 저장 시각 그대로(DB가 그 사이 바뀌었는지 확인한다) */
+export type TranscriptInput = { roomKey: string; updatedAt: string; lines: TranscriptLine[] };
+/** 삭제한 기록의 읽기용 대화 기록 한 방 — createdAt은 삭제한 시각 가까이다(화면의 "이전 대화" 기준) */
+export type TalkTranscriptRecord = { assessmentId: string; roomKey: string; userId: string; lines: TranscriptLine[]; createdAt: string };
 export type TalkRoomRecord = { assessmentId: string; roomKey: string; userId: string; actions: unknown[]; updatedAt: string; /** 행동 목록에서 어디까지 요약했는가 — 다음 저장은 여기부터 요약한다 */ savedUpto: number };
 
 /**
@@ -288,16 +298,16 @@ export interface MiyuRepository {
   getAssessment(id: string): Promise<AssessmentRecord | null>;
   listAssessments(userId: string): Promise<AssessmentRecord[]>;
   /**
-   * MY 목록에서 숨긴 검사 결과 번호들 (MY 목록 표시에만 쓴다 — 결과 · 채팅 · 주문 · 열람 권한 · 구매 여부와 무관).
-   * 숨김 열이 아직 없으면(DB 변경 27번 전) null — 호출한 쪽이 숨기기 기능을 보이지 않고 모든 결과를 예전처럼 보인다.
+   * 본인 검사 결과의 리포트 기록을 삭제한다(DB 함수 한 번 = 한 트랜잭션): 이 결과로 받은 개인 통합 · 고민 반영 리포트 본문(만족도 의견 포함) · 맛보기 글 · 고민 입력과 고민 기록 · 채팅 방의 행동 목록을 지우고 삭제 표시를 남긴다.
+   * 대화 내용은 읽기용 대화 기록(transcripts — 삭제 전에 화면에 이미 표시된 말, 방마다 줄 단위 글)으로 옮겨 남긴다. updatedAt은 그 대화를 읽을 때의 방 저장 시각 그대로이고, 그 사이 대화방이 바뀌었으면 "stale"(삭제하지 않음 — 다시 읽어 시도한다).
+   * 남는 것: 계정 · 동의 · 주문 · 결제 · 환불 기록 · 질문권 · 채팅 질문 횟수 · 채팅 요약 · 궁합 리포트 · 대화를 위한 분석 원자료. 맛보기는 줄만 남아(글은 지움) 한 계정 한 번이 다시 생기지 않는다.
+   * 같은 요청을 여러 번(동시에도) 보내도 한 번만 처리하고 나머지는 "unchanged". 회원번호와 검사 번호의 짝이 맞지 않으면(남의 것 · 없는 것) 구분 없이 "not-found".
+   * 진행 중인 리포트 생성 · 최근 결제 대기 주문 · 방금 오간 질문이 있으면 "busy"(지우지 않음). 서비스가 먼저 소유자를 확인한 뒤에만 부른다. 삭제 함수가 없으면 오류(코드 42P01).
    */
-  listHiddenAssessmentIds(userId: string): Promise<string[] | null>;
-  /**
-   * 본인 검사 결과 하나를 MY 목록에서 숨기거나(hidden: true) 다시 보이게 한다(false). 같은 요청을 여러 번 보내도 결과가 같다.
-   * 회원번호와 검사 결과 번호의 짝이 맞지 않으면(남의 것 · 없는 것) 둘을 구분하지 않고 "not-found". 서비스가 먼저 소유자를 확인한 뒤에만 부른다.
-   * 숨김 열 · 함수가 없으면 오류(코드 42P01).
-   */
-  setAssessmentMyHidden(userId: string, assessmentId: string, hidden: boolean): Promise<"changed" | "unchanged" | "not-found">;
+  deleteAssessmentRecord(userId: string, assessmentId: string, transcripts: TranscriptInput[]): Promise<"deleted" | "unchanged" | "busy" | "stale" | "not-found">;
+  /** 삭제한 기록의 읽기용 대화 기록 — 방 이름 순. 테이블이 없으면(DB 변경 28번 전) 빈 목록 */
+  listTalkTranscripts(assessmentId: string): Promise<TalkTranscriptRecord[]>;
+  /** 한 방의 읽기용 대화 기록을 지운다 ("이 채팅방 새로 시작하기" — 회원이 직접 대화를 지우는 것이다). 없으면 그대로 */
 
   getOrderByNumber(orderNumber: string): Promise<OrderRecord | null>;
   listOrdersForAssessment(assessmentId: string): Promise<OrderRecord[]>;

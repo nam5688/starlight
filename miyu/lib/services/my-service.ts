@@ -6,10 +6,12 @@ import type { OrderStatus } from "../commerce/order.ts";
 import { isCompatProduct, isPersonalProduct, parseCashProductId, parseConcernProductId, parsePairProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf, REPORT_TIER_NAMES } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
-import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
+import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord, TranscriptInput } from "./ports.ts";
 import { paidPersonalOrders, receivedAt } from "./purchases.ts";
 import { RECONCILE_DEFAULTS } from "./reconcile-service.ts";
 import { topicLabel, type ContextTopic } from "../personalization/context.ts";
+import { sanitizeRoomActions, type RoomAction } from "../report/reading/talk-room.ts";
+import type { TranscriptLine } from "../report/reading/talk-transcript.ts";
 
 export type Entitlement = "free" | "purchased" | "refunded";
 export type Generation = "none" | "in-progress" | "ready" | "failed";
@@ -142,28 +144,37 @@ export function receivedRowOf(
   };
 }
 
+/** 삭제한 기록 — 리포트 · 맛보기 글은 지웠지만 대화는 이어지는 검사 결과(채팅방은 이 번호로 계속 열린다) */
+export type MyDeletedRecord = {
+  assessmentId: string;
+  /** 분석 대상 (예: 지민 님 · 1995년 4월 12일 (양력)) — 본인 MY에서 어느 기록인지 알아보게 한다 */
+  subject: string;
+  /** 삭제한 시각 */
+  deletedAt: string;
+  /** 이 기록에 저장된 대화방 수 */
+  chatRooms: number;
+};
+
 /**
- * MY 화면 자료. `cards`는 "내 리포트" 목록에 보이는 것, `hiddenCards`는 본인이 목록에서 숨긴 것이다.
- * 숨김은 MY 목록 표시만 나눈다 — 두 목록의 카드는 같은 모양이고 결과 · 채팅 · 주문 · 구매 여부 · 열람 권한은 숨김과 무관하다.
- * `hideAvailable`이 false이면 숨김 열이 아직 없는 DB(27번 전)이므로 화면이 숨기기 버튼을 보이지 않는다(모든 카드가 `cards`에 있다).
+ * MY 화면 자료. `cards`는 "내 리포트" 목록에 보이는 삭제하지 않은 결과, `deletedRecords`는 회원이 "기록 삭제"한 결과다.
+ * 삭제한 결과의 리포트 · 맛보기 글은 지워졌고 결과 화면 · 구매 안내에도 다시 나오지 않지만, 채팅방 · 질문권 · 주문 · 결제 기록은 그대로다.
+ * `deleteAvailable`이 false이면 삭제 열이 아직 없는 DB(28번 전)이므로 화면이 삭제 버튼을 보이지 않는다.
  */
-export type MyPage = { cards: MyReportCard[]; hiddenCards: MyReportCard[]; hideAvailable: boolean; concerns: MyConcernCard[]; orders: MyOrderRow[] };
+export type MyPage = { cards: MyReportCard[]; deletedRecords: MyDeletedRecord[]; deleteAvailable: boolean; concerns: MyConcernCard[]; orders: MyOrderRow[] };
 
 export async function getMyPage(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<MyPage> {
-  const [assessments, orders, reports, contexts, records, hiddenIds] = await Promise.all([
+  const [assessments, orders, reports, contexts, records] = await Promise.all([
     repo.listAssessments(userId),
     repo.listOrdersForUser(userId),
     repo.listReportStatuses(userId),
     repo.listContexts(userId),
     repo.listConcernRecordSummaries(userId),
-    // 숨김 정보를 읽지 못해도 MY는 열린다(모두 보이는 예전 모양) — 숨긴 결과는 어디서도 지워지거나 바뀌지 않는다
-    repo.listHiddenAssessmentIds(userId).catch(() => null),
   ]);
   const mineOrders = orders.filter((o) => o.userId === userId);
-  const hidden = new Set(hiddenIds ?? []);
+  const mine = assessments.filter((a) => a.userId === userId);
 
-  const allCards = assessments
-    .filter((a) => a.userId === userId)
+  const cards = mine
+    .filter((a) => !a.recordDeletedAt)
     .map((a): MyReportCard => {
       const related = mineOrders.filter((o) => o.assessmentId === a.id && isPersonalProduct(o.productId));
       const receivedOrders = paidPersonalOrders(related);
@@ -228,35 +239,75 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
     )
     .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 
-  return {
-    cards: allCards.filter((c) => !hidden.has(c.assessmentId)),
-    hiddenCards: allCards.filter((c) => hidden.has(c.assessmentId)),
-    hideAvailable: hiddenIds !== null,
-    concerns,
-    orders: rows,
-  };
+  // 삭제한 기록 — 채팅방이 몇 개 남아 있는지 센다(이어 가는 중인 방 + 읽기용 대화 기록이 있는 방. 읽지 못하면 0으로 보고 화면은 그대로 열린다)
+  const deletedRecords: MyDeletedRecord[] = [];
+  for (const a of mine.filter((x) => x.recordDeletedAt)) {
+    const live = await repo.listTalkRoomKeys(a.id).catch(() => [] as string[]);
+    const archived = (await repo.listTalkTranscripts(a.id).catch(() => [])).map((t) => t.roomKey);
+    deletedRecords.push({ assessmentId: a.id, subject: `${a.nickname} 님 · ${formatAssessmentBirth(a)}`, deletedAt: a.recordDeletedAt as string, chatRooms: new Set([...live, ...archived]).size });
+  }
+  deletedRecords.sort((x, y) => y.deletedAt.localeCompare(x.deletedAt));
+
+  return { cards, deletedRecords, deleteAvailable: mine.some((a) => a.recordDeletedAt !== undefined), concerns, orders: rows };
 }
 
-export type HideReportResult =
-  | { kind: "hidden" | "restored" | "unchanged" }
+export type DeleteRecordResult =
+  | { kind: "deleted" | "unchanged" | "busy" }
+  /** 대화를 읽기용 기록으로 옮기지 못해 삭제하지 않았다(아무것도 지우지 않음) */
+  | { kind: "transcript-failed" }
   /** 없거나 본인 것이 아님 — 둘을 구분해 알리지 않는다 */
   | { kind: "not-found" }
-  /** 숨김 열이 아직 없는 DB(27번 전) */
+  /** 삭제 열 · 함수가 아직 없는 DB(28번 전) */
   | { kind: "db-not-ready" };
 
+/** 삭제 결과를 MY 화면 맨 위에 알리는 말 — 주소의 notice 값이 이 목록에 있을 때만 쓴다(없는 값은 보이지 않는다) */
+export const DELETE_NOTICE: Record<DeleteRecordResult["kind"], { tone: "ok" | "warn"; text: string }> = {
+  deleted: { tone: "ok", text: "기록을 삭제했어요. 리포트 글은 지워졌고, 채팅방 · 남은 질문권 · 주문 기록은 그대로예요." },
+  unchanged: { tone: "ok", text: "이미 삭제한 기록이에요. 바뀐 것은 없어요." },
+  busy: { tone: "warn", text: "지금 리포트를 만들거나 결제 · 질문을 처리하고 있어서 삭제하지 않았어요. 잠시 뒤에 다시 눌러 주세요." },
+  "transcript-failed": { tone: "warn", text: "지난 대화를 읽기용 기록으로 옮기지 못해서 삭제하지 않았어요. 아무것도 지우지 않았으니 잠시 뒤에 다시 눌러 주세요." },
+  "not-found": { tone: "warn", text: "삭제할 기록을 찾지 못했어요." },
+  "db-not-ready": { tone: "warn", text: "기록 삭제를 아직 쓸 수 없어요. 아무것도 지우지 않았어요." },
+};
+
+/** 주소에서 읽은 notice 값 → 안내 (모르는 값은 null) */
+export const deleteNoticeOf = (v: unknown) => (typeof v === "string" && Object.hasOwn(DELETE_NOTICE, v) ? DELETE_NOTICE[v as DeleteRecordResult["kind"]] : null);
+
+/** 대화방 하나를 "화면에 이미 표시된 말"로 옮긴다 — 서버가 저장된 리포트로 기존 렌더러를 돌려 만든다(AI를 부르지 않는다). 옮기지 못하면 던진다 */
+export type RenderRoom = (input: { roomKey: string; actions: RoomAction[] }) => Promise<TranscriptLine[]>;
+
+/** 동시 대화로 방이 바뀌어 다시 읽어야 할 때 다시 시도하는 횟수 */
+const DELETE_RETRIES = 3;
+
 /**
- * 본인 검사 결과 하나를 MY 목록에서 숨기거나(hidden: true) 다시 보이게 한다.
- * 바꾸는 것은 목록 표시 시각 하나뿐이다 — 검사 결과 · 리포트 · 주문 · 결제 · 질문권 · 채팅 · 동의 · 열람 권한은 읽지도 쓰지도 않는다.
- * 소유자는 여기서 확인하고, 저장소(DB 함수)가 회원번호와 번호의 짝을 한 번 더 확인한다. 같은 요청을 여러 번 보내도 결과가 같다.
+ * 본인 검사 결과의 리포트 기록을 삭제한다(되돌릴 수 없다). 리포트 본문 · 맛보기 글 · 고민 입력은 지우고, 계정 · 주문 · 결제 · 환불 기록 · 질문권 · 채팅 질문 횟수 · 분석 원자료는 남긴다.
+ * 대화는 삭제 전에 화면에 이미 표시된 말만 읽기용 대화 기록으로 옮겨 남긴다(renderRoom) — 리포트 전체 본문이 아니고 새로 쓴 글도 없다. 옮기지 못하면 아무것도 지우지 않는다.
+ * 소유자는 여기서 확인하고, 저장소(DB 함수)가 회원번호와 번호의 짝을 한 번 더 확인한다. 같은 요청을 여러 번(동시에도) 보내도 한 번만 지운다.
+ * 진행 중인 리포트 생성 · 결제 대기 주문 · 방금 오간 질문이 있으면 지우지 않고 busy, 읽은 뒤 대화방이 바뀌었으면(동시 대화) 다시 읽어 옮긴 뒤 시도한다.
  */
-export async function setReportHidden(repo: MiyuRepository, input: { userId: string; assessmentId: string; hidden: boolean }): Promise<HideReportResult> {
+export async function deleteReportRecord(repo: MiyuRepository, input: { userId: string; assessmentId: string }, deps: { renderRoom: RenderRoom }): Promise<DeleteRecordResult> {
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
+  if (assessment.recordDeletedAt) return { kind: "unchanged" };
   try {
-    const result = await repo.setAssessmentMyHidden(input.userId, input.assessmentId, input.hidden);
-    if (result === "not-found") return { kind: "not-found" };
-    if (result === "unchanged") return { kind: "unchanged" };
-    return { kind: input.hidden ? "hidden" : "restored" };
+    for (let attempt = 0; attempt < DELETE_RETRIES; attempt++) {
+      const transcripts: TranscriptInput[] = [];
+      for (const roomKey of await repo.listTalkRoomKeys(input.assessmentId)) {
+        const row = await repo.getTalkRoom(input.assessmentId, roomKey);
+        if (!row || row.userId !== input.userId) continue;
+        let lines: TranscriptLine[];
+        try {
+          lines = await deps.renderRoom({ roomKey, actions: sanitizeRoomActions(row.actions) });
+        } catch {
+          return { kind: "transcript-failed" };
+        }
+        transcripts.push({ roomKey, updatedAt: row.updatedAt, lines });
+      }
+      const result = await repo.deleteAssessmentRecord(input.userId, input.assessmentId, transcripts);
+      if (result === "stale") continue;
+      return result === "not-found" ? { kind: "not-found" } : { kind: result };
+    }
+    return { kind: "busy" };
   } catch (e) {
     if ((e as { code?: string } | null)?.code === "42P01") return { kind: "db-not-ready" };
     throw e;
@@ -278,6 +329,8 @@ export type OrderTrace = {
     pack: { questions: number; used: number; refundedQuestions: number; refundedKrw: number; remaining: number } | null;
   } | null;
   generation: Generation;
+  /** 이 주문의 개인 · 고민 리포트가 속한 기록을 사용자가 직접 삭제했다 — 결제 기록은 그대로이고 리포트는 다시 열리지 않는다 */
+  recordDeleted: boolean;
   /** 사주 궁합(유료) 주문이면 true — 리포트는 개인 통합 결과 화면이 아니라 궁합 리포트 화면에서 연다 */
   isCompat: boolean;
   /** 리포트 궁합(유료) 주문이면 그 쌍 번호 — 리포트는 쌍 화면에서 연다 */
@@ -332,6 +385,8 @@ export async function traceOrder(
   if (!order || order.userId !== input.userId) return null;
   const [events, report] = await Promise.all([serverRepo.listPaymentEvents(order.id), readRepo.getReportByOrder(order.id)]);
   const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+  const ownsReport = isPersonalProduct(order.productId) || parseConcernProductId(order.productId) !== null;
+  const recordDeleted = ownsReport ? Boolean((await readRepo.getAssessment(order.assessmentId))?.recordDeletedAt) : false;
   return {
     order: {
       orderNumber: order.orderNumber,
@@ -348,7 +403,8 @@ export async function traceOrder(
     },
     entitled: order.status === "paid",
     cash: await cashTraceOf(readRepo, input.userId, order),
-    generation: order.status === "paid" ? generationOf(report) : "none",
+    generation: order.status === "paid" && !recordDeleted ? generationOf(report) : "none",
+    recordDeleted,
     isCompat: isCompatProduct(order.productId),
     pairId: parsePairProductId(order.productId),
     events: events.map((e) => ({

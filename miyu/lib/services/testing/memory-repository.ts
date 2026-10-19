@@ -26,6 +26,7 @@ import type {
   ReportRecord,
   TalkRoomRecord,
   ChatSummaryRecord,
+  TalkTranscriptRecord,
 } from "../ports.ts";
 
 export function createMemoryRepository(now: () => Date = () => new Date()) {
@@ -34,9 +35,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const profiles = new Map<string, ProfileRecord>();
   const regions = new Map<string, { province: string; district: string }>();
   const assessments = new Map<string, AssessmentRecord>();
-  // MY 목록에서 숨긴 검사 결과 번호 → 숨긴 시각 (DB 27번의 assessments.my_hidden_at). myHide.ready=false이면 27번 적용 전 DB를 흉내 낸다
-  const myHidden = new Map<string, string>();
-  const myHide = { ready: true };
+  // myDelete.ready=false이면 28번(기록 삭제) 적용 전 DB를 흉내 낸다 — 삭제 열이 없어 recordDeletedAt이 비어 있고(undefined) 삭제 함수는 42P01
+  const myDelete = { ready: true };
   const orders = new Map<string, OrderRecord>();
   /** 주문 상태가 바뀔 때 부르는 훅(테스트용 혜택 저장소가 DB 트리거 대신 등록한다) */
   const orderHooks: ((before: OrderRecord, after: OrderRecord) => void)[] = [];
@@ -49,6 +49,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const concernRecords = new Map<string, ConcernRecord>();
   const compatRequests = new Map<string, CompatRequestRecord>();
   const talkRooms = new Map<string, TalkRoomRecord>();
+  // 삭제한 기록의 읽기용 대화 기록 (DB 28번의 talk_transcripts)
+  const transcripts = new Map<string, TalkTranscriptRecord>();
   const chatQuestions: { userId: string; assessmentId: string; roomKey: string; createdAt: string }[] = [];
   // 무료 질문 자리 예약(답을 기다리는 중) — 10분 안에만 센다
   const chatReservations: { id: number; userId: string; assessmentId: string; roomKey: string; until: number }[] = [];
@@ -153,6 +155,14 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const feedback = new Map<string, FeedbackRecord>();
   let tick = 0;
   const iso = () => now().toISOString();
+  /** 삭제 열이 있는 DB(28번 후)는 값이 null 또는 시각이고, 없는 DB는 비어 있다(undefined) */
+  const withDeleteColumn = (a: AssessmentRecord): AssessmentRecord => {
+    if (!myDelete.ready) {
+      const { recordDeletedAt: _unused, ...rest } = a; // eslint-disable-line @typescript-eslint/no-unused-vars
+      return rest;
+    }
+    return { ...a, recordDeletedAt: a.recordDeletedAt ?? null };
+  };
 
   const repo: MiyuRepository = {
     async listConsents(userId) {
@@ -253,23 +263,64 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       return record;
     },
     async getAssessment(assessmentId) {
-      return assessments.get(assessmentId) ?? null;
+      const a = assessments.get(assessmentId);
+      return a ? withDeleteColumn(a) : null;
     },
     async listAssessments(userId) {
-      return [...assessments.values()].filter((a) => a.userId === userId);
+      return [...assessments.values()].filter((a) => a.userId === userId).map(withDeleteColumn);
     },
-    async listHiddenAssessmentIds(userId) {
-      if (!myHide.ready) return null;
-      return [...assessments.values()].filter((a) => a.userId === userId && myHidden.has(a.id)).map((a) => a.id);
-    },
-    async setAssessmentMyHidden(userId, assessmentId, hidden) {
-      if (!myHide.ready) throw Object.assign(new Error("숨김 열이 없습니다 (DB 변경 27번 필요)"), { code: "42P01" });
+    async deleteAssessmentRecord(userId, assessmentId, input) {
+      // DB 함수 delete_assessment_record(28번)와 같은 규칙 — 소유자 · 이미 삭제 · 진행 중 확인 → 대화방 확인 · 읽기용 대화 기록 → 리포트 본문 · 고민 · 맛보기 글 삭제 → 삭제 표시
+      if (!myDelete.ready) throw Object.assign(new Error("삭제 함수가 없습니다 (DB 변경 28번 필요)"), { code: "42P01" });
       const a = assessments.get(assessmentId);
-      if (!a || a.userId !== userId) return "not-found";
-      if (hidden === myHidden.has(assessmentId)) return "unchanged";
-      if (hidden) myHidden.set(assessmentId, iso());
-      else myHidden.delete(assessmentId);
-      return "changed";
+      if (!a || a.userId !== userId || a.contentVersion === "withdrawn") return "not-found";
+      if (a.recordDeletedAt) return "unchanged";
+      const nowMs = now().getTime();
+      const isReportOrder = (productId: string) => productId === "personal-integrated-report" || productId.startsWith("personal-integrated-report:r") || productId.startsWith("concern-report:");
+      const mine = [...orders.values()].filter((o) => o.assessmentId === assessmentId);
+      // 1) 생성 중인 리포트(어느 상품이든) 2) 결제 대기 주문(질문 결제 제외) 3) 결제는 끝났는데 리포트 줄이 아직 없는 궁합 주문 4) 맛보기 작성 중 5) 답을 기다리는 질문 · 방금 오간 질문
+      const generating = [...reports.values()].some((r) => r.assessmentId === assessmentId && (r.status === "queued" || r.status === "generating") && nowMs - new Date(r.updatedAt).getTime() < 15 * 60_000);
+      const pendingOrder = mine.some((o) => o.status === "pending" && nowMs - new Date(o.createdAt).getTime() < 60 * 60_000 && !o.productId.startsWith("cash-charge:"));
+      const compatWithoutReport = mine.some((o) => o.status === "paid" && (o.productId.startsWith("saju-compat:") || o.productId.startsWith("report-compat:")) && ![...reports.values()].some((r) => r.orderId === o.id));
+      const t = tasteReports.get(userId);
+      const tastePending = !!t && t.assessmentId === assessmentId && t.status === "pending" && t.until !== null && t.until > nowMs;
+      const chatInFlight = chatReservations.some((r) => r.assessmentId === assessmentId && r.until > nowMs) || chatQuestions.some((c) => c.assessmentId === assessmentId && nowMs - new Date(c.createdAt).getTime() < 30_000);
+      const spentJustNow = ledger.some((l) => l.userId === userId && l.kind === "spend" && nowMs - new Date(l.createdAt).getTime() < 30_000);
+      if (generating || pendingOrder || compatWithoutReport || tastePending || chatInFlight || spentJustNow) return "busy";
+
+      // 대화방: 앱이 읽은 그대로인지 확인하고 읽기용 기록을 저장한 뒤 행동 목록 줄을 정리한다
+      const rooms = [...talkRooms.values()].filter((r) => r.assessmentId === assessmentId);
+      const staged: TalkTranscriptRecord[] = [];
+      for (const room of rooms) {
+        const entry = input.find((x) => x.roomKey === room.roomKey && x.updatedAt === room.updatedAt);
+        if (!entry) return "stale";
+        if (entry.lines.length > 0) staged.push({ assessmentId, roomKey: room.roomKey, userId, lines: entry.lines, createdAt: iso() });
+      }
+      for (const row of staged) transcripts.set(`${assessmentId}|${row.roomKey}`, row);
+      for (const room of rooms) talkRooms.delete(`${room.assessmentId}|${room.roomKey}`);
+
+      for (const r of [...reports.values()]) {
+        const o = orders.get(r.orderId);
+        if (r.assessmentId === assessmentId && o && isReportOrder(o.productId)) {
+          reports.delete(r.id);
+          feedback.delete(r.id);
+        }
+      }
+      contexts.delete(assessmentId);
+      for (const c of [...concernRecords.values()]) if (c.assessmentId === assessmentId) concernRecords.delete(c.id);
+      if (t && t.assessmentId === assessmentId) {
+        if (t.status === "pending") tasteReports.delete(userId);
+        else {
+          t.content = { deleted: true };
+          t.generator = null;
+          t.generatorVersion = null;
+        }
+      }
+      assessments.set(assessmentId, { ...a, recordDeletedAt: iso() });
+      return "deleted";
+    },
+    async listTalkTranscripts(assessmentId) {
+      return [...transcripts.values()].filter((r) => r.assessmentId === assessmentId).sort((x, y) => (x.roomKey < y.roomKey ? -1 : 1));
     },
     async getOrderByNumber(orderNumber) {
       return [...orders.values()].find((o) => o.orderNumber === orderNumber) ?? null;
@@ -281,6 +332,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       return [...orders.values()].filter((o) => o.userId === userId);
     },
     async insertOrder(o) {
+      // DB 트리거(28번)와 같다: 삭제한 기록에는 새 주문을 만들지 않는다(질문 결제 주문만 허용 — 채팅은 이어진다)
+      if (!o.productId.startsWith("cash-charge:") && assessments.get(o.assessmentId)?.recordDeletedAt) throw new Error("record_deleted");
       const all = [...orders.values()];
       const conflict =
         all.some((x) => x.orderNumber === o.orderNumber) ||
@@ -613,6 +666,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     async reserveTasteReport({ userId, assessmentId }) {
       const r = tasteReports.get(userId);
       const nowMs = now().getTime();
+      // DB 트리거(28번)와 같다: 삭제한 기록으로는 맛보기 줄을 새로 만들거나 옮기지 않는다(이미 받은 줄을 돌려주는 것은 그대로)
+      if ((!r || r.status !== "ready") && assessments.get(assessmentId)?.recordDeletedAt) throw new Error("record_deleted");
       if (r) {
         if (r.status === "ready") return { state: "ready", record: tasteRecord(r) };
         if (r.until !== null && r.until > nowMs) return { state: "busy" };
@@ -625,6 +680,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async saveTasteReport({ userId, assessmentId, content, generator, generatorVersion }) {
       const r = tasteReports.get(userId);
+      // DB 트리거(28번)와 같다: 삭제한 기록의 맛보기 줄은 고칠 수 없다 — 늦게 도착한 생성 응답으로 글이 되살아나지 않는다
+      if (assessments.get(assessmentId)?.recordDeletedAt) throw new Error("record_deleted");
       if (!r || r.assessmentId !== assessmentId || r.status !== "pending") throw new Error("taste_not_reserved");
       r.status = "ready";
       r.content = content;
@@ -782,6 +839,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         .map((r) => ({ id: r.id, orderId: r.orderId, assessmentId: r.assessmentId, status: r.status, generator: r.generator, generatorVersion: r.generatorVersion, readyAt: r.readyAt }));
     },
     async insertReport(r) {
+      // DB 트리거(28번)와 같다: 삭제한 기록에는 새 리포트 줄을 넣지 않는다(저장소가 "만들 수 없음"으로 돌려준다)
+      if (assessments.get(r.assessmentId)?.recordDeletedAt) return { ok: false, reason: "conflict" };
       if ([...reports.values()].some((x) => x.orderId === r.orderId)) return { ok: false, reason: "conflict" };
       const record: ReportRecord = {
         ...r,
@@ -808,5 +867,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, newId: id, orderHooks, withdrawHooks, compatRequests, profiles, regions, assessments, myHidden, myHide, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
+  return { repo, newId: id, orderHooks, withdrawHooks, compatRequests, profiles, regions, assessments, myDelete, transcripts, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
 }

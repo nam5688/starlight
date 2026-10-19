@@ -658,6 +658,15 @@ wd27 as (
     exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'set_assessment_my_hidden') as hide_fn,
     coalesce(has_function_privilege('service_role', 'public.set_assessment_my_hidden(uuid, uuid, boolean)', 'execute'), false) as service_grant
 ),
+wd28 as (
+  select
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'assessments' and column_name = 'record_deleted_at') as deleted_col,
+    to_regclass('public.talk_transcripts') is not null as transcripts_table,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'delete_assessment_record') as delete_fn,
+    coalesce(has_function_privilege('service_role', 'public.delete_assessment_record(uuid, uuid, jsonb)', 'execute'), false) as service_grant,
+    coalesce(not has_function_privilege('anon', 'public.delete_assessment_record(uuid, uuid, jsonb)', 'execute') and not has_function_privilege('authenticated', 'public.delete_assessment_record(uuid, uuid, jsonb)', 'execute'), false) as browser_blocked,
+    exists (select 1 from pg_trigger where tgname in ('reports_block_deleted_record', 'orders_block_deleted_record', 'taste_reports_block_deleted_record') having count(*) = 3) as guard_triggers
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -842,5 +851,11 @@ select * from (
               when wd27.hidden_col or wd27.hide_fn or wd27.service_grant then '일부만' else '아직 안 함' end,
          '열 assessments.my_hidden_at (MY 목록에서 숨긴 시각) / 함수 set_assessment_my_hidden (본인 것만 숨기기 · 다시 보이게 하기) / 서버 권한: ' || wd27.service_grant::text || ' — 이 열이 없으면 MY의 숨기기 버튼만 보이지 않고 나머지는 그대로 동작한다'
   from wd27
+  union all
+  select 28, '20261107000000_record_delete.sql',
+         case when wd28.deleted_col and wd28.transcripts_table and wd28.delete_fn and wd28.service_grant and wd28.browser_blocked and wd28.guard_triggers then '적용됨'
+              when wd28.deleted_col or wd28.transcripts_table or wd28.delete_fn or wd28.guard_triggers then '일부만' else '아직 안 함' end,
+         '열 assessments.record_deleted_at / 표 talk_transcripts(읽기용 대화 기록) / 함수 delete_assessment_record(서버만 실행: ' || wd28.service_grant::text || ' · 브라우저 실행 막힘: ' || wd28.browser_blocked::text || ') / 삭제한 기록에 새 리포트 · 주문 · 맛보기 글을 막는 장치 3개: ' || wd28.guard_triggers::text || ' — 이 열이 없으면 MY의 기록 삭제 버튼만 보이지 않고 나머지는 그대로 동작한다'
+  from wd28
 ) r
 order by "번호";

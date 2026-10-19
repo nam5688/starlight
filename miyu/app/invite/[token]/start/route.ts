@@ -27,7 +27,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext<"/invite/[tok
     try {
       const member = await getMember();
       if (member) {
-        const latest = (await (await readRepository()).listAssessments(member.userId))[0];
+        // 리포트를 삭제한 기록으로는 구매 화면이 없으므로, 삭제하지 않은 가장 최근 분석으로만 이어 준다
+        const latest = (await (await readRepository()).listAssessments(member.userId)).find((a) => !a.recordDeletedAt);
         if (latest) return to(`/results/${latest.id}`);
       }
     } catch {

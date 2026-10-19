@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { LoginOptions } from "@/components/auth/login-options";
+import { ArchivedRoom } from "@/components/talk/archived-room";
 import { talkRoomPath } from "@/components/talk/room-paths";
 import { LockedRoom } from "@/components/talk/locked-room";
 import { TalkView } from "@/components/talk/talk-view";
@@ -9,12 +10,13 @@ import { isSimpleRoom } from "@/lib/report/chat/quota";
 import { ROOM_ORDER, roomAvailable, roomSaveKey, type RoomId } from "@/lib/report/reading/talk-room";
 import type { TalkModel } from "@/lib/report/reading/talk";
 import { getResultView } from "@/lib/services/report-service";
-import { listSavedRoomKeys, loadTalkRoom } from "@/lib/services/talk-service";
+import type { TranscriptLine } from "@/lib/report/reading/talk-transcript";
+import { listSavedRoomKeys, loadTalkRoom, loadTranscripts, roomEpochOf } from "@/lib/services/talk-service";
 import { chatStateFor } from "@/server/chat";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { now, readRepository } from "@/server/services";
-import { seoulDate } from "@/lib/saju/interpret/day-plain";
+import { dayKey, seoulDate } from "@/lib/saju/interpret/day-plain";
 import { ownedState, roomModelFor, viewTier, type OwnedState } from "@/server/talk-model";
 
 const ORDER_NUMBER = /^[A-Za-z0-9_-]{6,64}$/;
@@ -53,6 +55,8 @@ export async function TalkRoomContent({ id, room, paid = null }: { id: string; r
   const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
   const roomHrefs = Object.fromEntries(ROOM_ORDER.map((r) => [r, talkRoomPath(id, r)]));
   const repo = await readRepository();
+  // 리포트를 삭제한 기록 — 채팅방은 그대로 열리고, 삭제 전에 오간 대화는 읽기용으로 보인다(리포트 · 구매 안내는 없다)
+  if (view.deleted) return <DeletedRecordRoom view={view} userId={member.userId} id={id} room={room} paid={paid} created={created} roomHrefs={roomHrefs} />;
   /** 서버에 저장된 이 방의 대화와 저장된 방 목록 — 폰을 바꿔도 이어 본다 */
   const persistFor = async (model: TalkModel) => ({
     assessmentId: id,
@@ -105,6 +109,49 @@ export async function TalkRoomContent({ id, room, paid = null }: { id: string; r
       roomHrefs={roomHrefs}
       persist={await persistFor(model)}
       badge={ownedState(view) ? ownedNotReadyBadge(ownedState(view)!, created) : { label: "무료 맛보기", text: `무료 분석으로 만든 맛보기예요 · 검사일 ${created}. 이어지는 깊은 풀이는 리포트에서 볼 수 있어요.` }}
+    />
+  );
+}
+
+const RESTRICTED_REASON =
+  "리포트를 삭제한 기록이라 이 방에서는 새 대화를 이어 갈 수 없어요. 이 방의 풀이는 삭제한 리포트의 글에서 가져오던 것이라서요. 지난 대화는 아래에서 그대로 읽을 수 있어요.";
+
+/**
+ * 리포트를 삭제한 기록의 채팅방. 삭제 전에 이 방에 이미 표시된 말(읽기용 대화 기록)을 위쪽에 읽기 전용으로 보이고, 이어 갈 수 있는 방(무료 리포트로 열리는 방)은 그 아래에서 새 대화를 계속한다.
+ * 리포트 글로 풀이를 가져오던 방(올해의 흐름 · 결혼 · 진로 · 재무)은 지난 대화만 읽을 수 있고 새 대화는 이어 갈 수 없는 이유를 알린다. 리포트 · 결과 화면 · 구매 안내로 가는 링크는 없다.
+ */
+async function DeletedRecordRoom({ view, userId, id, room, paid, created, roomHrefs }: { view: NonNullable<Awaited<ReturnType<typeof getResultView>>>; userId: string; id: string; room: RoomId; paid: string | null; created: string; roomHrefs: Record<string, string> }) {
+  const repo = await readRepository();
+  const transcripts = await loadTranscripts(repo, { userId, assessmentId: id }).catch(() => []);
+  const today = seoulDate(now());
+  const roomKey = room === "daily" ? `daily:${dayKey(today)}` : room;
+  // 오늘의 한 장은 날짜별 방이라, 오늘 것이 없으면 가장 최근에 남은 날짜의 대화를 읽는다
+  const found = room === "daily" ? [...transcripts.filter((t) => t.roomKey.startsWith("daily:"))].sort((a, b) => b.roomKey.localeCompare(a.roomKey))[0] : transcripts.find((t) => t.roomKey === roomKey);
+  const lines: TranscriptLine[] = found?.lines ?? [];
+  const mainHref = talkRoomPath(id, "main");
+  if (!isSimpleRoom(room)) return <ArchivedRoom room={room} lines={lines} reason={RESTRICTED_REASON} backHref="/my" talkHref={mainHref} />;
+  const chat = await chatStateFor("free", userId, room, roomKey);
+  const { model } = roomModelFor(view, { paid: chat, free: chat }, room);
+  if (!roomAvailable(model, room)) return <ArchivedRoom room={room} lines={lines} reason="이 방은 지금 새 대화를 이어 갈 수 없어요. 지난 대화는 아래에서 읽을 수 있어요." backHref="/my" talkHref={mainHref} />;
+  return (
+    <TalkView
+      key={paid ?? "-"}
+      payReturn={paid !== null}
+      model={model}
+      room={room}
+      scope={id}
+      dateLabel={created}
+      reportHref="/my"
+      dataHref="/my"
+      roomHrefs={roomHrefs}
+      persist={{
+        assessmentId: id,
+        initial: await loadTalkRoom(repo, { userId, assessmentId: id, roomKey: roomSaveKey(model, room) }).catch(() => []),
+        savedKeys: await listSavedRoomKeys(repo, { userId, assessmentId: id }).catch(() => []),
+        epoch: roomEpochOf(true, transcripts, roomKey),
+      }}
+      archive={lines.length > 0 ? { lines } : undefined}
+      badge={{ label: "삭제한 기록", text: `리포트를 삭제한 기록이에요 · 검사일 ${created}. 리포트 글은 지워졌고 채팅은 그대로 이어져요. 지난 대화는 읽기만 할 수 있어요.` }}
     />
   );
 }

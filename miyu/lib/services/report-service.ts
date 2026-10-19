@@ -38,6 +38,8 @@ export async function queueReport(deps: { repo: MiyuRepository }, order: OrderRe
   if (order.status !== "paid" || isCashProduct(order.productId)) return null;
   const existing = await deps.repo.getReportByOrder(order.id);
   if (existing) return existing;
+  // 삭제한 기록에는 리포트를 새로 만들지 않는다 — 지운 리포트가 기존 결제 주문 때문에 다시 생기지 않게 한다(DB 트리거가 마지막으로 한 번 더 막는다)
+  if ((await deps.repo.getAssessment(order.assessmentId))?.recordDeletedAt) return null;
   const inserted = await deps.repo.insertReport({
     userId: order.userId,
     orderId: order.id,
@@ -287,6 +289,11 @@ export type ResultView = {
   received: ReceivedReport[];
   /** 맛보기 리포트(무료 · 한 계정당 1번) 상태 — DB 변경 17번 전이거나 조회가 실패하면 unavailable (결과 화면은 그대로 열린다) */
   taste: TasteViewState;
+  /**
+   * 회원이 "기록 삭제"한 결과다 — 리포트 · 주문 · 맛보기 · 고민 입력은 없는 것으로 돌려준다(주문은 결제 기록으로만 남아 있다). 결과 화면 · 구매 안내는 보이지 않고, 채팅방만 이어진다.
+   * 분석 원자료(assessment)는 대화를 위해 그대로 담긴다.
+   */
+  deleted: boolean;
 };
 
 /**
@@ -300,6 +307,8 @@ export async function getResultView(
 ): Promise<ResultView | null> {
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return null;
+  // 삭제한 기록 — 지운 리포트 · 맛보기 · 고민 입력은 없는 것으로 돌려준다(기존 결제 주문이 남아 있어도 다시 만들거나 구매로 이끌지 않는다)
+  if (assessment.recordDeletedAt) return { assessment, paidOrder: null, refunded: false, report: null, context: null, received: [], taste: { kind: "unavailable" }, deleted: true };
   const orders = await repo.listOrdersForAssessment(assessment.id);
   const paid = paidPersonalOrders(orders);
   const refunded = paid.length === 0 && orders.some((o) => o.status === "refunded" && parsePersonalSeq(o.productId) !== null);
@@ -308,7 +317,7 @@ export async function getResultView(
   const chosen =
     (input.orderNumber ? received.find((r) => r.order.orderNumber === input.orderNumber) : undefined) ?? received.find((r) => r.report?.status === "ready") ?? received[0] ?? null;
   const taste = await tasteStateFor(repo, input.userId, assessment.id).catch((): TasteViewState => ({ kind: "unavailable" }));
-  return { assessment, paidOrder: chosen?.order ?? null, refunded, report: chosen?.report ?? null, context, received, taste };
+  return { assessment, paidOrder: chosen?.order ?? null, refunded, report: chosen?.report ?? null, context, received, taste, deleted: false };
 }
 
 export type MyItem = {
@@ -325,7 +334,7 @@ export async function listMyItems(repo: MiyuRepository, userId: string): Promise
     repo.listReportStatuses(userId),
   ]);
   return assessments
-    .filter((a) => a.userId === userId)
+    .filter((a) => a.userId === userId && !a.recordDeletedAt)
     .map((a) => {
       const mine = orders.filter((o) => o.assessmentId === a.id && parsePersonalSeq(o.productId) !== null);
       const paid = mine.find((o) => o.status === "paid");

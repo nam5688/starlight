@@ -71,7 +71,8 @@ export async function createPairInvite(deps: PairDeps, input: { userId: string; 
   if (!isOpen(deps)) return { kind: "not-open" };
   if (deps.generatorReady === false) return { kind: "ai-not-connected" };
   const assessment = await deps.repo.getAssessment(input.assessmentId);
-  if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
+  // 삭제한 기록으로는 새 연결을 만들지 않는다(이미 연결된 쌍 · 진행 중인 생성은 그대로 이어진다 — usable은 그 경로에 쓰이므로 바꾸지 않는다)
+  if (!assessment || assessment.userId !== input.userId || assessment.recordDeletedAt) return { kind: "not-found" };
   if (!usable(assessment)) return { kind: "no-saju" };
   const relationship = parseRelationship(input.relationship);
   const errors: PairInputErrors = {};
@@ -142,7 +143,7 @@ export async function peekPairInvite(deps: PairDeps, input: { token: string; use
 /** 가장 최근에 받은 사용 가능한 검사 결과 — 상대가 따로 고르지 않으면 이것으로 연결한다 */
 export async function latestUsableAssessment(repo: MiyuRepository, userId: string): Promise<AssessmentRecord | null> {
   const all = await repo.listAssessments(userId);
-  return all.filter((a) => a.userId === userId && usable(a)).sort((x, y) => (x.createdAt < y.createdAt ? 1 : -1))[0] ?? null;
+  return all.filter((a) => a.userId === userId && !a.recordDeletedAt && usable(a)).sort((x, y) => (x.createdAt < y.createdAt ? 1 : -1))[0] ?? null;
 }
 
 export type JoinResult =
@@ -160,7 +161,7 @@ export async function joinPairInvite(deps: PairDeps, input: { token: string; use
   if (input.consent !== true) return { kind: "no-consent" };
   const mine = input.assessmentId ? await deps.repo.getAssessment(input.assessmentId) : await latestUsableAssessment(deps.repo, input.userId);
   if (!mine) return { kind: "no-assessment" };
-  if (mine.userId !== input.userId || !usable(mine)) return { kind: "bad-assessment" };
+  if (mine.userId !== input.userId || mine.recordDeletedAt || !usable(mine)) return { kind: "bad-assessment" };
   // 내 성별을 직접 골라야 하고, 분석 때 입력한 성별과 다르면 덮어쓰지 않고 멈춘다
   const genderError = myGenderError(mine.saju, input.myGender);
   if (genderError) return { kind: "invalid", errors: { myGender: genderError } };

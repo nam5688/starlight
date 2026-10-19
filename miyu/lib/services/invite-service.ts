@@ -5,7 +5,7 @@ import { createInviteToken, isInviteToken, type InviteDiscountCheck, type Invite
 import { INVITE_DISCOUNT, PERSONAL_REPORT } from "../config/product.ts";
 import type { MiyuRepository } from "./ports.ts";
 import { paidPersonalOrders } from "./purchases.ts";
-import { owns } from "./talk-service.ts";
+import { ownsActive } from "./talk-service.ts";
 
 const missingTable = (e: unknown) => (e as { code?: string } | null)?.code === "42P01";
 
@@ -20,7 +20,7 @@ async function paidHere(repo: MiyuRepository, assessmentId: string): Promise<boo
 }
 
 export async function getInviteView(repo: MiyuRepository, input: { userId: string; assessmentId: string }): Promise<InviteView> {
-  if (!(await owns(repo, input.userId, input.assessmentId))) return { kind: "locked" };
+  if (!(await ownsActive(repo, input.userId, input.assessmentId))) return { kind: "locked" };
   if (!(await paidHere(repo, input.assessmentId))) return { kind: "locked" };
   try {
     const invite = await repo.getInviteByAssessment(input.userId, input.assessmentId);
@@ -36,7 +36,7 @@ export type CreateInviteResult = { ok: true; view: Extract<InviteView, { kind: "
 
 /** 초대 링크 만들기 — 심층 리포트를 받은 결과의 주인만. 이미 있으면 그 링크를 그대로 돌려준다(결과마다 하나) */
 export async function createInviteLink(repo: MiyuRepository, input: { userId: string; assessmentId: string; newToken?: () => string }): Promise<CreateInviteResult> {
-  if (!(await owns(repo, input.userId, input.assessmentId))) return { ok: false, reason: "not-found" };
+  if (!(await ownsActive(repo, input.userId, input.assessmentId))) return { ok: false, reason: "not-found" };
   if (!(await paidHere(repo, input.assessmentId))) return { ok: false, reason: "not-paid" };
   try {
     await repo.createInvite({ userId: input.userId, assessmentId: input.assessmentId, token: (input.newToken ?? createInviteToken)(), tier: "deep" });

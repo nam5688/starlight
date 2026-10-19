@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ReportFeedback } from "@/components/results/report-feedback";
+import { DeletedRecordNotice } from "@/components/results/deleted-record";
 import { IdentityCard } from "@/components/results/identity-card";
 import { MiyuFirst } from "@/components/results/miyu-first";
 import { TalkEntry } from "@/components/results/talk-entry";
@@ -117,6 +118,8 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   // 로그인한 사용자 권한으로 조회 — 다른 회원의 결과는 DB 접근 정책에서도 걸러진다
   const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId: id, orderNumber: chosen });
   if (!view) notFound();
+  // 사용자가 직접 삭제한 기록 — 리포트 · 미리보기 · 분석 자료는 보이지 않고 구매 · 다시 만들기를 권하지도 않는다
+  if (view.deleted) return <DeletedRecordNotice assessmentId={id} />;
 
   const { assessment, report } = view;
   const generator = reportGenerator();

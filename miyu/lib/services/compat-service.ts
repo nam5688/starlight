@@ -105,7 +105,7 @@ export async function startCompatCheckout(
   if (!(deps.saleOpen ?? SAJU_COMPAT.saleOpen)) return { kind: "not-open" };
   if (!deps.generatorReady) return { kind: "ai-not-connected" };
   const assessment = await repo.getAssessment(input.assessmentId);
-  if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
+  if (!assessment || assessment.userId !== input.userId || assessment.recordDeletedAt) return { kind: "not-found" };
   if (assessment.saju.status !== "ok") return { kind: "invalid", errors: { birthDate: "내 사주를 계산하지 못한 결과라 궁합을 볼 수 없어요." } };
   const read = readCompatPartner(input.partner, deps.now(), input.relationship);
   const mine = myGenderError(assessment.saju, input.myGender);

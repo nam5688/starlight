@@ -38,7 +38,7 @@ export async function CompatPaidSection() {
   }
   if (member.needsConsent) redirect(consentPath("/compat"));
   const assessments = await (await readRepository()).listAssessments(member.userId).catch(() => []);
-  const latest = assessments.filter((a) => a.userId === member.userId && a.saju.status === "ok").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
+  const latest = assessments.filter((a) => a.userId === member.userId && !a.recordDeletedAt && a.saju.status === "ok").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
   if (!latest) {
     return (
       <Frame>

@@ -57,6 +57,8 @@ export type StartCheckoutResult =
   | { kind: "report-not-ready"; order: OrderRecord }
   /** 지금은 새 구매를 받지 않음 (리포트 준비 용량 · 하루 예산). 결제는 시작하지 않는다 */
   | { kind: "sales-closed"; reason: GateReason | null }
+  /** 회원이 "기록 삭제"한 결과다 — 삭제한 기록에는 주문을 만들지 않는다(기존 결제 주문이 있어도 다시 구매하게 하지 않는다) */
+  | { kind: "record-deleted" }
   | { kind: "not-found" };
 
 /**
@@ -74,6 +76,8 @@ export async function startCheckout(
   const { repo } = deps;
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
+  // 삭제한 기록에는 새 주문을 만들지 않는다 — 이미 결제한 주문이 있어도 "이미 결제함" · "다시 받기"로 이어지지 않는다(DB 트리거가 마지막으로 한 번 더 막는다)
+  if (assessment.recordDeletedAt) return { kind: "record-deleted" };
 
   const orders = await repo.listOrdersForAssessment(assessment.id);
   const received = paidPersonalOrders(orders);
@@ -226,6 +230,12 @@ export async function confirmPayment(
   }
   if (order.status !== "pending") {
     return { kind: "rejected", code: "ORDER_NOT_PAYABLE", message: "결제할 수 없는 주문이에요. 다시 결제해 주세요.", order };
+  }
+  // 삭제한 기록으로 만든 결제 대기 주문(삭제 전에 열어 둔 결제창 · 오래된 대기 주문)은 승인하지 않는다 — 승인하지 않은 결제는 자동 만료되어 카드에서 돈이 빠지지 않는다. 질문 결제는 채팅이 이어지므로 그대로 승인한다
+  if (!isCashProduct(order.productId) && (await repo.getAssessment(order.assessmentId))?.recordDeletedAt) {
+    const canceled = await repo.updateOrder(order.id, ["pending"], { status: "canceled", failureCode: "RECORD_DELETED", failureMessage: "삭제한 기록이라 결제를 진행하지 않음" });
+    await repo.addPaymentEvent({ orderId: order.id, source: "confirm", status: "RECORD_DELETED", detail: {} }).catch(() => {});
+    return { kind: "rejected", code: "RECORD_DELETED", message: "삭제한 기록이라 결제할 수 없어요. 결제는 진행되지 않았어요.", order: canceled ?? order };
   }
   // 주소에 담긴 금액이 서버 주문 금액과 다르면 승인하지 않는다 (승인하지 않은 결제는 자동 만료)
   if (!Number.isInteger(input.amount) || input.amount !== order.amount) {

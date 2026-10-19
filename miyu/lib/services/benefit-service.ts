@@ -162,7 +162,7 @@ async function productFor(deps: BenefitDeps, assessmentId: string, again: boolea
  */
 export async function quoteForCheckout(deps: BenefitDeps, input: QuoteInput): Promise<QuoteResult> {
   const assessment = await deps.repo.getAssessment(input.assessmentId);
-  if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
+  if (!assessment || assessment.userId !== input.userId || assessment.recordDeletedAt) return { kind: "not-found" };
   const listKrw = PERSONAL_REPORT.priceKrw;
   try {
     const { ready, settings } = await loadBenefitSettings(deps.benefits);

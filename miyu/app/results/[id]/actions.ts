@@ -19,6 +19,8 @@ async function goAfterStart(assessmentId: string, result: StartCheckoutResult, b
   if (result.kind === "not-found") notFound();
   // 이미 결제했거나, 지금은 새 구매를 받지 않는 경우: 결과 화면이 상태에 맞는 안내를 보여 준다 (결제는 시작하지 않았다)
   if (result.kind === "already-paid" || result.kind === "sales-closed") redirect(`/results/${assessmentId}`);
+  // 삭제한 기록 — 결제를 시작하지 않았고, 결과 화면이 삭제한 기록이라고 안내한다
+  if (result.kind === "record-deleted") redirect(`/results/${assessmentId}`);
   // 가장 최근에 받은 리포트가 아직 완성되지 않았다면 새로 결제하지 않고 그 리포트의 상태(만드는 중 · 실패 · 다시 만들기)를 보여 준다
   if (result.kind === "report-not-ready") redirect(`/results/${assessmentId}?r=${encodeURIComponent(result.order.orderNumber)}`);
   // 요청한 할인 · 혜택을 확정하지 못했다 — 결제는 시작하지 않았고 이유를 화면에 보여 준다(서버 오류는 "할인 불가"와 따로 안내한다)

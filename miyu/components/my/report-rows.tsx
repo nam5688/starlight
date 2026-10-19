@@ -1,15 +1,13 @@
 import Link from "next/link";
-import { hideReportAction, restoreReportAction } from "@/app/my/actions";
 import { retryReceivedReportAction, retryReportAction } from "@/app/results/[id]/actions";
+import { DeleteRecordButton } from "@/components/my/delete-record-button";
 import { ReceivedReports } from "@/components/results/received-reports";
 import { StateBadge } from "@/components/my/state-badge";
 import { formatDate, formatDateTime } from "@/components/ui/format";
-import { ChevronIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
-import { textLink } from "@/components/ui/styles";
 import { CONCERN_RECORDS } from "@/lib/config/product";
 import { topicLabel } from "@/lib/personalization/context";
-import type { MyConcernCard, MyReportCard } from "@/lib/services/my-service";
+import type { MyConcernCard, MyDeletedRecord, MyReportCard } from "@/lib/services/my-service";
 
 /** 고민 반영 리포트 한 건: 제목 · 상태 · 발급일 · 고민 주제 · 고민을 쓴 시점 */
 export function ConcernRow({ card }: { card: MyConcernCard }) {
@@ -56,7 +54,7 @@ export function ConcernRow({ card }: { card: MyConcernCard }) {
   );
 }
 
-/** 리포트 카드의 상태 표시 — 목록의 카드와 숨긴 리포트의 줄이 같은 모양을 쓴다 */
+/** 리포트 카드의 상태 표시 */
 function ReportStateBadges({ card }: { card: MyReportCard }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -79,9 +77,9 @@ function ReportStateBadges({ card }: { card: MyReportCard }) {
 
 /**
  * 리포트 한 건: 제목 · 상태(무료 / 구매 완료 / 생성 중) · 대상 · 날짜 · 고민 주제와, 상태에 맞는 버튼만.
- * hideAvailable이면 맨 아래에 "목록에서 숨기기"가 있다 — 이 목록에서만 접어 두는 것이고 결과 · 대화 · 구매 기록 · 질문권은 그대로다.
+ * deleteAvailable이면 맨 아래에 "기록 삭제"가 있다 — 누르면 확인창이 열리고, 확인해야 리포트 본문 · 맛보기 글 · 고민이 되돌릴 수 없게 지워진다(대화 · 질문권 · 주문 · 결제 기록은 남는다).
  */
-export function ReportRow({ card, paymentsReady, hideAvailable = false }: { card: MyReportCard; paymentsReady: boolean; hideAvailable?: boolean }) {
+export function ReportRow({ card, paymentsReady, deleteAvailable = false }: { card: MyReportCard; paymentsReady: boolean; deleteAvailable?: boolean }) {
   const href = `/results/${card.assessmentId}`;
   const small = "inline-flex h-10 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
   const primary = `${small} bg-accent text-white hover:bg-accent-strong`;
@@ -148,63 +146,44 @@ export function ReportRow({ card, paymentsReady, hideAvailable = false }: { card
       {card.entitlement === "purchased" && card.generation === "failed" && (
         <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">결제는 정상 처리되었어요. 다시 결제하지 말고 ‘다시 생성’을 눌러 주세요.</p>
       )}
-      {hideAvailable && (
-        <form action={hideReportAction.bind(null, card.assessmentId)} className="mt-3 border-t border-line pt-1">
-          <button
-            type="submit"
-            aria-label={`${card.productName}, ${card.subject}, 내 리포트 목록에서 숨기기`}
-            className={`${textLink} inline-flex min-h-11 items-center text-[14px] font-semibold text-ink-3`}
-          >
-            목록에서 숨기기
-          </button>
-        </form>
+      {deleteAvailable && (
+        <div className="mt-3 border-t border-line pt-1">
+          <DeleteRecordButton assessmentId={card.assessmentId} label={`${card.productName}, ${card.subject}`} />
+        </div>
       )}
     </li>
   );
 }
 
-/** 목록에서 숨긴 리포트 — 접어 두었다가 펼쳐 다시 보이게 한다. 열어 보는 링크는 그대로 있다(숨김은 열람 권한과 무관) */
-export function HiddenReports({ cards }: { cards: MyReportCard[] }) {
-  if (cards.length === 0) return null;
-  const touch = "inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
+/**
+ * 삭제한 기록의 대화 — 리포트를 삭제한 검사 결과도 채팅방은 그대로 열린다(삭제 전에 오간 대화는 읽기만 되는 기록으로 남고, 새 대화는 이어 갈 수 있는 방에서 계속된다).
+ * 리포트 · 결과 화면으로 가는 링크는 없다.
+ */
+export function DeletedRecords({ records }: { records: MyDeletedRecord[] }) {
+  if (records.length === 0) return null;
+  const touch = "inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-[14px] font-semibold border border-line-strong bg-canvas text-ink hover:bg-mist";
   return (
-    <details data-fold className="group mt-4 rounded-xl border border-line bg-canvas" data-testid="my-hidden">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
-        <span className="text-[15px] font-semibold">숨긴 리포트 {cards.length}개</span>
-        <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="border-t border-line px-4 py-4">
-        <p className="text-[13px] leading-[1.6] text-ink-3">
-          목록에서만 숨겨 둔 리포트예요. 삭제나 탈퇴가 아니라서 결과 · 대화 · 구매 기록 · 질문권은 그대로이고, 아래에서 언제든 다시 보이게 할 수 있어요.
-        </p>
-        <ul className="mt-3 space-y-3">
-          {cards.map((card) => (
-            <li key={card.assessmentId} className="rounded-xl border border-line bg-page p-4" data-testid="my-hidden-report">
-              <p className="text-[15px] leading-snug font-bold">{card.productName}</p>
-              <ReportStateBadges card={card} />
-              <p className="mt-2.5 text-[14px] leading-[1.6] text-ink-2">{card.subject}</p>
-              <p className="mt-1 text-[13px] leading-[1.6] text-ink-3">
-                생성일 {formatDate(card.createdAt)}
-                {card.paidOrderNumber ? ` · 주문번호 ${card.paidOrderNumber}` : ""}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Link href={`/results/${card.assessmentId}`} className={`${touch} border border-line-strong bg-canvas text-ink hover:bg-mist`}>
-                  {card.entitlement === "purchased" && card.generation === "ready" ? "구매한 리포트 보기" : "결과 보기"}
-                </Link>
-                <form action={restoreReportAction.bind(null, card.assessmentId)}>
-                  <button
-                    type="submit"
-                    aria-label={`${card.productName}, ${card.subject}, 목록에 다시 보이기`}
-                    className={`${touch} bg-accent text-white hover:bg-accent-strong`}
-                  >
-                    목록에 다시 보이기
-                  </button>
-                </form>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </details>
+    <div className="mt-6" data-testid="my-deleted">
+      <h3 className="text-[15px] font-bold">삭제한 기록의 대화</h3>
+      <p className="mt-1 text-[13px] leading-[1.6] text-ink-3">
+        리포트를 삭제한 기록이에요. 리포트 글은 지워졌지만 채팅방과 지난 대화는 그대로 열려요. 지난 대화는 읽기만 할 수 있고, 이어 갈 수 있는 방에서는 새 대화를 계속할 수 있어요.
+      </p>
+      <ul className="mt-3 space-y-3">
+        {records.map((r) => (
+          <li key={r.assessmentId} className="rounded-xl border border-line bg-canvas p-4" data-testid="my-deleted-record">
+            <p className="text-[15px] leading-snug font-bold">삭제한 기록</p>
+            <p className="mt-1.5 text-[14px] leading-[1.6] text-ink-2">{r.subject}</p>
+            <p className="mt-1 text-[13px] leading-[1.6] text-ink-3">
+              삭제일 {formatDate(r.deletedAt)} · 저장된 채팅방 {r.chatRooms}개
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href={`/results/${r.assessmentId}/talk`} className={touch}>
+                채팅방 열기
+              </Link>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

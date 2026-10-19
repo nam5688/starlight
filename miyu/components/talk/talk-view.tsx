@@ -28,6 +28,8 @@ import {
   type TalkLine,
   type TalkSay,
 } from "@/lib/report/reading/talk-room";
+import { ArchivedLines } from "@/components/talk/archive-lines";
+import type { TranscriptLine } from "@/lib/report/reading/talk-transcript";
 import { askMiyuAction, closeTalkRoomAction, resetTalkRoomAction, saveChatSummaryAction, saveTalkRoomAction, startQuestionPaymentAction } from "@/app/results/[id]/talk/actions";
 import { AnalysisCard } from "./analysis-card";
 import { CardActions } from "./card-actions";
@@ -60,7 +62,9 @@ type Props = {
    * 대화를 서버에도 저장하는 화면(로그인한 회원의 내 결과) — 폰을 바꿔도 이어 본다.
    * initial: 이 방에 서버에 저장돼 있던 행동 목록(없으면 빈 목록) · savedKeys: 저장된 대화가 있는 방 이름들. 없으면 이 기기의 브라우저에만 저장한다(예시 화면).
    */
-  persist?: { assessmentId: string; initial: unknown[]; savedKeys: string[] };
+  persist?: { assessmentId: string; initial: unknown[]; savedKeys: string[]; /** 삭제한 기록의 방에서만 있다 — 저장할 때 서버에 돌려보내는 표지(삭제 전에 열어 둔 화면이 옛 대화를 되돌려 쓰지 못하게 한다). 삭제하지 않은 기록은 null */ epoch?: string | null };
+  /** 삭제한 기록: 삭제 전에 이 방에서 이미 표시된 말(읽기 전용) — 대화 위쪽에 먼저 보이고, 그 아래에서 새 대화가 시작된다 */
+  archive?: { lines: TranscriptLine[] };
   /** 유료 질문 결제를 마치고 돌아온 화면이다(주소의 paid) — 결제 전에 적어 둔 질문이 브라우저에 남아 있으면 이어서 바로 보낸다 */
   payReturn?: boolean;
 };
@@ -106,7 +110,9 @@ const writeSave = (scope: string, key: string, actions: RoomAction[]) => {
  * 모두 저장된 리포트의 글(답변 한 번에 말풍선 1~2개)과 고정 문구이며 AI를 부르지 않는다. 풀이를 읽은 뒤에는 내 경험을 말하는 질문과 보조 버튼이 따라온다.
  * 대화는 이 기기에만 이어 보기로 남는다(서버 저장 없음). 자유 질문 · 고민 말하기(AI가 답하는 부분)는 아직 준비 중이라고 밝힌다. 모션을 줄이는 설정이면 말풍선이 한꺼번에 나타난다.
  */
-export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, badge, contextHref, roomHrefs, persist, payReturn }: Props) {
+export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, badge, contextHref, roomHrefs, persist, archive, payReturn }: Props) {
+  // 삭제한 기록의 방이다 — 이 기기에 남은 옛 대화(삭제 전 행동 목록)는 쓰지 않고, 옛 대화는 읽기용 기록으로만 보인다
+  const archived = persist?.epoch != null;
   const def = ROOMS[room];
   /** 이 방의 캐릭터 색 — 상담 주제마다 다르다(연애 · 결혼 방만 윙크 · 하트의 핑크) */
   const tone = toneOfRoom(room);
@@ -252,7 +258,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     const t = window.setTimeout(() => {
       // 서버에 저장된 대화가 있으면 그것을 먼저(어느 기기에서나 이어 보기), 없으면 이 기기에 남은 것
       const fromServer = persist && persist.initial.length > 0 ? parseRoomSave({ v: ROOM_SAVE_VERSION, actions: persist.initial }, model, room) : [];
-      const restored = fromServer.length > 0 ? fromServer : parseRoomSave(readSave(scope, key), model, room);
+      const restored = fromServer.length > 0 ? fromServer : archived ? [] : parseRoomSave(readSave(scope, key), model, room);
+      if (archived) writeSave(scope, key, []);
       if (restored.length > 0) {
         const state = replayRoom(model, room, restored, { contextHref });
         setEngine(state);
@@ -305,9 +312,9 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
     setEngine(r.state);
     const next = [...actions, action];
     setActions(next);
-    writeSave(scope, key, next);
+    if (!archived) writeSave(scope, key, next);
     // 서버 저장은 기다리지 않는다 — 실패해도 대화는 그대로이고 이 기기에는 남는다
-    if (persist) void saveTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key, actions: next }).catch(() => undefined);
+    if (persist) void saveTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key, actions: next, epoch: persist.epoch ?? null }).catch(() => undefined);
     deliver(r.added);
   };
 
@@ -398,8 +405,8 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       setEngine(r.state);
       const next = [...actions, action];
       setActions(next);
-      writeSave(scope, key, next);
-      void saveTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key, actions: next }).catch(() => undefined);
+      if (!archived) writeSave(scope, key, next);
+      void saveTalkRoomAction({ assessmentId: persist.assessmentId, roomKey: key, actions: next, epoch: persist.epoch ?? null }).catch(() => undefined);
       deliver(r.added.filter((l) => l.from === "miyu"));
       return;
     }
@@ -518,7 +525,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
   // 메뉴: 열면 첫 항목으로 초점, Esc · 바깥을 누르면 닫고 메뉴 버튼으로 초점을 돌려준다 · 열 때 이 기기에 남은 방을 확인한다
   useEffect(() => {
     if (!menuOpen) return;
-    const t = window.setTimeout(() => setSaved(Object.fromEntries(ROOM_ORDER.map((r) => [r, Boolean(persist?.savedKeys.includes(roomSaveKey(model, r))) || parseRoomSave(readSave(scope, roomSaveKey(model, r)), model, r).length > 0]))), 0);
+    const t = window.setTimeout(() => setSaved(Object.fromEntries(ROOM_ORDER.map((r) => [r, Boolean(persist?.savedKeys.includes(roomSaveKey(model, r))) || (!archived && parseRoomSave(readSave(scope, roomSaveKey(model, r)), model, r).length > 0)]))), 0);
     menuRef.current?.querySelector<HTMLElement>("button, a")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -537,7 +544,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onDown);
     };
-  }, [menuOpen, scope, model, persist]);
+  }, [menuOpen, scope, model, persist, archived]);
 
   // 채팅방 메뉴 — 심층 리포트(paid)는 열 수 있는 방을 한 목록으로, 무료 리포트(free)는 무료로 열리는 방을 위에, 심층 리포트로만 열리는 방은 "심층 리포트로는 아래 상담도 가능해요!" 아래에 잠금 표시로 둔다
   const menuRooms = (() => {
@@ -636,7 +643,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
       className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh w-full max-w-[560px] flex-col bg-page chat-frame:static chat-frame:z-auto chat-frame:my-8 chat-frame:h-[max(560px,min(820px,calc(100dvh-9rem)))] chat-frame:w-[680px] chat-frame:max-w-[calc(100vw-3rem)] chat-frame:overflow-hidden chat-frame:rounded-3xl chat-frame:shadow-pop chat-frame:ring-1 chat-frame:ring-line"
     >
       <header className="relative z-10 flex items-center gap-2 bg-page px-2 py-2 shadow-[0_6px_10px_-10px_rgb(48_49_59/0.4)]">
-        <Link href={reportHref} aria-label="전체 리포트로 돌아가기" className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
+        <Link href={reportHref} aria-label={archived ? "MY로 돌아가기" : "전체 리포트로 돌아가기"} className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-mist">
           <ArrowIcon className="size-5 rotate-180" />
         </Link>
         <MiyuAvatar className="size-11" tone={tone} bob={miyuBusy} />
@@ -730,13 +737,14 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         aria-live="polite"
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-page px-3 py-4"
       >
+        {archive && archive.lines.length > 0 && <ArchivedLines lines={archive.lines} tone={tone} />}
         {log.map((m, i) => {
           const prev = log[i - 1];
           const isSystem = m.from === "miyu" && m.say.kind === "system";
           const sameSender = i > 0 && prev.from === m.from && !isSystem && !(prev.from === "miyu" && prev.say.kind === "system");
           return (
             <div key={m.id} data-msg={m.id} className={`motion-safe:animate-miyu-in ${i === 0 ? "" : sameSender ? "mt-1.5" : "mt-4"}`}>
-              {m.from === "me" ? <MeBubble text={m.text} /> : m.say.kind === "system" ? <System text={m.say.text} sub={m.say.sub} /> : <MiyuRow say={m.say} tone={tone} first={!sameSender} model={model} dateLabel={dateLabel} dataHref={dataHref} />}
+              {m.from === "me" ? <MeBubble text={m.text} /> : m.say.kind === "system" ? <System text={m.say.text} sub={m.say.sub} /> : <MiyuRow say={m.say} tone={tone} first={!sameSender} model={model} dateLabel={dateLabel} dataHref={archived ? null : dataHref} />}
             </div>
           );
         })}
@@ -783,7 +791,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
               <div className="flex gap-2 overflow-x-auto px-3 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {replies.helpers.map((c) => <ChipButton key={c.key} chip={c} className={chipSub} onPick={act} />)}
                 {replies.next && <ChipButton chip={replies.next} className={chipPrimary} onPick={act} />}
-                {replies.report && (
+                {replies.report && !archived && (
                   <Link href={reportHref} className={chipPrimary}>
                     {TALK_COPY.buttons.fullReport}
                   </Link>
@@ -842,14 +850,24 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
               </div>
             )}
             <div className="mt-1 px-1 pt-1">
-              <Link href={dataHref} className="flex min-h-11 w-full items-center justify-between rounded-lg px-2 text-[15px] font-semibold hover:bg-mist">
-                {TALK_COPY.buttons.data}
-                <ArrowIcon className="size-4" />
-              </Link>
-              <Link href={reportHref} className="flex min-h-11 w-full items-center justify-between rounded-lg px-2 text-[15px] font-semibold hover:bg-mist">
-                {TALK_COPY.buttons.fullReport}
-                <ArrowIcon className="size-4" />
-              </Link>
+              {archived ? (
+                // 삭제한 기록: 리포트 · 분석 자료 화면은 없다 — MY로만 돌아간다
+                <Link href={reportHref} className="flex min-h-11 w-full items-center justify-between rounded-lg px-2 text-[15px] font-semibold hover:bg-mist">
+                  MY로 가기
+                  <ArrowIcon className="size-4" />
+                </Link>
+              ) : (
+                <>
+                  <Link href={dataHref} className="flex min-h-11 w-full items-center justify-between rounded-lg px-2 text-[15px] font-semibold hover:bg-mist">
+                    {TALK_COPY.buttons.data}
+                    <ArrowIcon className="size-4" />
+                  </Link>
+                  <Link href={reportHref} className="flex min-h-11 w-full items-center justify-between rounded-lg px-2 text-[15px] font-semibold hover:bg-mist">
+                    {TALK_COPY.buttons.fullReport}
+                    <ArrowIcon className="size-4" />
+                  </Link>
+                </>
+              )}
               {persist ? (
                 <>
                   <button
@@ -1000,7 +1018,7 @@ function System({ text, sub }: { text: string; sub?: string }) {
 // 일반 답변은 테두리도 그림자도 없이 하얀 말풍선만 — 그림자는 분석 카드에만 약하게 쓴다(박스를 덜 쓴다)
 const bubble = "rounded-2xl rounded-tl-md bg-canvas px-3.5 py-2.5";
 
-function MiyuRow({ say, tone, first, model, dateLabel, dataHref }: { say: TalkSay; tone: MiyuTone; first: boolean; model: TalkModel; dateLabel: string; dataHref: string }) {
+function MiyuRow({ say, tone, first, model, dateLabel, dataHref }: { say: TalkSay; tone: MiyuTone; first: boolean; model: TalkModel; dateLabel: string; dataHref: string | null }) {
   return (
     <div className="flex items-start gap-2">
       <div className="w-9 shrink-0">{first && <MiyuAvatar className="size-9" tone={tone} />}</div>
@@ -1011,7 +1029,7 @@ function MiyuRow({ say, tone, first, model, dateLabel, dataHref }: { say: TalkSa
   );
 }
 
-function Content({ say, model, dateLabel, dataHref }: { say: TalkSay; model: TalkModel; dateLabel: string; dataHref: string }) {
+function Content({ say, model, dateLabel, dataHref }: { say: TalkSay; model: TalkModel; dateLabel: string; dataHref: string | null }) {
   switch (say.kind) {
     case "card":
       return (

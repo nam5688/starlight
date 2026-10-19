@@ -17,14 +17,14 @@ import { logError } from "@/server/ops";
 import { verifyPacksBeforeUse } from "@/server/reconcile";
 import { benefitRepository, now, readRepository, writeRepository } from "@/server/services";
 
-type Input = { assessmentId: unknown; roomKey: unknown; actions?: unknown };
+type Input = { assessmentId: unknown; roomKey: unknown; actions?: unknown; /** 삭제한 기록의 방에서만 — 화면이 열릴 때 받은 표지 */ epoch?: unknown };
 
 /** 대화를 서버에 저장한다 — 로그인한 회원의 자기 검사 결과에만(서비스가 소유자를 확인한다). 실패해도 대화는 그대로 이어지고 이 기기에는 남는다 */
 export async function saveTalkRoomAction(input: Input): Promise<{ ok: boolean }> {
   if (typeof input?.assessmentId !== "string" || typeof input?.roomKey !== "string") return { ok: false };
   const member = await getMember();
   if (!member || member.needsConsent) return { ok: false };
-  const r = await saveTalkRoom(writeRepository(), { userId: member.userId, assessmentId: input.assessmentId, roomKey: input.roomKey, actions: input.actions });
+  const r = await saveTalkRoom(writeRepository(), { userId: member.userId, assessmentId: input.assessmentId, roomKey: input.roomKey, actions: input.actions, epoch: input.epoch });
   return { ok: r.ok };
 }
 

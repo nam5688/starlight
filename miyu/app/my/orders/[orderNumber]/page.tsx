@@ -100,14 +100,22 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
             리포트 제공
           </h2>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-            {trace.entitled
-              ? `서버가 결제 승인을 확인해 전체 리포트 열람 권한이 있어요. 생성 상태: ${GENERATION_LABEL[trace.generation] || "생성 전"}.`
-              : "결제 승인이 확인되지 않아 전체 리포트 열람 권한이 없어요. 결제 성공 화면으로 이동했거나 리포트가 보였더라도, 서버 승인 기록이 없으면 결제 완료가 아니에요."}
+            {trace.recordDeleted
+              ? "결제는 정상 처리된 기록이에요. 이 주문의 리포트는 직접 삭제한 기록이라 더 볼 수 없고, 다시 만들거나 다시 구매하지 않아요. 결제 · 환불 기록은 그대로 남아요."
+              : trace.entitled
+                ? `서버가 결제 승인을 확인해 전체 리포트 열람 권한이 있어요. 생성 상태: ${GENERATION_LABEL[trace.generation] || "생성 전"}.`
+                : "결제 승인이 확인되지 않아 전체 리포트 열람 권한이 없어요. 결제 성공 화면으로 이동했거나 리포트가 보였더라도, 서버 승인 기록이 없으면 결제 완료가 아니에요."}
           </p>
           <p className="mt-2 text-[15px]">
-            <Link href={trace.pairId ? `/pair/${trace.pairId}` : trace.isCompat ? `/compat/report/${order.orderNumber}` : `/results/${order.assessmentId}`} className={textLink}>
-              {trace.pairId ? "리포트 궁합 보기" : trace.isCompat ? "사주 궁합 보기" : "연결된 결과 보기"}
-            </Link>
+            {trace.recordDeleted ? (
+              <Link href={`/results/${order.assessmentId}/talk`} className={textLink}>
+                채팅방으로 가기
+              </Link>
+            ) : (
+              <Link href={trace.pairId ? `/pair/${trace.pairId}` : trace.isCompat ? `/compat/report/${order.orderNumber}` : `/results/${order.assessmentId}`} className={textLink}>
+                {trace.pairId ? "리포트 궁합 보기" : trace.isCompat ? "사주 궁합 보기" : "연결된 결과 보기"}
+              </Link>
+            )}
           </p>
         </section>
       )}

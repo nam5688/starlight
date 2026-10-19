@@ -3,6 +3,7 @@
 // - 로그인한 사용자 클라이언트: DB 접근 정책(RLS) 때문에 본인 행만 읽을 수 있고, 쓰기는 거부된다
 // - 서버 비밀키 클라이언트: 쓰기용. 서비스가 소유자를 직접 확인한 뒤에만 쓴다
 
+import { readTranscriptLines } from "../../report/reading/talk-transcript.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InviteDiscountCheck, InviteDiscountReason } from "../../commerce/invite.ts";
 import type { ConsentRecord } from "../../membership/terms.ts";
@@ -141,6 +142,8 @@ function toAssessment(r: Row): AssessmentRecord {
     summary: r.summary as AssessmentRecord["summary"],
     saju: r.saju as AssessmentRecord["saju"],
     createdAt: r.created_at as string,
+    // 삭제 열이 없는 DB(28번 전)는 값이 아예 없다(undefined) — 삭제하지 않은 기록(null)과 구분한다
+    recordDeletedAt: r.record_deleted_at === undefined ? undefined : ((r.record_deleted_at as string | null) ?? null),
   };
 }
 
@@ -404,25 +407,27 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       return (data ?? []).map(toAssessment);
     },
 
-    async listHiddenAssessmentIds(userId) {
-      const { data, error } = await db.from("assessments").select("id").eq("user_id", userId).not("my_hidden_at", "is", null);
-      if (error) {
-        if (["42703", "PGRST204"].includes(error.code ?? "")) return null; // 27번 전 — 숨김 열이 없다
-        fail("숨긴 결과 조회", error);
-      }
-      return (data ?? []).map((r) => (r as Row).id as string);
-    },
-
-    async setAssessmentMyHidden(userId, assessmentId, hidden) {
-      const { data, error } = await db.rpc("set_assessment_my_hidden", { p_user_id: userId, p_assessment_id: assessmentId, p_hidden: hidden });
+    async deleteAssessmentRecord(userId, assessmentId, transcripts) {
+      const { data, error } = await db.rpc("delete_assessment_record", { p_user_id: userId, p_assessment_id: assessmentId, p_transcripts: transcripts });
       if (error) {
         if (error.code === "22P02") return "not-found"; // uuid 형식이 아닌 번호
         const missing = isMissingFunction(error) || isMissingTableError(error) || error.code === "42703";
-        fail("MY 목록 숨김 변경", missing ? { code: "42P01", message: "set_assessment_my_hidden 함수가 없습니다 (DB 변경 27번 필요)" } : error);
+        fail("기록 삭제", missing ? { code: "42P01", message: "delete_assessment_record 함수가 없습니다 (DB 변경 28번 필요)" } : error);
       }
-      return data === "changed" ? "changed" : data === "unchanged" ? "unchanged" : "not-found";
+      return data === "deleted" ? "deleted" : data === "unchanged" ? "unchanged" : data === "busy" ? "busy" : data === "stale" ? "stale" : "not-found";
     },
 
+    async listTalkTranscripts(assessmentId) {
+      const { data, error } = await db.from("talk_transcripts").select().eq("assessment_id", assessmentId).order("room_key", { ascending: true });
+      if (error) {
+        if (isMissingTableError(error)) return []; // 28번 전
+        fail("읽기용 대화 기록 조회", error);
+      }
+      return (data ?? []).map((r) => {
+        const row = r as Row;
+        return { assessmentId: row.assessment_id as string, roomKey: row.room_key as string, userId: row.user_id as string, lines: readTranscriptLines(row.lines), createdAt: row.created_at as string };
+      });
+    },
     async getOrderByNumber(orderNumber) {
       const { data, error } = await db.from("orders").select().eq("order_number", orderNumber).maybeSingle();
       if (error) fail("주문 조회", error);
@@ -1254,6 +1259,8 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         .single();
       if (error) {
         if (error.code === UNIQUE_VIOLATION) return { ok: false, reason: "conflict" };
+        // 사용자가 직접 삭제한 기록에는 리포트 줄이 생기지 않는다(DB 장치 record_deleted) — 호출한 쪽은 "만들 수 없음"으로 본다
+        if (error.message?.includes("record_deleted")) return { ok: false, reason: "conflict" };
         fail("리포트 생성", error);
       }
       return { ok: true, value: toReport(data) };

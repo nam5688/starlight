@@ -28,7 +28,9 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/go/[room]">)
     try {
       const member = await getMember();
       if (member) {
-        const latest = (await (await readRepository()).listAssessments(member.userId))[0];
+        const mine = await (await readRepository()).listAssessments(member.userId);
+        // 리포트를 삭제하지 않은 가장 최근 분석을 먼저 — 삭제한 기록밖에 없어도 채팅방은 그대로 열린다
+        const latest = mine.find((a) => !a.recordDeletedAt) ?? mine[0];
         if (latest) return to(talkRoomPath(latest.id, room));
       }
     } catch {

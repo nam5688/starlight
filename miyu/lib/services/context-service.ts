@@ -17,7 +17,8 @@ export type ContextView = {
 
 async function ownedAssessment(repo: MiyuRepository, userId: string, assessmentId: string) {
   const assessment = await repo.getAssessment(assessmentId);
-  return assessment && assessment.userId === userId ? assessment : null;
+  // 삭제한 기록에는 고민을 적거나 발급하지 않는다(찾을 수 없음으로 처리)
+  return assessment && assessment.userId === userId && !assessment.recordDeletedAt ? assessment : null;
 }
 
 /** 본인 것이 아니면 null (화면에서는 '찾을 수 없음') */

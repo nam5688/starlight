@@ -8,7 +8,7 @@ import { setMarketingAction } from "@/app/my/actions";
 import { LoginOptions } from "@/components/auth/login-options";
 import { MyHeader, MyHubList, MyStatCards } from "@/components/my/my-hub";
 import { hubCards, hubItems } from "@/components/my/my-hub-data";
-import { ConcernRow, HiddenReports, ReportRow } from "@/components/my/report-rows";
+import { ConcernRow, DeletedRecords, ReportRow } from "@/components/my/report-rows";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDate } from "@/components/ui/format";
@@ -19,7 +19,7 @@ import { getCashView } from "@/lib/services/cash-service";
 import { listMyCompat } from "@/lib/services/compat-service";
 import { listMyPairs } from "@/lib/services/pair-service";
 import { pairDeps } from "@/server/pair";
-import { getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
+import { deleteNoticeOf, getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { logError } from "@/server/ops";
@@ -32,20 +32,20 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default function MyPage() {
+export default function MyPage({ searchParams }: { searchParams: Promise<{ notice?: string | string[] }> }) {
   return (
     <main className="bg-page">
       <div className="mx-auto w-full max-w-[720px] px-5 py-8 md:py-12">
         <MyHeader />
         <Suspense fallback={<PageFallback className="mt-8" />}>
-          <MyContent />
+          <MyContent searchParams={searchParams} />
         </Suspense>
       </div>
     </main>
   );
 }
 
-async function MyContent() {
+async function MyContent({ searchParams }: { searchParams: Promise<{ notice?: string | string[] }> }) {
   await connection(); // 환경변수·로그인 상태를 요청 때마다 확인한다
   if (!isAuthConfigured()) {
     return (
@@ -82,7 +82,8 @@ async function MyContent() {
   reconcileUserInBackground(member.userId);
 
   const repo = await readRepository();
-  const [{ cards, hiddenCards, hideAvailable, concerns, orders }, cash, savedChats, benefits, compats, pairs] = await Promise.all([
+  const notice = deleteNoticeOf((await searchParams).notice);
+  const [{ cards, deletedRecords, deleteAvailable, concerns, orders }, cash, savedChats, benefits, compats, pairs] = await Promise.all([
     getMyPage(repo, member.userId),
     getCashView(repo, member.userId, 1),
     repo.countVisibleChatSummaries(member.userId).catch(() => 0),
@@ -91,36 +92,45 @@ async function MyContent() {
     listMyPairs(pairDeps(), member.userId).catch(() => []),
   ]);
   const paymentsReady = paymentConfig().ok;
-  // 채팅방 바로가기는 숨긴 결과여도 끊기지 않게 한다(숨김은 목록 표시만 바꾼다)
-  const talkTarget = cards[0] ?? hiddenCards[0];
+  // 채팅방 바로가기는 리포트를 삭제한 기록이어도 끊기지 않게 한다(삭제해도 채팅방은 그대로 열린다)
+  const talkTarget = cards[0] ?? deletedRecords[0];
   const talkHref = talkTarget ? `/results/${talkTarget.assessmentId}/talk` : null;
   return (
     <>
       <MyStatCards cards={hubCards(benefits, cash.ready ? cash.questions : 0)} />
-      <MyHubList items={hubItems(benefits, cards.length + hiddenCards.length)} />
+      <MyHubList items={hubItems(benefits, cards.length)} />
 
       <section aria-labelledby="my-list" className="mt-12 scroll-mt-20">
         <h2 id="my-list" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
           내 리포트
         </h2>
         <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있어요.</p>
+        {notice && (
+          <p
+            role="status"
+            data-testid="delete-notice"
+            className={`mt-3 rounded-xl px-4 py-3 text-[14px] leading-[1.65] ${notice.tone === "ok" ? "bg-positive-soft text-positive" : "bg-caution-soft text-caution"}`}
+          >
+            {notice.text}
+          </p>
+        )}
         {cards.length === 0 ? (
           <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-8 text-[15px] text-ink-2">
-            {hiddenCards.length > 0 ? "목록에 보이는 리포트가 없어요. 아래 ‘숨긴 리포트’에서 다시 보이게 할 수 있어요." : "아직 저장한 결과가 없어요."}
+            {deletedRecords.length > 0 ? "목록에 보이는 리포트가 없어요. 삭제한 기록의 대화는 아래에서 열 수 있어요." : "아직 저장한 결과가 없어요."}
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
             {cards.map((card) => (
-              <ReportRow key={card.assessmentId} card={card} paymentsReady={paymentsReady} hideAvailable={hideAvailable} />
+              <ReportRow key={card.assessmentId} card={card} paymentsReady={paymentsReady} deleteAvailable={deleteAvailable} />
             ))}
           </ul>
         )}
-        {hideAvailable && cards.length > 0 && (
+        {deleteAvailable && cards.length > 0 && (
           <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">
-            ‘목록에서 숨기기’는 이 목록에서만 접어 둬요. 삭제나 탈퇴가 아니라서 결과 · 대화 · 구매 기록 · 질문권은 그대로이고, ‘숨긴 리포트’에서 다시 보이게 할 수 있어요.
+            ‘기록 삭제’를 누르면 확인창이 열려요. 삭제하면 리포트 글은 되돌릴 수 없지만, 채팅방 · 남은 질문권 · 주문 기록은 그대로 남아요.
           </p>
         )}
-        {hideAvailable && <HiddenReports cards={hiddenCards} />}
+        {deleteAvailable && <DeletedRecords records={deletedRecords} />}
       </section>
 
       {compats.length > 0 && (

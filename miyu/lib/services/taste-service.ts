@@ -6,9 +6,9 @@ import { readTasteReport } from "../report/taste/validate.ts";
 import { TasteWriteError, type TasteWriter } from "../report/taste/writer.ts";
 import { estimateCostKrw, seoulDayStart, type CapacityConfig } from "./capacity-service.ts";
 import type { MiyuRepository } from "./ports.ts";
-import { owns } from "./talk-service.ts";
+import { owns, ownsActive } from "./talk-service.ts";
 
-export type TasteReason = "closed" | "owned" | "budget" | "busy" | "used-elsewhere" | "not-ready" | "not-found" | "failed";
+export type TasteReason = "closed" | "owned" | "budget" | "busy" | "used-elsewhere" | "not-ready" | "not-found" | "failed" | "deleted";
 
 export const TASTE_MESSAGES: Record<TasteReason, string> = {
   closed: "맛보기 리포트는 아직 준비 중이에요.",
@@ -19,6 +19,7 @@ export const TASTE_MESSAGES: Record<TasteReason, string> = {
   "not-ready": "맛보기 리포트는 아직 준비 중이에요.",
   "not-found": "이 결과를 찾지 못했어요. 화면을 새로 열어 주세요.",
   failed: "이번에는 맛보기 리포트를 만들지 못했어요. 한 번으로 세지 않았으니 잠시 뒤에 다시 눌러 주세요.",
+  deleted: "삭제한 기록에서는 맛보기 리포트를 받을 수 없어요.",
 };
 
 export type TasteResult = { ok: true; report: TasteReport; alreadyHad: boolean } | { ok: false; reason: TasteReason; message: string };
@@ -75,6 +76,8 @@ async function overBudget(deps: TasteDeps): Promise<boolean> {
 export async function requestTasteReport(deps: TasteDeps, req: TasteRequest): Promise<TasteResult> {
   const { repo } = deps;
   if (!(await owns(repo, req.userId, req.assessmentId))) return fail("not-found");
+  // 삭제한 기록에서는 맛보기 글을 새로 만들지 않는다(이미 받은 줄은 글만 지워져 있고 한 계정 한 번은 그대로다 — DB 트리거도 막는다)
+  if (!(await ownsActive(repo, req.userId, req.assessmentId))) return fail("deleted");
   const writer = deps.writer;
   if (!writer) return fail("closed");
 
