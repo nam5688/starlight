@@ -345,9 +345,11 @@ npm.cmd run dev
 **시험 뒤에 하지 않는 것**: 재작성 · 재시도 · 추가 호출 · 지시문 · 프레임 · 검사 수정. 새 글이 충분하다고 운영자가 판단하면 개인 심층 콘텐츠(지시문 0.6 · 프레임 17개)를 동결한다. 출시를 막는 실제 오류(명리 계산 오류 · 근거 없는 사건 단정 · 나이 범위 어긋남)만 그 오류만 최소 수정한다. 이 시험의 결과 폴더는 운영자 PC의 `pilot-data`에만 있고(저장소에 올라가지 않는다) 클라우드 세션은 읽지 못한다 — 글 평가는 운영자가 읽고 정한다.
 
 
-## 14. 개인 심층 5차 시험(지시문 0.7 · 고객용 서술) — 운영자 신규 승인 2026-10-19 · 준비만 마침(이 개발 세션은 실제 호출을 하지 않았다)
+## 14. 개인 심층 5차 시험(지시문 0.7 · 고객용 서술) — 운영자 신규 승인 2026-10-19 · 운영자 PC에서 실행함(호출 1회 · 303.93원 · 형식 검사 불통과 BLOCK 2 · WARN 7) · 이 개발 세션은 실제 호출을 하지 않았다
 
-**승인 기록(코드 `lib/config/ai-candidates.ts`의 `story7-own`)**: `runsApproved 5 · runsDone 4` — 기존 4회 + 신규 1회. 새 실제 호출은 **정확히 1회**, 자동 재작성 · 재시도 **0회**, 이번 호출 상한 **800원 그대로**, 누적 총 승인 **6,000원 그대로**, 이미 쓴 금액 **3,694.51원**(남은 2,305.49원). `runsDone 4`와 4차까지의 비용 · 원문 기록(`lastRun`)은 되돌리지 않았다. 지시문은 현재 코드의 `story-7-prompt-0.7`, 입력은 PC의 같은 본인 입력(`--birth-time-unknown`, 2~4차와 같은 조건 — 조건을 바꾸려면 운영자가 알려 준다). 승인 문장: 운영자 "123 해줘"(다음 단계 1 Windows 재로그인 · 2 준비된 비용 없는 검사 · 3 실제 AI 1회).
+**상태: 실행 완료 — 승인된 5회를 모두 썼다(`runsDone 5`). 아래 14-1~14-2는 실행 전 절차의 기록이고 같은 명령을 다시 치지 않는다(14-5에 결과, 14-3에 Windows 동기화).**
+
+**승인 기록(코드 `lib/config/ai-candidates.ts`의 `story7-own`)**: 실행 전 `runsApproved 5 · runsDone 4`(→ 실행 뒤 `5/5`, 14-5) — 기존 4회 + 신규 1회. 새 실제 호출은 **정확히 1회**, 자동 재작성 · 재시도 **0회**, 이번 호출 상한 **800원 그대로**, 누적 총 승인 **6,000원 그대로**, 이미 쓴 금액 **3,694.51원**(남은 2,305.49원). `runsDone 4`와 4차까지의 비용 · 원문 기록(`lastRun`)은 되돌리지 않았다. 지시문은 현재 코드의 `story-7-prompt-0.7`, 입력은 PC의 같은 본인 입력(`--birth-time-unknown`, 2~4차와 같은 조건 — 조건을 바꾸려면 운영자가 알려 준다). 승인 문장: 운영자 "123 해줘"(다음 단계 1 Windows 재로그인 · 2 준비된 비용 없는 검사 · 3 실제 AI 1회).
 
 ### 14-1. 호출이 정확히 1번만 나가는지 — 코드로 확인한 것 (실제 호출 없이)
 
@@ -410,7 +412,7 @@ node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3694.51 
 
 하나라도 다르거나 `승인 범위 확인 — 실행할 수 없습니다`가 나오면 **실행하지 말고 그 화면을 알려 준다.**
 
-**5. 실제 호출 1회 + 곧바로 기록(한 덩어리로 붙여 넣는다 — 앞 줄이 끝나야 다음 줄이 실행된다).** 맨 위 줄은 "이 실행 뒤에 생긴 결과 폴더"를 찾기 위한 시각이고, 새 폴더가 있을 때만 기록하므로 승인 확인에서 거절된 경우(폴더가 안 생김)는 소진으로 적지 않는다. 폴더가 생겼으면 호출이 나갔거나 나가려던 것이라 **안전 쪽으로 소진으로 센다.**
+**5. 실제 호출 1회 + 곧바로 기록(한 덩어리로 붙여 넣는다 — 앞 줄이 끝나야 다음 줄이 실행된다).** 맨 위 줄은 "이 실행 뒤에 생긴 결과 폴더"를 찾기 위한 시각이다. 새 폴더가 있으면 호출이 나갔거나 나가려던 것이라 **안전 쪽으로 소진으로 센다.** **폴더가 없다는 것은 호출이 없었다는 증거가 아니다**(승인 확인에서 거절돼 안 생겼을 수도 있고, 호출이 나간 뒤 폴더를 쓰기 전에 끊겼을 수도 있다) — 이 경우 코드는 소진 기록을 올리지도 않고 "호출 없음"이라 단정하지도 않으며, 사람이 화면과 콘솔 사용량으로 판단한다(아래 "수동 기록").
 
 ```powershell
 $t0 = Get-Date
@@ -427,10 +429,10 @@ if ($d) {
   if (Test-Path $cj) { $c = Get-Content $cj -Raw -Encoding UTF8 | ConvertFrom-Json; $line += (" | calls={0} | spent={1}원 | cumulative={2}원 | result={3}" -f $c.calls, $c.spentKrw, $c.cumulativeSpentKrw, $c.result) } else { $line += " | cost-and-checks.json 없음(비용 불명 — Anthropic 콘솔 사용량 확인)" }
   Add-Content -Encoding UTF8 pilot-data\ai-compare\RUN-LEDGER.txt $line
   Write-Host $line
-} else { Write-Host "새 결과 폴더가 없습니다 — 호출 전에 중단된 것으로 보고 소진 기록을 올리지 않았습니다. 화면의 중단 문구를 알려 주세요." }
+} else { Write-Host "새 결과 폴더가 없습니다 — 호출이 없었다는 뜻이 아닙니다(연결이 끊겼거나 폴더를 쓰기 전에 멈췄을 수 있습니다). 소진 여부 불명: 같은 명령을 다시 치지 말고, 화면 출력과 Anthropic 콘솔 사용량을 확인해 알려 주세요. 화면에 `승인 범위 확인 — 실행할 수 없습니다`가 보였다면 호출 전 거절이므로 그 문구를 알려 주세요." }
 ```
 
-실행 중에는 **두 번째 창에서 같은 명령을 치지 않는다**(보통 몇 분 걸린다, 창을 닫지 않는다). 창이 닫히거나 화면이 끊겼으면 같은 명령을 다시 치지 말고 아래 "수동 기록"만 한다: `$t0 = (Get-Date).AddHours(-3)`로 바꿔 위 `$d = …` 이후 줄만 붙여 넣는다.
+실행 중에는 **두 번째 창에서 같은 명령을 치지 않는다**(보통 몇 분 걸린다, 창을 닫지 않는다). 창이 닫히거나 화면이 끊겼으면 같은 명령을 다시 치지 말고 아래 "수동 기록"만 한다: `$t0 = (Get-Date).AddHours(-3)`로 바꿔 위 `$d = …` 이후 줄만 붙여 넣는다. 그래도 새 폴더가 없고 호출이 나갔는지 확인할 수 없으면(콘솔 사용량이 늘었으면 나간 것이다) **소진으로 간주해 `runsDone`을 한 칸 올리고(아래 14-3의 확인 명령으로 `5/5`가 되는지 본다) 개발방에 알린다** — 호출이 없었다고 확인되기 전에는 다시 실행하지 않는다.
 
 **6. 읽기 · 검사 · 4차와 비교(호출 0).** `<새 폴더>`는 5번 마지막 줄(또는 `RUN-LEDGER.txt`)의 폴더 이름:
 
@@ -441,12 +443,56 @@ node scripts/compare-own-runs.ts pilot-data\ai-compare\story7-own-20261018-15124
 
 원문 전문은 `pilot-data\ai-compare\<새 폴더>\attempts\round1.txt`(AI가 준 그대로, 고치지 않는다), 읽는 순서 글은 `readable.md`, 화면은 `npm.cmd run dev` 뒤 `http://localhost:3000/dev/live/<새 폴더 이름>`이다.
 
-### 14-3. 실행 뒤 이 개발방이 하는 일
+### 14-3. 실행 뒤 — Windows가 최종 기록을 받는 방법 (로컬 5/5 보호 · 되돌리는 checkout 없음)
 
-운영자가 Windows 결과(폴더 이름 · `RUN-LEDGER.txt` 마지막 줄 · 화면의 비용)를 이 방에 전달하면 ① `runsDone 5` · `lastRun`(날짜 · 호출 수 · 비용 · 결과) · 누적 비용을 코드에 기록해 커밋 · 푸시한다 ② 그 전에 **PC에서 `git pull`을 하기 전에** 아래를 한다: `git checkout -- lib\config\ai-candidates.ts`(PC에서 14-2의 5번이 고친 한 줄은 이 개발방의 최종 기록으로 대체되므로 되돌려도 된다. 되돌리지 않으면 `git pull`이 "local changes would be overwritten"로 멈춘다). 글 평가는 운영자가 읽고 정한다 — 합격 · 동결을 이 문서가 선언하지 않는다.
+개발방은 5차 결과(`runsDone 5` · `lastRun` · 누적 3,998.44원 · 폴더 이름)를 코드에 기록해 푸시했다. Windows `ai-candidates.ts`에는 14-2의 5번이 고친 `runsDone: 5,` 한 줄이 커밋 없이 남아 있고, 가져올 쪽도 같은 줄과 이웃한 줄(`lastRun` · 주석)을 바꿔서 그냥 `git pull`하면 "local changes would be overwritten"로 멈춘다. **`git checkout -- lib\config\ai-candidates.ts`(작업 파일을 커밋된 상태로 되돌리는 것)는 하지 않는다 — 커밋된 파일은 `4/5`(실제 호출 허용 상태)라, 되돌린 순간부터 pull이 끝날 때까지 이 PC가 한 번 더 호출을 허용하는 상태가 되기 때문이다.** 대신 아래 순서는 가져올 쪽의 `5/5` 파일을 **먼저 확인**한 뒤에만 바꾸고, 어느 순간에도 파일이 `4/x`로 읽히지 않는다(내 컴퓨터의 임시 복제본에서 위 상황을 만들어 확인했다 — 아래 "확인한 것").
+
+```powershell
+cd $HOME\Desktop\starlight-work\miyu
+$br = "claude/miyu-claude-code-setup-klw8ms"
+
+# ① 지금 이 PC가 5/5로 거절하는지(네트워크 호출 없음 — 14-2의 0번과 같은 명령, 기대: 마친/허용 5/5 · 실제 호출 거절됨)
+node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/report/ai/compare-plan.ts')]).then(([a,b])=>{const s=a.COMPARE_STAGES.find(x=>x.name==='story7-own');console.log('story7-own 마친/허용: '+s.restrict.runsDone+'/'+s.restrict.runsApproved+' · 1회 상한 '+s.restrict.runCeilingKrw+'원 · 총액 '+s.capKrw+'원');const w=b.checkStageRestriction(s,{variant:'story-7',only:'A',persona:'OWN',alreadySpentGiven:true,twoRoundWorstKrw:700,execute:true});console.log(w.length?'실제 호출 거절됨: '+w.join(' / '):'실제 호출 허용 상태(횟수 남음)')})" 2>$null
+
+# ② 가져오기만(작업 파일은 바뀌지 않는다) + 가져올 쪽 파일에도 runsDone: 5, 가 정확히 한 줄 있는지 확인
+git fetch origin $br
+$in = @(git show "origin/${br}:./lib/config/ai-candidates.ts" | Select-String -SimpleMatch "runsDone: 5,").Count
+if ($in -ne 1) { Write-Host "중단: 가져올 파일의 'runsDone: 5,'가 $in 줄입니다. 아무것도 바꾸지 않았습니다 — 화면을 알려 주세요" } else {
+  # ③ 로컬 사본을 따로 보관한 뒤, 가져올 쪽의 5/5 파일 한 개만 받고, 이어서 나머지를 가져온다(되돌아가는 단계 없음)
+  New-Item -ItemType Directory -Force pilot-data | Out-Null
+  Copy-Item lib\config\ai-candidates.ts pilot-data\ai-candidates.local-5of5.bak -Force
+  git checkout "origin/$br" -- lib/config/ai-candidates.ts
+  git pull --ff-only origin $br
+}
+
+# ④ 확인 — 기대: 'runsDone: 5,' 한 줄 · 마친/허용 5/5 · 실제 호출 거절됨 · git status에 수정 없음(untracked만)
+Select-String -Path lib\config\ai-candidates.ts -SimpleMatch "runsDone: 5,"
+node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/report/ai/compare-plan.ts')]).then(([a,b])=>{const s=a.COMPARE_STAGES.find(x=>x.name==='story7-own');console.log('story7-own 마친/허용: '+s.restrict.runsDone+'/'+s.restrict.runsApproved);const w=b.checkStageRestriction(s,{variant:'story-7',only:'A',persona:'OWN',alreadySpentGiven:true,twoRoundWorstKrw:700,execute:true});console.log(w.length?'실제 호출 거절됨: '+w.join(' / '):'실제 호출 허용 상태(횟수 남음)')})" 2>$null
+git status --short
+```
+
+- ②에서 "중단"이 나오면 PC 파일은 그대로(`5/5`)다. ③ 도중에 문제가 생겨 ④가 5/5가 아니면 **실행 명령을 치지 말고** 보관한 사본을 `Copy-Item pilot-data\ai-candidates.local-5of5.bak lib\config\ai-candidates.ts -Force`로 되돌린 뒤 화면을 알려 준다(되돌리는 쪽이 `git checkout`이 아니라 5/5 사본이다).
+- `git pull --ff-only`가 그래도 멈추면(`ai-candidates.ts`가 아닌 다른 파일을 PC에서 고쳤다는 뜻) 지우지 말고 `git status --short` 화면을 알려 준다.
+- `pilot-data`(결과 폴더 · `RUN-LEDGER.txt` · 위 사본)는 저장소에 올라가지 않는 폴더라 pull이 건드리지 않는다.
+- **확인한 것(이 개발 환경의 임시 복제본, 실제 Windows · 실제 GitHub는 아님)**: 커밋 `f240320` 상태에서 `runsDone: 5,` 한 줄만 고친 복제본을 만들고 위 ②~③을 실행 → ① 가져올 쪽 확인 통과 ② 파일은 어느 시점에도 `runsDone: 5,` ③ `git pull --ff-only` 성공 · `git status`에 수정 없음. 가져올 쪽이 아직 `4`인 경우를 만들어 ②를 실행 → "중단", 로컬 `runsDone: 5,` 그대로. PowerShell의 인코딩 · 줄 끝(CRLF) 처리는 이 환경에서 확인하지 못했다 — `git checkout`은 PC의 줄 끝 설정을 따르고 파일을 직접 쓰지 않아서 인코딩 문제를 피하도록 했지만, 실제 PC에서는 ④로 확인한다.
+
+글 평가는 운영자가 읽고 정한다 — 합격 · 동결을 이 문서가 선언하지 않는다.
 
 ### 14-4. 이중 실행 방지 — 최소 절차(요약)
 
-1. 호출 직후 14-2의 5번 아래 줄이 `runsDone 4 -> 5`를 적고(이 PC의 `ai-candidates.ts`, 커밋하지 않음) `RUN-LEDGER.txt`에 폴더 · 비용 · 결과를 한 줄 적는다.
+1. 호출 직후 14-2의 5번 아래 줄이 `runsDone 4 -> 5`를 적고(이 PC의 `ai-candidates.ts`, 커밋하지 않음) `RUN-LEDGER.txt`에 폴더 · 비용 · 결과를 한 줄 적는다. **(5차는 이대로 실행됐다 — 14-5)**
 2. 상태 조회(14-2의 0번 명령)를 다시 쳐서 `story7-own 마친/허용: 5/5` · `실제 호출 거절됨: 이 승인(5건)은 이미 실행했습니다`가 나오는지 본다 — 이 조회는 네트워크 호출이 없어 몇 번이든 안전하다.
 3. 그다음 어떤 이유로도 `--execute`를 다시 치지 않는다. 새 호출이 필요하면 운영자가 다시 승인한다.
+
+### 14-5. 5차 실행 결과 (운영자 PC의 Windows 세션 보고 기준 · 이 개발 세션은 폴더를 보지 못했고 API 키도 없다)
+
+| 항목 | 값 |
+| --- | --- |
+| 실행 | `--execute` **정확히 1회** · 재시도 · 재작성 0회 · 개발방 커밋 `f240320`에서 실행 |
+| 결과 폴더 | `story7-own-20261019-014707`(운영자 PC의 `pilot-data\ai-compare`, 저장소에 없다) |
+| 호출 · 토큰 · 시간 | 호출 1 · 입력 57,639 · 출력 5,741토큰 · 43.5초 |
+| 비용 | 이번 303.93원 · 누적 3,998.44원(4차까지 3,694.51원) · 남은 2,001.56원 · 1회 상한 800원 · 총 6,000원(올리지 않았다) |
+| 결과 | 형식 검사 불통과 — BLOCK 2 · WARN 7 · 저장되지 않음 · 원문 전문 보존(`attempts\round1.txt` 해시 `6C08632A…EDA9` — 보존은 PC의 파일이 기준이고 이 저장소에 원문을 올리지 않는다) |
+| 승인 기록 | `runsApproved 5 / runsDone 5`(PC가 14-2의 5번 아래 줄로 올렸고 이 방이 같은 값을 코드에 기록했다) · 5/5에서 새 실행이 거절되는 것을 네트워크 없는 조회로 확인 |
+| 분량 | 전체 4,566자(4차 5,175자) — 숫자는 코드가 센 어림이다. 목표 분량 기준은 코드에 없다(장별 문단 상한 · 문단 60~420자만 있다) |
+| 이후 | 추가 유료 호출 권한 없음. 지시문 0.8 최소 보정 · 의심 문장 표 · 평가는 `story7-customer-voice-v1.md` 8장 |

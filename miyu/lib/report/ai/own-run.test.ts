@@ -191,17 +191,18 @@ test("본인 입력 내보내기는 켠 사람이 직접 적고 개발 서버일
 
 // ───── 7개 대주제(story-7) 본인 입력 시험 — 승인 범위 · 입력 확인 · 호출 한 번 · 읽기 전 지표 ─────
 
-test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 · 1회 상한 800원 그대로 — 4차까지 마친 기록(runsDone 4)은 보존하고, 5차 한 건은 운영자 신규 승인(2026-10-19)으로 허용 횟수가 정확히 한 번 남는다(runsApproved 5)", async () => {
+test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6,000원 · 1회 상한 800원 그대로 — 5차(운영자 신규 승인 2026-10-19)까지 마쳐 허용 5회를 모두 썼다(runsApproved 5 · runsDone 5) · 새 실제 호출은 거절된다", async () => {
   const own = COMPARE_STAGES.find((s) => s.name === "story7-own")!;
   assert.equal(own.capKrw, 6000, "기존 승인 총액 그대로");
   assert.equal(own.restrict?.runCeilingKrw, 800, "4차 승인(2026-10-18): 이번 호출 상한 800원(3차는 700원 — 지시문 0.6과 프레임 근거로 최악 예약액이 늘었다)");
   assert.equal(own.restrict?.variant, "story-7");
   assert.equal(own.restrict?.persona, "OWN");
   assert.equal(own.restrict?.runsApproved, 5, "기존 4회 + 5차 한 건을 운영자가 신규 호출로 승인했다(2026-10-19) — 허용 횟수는 5회뿐이다");
-  assert.equal(own.restrict?.runsDone, 4, "4차까지 운영자 PC에서 마쳤다(2026-10-18 · 호출 1회 · 306.51원) — 마친 횟수와 과거 기록은 되돌리지 않았다");
-  assert.equal(own.restrict!.runsApproved - own.restrict!.runsDone, 1, "새로 허용된 호출은 정확히 1회다");
-  assert.match(own.restrict?.lastRun ?? "", /306\.51원/);
-  assert.match(own.restrict?.lastRun ?? "", /3,694\.51원/);
+  assert.equal(own.restrict?.runsDone, 5, "5차까지 운영자 PC에서 마쳤다(2026-10-19 · 호출 1회 · 303.93원) — 4차 기록(306.51원 · 누적 3,694.51원)은 코드 주석에 보존했다");
+  assert.equal(own.restrict!.runsApproved - own.restrict!.runsDone, 0, "허용된 5회를 모두 썼다 — 남은 신규 호출은 0회다");
+  assert.match(own.restrict?.lastRun ?? "", /303\.93원/);
+  assert.match(own.restrict?.lastRun ?? "", /3,998\.44원/);
+  assert.match(own.restrict?.lastRun ?? "", /지시문 0\.7/);
   const built = await ownReportInput(CAPTURE, NOW);
   assert.ok(built.ok);
   if (!built.ok) return;
@@ -220,16 +221,16 @@ test("승인 범위: story7-own은 story-7 · 본인 입력 · 후보 A · 총 6
   assert.ok(checkStageRestriction(before, { ...ok, persona: "P01" }).length > 0, "다른 인물은 안 된다");
   assert.ok(checkStageRestriction(before, { ...ok, only: "B" }).length > 0);
   assert.ok(checkStageRestriction(before, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 막힌다");
-  // 5차 승인(runsApproved 5 · runsDone 4): 호출 1회의 최악이 800원 이하이고 나머지 조건이 맞으면 실제 호출이 남아 있다 — 같은 승인으로 두 번은 안 된다
-  assert.deepEqual(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 798 }), [], "5차: 허용 횟수가 한 번 남아 있고 최악 비용이 상한 안이면 거절 사유가 없다");
-  assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 800.01 }).length > 0, "5차도 최악 비용이 800원을 넘으면 거절된다(상한은 올리지 않았다)");
-  assert.ok(checkStageRestriction(own, { ...ok, alreadySpentGiven: false }).length > 0, "5차도 이미 쓴 금액을 적지 않으면 거절된다");
-  // 5차를 마치면(runsDone 5 — 운영자가 실행한 뒤 기록으로 올린다) 실제 호출은 다시 거절되고, 드라이런은 계속 볼 수 있다
-  const after5 = { restrict: { ...own.restrict!, runsDone: 5 } };
-  assert.ok(checkStageRestriction(after5, ok).some((m) => /이미 실행/.test(m)), "허용된 5회를 쓰고 나면 새 실행은 막힌다(같은 승인으로 두 번 호출되지 않는다)");
-  assert.deepEqual(checkStageRestriction(after5, { ...ok, execute: false }), [], "드라이런은 계속 볼 수 있다");
-  // 승인 반영 전의 상태(runsApproved 4 · runsDone 4)에서는 실제 호출이 거절된다 — 승인 반영 전에 하는 "4/4 소진 거절 확인"과 같은 판정
-  const before5 = { restrict: { ...own.restrict!, runsApproved: 4 } };
+  // 5차까지 마쳤다(runsApproved 5 · runsDone 5): 최악 비용이 상한 안이어도 새 실제 호출은 거절된다 — 같은 승인으로 두 번은 안 된다
+  assert.ok(checkStageRestriction(own, { ...ok, twoRoundWorstKrw: 798 }).some((m) => /이미 실행/.test(m)), "5/5: 최악 비용이 상한 안이어도 새 실행은 거절된다");
+  assert.deepEqual(checkStageRestriction(own, { ...ok, execute: false }), [], "드라이런은 5/5에서도 볼 수 있다(호출 없음)");
+  // 5차 실행 전의 상태(runsApproved 5 · runsDone 4)로 규칙을 계속 확인한다 — 허용 횟수가 한 번 남아 있을 때의 판정
+  const before5run = { restrict: { ...own.restrict!, runsDone: 4 } };
+  assert.deepEqual(checkStageRestriction(before5run, { ...ok, twoRoundWorstKrw: 798 }), [], "5차 실행 전: 허용 횟수가 한 번 남아 있고 최악 비용이 상한 안이면 거절 사유가 없다");
+  assert.ok(checkStageRestriction(before5run, { ...ok, twoRoundWorstKrw: 800.01 }).length > 0, "상한(800원)은 올리지 않았다");
+  assert.ok(checkStageRestriction(before5run, { ...ok, alreadySpentGiven: false }).length > 0, "이미 쓴 금액을 적지 않으면 거절된다");
+  // 승인 반영 전의 상태(runsApproved 4 · runsDone 4)에서도 실제 호출은 거절된다 — "4/4 소진 거절"과 같은 판정
+  const before5 = { restrict: { ...own.restrict!, runsApproved: 4, runsDone: 4 } };
   assert.ok(checkStageRestriction(before5, ok).some((m) => /이미 실행/.test(m)), "승인 반영 전(4/4)에는 새 실행이 거절된다");
   assert.deepEqual(checkStageRestriction(before5, { ...ok, execute: false }), [], "드라이런은 4/4에서도 볼 수 있다");
 });

@@ -151,9 +151,11 @@ export const COMPARE_STAGES: CompareStageDef[] = [
       //   허용 횟수는 기존 4회 + 신규 1회 = 5회(runsApproved 5)이고 마친 횟수(runsDone 4)와 과거 비용 · 원문 기록(lastRun · 누적 3,694.51원)은 되돌리지 않았다. 지시문은 현재 코드의 story-7-prompt-0.7이다.
       //   코드가 이 시험을 한 번만 부르는 근거: scripts/run-own-story.ts가 maxRepairs 0 · maxRetries 0 · repairRepeats false로 부르고(BLOCK이어도 두 번째 호출이 없다) own-run.test.ts가 이를 확인한다. 드라이런의 "호출 1회 최악"이 800원을 넘으면 checkStageRestriction이 실행을 거절한다.
       //   이 개발 세션은 실제 호출을 하지 않았다(키 없음) — 실행은 운영자 PC의 Windows 세션에서 한다.
+      //   5차 실행 결과(운영자 PC의 Windows 세션 보고 기준 2026-10-19 — 이 환경에는 키가 없어 클라우드는 호출하지 않았고 결과 폴더도 보지 못했다): 지시문 0.7 · 같은 본인 입력 · 출생 시각 미상 · 실제 --execute **정확히 1회**(재작성 · 재시도 0회, 사용자 승인 이외의 호출 없음) · 실제 303.93원(입력 57,639 · 출력 5,741토큰 · 43.5초) · 누적 3,998.44원(남은 2,001.56원) · 결과 폴더 story7-own-20261019-014707(운영자 PC의 pilot-data/ai-compare, 저장소에 없다) · 형식 검사 불통과(BLOCK 2 · WARN 7), 저장되지 않음, 원문 전문 보존(round1.txt 해시 6C08632A…EDA9).
+      //   승인된 5회를 모두 마쳤다(runsDone 5) — 코드가 같은 승인의 --execute를 거절하고 새 실행은 운영자가 글을 읽은 뒤 다시 승인해야 한다. 추가 유료 호출 권한은 없다.
       runsApproved: 5,
-      runsDone: 4,
-      lastRun: "2026-10-18 · 호출 1회(재작성 없음) · 306.51원 · 지시문 0.6 · 출생 시각 미상 · 형식 검사 불통과(BLOCK 2 · WARN 27) · 저장되지 않음, 원문 저장 · 누적 3,694.51원",
+      runsDone: 5,
+      lastRun: "2026-10-19 · 호출 1회(재작성 없음) · 303.93원 · 지시문 0.7 · 출생 시각 미상 · 형식 검사 불통과(BLOCK 2 · WARN 7) · 저장되지 않음, 원문 저장 · 누적 3,998.44원",
     },
   },
 ];
