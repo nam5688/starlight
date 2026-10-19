@@ -9,6 +9,7 @@ import { ActionList } from "./integrated-view";
 import { Fold, FoldRow } from "./reading-parts";
 import { FoldedRest, ReportShell } from "./report-shell";
 import { CoreSummaryTable, SCORE_NOTE, ScoreGroups, SectionTitle, TendencyBlock } from "./summary-blocks";
+import type { TypeTitle } from "@/lib/report/type-title";
 
 /** 문단 묶음 — 첫 문단만 보이고 나머지는 접는다. 문단마다 "분석 근거 보기"가 붙는다 */
 export function ParagraphGroup({ paragraphs, evidence, restLabel }: { paragraphs: Paragraph[]; evidence: Map<string, Evidence>; restLabel?: string }) {
@@ -35,10 +36,13 @@ export function PersonalV2View({
   report,
   idPrefix = "",
   footer,
+  typeTitle,
 }: {
   report: PersonalReportV2;
   idPrefix?: string;
   footer?: React.ReactNode;
+  /** 나의 유형 — 호출하는 쪽이 사주 + 응답으로 계산해 넘긴다(lib/report/type-title.ts) */
+  typeTitle?: TypeTitle | null;
 }) {
   const id = (name: string) => `${idPrefix}${name}`;
   const evidence = new Map(report.evidence.map((e) => [e.id, e]));
@@ -80,7 +84,7 @@ export function PersonalV2View({
 
       {base && (
         <section aria-labelledby={id("v2-tendency")}>
-          <TendencyBlock summary={base} headingId={id("v2-tendency")} />
+          <TendencyBlock summary={base} headingId={id("v2-tendency")} typeTitle={typeTitle} />
           <div className="mt-6">
             <CoreSummaryTable core={base.core} />
           </div>

@@ -5,7 +5,7 @@ import { ReadingReportView } from "@/components/report/reading-report-view";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { textLink } from "@/components/ui/styles";
 import { sampleStoryReport } from "@/lib/samples/sample-story-report";
-import { sampleReport } from "@/lib/samples/sample-report";
+import { sampleReport, SAMPLE_TYPE_TITLE } from "@/lib/samples/sample-report";
 
 export const metadata: Metadata = { title: "영역별 이야기 예시 · ME:U 미유", robots: { index: false } };
 
@@ -36,7 +36,7 @@ export default function DevStoryPage() {
       <ReadingReportView
         report={report}
         idPrefix="story-"
-        tendencyName={sampleReport.tendency.name}
+        typeTitle={SAMPLE_TYPE_TITLE}
         saju={sampleReport.details.saju.saju}
         scores={[
           { title: "기질 · 성격 (개발용 예시 문항)", rows: sampleReport.temperament },

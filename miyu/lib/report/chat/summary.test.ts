@@ -7,8 +7,9 @@ import { buildTalkModel, TALK_COPY, type TalkModel } from "../reading/talk.ts";
 import { ROOMS, type RoomAction } from "../reading/talk-room.ts";
 import { CHAT_SUMMARY_POLICY } from "../../config/product.ts";
 import { isEmptySummary, memoryPairs, parseSummaryItems, referenceCutoff, shorten, summarizeActions, SUMMARY_LIMITS } from "./summary.ts";
+import { legacyTypeTitle } from "../type-title.ts";
 
-const model = (): TalkModel => buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+const model = (): TalkModel => buildTalkModel(sampleReadingReport, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
 const free = (q: string, a: string[]): RoomAction => ({ t: "free", q, a, topic: "love" });
 
 test("shorten: 짧은 글은 그대로, 긴 글은 문장이 끝난 곳에서 줄이고 문장이 이어지면 …을 붙인다", () => {

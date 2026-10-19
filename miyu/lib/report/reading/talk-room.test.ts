@@ -24,10 +24,11 @@ import {
   type RoomId,
   type TalkLine,
 } from "./talk-room.ts";
+import { legacyTypeTitle } from "../type-title.ts";
 
 const R = sampleReadingReport;
 const TODAY = { year: 2026, month: 10, day: 15 };
-const model = (chat: TalkChat = { state: "pending" }): TalkModel => buildTalkModel(R, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: TODAY, chat });
+const model = (chat: TalkChat = { state: "pending" }): TalkModel => buildTalkModel(R, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: TODAY, chat });
 const miyuText = (lines: TalkLine[]) => lines.flatMap((l) => (l.from === "miyu" && l.say.kind === "text" ? [l.say.text] : []));
 const kinds = (lines: TalkLine[]) => lines.map((l) => (l.from === "miyu" ? l.say.kind : "me"));
 
@@ -97,7 +98,7 @@ test("방 열기: 예시 리포트는 여덟 방이 모두 열리고, 풀이 자
   const noLove: TalkModel = { ...m, topics: m.topics.filter((t) => t.id !== "love") };
   assert.deepEqual(roomTopics(noLove, "love").map((t) => t.id), ["partner"], "리포트 주제가 없어도 계산한 풀이는 열린다");
   // 사주 계산 결과가 없으면 계산한 풀이(오늘의 한 장 · 인연의 경향)가 없어 그 방들은 열리지 않는다
-  const noSaju = buildTalkModel(R, { tendencyName: "확인추구형" });
+  const noSaju = buildTalkModel(R, { typeTitle: legacyTypeTitle("확인추구형") });
   assert.equal(roomAvailable(noSaju, "daily"), false);
   assert.equal(roomAvailable(noSaju, "marriage"), false);
   assert.equal(roomAvailable(noSaju, "main"), true);
@@ -458,7 +459,7 @@ test("진로 방과 재무 방: 같은 저장된 일과 돈 풀이에서 보이�
   assert.ok(miyuText(open("career").lines).includes(ROOM_COPY.focus.career.ask));
   assert.ok(miyuText(open("money").lines).includes(ROOM_COPY.focus.money.ask));
   // 소단락이 없는 이전 리포트에서도 방마다 질문 · 안내는 다르다
-  const old = buildTalkModel({ ...R, blocks: R.blocks.map((b) => (b.id === "work-money" ? { ...b, sections: undefined } : b)) }, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: TODAY, chat: { state: "pending" } });
+  const old = buildTalkModel({ ...R, blocks: R.blocks.map((b) => (b.id === "work-money" ? { ...b, sections: undefined } : b)) }, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: TODAY, chat: { state: "pending" } });
   assert.notEqual(roomTopics(old, "career")[0].askText, roomTopics(old, "money")[0].askText);
 });
 

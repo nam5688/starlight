@@ -13,8 +13,9 @@ import { luckTimeline } from "../../saju/interpret/rules.ts";
 import { dayMasterShort } from "../../saju/plain.ts";
 import { dayKey } from "../../saju/interpret/day-plain.ts";
 import type { FreePreview } from "../preview.ts";
+import type { TypeTitle } from "../type-title.ts";
 import type { TasteReport } from "../taste/types.ts";
-import { groupsOf, type TalkChat, type TalkModel, type TalkPiece, type TalkTopic } from "./talk.ts";
+import { cardTypeFields, groupsOf, type TalkChat, type TalkModel, type TalkPiece, type TalkTopic } from "./talk.ts";
 import { codeTopicsFor } from "./talk-code.ts";
 
 export type FreeTalkInput = {
@@ -33,6 +34,8 @@ export type FreeTalkInput = {
    * 글 자체가 유료 핵심(실제 연애의 진행 · 어울리는 사람 · 시기 · 해 볼 것)을 담지 않도록 검사를 통과한 것뿐이다.
    */
   taste?: TasteReport | null;
+  /** 나의 유형(개인 유형 10개 + 혼합 경향) — 호출하는 쪽이 이 사람의 사주 + 응답으로 계산해 넘긴다. 없으면 카드에 유형을 보이지 않는다 */
+  typeTitle?: TypeTitle | null;
 };
 
 const para = (text: string, label?: string): TalkPiece => ({ kind: "para", text, ...(label ? { label } : {}) });
@@ -148,7 +151,7 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
     name: input.name,
     card: {
       headline: dmSentence ?? (preview.lead.kind === "oneLiner" ? preview.lead.shown : "내 분석을 한 장으로 맛봤어요"),
-      tendency: null,
+      ...cardTypeFields(input.typeTitle ?? null),
       strength: { label: "내가 강한 포인트", keyword: work?.strengthLabel || "리포트에서 이어서 볼 수 있어요", note: "" },
       caution: { label: "내가 힘들 수 있는 포인트", keyword: work?.cautionLabel || "리포트에서 이어서 볼 수 있어요", note: "" },
       flow: {

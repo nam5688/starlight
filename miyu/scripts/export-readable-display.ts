@@ -1,6 +1,7 @@
 // 저장된 리포트(report.json)를 **AI를 부르지 않고(호출 0 · 비용 0원 · 키 불필요)** 읽는 순서의 글로 다시 내보낸다 — 새 파일 readable-display.md 하나만 만든다.
-// 쓰는 때: 읽기용 글(readable.md)에 화면과 달리 대표 경향 이름(~형)이 빠져 있던 옛 파일을 새 표시 기준으로 다시 읽고 싶을 때.
-//   · 결과 폴더의 report.json만 읽는다. attempts/round*.txt(AI 원문) · report.json · readable.md · input.json 등 기존 파일은 고치지도 덮어쓰지도 않는다.
+// 쓰는 때: 읽기용 글(readable.md)에 화면과 달리 유형 이름(~형)이 빠져 있던 옛 파일을 새 표시 기준으로 다시 읽고 싶을 때.
+//   · 결과 폴더의 report.json과(유형 이름을 계산하려고) input.json을 읽기만 한다. attempts/round*.txt(AI 원문) · report.json · readable.md · input.json 등 기존 파일은 고치지도 덮어쓰지도 않는다.
+//   · 나의 유형(개인 유형 10개 + 혼합 경향)은 저장된 값이 아니라 그 입력의 사주 + 응답으로 화면과 같은 코드가 계산한다. input.json이 없으면 이름 줄만 빠지고 그 사실을 안내한다.
 //   · 형식 검사에 걸려 report.json이 없는 폴더는 이 스크립트가 아니라 `recheck-own-draft.ts`(원문에서 풀어 쓰기)를 쓴다.
 //
 // 이미 같은 이름의 파일이 있으면 **덮어쓰지 않고 멈춘다**(쓰기 방식이 "새로 만들 때만"이다 — 먼저 만든 readable-display.md도 지키고, 다른 이름을 고르는 길도 있다).
@@ -11,6 +12,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isReadingReport } from "../lib/report/generator.ts";
+import { captureForRun, ownTypeTitle, parseOwnCapture } from "../lib/report/ai/own-run.ts";
+import { isHourUnknown } from "../lib/report/reading/hour-text.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
 
 const args = process.argv.slice(2);
@@ -39,7 +42,22 @@ if (!isReadingReport(report)) {
   process.exit(1);
 }
 const out = outArg ?? join(dir, "readable-display.md");
-const body = `> 저장된 리포트(report.json)를 읽는 순서로 풀어 쓴 새 파일입니다. 글은 한 글자도 고치지 않았고, 대표 경향 이름(~형)과 한 줄 특징이 화면과 같은 순서로 맨 위에 있습니다. AI 원문(attempts) · report.json · readable.md는 건드리지 않았습니다.\n\n${renderReadingMarkdown(report)}`;
+// 나의 유형 — 그 실행에서 쓴 입력(출생 시각을 모른 채 읽었다면 같게)으로 화면과 같은 코드가 계산한다. 입력 사본이 없으면 이름 줄을 만들지 않는다(옛 후보 이름으로 대신 채우지 않는다)
+let typeTitle = null as Awaited<ReturnType<typeof ownTypeTitle>>;
+let typeNote = "";
+const inputFile = join(dir, "input.json");
+if (existsSync(inputFile)) {
+  try {
+    const capture = parseOwnCapture(JSON.parse(readFileSync(inputFile, "utf8")));
+    if (capture) typeTitle = await ownTypeTitle(captureForRun(capture, isHourUnknown(report)), new Date());
+    if (!typeTitle) typeNote = "입력 사본(input.json)으로 나의 유형을 계산하지 못해 이름 줄이 없습니다.";
+  } catch {
+    typeNote = "입력 사본(input.json)을 읽지 못해 나의 유형 줄이 없습니다.";
+  }
+} else {
+  typeNote = "입력 사본(input.json)이 없어 나의 유형 줄이 없습니다(옛 대표 경향 이름으로 대신 채우지 않습니다).";
+}
+const body = `> 저장된 리포트(report.json)를 읽는 순서로 풀어 쓴 새 파일입니다. 글은 한 글자도 고치지 않았고, 나의 유형 이름과 한 줄이 화면과 같은 순서로 맨 위에 있습니다${typeNote ? ` — ${typeNote}` : ""} AI 원문(attempts) · report.json · readable.md는 건드리지 않았습니다.\n\n${renderReadingMarkdown(report, { typeTitle })}`;
 try {
   // flag "wx": 파일이 이미 있으면 쓰지 않고 오류(EEXIST)로 멈춘다 — 존재 확인과 쓰기 사이에 끼어드는 틈 없이 한 번에
   writeFileSync(out, body, { flag: "wx" });
@@ -51,4 +69,5 @@ try {
   throw e;
 }
 console.log(`만든 파일: ${out}`);
+console.log(typeNote ? `안내: ${typeNote}` : `나의 유형: ${typeTitle?.name ?? "-"}`);
 console.log("AI는 호출하지 않았고 비용은 0원입니다. 기존 파일은 바꾸지 않았습니다.");

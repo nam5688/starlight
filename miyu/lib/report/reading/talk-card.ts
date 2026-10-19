@@ -88,16 +88,24 @@ export function layoutCard(card: TalkCard, o: CardLayoutOptions): { ops: CardOp[
   if (o.variant === "save" && o.dateLabel) text(o.dateLabel, width - MARGIN, headTop + 3, 24, 400, "ink-3", "right");
   text(showName && name ? `${name} 님의 분석 카드` : "나의 분석 카드", textX, headTop + 46, 34, 700, "ink");
   let bandH = headTop + MARK + 56;
-  if (card.tendency) {
-    const w = Math.ceil(o.measure(card.tendency, 32, 700)) + 48;
+  // 이름표 칸 — 개인 유형이면 유형 이름(짧음)을 칸에 넣고 한 줄 설명은 띠 아래에 따로 쓴다. 옛 후보(스위치 꺼짐)는 예전처럼 설명을 칸에 넣는다
+  const chipText = card.typeName ?? card.tendency;
+  if (chipText) {
+    const w = Math.ceil(o.measure(chipText, 32, 700)) + 48;
     const chipY = headTop + 46 + 34 + 26;
     ops.push({ type: "rect", x: textX, y: chipY, w, h: 56, color: "canvas", r: 28 });
-    text(card.tendency, textX + 24, chipY + 10, 32, 700, "accent-strong");
-    text("나의 대표 경향", textX + w + 20, chipY + 16, 24, 400, "ink-3");
+    text(chipText, textX + 24, chipY + 10, 32, 700, "accent-strong");
+    text(card.typeName ? "나의 유형" : "나의 대표 경향", textX + w + 20, chipY + 16, 24, 400, "ink-3");
     bandH = Math.max(bandH, chipY + 56 + 48);
   }
   ops.splice(headStart, 0, { type: "rect", x: 0, y: 0, w: width, h: bandH, color: "accent-soft" }, { type: "mark", x: MARGIN, y: headTop - 8, size: MARK });
   y = bandH + 52;
+
+  // 유형 이름 아래 한 줄(개인 유형일 때)
+  if (card.typeName && card.tendency) {
+    block(card.tendency, MARGIN, inner, 30, 600, "ink-2");
+    y += 20;
+  }
 
   // 핵심 해석 한 문장
   block(card.headline, MARGIN, inner, 52, 700, "ink");

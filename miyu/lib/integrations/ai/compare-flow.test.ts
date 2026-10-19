@@ -5,11 +5,11 @@ import { AI_CANDIDATES } from "../../config/ai-candidates.ts";
 import { BudgetGuard, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE } from "../../report/ai/budget.ts";
 import { buildPersonas } from "../../report/ai/compare-personas.ts";
 import { runStage, type CompareCandidate } from "../../report/ai/compare-plan.ts";
-import { tendencyPhrase } from "../../assessment/dev-rules.ts";
 import { isReadingReport } from "../../report/generator.ts";
 import { composeMockReading } from "../../report/reading/mock-model.ts";
 import { renderReadingMarkdown } from "../../report/reading/render-text.ts";
-import { sampleReport } from "../../samples/sample-report.ts";
+import { SAMPLE_TYPE_TITLE } from "../../samples/sample-report.ts";
+import { typeTitleFor } from "../../report/type-title.ts";
 import { sampleReadingReport } from "../../samples/sample-reading-report.ts";
 import { createAnthropicModel, createOpenAiModel } from "./providers.ts";
 
@@ -64,12 +64,14 @@ test("승인 후: 두 후보 · 두 인물 4건이 읽기 구조로 생성되고
   }
   // 가려진 글: 후보 이름 · 모델 ID가 글에 들어가지 않는다
   for (const r of res.runs) {
-    const md = renderReadingMarkdown(r.report as never);
+    // 나의 유형은 그 인물의 사주 + 응답에서 코드가 정한 값이라 같은 인물이면 후보와 상관없이 같다 — 어느 후보인지 알려 주지 않는다
+    const persona = personas.find((p) => p.id === r.persona)!;
+    const title = typeTitleFor(persona.input, persona.input.summary.tendency.name);
+    assert.ok(title, "가상 인물은 사주가 계산돼 나의 유형이 있다");
+    const md = renderReadingMarkdown(r.report as never, { typeTitle: title });
     assert.doesNotMatch(md, /claude|gpt|anthropic|openai|Sonnet/i);
-    // 대표 경향은 화면과 같게 설명 문구("~하는 편")로 맨 위에 보이고, 같은 인물이면 후보와 상관없이 같은 값이다
-    const tendencyName = (r.report as { base?: { tendency: { name: string } } }).base?.tendency.name;
-    const tendency = tendencyPhrase(tendencyName);
-    assert.ok(tendency && md.includes(`**나의 대표 경향** ${tendencyName} — ${tendency}`), "평가용 글에도 대표 경향 이름(~형)과 바로 이어지는 한 줄 특징이 있다");
+    assert.ok(md.includes(`**나의 유형** ${title.name}`), "평가용 글에도 나의 유형 이름과 바로 이어지는 한 줄이 있다");
+    assert.ok(!md.includes(persona.input.summary.tendency.name) || title.name === persona.input.summary.tendency.name, "옛 대표 경향 이름은 같은 자리에 겹쳐 보이지 않는다");
   }
   // 모의 글이므로 내용 검사는 "모의 생성 표시"로 실패해야 한다 (판매할 수 없는 글을 통과시키지 않는다)
   assert.ok(res.runs.every((r) => r.depth && !r.depth.pass && r.depth.fails.includes("placeholder")));
@@ -102,9 +104,9 @@ test("검사에 걸려 실패하면 걸린 이유와 그때의 글이 남는다 
 });
 
 test("블라인드 평가용 글: 예시 리포트를 마크다운으로 옮기면 본문만 담고(분석 근거 · 내부 근거 ID 없음) 모든 주제와 행동이 들어 있다", () => {
-  const md = renderReadingMarkdown(sampleReadingReport, { tendencyName: sampleReport.tendency.name });
+  const md = renderReadingMarkdown(sampleReadingReport, { typeTitle: SAMPLE_TYPE_TITLE });
   assert.match(md, /^# 서윤 님의 개인 통합 리포트/);
-  assert.ok(md.includes(`**나의 대표 경향** ${sampleReport.tendency.name} — ${tendencyPhrase(sampleReport.tendency.name)}`), "예시도 대표 경향 이름과 한 줄 특징을 맨 위에 보인다");
+  assert.ok(SAMPLE_TYPE_TITLE && md.includes(`**나의 유형** ${SAMPLE_TYPE_TITLE.name}`), "예시도 나의 유형 이름과 한 줄을 맨 위에 보인다");
   for (const b of sampleReadingReport.blocks) assert.ok(md.includes(b.headline), b.headline);
   for (const a of sampleReadingReport.actions) assert.ok(md.includes(a.detail));
   assert.doesNotMatch(md, /\b(saju|survey|self)\.[\w.가-힣-]+/);

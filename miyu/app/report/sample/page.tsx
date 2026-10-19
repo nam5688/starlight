@@ -4,13 +4,15 @@ import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { ReadingReportView } from "@/components/report/reading-report-view";
 import { SampleTabs } from "@/components/report/sample-tabs";
 import { ScopeCompare } from "@/components/report/scope-compare";
+import { IdentityCard } from "@/components/results/identity-card";
 import { TalkEntry } from "@/components/results/talk-entry";
 import { ArrowIcon } from "@/components/ui/icons";
 import { SourceBadge } from "@/components/ui/source-badge";
-import { formatKrw, PERSONAL_REPORT, REPORT_TIER_NAMES } from "@/lib/config/product";
+import { formatKrw, LUCKY_INDEX, PERSONAL_REPORT, PERSONAL_TYPE, REPORT_TIER_NAMES } from "@/lib/config/product";
+import { buildIdentity } from "@/lib/report/identity";
 import { buildFreePreview } from "@/lib/report/preview";
 import { ROOM_ORDER } from "@/lib/report/reading/talk-room";
-import { SAMPLE_CHART, sampleReport } from "@/lib/samples/sample-report";
+import { SAMPLE_CHART, SAMPLE_TYPE_TITLE, sampleReport } from "@/lib/samples/sample-report";
 import { sampleReadingReport, TIMELINE_REFERENCE } from "@/lib/samples/sample-reading-report";
 
 export const metadata: Metadata = {
@@ -28,6 +30,8 @@ export const metadata: Metadata = {
 export default function SampleReportPage() {
   const report = sampleReadingReport;
   const freePreview = buildFreePreview({ summary: sampleReport, saju: SAMPLE_CHART, reference: TIMELINE_REFERENCE });
+  // 서윤의 나의 유형 카드 — 실제 서비스와 같은 코드가 서윤의 가상 원국 + 가상 응답에서 계산한다(고정한 이름이 아니다)
+  const identity = PERSONAL_TYPE.visible || LUCKY_INDEX.visible ? buildIdentity({ saju: SAMPLE_CHART, summary: sampleReport }) : null;
   return (
     <main className="bg-page">
       <div className="mx-auto w-full max-w-[720px] px-5 pt-5 pb-5 md:pt-10">
@@ -46,6 +50,11 @@ export default function SampleReportPage() {
             <div className="mx-auto w-full max-w-[720px] px-5 pt-6">
               <h2 className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">{report.personName} 님의 {REPORT_TIER_NAMES.simple}</h2>
               <p className="mt-1 text-[14px] leading-[1.65] text-ink-3">무료 분석을 마치면 받는 리포트예요. 핵심 풀이를 결론까지 보여 줘요.</p>
+              {identity && (
+                <div className="-mx-5 -mt-3">
+                  <IdentityCard identity={identity} showType={PERSONAL_TYPE.visible} showLucky={LUCKY_INDEX.visible} idPrefix="free-id-" />
+                </div>
+              )}
               <div className="mt-6">
                 <FreePreviewBody preview={freePreview} idPrefix="free-" />
               </div>
@@ -72,7 +81,7 @@ export default function SampleReportPage() {
             <ReadingReportView
               report={report}
               idPrefix="deep-"
-              tendencyName={sampleReport.tendency.name}
+              typeTitle={SAMPLE_TYPE_TITLE}
               saju={sampleReport.details.saju.saju}
               scores={[
                 { title: "기질 · 성격 (개발용 예시 문항)", rows: sampleReport.temperament },

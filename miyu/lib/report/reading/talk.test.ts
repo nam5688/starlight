@@ -6,6 +6,7 @@ import { answerBubbles, askFor, buildTalkModel, CARD_DISCLAIMER, extraBubbles, n
 import { periodPlain } from "../../saju/interpret/period-plain.ts";
 import { layoutCard, wrapText, type Measure } from "./talk-card.ts";
 import type { IntegratedReadingReport } from "./types.ts";
+import { legacyTypeTitle } from "../type-title.ts";
 
 const R = sampleReadingReport;
 /** 글자 하나당 폭 — 한글은 크게, 숫자 · 영문 · 공백은 작게 (실제 글꼴이 아니라 배치 규칙만 시험하는 가짜 자) */
@@ -24,7 +25,7 @@ const pieceTexts = (ps: TalkPiece[]) =>
 const contentOf = (t: TalkTopic) => [t.headline, ...t.summary, ...(t.caveat ? [t.caveat] : []), ...(t.traits ?? []).flatMap((x) => [x.shinesShort, x.burdenShort]), ...pieceTexts(t.example), ...pieceTexts(t.detail)];
 
 test("큰 주제 번호: 주제 5개 + 앞으로의 시기가 1부터 차례로 이어지고, 고르는 버튼이 모두 있다", () => {
-  const m = buildTalkModel(R, { tendencyName: "확인추구형" });
+  const m = buildTalkModel(R, { typeTitle: legacyTypeTitle("확인추구형") });
   assert.deepEqual(m.topics.map((t) => t.number), [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(m.topics.map((t) => t.id), ["tendency", "strength-burden", "values", "love", "work-money", "flow"]);
   assert.ok(m.topics.every((t) => t.chip && t.title && t.headline && t.summary.length > 0));
@@ -76,7 +77,7 @@ test("알려 준 고민이 있을 때만 '알려 주신 고민' 주제가 생기
 });
 
 test("분석 카드: 핵심 문장 · 대표 경향 · 강한 포인트 · 힘들 수 있는 포인트 · 지금 나의 시기 · 사용한 정보만 — 주제별 한 줄 요약 · 생년월일 · 점수는 없다", () => {
-  const { card } = buildTalkModel(R, { tendencyName: "확인추구형" });
+  const { card } = buildTalkModel(R, { typeTitle: legacyTypeTitle("확인추구형") });
   assert.equal(card.headline, R.headline);
   assert.equal(card.tendency, "관계에서 확인을 중요하게 여기는 편", "이름표(~형) 대신 설명으로");
   // 같은 특징을 카드 · 요약 · 주제에서 되풀이하지 않도록, 주제별 한 줄 요약(이전 rows)은 카드에 넣지 않는다
@@ -88,10 +89,19 @@ test("분석 카드: 핵심 문장 · 대표 경향 · 강한 포인트 · 힘�
   assert.doesNotMatch(JSON.stringify(card), /\d{4}[.\-년]\s*\d{1,2}[.\-월]\s*\d{1,2}|\(\d{2,3}\)|\d+\s*%|생년월일|백분위/);
 });
 
-test("대표 경향은 저장된 응답 요약에서 읽고, 없으면 카드에 넣지 않는다", () => {
+test("나의 유형은 호출하는 쪽이 사주 + 응답으로 계산해 넘긴 값을 카드에 쓰고, 없으면 카드에 넣지 않는다 — 저장된 옛 후보 이름은 읽지 않는다", () => {
   assert.equal(buildTalkModel(R).card.tendency, null);
+  assert.equal(buildTalkModel(R).card.typeName ?? null, null);
   const withBase = { ...R, base: { tendency: { id: "stability", name: "안정지향형" } } } as unknown as IntegratedReadingReport;
-  assert.equal(buildTalkModel(withBase).card.tendency, "익숙한 방식에서 편안함을 느끼는 편");
+  assert.equal(buildTalkModel(withBase).card.tendency, null, "개인 유형이 켜져 있으면 저장된 옛 이름 · 설명은 카드에 나오지 않는다");
+  assert.equal(buildTalkModel(withBase).card.typeName ?? null, null);
+  const card = buildTalkModel(withBase, { typeTitle: { name: "신중 몰입형", line: "생각이 서면 깊이 파고드는 사람", kind: "type", note: "" } }).card;
+  assert.equal(card.typeName, "신중 몰입형");
+  assert.equal(card.tendency, "생각이 서면 깊이 파고드는 사람");
+  // 옛 모양(스위치를 끄고 되돌릴 때): 이름표 없이 설명만
+  const old = buildTalkModel(withBase, { typeTitle: legacyTypeTitle("안정지향형") }).card;
+  assert.equal(old.typeName, null);
+  assert.equal(old.tendency, "익숙한 방식에서 편안함을 느끼는 편");
 });
 
 test("다음 풀이: 지금 다음 순서에서 아직 보지 않은 첫 주제를 고르고, 다 봤으면 없다", () => {
@@ -112,7 +122,7 @@ test("카드 줄바꿈: 어절 단위로 나누고, 한 줄이 폭을 넘지 않
 });
 
 test("카드 배치: 저장용에는 이름 · 분석일 · 사용한 정보가 있고, 공유용에는 기본으로 없다 (이름은 고르면 넣는다)", () => {
-  const { card } = buildTalkModel(R, { tendencyName: "확인추구형" });
+  const { card } = buildTalkModel(R, { typeTitle: legacyTypeTitle("확인추구형") });
   const textsOf = (o: Parameters<typeof layoutCard>[1]) => layoutCard(card, o).ops.flatMap((op) => (op.type === "text" ? [op.text] : []));
   const save = textsOf({ variant: "save", measure, name: "서윤", dateLabel: "2026. 10. 13." });
   assert.ok(save.some((t) => t.includes("서윤 님의 분석 카드")) && save.includes("2026. 10. 13.") && save.includes("사용한 정보"));
@@ -128,7 +138,7 @@ test("카드 배치: 저장용에는 이름 · 분석일 · 사용한 정보가 
 });
 
 test("카드 배치: 모든 글이 이미지 안에 들어가고 높이는 글에 맞춰 늘어난다", () => {
-  const { card } = buildTalkModel(R, { tendencyName: "확인추구형" });
+  const { card } = buildTalkModel(R, { typeTitle: legacyTypeTitle("확인추구형") });
   const a = layoutCard(card, { variant: "save", measure, name: "서윤", dateLabel: "2026. 10. 13." });
   assert.equal(a.width, 1080);
   assert.ok(a.height > 1200);
@@ -148,7 +158,7 @@ test("카드 배치: 모든 글이 이미지 안에 들어가고 높이는 글�
 });
 
 test("카드 배치: 맨 위 연보라 띠에 캐릭터 자리가 있고, 글은 캐릭터와 겹치지 않으며, 칸은 둥글게 색으로만 나눈다(띠 · 선 없음)", () => {
-  const { card } = buildTalkModel(R, { tendencyName: "확인추구형" });
+  const { card } = buildTalkModel(R, { typeTitle: legacyTypeTitle("확인추구형") });
   for (const variant of ["save", "share"] as const) {
     const { ops } = layoutCard(card, { variant, measure, name: "서윤", dateLabel: "2026. 10. 13." });
     const marks = ops.filter((op) => op.type === "mark");

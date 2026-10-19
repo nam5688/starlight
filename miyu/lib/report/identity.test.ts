@@ -21,8 +21,8 @@ const summaryOf = (scores: Record<string, number> = {}): Pick<FreeSummary, "temp
   return { temperament: ["novelty", "caution", "sensitivity", "persistence"].map(row), relationship: ["anxiety", "avoidance"].map(row), mbti: { axes: ["ei", "sn", "tf", "jp"].map(axis) } };
 };
 
-test("화면 스위치: 개인 유형명 · 럭키 지수는 운영자가 유형 목록 · 점수표 · 분포를 확인하기 전까지 꺼져 있다(켤 때는 이 시험도 함께 바꾼다)", () => {
-  assert.equal(PERSONAL_TYPE.visible, false);
+test("화면 스위치: 개인 유형명은 운영자 지시(2026-10-19)로 켜져 있고, 럭키 지수는 점수 기준을 운영자가 확정하기 전까지 꺼져 있다(켤 때는 이 시험도 함께 바꾼다)", () => {
+  assert.equal(PERSONAL_TYPE.visible, true);
   assert.equal(LUCKY_INDEX.visible, false);
 });
 

@@ -7,6 +7,7 @@ import type { FreeSummary } from "@/lib/report/types";
 import { pillarsLine } from "@/lib/saju/display";
 import type { SajuResult } from "@/lib/saju/engine";
 import { CoreSummaryTable, SCORE_NOTE, ScoreGroups, SectionTitle, TendencyBlock } from "./summary-blocks";
+import type { TypeTitle } from "@/lib/report/type-title";
 
 /** 무료 요약 본문 — 검사 직후 화면과 저장된 결과 화면이 같이 쓴다 */
 export function FreeSummaryBody({
@@ -16,6 +17,7 @@ export function FreeSummaryBody({
   birthText,
   region,
   saju,
+  typeTitle,
 }: {
   summary: FreeSummary;
   idPrefix: string;
@@ -23,6 +25,8 @@ export function FreeSummaryBody({
   birthText: string;
   region: string | null;
   saju: SajuResult;
+  /** 나의 유형 — 호출하는 쪽이 사주 + 응답으로 계산해 넘긴다 */
+  typeTitle?: TypeTitle | null;
 }) {
   const id = (name: string) => `${idPrefix}${name}`;
   const itemCount = (moduleId: string) => ASSESSMENT_MODULES.find((m) => m.id === moduleId)?.items.length ?? 0;
@@ -30,7 +34,7 @@ export function FreeSummaryBody({
   return (
     <div className="space-y-16">
       <section aria-labelledby={id("tendency")}>
-        <TendencyBlock summary={summary} headingId={id("tendency")} />
+        <TendencyBlock summary={summary} headingId={id("tendency")} typeTitle={typeTitle} />
       </section>
 
       <section aria-labelledby={id("core")}>

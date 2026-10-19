@@ -4,7 +4,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { CompatReport, PairReport } from "@/lib/report/compat/types";
-import { ownReportInput, parseOwnCapture } from "@/lib/report/ai/own-run";
+import { captureForRun, ownReportInput, parseOwnCapture } from "@/lib/report/ai/own-run";
+import { buildIdentity, type IdentityView } from "@/lib/report/identity";
+import { isHourUnknown } from "@/lib/report/reading/hour-text";
+import { typeTitleFor, type TypeTitle } from "@/lib/report/type-title";
 import { buildFreePreview, type FreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import type { IntegratedReadingReport } from "@/lib/report/reading/types";
@@ -31,6 +34,10 @@ export type OwnRunDetail = {
   reading: IntegratedReadingReport | null;
   /** 같은 입력(운영자가 푼 응답 + 사주)으로 만든 무료 리포트 미리보기 — 무료 화면이 보이는 그대로 */
   free: FreePreview | null;
+  /** 같은 입력의 나의 유형(개인 유형 10개 + 혼합 경향) — 무료 · 심층 화면과 읽기용 글이 같은 이름을 보인다 */
+  typeTitle: TypeTitle | null;
+  /** 무료 화면 맨 위 카드(유형 이름 · 한 줄 · 잘 쓰일 때 · 조절이 필요할 때) */
+  identity: IdentityView | null;
   inputCheck: string | null;
   readable: string | null;
   metrics: string | null;
@@ -105,11 +112,21 @@ async function readOwn(id: string): Promise<OwnRunDetail> {
   const dir = join(ROOT, id);
   const reading = (await json(join(dir, "report.json"))) as IntegratedReadingReport | null;
   let free: FreePreview | null = null;
-  const capture = parseOwnCapture(await json(join(dir, "input.json")));
-  if (capture) {
+  let typeTitle: TypeTitle | null = null;
+  let identity: IdentityView | null = null;
+  const capture0 = parseOwnCapture(await json(join(dir, "input.json")));
+  if (capture0) {
+    // 입력 사본은 원래 입력 그대로다 — 그 실행이 출생 시각을 모른 채 읽었다면(저장된 리포트의 시주가 비어 있음) 같은 조건으로 다시 만든다
+    const capture = captureForRun(capture0, reading ? isHourUnknown(reading) : false);
     const built = await ownReportInput(capture, new Date());
-    if (built.ok && built.input.saju.status === "ok") free = buildFreePreview({ summary: built.input.summary, saju: built.input.saju, reference: seoulReference(new Date()) });
+    if (built.ok) {
+      typeTitle = typeTitleFor(built.input, built.input.summary.tendency.name);
+      if (built.input.saju.status === "ok") {
+        free = buildFreePreview({ summary: built.input.summary, saju: built.input.saju, reference: seoulReference(new Date()) });
+        identity = buildIdentity({ saju: built.input.saju, summary: built.input.summary });
+      }
+    }
   }
   // 읽는 순서 글: 새 표시용 내보내기(readable-display.md)가 있으면 그것을, 없으면 실행 때 만든 readable.md를 보인다(두 파일 모두 고치지 않는다)
-  return { reading, free, inputCheck: await read(join(dir, "input-check.md")), readable: (await read(join(dir, "readable-display.md"))) ?? (await read(join(dir, "readable.md"))), metrics: await read(join(dir, "metrics.md")) };
+  return { reading, free, typeTitle, identity, inputCheck: await read(join(dir, "input-check.md")), readable: (await read(join(dir, "readable-display.md"))) ?? (await read(join(dir, "readable.md"))), metrics: await read(join(dir, "metrics.md")) };
 }

@@ -10,8 +10,9 @@ import type { AssessmentRecord, MiyuRepository } from "./ports.ts";
 import { closeRoom, deleteAllSummaries, deleteSavedSummary, listSavedSummaries, memoryFor, purgeExpiredReferenceRecords, saveRoomSummary } from "./summary-service.ts";
 import { loadTalkRoom, saveTalkRoom } from "./talk-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
+import { legacyTypeTitle } from "../report/type-title.ts";
 
-const model = (): TalkModel => buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+const model = (): TalkModel => buildTalkModel(sampleReadingReport, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
 const free = (n: number): RoomAction => ({ t: "free", q: `질문${n}`, a: [`답${n}이에요.`], topic: "love" });
 
 async function setup() {

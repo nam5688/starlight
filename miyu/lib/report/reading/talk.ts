@@ -2,7 +2,7 @@
 // 새 글을 쓰지 않는다(AI 호출 없음): 풀이 · 예시 · 근거는 모두 저장된 리포트의 문장 그대로이고, 대화 속 안내 문구만 이 파일의 고정 문구다.
 // 자유 질문 · "내 경우는 달라"에 AI가 답하는 기능은 아직 없다(2단계, 운영자 결정 뒤) — 화면에서 "준비 중"으로 밝힌다.
 // 이 파일은 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
-import { tendencyPhrase } from "../../assessment/dev-rules.ts";
+import { resolveTypeTitle, type TypeTitle } from "../type-title.ts";
 import { isHourUnknown, softenMonths } from "./hour-text.ts";
 import { CHAT_ROOMS, formatKrw, QUESTION_PACK_SIZE, REPORT_TIER_NAMES } from "../../config/product.ts";
 import type { SajuResult } from "../../saju/engine.ts";
@@ -67,7 +67,9 @@ export type TalkExtra = "example" | "detail" | "basis" | "calendar-love" | "cale
 
 export type TalkCard = {
   headline: string;
-  /** 대표 경향 설명(예: 관계에서 확인을 중요하게 여기는 편) — "~형" 이름표 대신 쓴다. 없으면 null */
+  /** 나의 유형 이름(예: 신중 몰입형 · 혼합 경향) — 개인 유형이 켜져 있을 때만 있다. 옛 후보 이름(스위치가 꺼졌을 때)은 이름표 대신 설명만 쓰므로 null */
+  typeName?: string | null;
+  /** 유형 이름 아래 한 줄(개인 유형) 또는 옛 후보 설명(예: 관계에서 확인을 중요하게 여기는 편, 스위치가 꺼졌을 때). 없으면 null */
   tendency: string | null;
   strength: { label: string; keyword: string; note: string };
   caution: { label: string; keyword: string; note: string };
@@ -275,8 +277,15 @@ function blockTopic(b: ReadingBlock, number: number): TalkTopic {
   };
 }
 
+/** 카드에 보이는 유형 이름 · 한 줄 — 옛 후보(스위치 꺼짐)는 예전처럼 설명만 */
+export function cardTypeFields(title: TypeTitle | null): { typeName: string | null; tendency: string | null } {
+  if (!title) return { typeName: null, tendency: null };
+  return title.kind === "legacy" ? { typeName: null, tendency: title.line } : { typeName: title.name, tendency: title.line };
+}
+
 export type TalkModelOptions = {
-  tendencyName?: string;
+  /** 나의 유형 — 호출하는 쪽이 그 사람의 사주 + 응답으로 계산해 넘긴다(lib/report/type-title.ts). 넘기지 않으면 스위치가 꺼졌을 때만 저장된 옛 이름을 쓴다 */
+  typeTitle?: TypeTitle | null;
   /** 사주 계산 결과 — 있으면 인연의 경향 · 오래 가는 관계 · 오늘의 한 장을 코드로 계산해 더한다 */
   saju?: SajuResult | null;
   /** 오늘(한국 날짜) — 오늘의 한 장에 쓴다. 없으면 오늘의 한 장은 만들지 않는다 */
@@ -333,7 +342,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: TalkModelO
     name: report.personName,
     card: {
       headline: report.headline,
-      tendency: tendencyPhrase(opts.tendencyName ?? report.base?.tendency.name),
+      ...cardTypeFields(resolveTypeTitle(opts.typeTitle, report.base?.tendency.name)),
       strength: cardOf("strength"),
       caution: cardOf("caution"),
       flow: cardOf("flow"),

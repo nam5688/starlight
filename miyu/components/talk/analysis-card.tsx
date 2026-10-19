@@ -27,7 +27,14 @@ export function AnalysisCard({ card, name, dateLabel }: { card: TalkCard; name: 
       </div>
 
       <div className="px-4 pt-3.5 pb-3.5">
-        {card.tendency && <p className="text-[13px] leading-snug text-ink-3">{card.tendency}</p>}
+        {card.typeName ? (
+          <p className="text-[13px] leading-snug text-ink-3">
+            <span className="font-bold text-accent-strong">{card.typeName}</span>
+            {card.tendency ? ` · ${card.tendency}` : ""}
+          </p>
+        ) : (
+          card.tendency && <p className="text-[13px] leading-snug text-ink-3">{card.tendency}</p>
+        )}
         <p className="mt-1 text-[20px] leading-[1.4] font-bold tracking-tight">{card.headline}</p>
 
         <ul className="mt-3 space-y-2">

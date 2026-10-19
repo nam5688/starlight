@@ -27,11 +27,12 @@ import { AI_CANDIDATES, COMPARE_STAGES } from "../lib/config/ai-candidates.ts";
 import { createAnthropicModel, createOpenAiModel } from "../lib/integrations/ai/providers.ts";
 import { BudgetGuard, DEFAULT_FX_KRW_PER_USD, DEFAULT_SURCHARGE } from "../lib/report/ai/budget.ts";
 import { buildPersonas } from "../lib/report/ai/compare-personas.ts";
+import { typeTitleFor } from "../lib/report/type-title.ts";
 import { type CompareCandidate, type CompareVariant, checkStageRestriction, planStage, runStage } from "../lib/report/ai/compare-plan.ts";
 import { isReadingReport } from "../lib/report/generator.ts";
 import { composeMockReading } from "../lib/report/reading/mock-model.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
-import { sampleReport } from "../lib/samples/sample-report.ts";
+import { SAMPLE_TYPE_TITLE } from "../lib/samples/sample-report.ts";
 import { sampleReadingReport } from "../lib/samples/sample-reading-report.ts";
 
 const args = process.argv.slice(2);
@@ -196,10 +197,10 @@ safely("검사에 걸린 글", () => {
 safely("이름을 가린 글", () => {
   for (const run of result.runs) {
     if (!run.report || !isReadingReport(run.report)) continue;
-    writeFileSync(join(dir, "blind", `${run.persona}-${run.blind}.md`), renderReadingMarkdown(run.report));
+    writeFileSync(join(dir, "blind", `${run.persona}-${run.blind}.md`), renderReadingMarkdown(run.report, { typeTitle: (() => { const p = personas.find((x) => x.id === run.persona); return p ? typeTitleFor(p.input, p.input.summary.tendency.name) : null; })() }));
   }
 });
-safely("사람이 쓴 예시", () => writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport, { tendencyName: sampleReport.tendency.name })}`));
+safely("사람이 쓴 예시", () => writeFileSync(join(dir, "reference-사람이-쓴-예시.md"), `> 사람이 쓴 목표 수준 예시입니다 (가상 인물 서윤). 채점할 때 기준으로 함께 읽으세요 — 두 후보 중 하나가 아닙니다.\n\n${renderReadingMarkdown(sampleReadingReport, { typeTitle: SAMPLE_TYPE_TITLE })}`));
 safely("채점표", () => {
 const rows = personas.flatMap((p) => (solo ? ["X"] : ["X", "Y"]).map((b) => `| ${p.id} | ${b} |  |  |  |  |  |  |  |`)).join("\n");
 writeFileSync(

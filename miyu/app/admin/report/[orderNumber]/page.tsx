@@ -102,7 +102,7 @@ async function Content({ params }: Pick<PageProps<"/admin/report/[orderNumber]">
       ) : (
         <>
           <ResultHeader title={`${view.nickname} 님의 ${isPersonalV2(content) ? "개인 종합 사주 리포트" : "심층 리포트"}`} subtitle="운영자 확인용 보기" source={content.source} meta={`검사일 ${created} · 저장된 리포트${view.generator ? ` · 생성 ${view.generator}` : ""}`} />
-          {isReadingReport(content) ? <ReadingReportView report={content} idPrefix="adm-" /> : isPersonalV2(content) ? <PersonalV2View report={content} idPrefix="adm-" /> : isConcernReport(content) ? <ConcernReportView report={content} idPrefix="adm-" /> : <FullReportView report={content} idPrefix="adm-" />}
+          {isReadingReport(content) ? <ReadingReportView report={content} typeTitle={view.typeTitle} idPrefix="adm-" /> : isPersonalV2(content) ? <PersonalV2View report={content} typeTitle={view.typeTitle} idPrefix="adm-" /> : isConcernReport(content) ? <ConcernReportView report={content} idPrefix="adm-" /> : <FullReportView report={content} typeTitle={view.typeTitle} idPrefix="adm-" />}
         </>
       )}
     </>

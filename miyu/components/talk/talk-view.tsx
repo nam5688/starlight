@@ -661,7 +661,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
           </h1>
           {/* 대표 경향 설명은 분석 카드가 위로 올라가도 계속 보인다 — 후보 설명이며 진단이 아니다. 답을 쓰는 동안에는 "입력하고 있어요"가 겹쳐 보인다(높이는 그대로) */}
           <div className="relative">
-            <p className={`line-clamp-2 text-[13px] leading-snug text-ink-3 transition-opacity ${miyuBusy ? "opacity-0" : ""}`}>{model.card.tendency ?? def.blurb}</p>
+            <p className={`line-clamp-2 text-[13px] leading-snug text-ink-3 transition-opacity ${miyuBusy ? "opacity-0" : ""}`}>{model.card.typeName ? `${model.card.typeName}${model.card.tendency ? ` · ${model.card.tendency}` : ""}` : (model.card.tendency ?? def.blurb)}</p>
             {miyuBusy && (
               <p aria-hidden="true" className="absolute inset-x-0 top-0 flex items-center gap-2 text-[13px] leading-snug font-semibold text-accent-strong">
                 {TALK_COPY.typing}

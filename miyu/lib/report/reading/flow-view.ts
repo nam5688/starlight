@@ -5,6 +5,8 @@
 //  · 출생 시각을 모르면 대운이 바뀌는 달이 달라질 수 있어 연도 "무렵"으로만 보이고 달 · 지난 개월 수는 쓰지 않는다(근거 `saju.hour.unknown`).
 //  · 막대의 길이는 기간일 뿐이다. 높이 · 색으로 좋고 나쁨 · 점수를 나타내지 않는다.
 //  · 개운(색 · 방향 · 숫자 · 장소) 문단은 근거 `saju.fortify`가 정한 보완 후보로 카드를 만들어 대신 보인다. 후보가 동점이면 하나를 앞세우지 않는다.
+//  · 시간축은 사주에서 읽은 시기(근거가 있는 기간)만 막대로 놓고, 끝에 "앞으로 만들어 갈 변화"를 점선으로 따로 구분해 덧붙인다(운영자 2026-10-19: 희망적인 마무리).
+//    이 마무리는 점수 · 높이 · 확률이 아니고 막대(시기)도 아니다 — 시기를 읽은 값이 올라간다는 뜻이 아니라, 저장된 조언(report.actions)의 제목을 "지금부터 해 볼 수 있는 준비"로 다시 가리킬 뿐이다.
 import type { Evidence } from "../evidence.ts";
 import type { FiveElement } from "../../saju/engine.ts";
 import { FORTUNE_WORDS, fortifyCandidatesOf } from "../../saju/interpret/fortune.ts";
@@ -56,6 +58,12 @@ export type FlowFortifyCard = {
 
 export type FlowFortify = { lead: string; tied: boolean; cards: FlowFortifyCard[] };
 
+/**
+ * 시간축 끝의 "앞으로 만들어 갈 변화" — 사주에서 읽은 시기(막대)와 구분되는 행동형 마무리. 문구는 코드가 고정하고(조건형 · 가능성의 말, 확정 · 보장 · 상승을 말하지 않는다),
+ * points만 이 리포트에 저장된 조언(7번 장의 실천 행동)의 제목에서 온다. 점수 · 확률 · 막대 높이는 없다.
+ */
+export type FlowClosing = { title: string; axisLabel: string; lead: string; listLabel: string; points: string[]; pointsNote: string };
+
 export type FlowView = {
   hourUnknown: boolean;
   /** 시기 칸에 들어가지 않은 앞머리 문장 */
@@ -64,10 +72,21 @@ export type FlowView = {
   /** 지나온 / 지금 / 앞으로 묶음 전체에 걸리는 문장 (한 칸에 속하지 않는다) */
   notes: { past: string[]; now: string[]; next: string[] };
   axis: FlowAxis | null;
+  /** 시간축 끝의 행동형 마무리 — 시간축이 있을 때만 */
+  closing: FlowClosing | null;
   fortify: FlowFortify | null;
   /** 개운 문단인데 카드로 만들 수 없을 때(근거 없음) 그대로 보이는 문단 */
   rest: string[];
 };
+
+/** 마무리의 고정 문구 — 사건 · 상승 · 보장을 말하지 않고, 시기는 읽은 가능성이고 앞으로의 모습은 내가 만들어 가는 몫이라는 구분만 한다 */
+export const FLOW_CLOSING_COPY = {
+  title: "앞으로 만들어 갈 변화",
+  axisLabel: "앞으로 만들어 갈 변화",
+  lead: "여기까지는 사주에서 읽은 시기의 흐름이에요. 어떻게 보낼지는 정해져 있지 않아서, 시기마다 준비를 하나씩 해 두면 앞으로의 모습은 내가 만들어 갈 수 있어요.",
+  listLabel: "지금부터 해 볼 수 있는 준비",
+  pointsNote: "자세한 방법은 아래 7번 조언에서 이어서 읽을 수 있어요.",
+} as const;
 
 // ───────────── 작은 도구 ─────────────
 
@@ -410,7 +429,11 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
     for (const para of paragraphs) if (isFortifyPara(para)) rest.push(para);
   }
 
-  return { hourUnknown, lead, items: sortedItems, notes, axis, fortify, rest };
+  // 마무리의 준비 목록은 저장된 조언(7번 장 실천 행동)의 제목만 가져온다 — 새 문장을 쓰지 않는다
+  const points = (report.actions ?? []).map((a) => a.title.trim()).filter(Boolean).slice(0, 3);
+  const closing: FlowClosing | null = axis ? { ...FLOW_CLOSING_COPY, points } : null;
+
+  return { hourUnknown, lead, items: sortedItems, notes, axis, closing, fortify, rest };
 }
 
 // ───────────── 시간축 ─────────────

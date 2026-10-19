@@ -1,8 +1,8 @@
 import { ArrowIcon, ChevronIcon } from "@/components/ui/icons";
-import { tendencyPhrase } from "@/lib/assessment/dev-rules";
 import { REPORT_BASIS } from "@/lib/config/product";
 import { basisFor } from "@/lib/report/reading/assemble";
 import type { IntegratedReadingReport, ReadingBlock, ReadingGroupId } from "@/lib/report/reading/types";
+import { resolveTypeTitle, type TypeTitle } from "@/lib/report/type-title";
 import type { SajuSection, ScoreRow } from "@/lib/report/types";
 import { SajuChart } from "./detail-sections";
 import { MonthCalendarView } from "./month-calendar";
@@ -55,7 +55,7 @@ export function ReadingReportView({
   report,
   saju,
   scores,
-  tendencyName,
+  typeTitle,
   idPrefix = "",
   footer,
 }: {
@@ -64,16 +64,18 @@ export function ReadingReportView({
   saju?: SajuSection;
   /** 응답 환산값 막대 — 실제 리포트는 저장된 report.base에서 만든다 (예시 화면만 따로 넘긴다) */
   scores?: { title: string; rows: ScoreRow[] }[];
-  /** 대표 경향 이름(~형, 후보 이름) — 실제 리포트는 저장된 report.base에서 읽는다 (예시 화면만 따로 넘긴다) */
-  tendencyName?: string;
+  /**
+   * 나의 유형(개인 유형 10개 + 혼합 경향) — 호출하는 쪽이 그 사람의 사주 + 응답으로 계산해 넘긴다(lib/report/type-title.ts).
+   * 넘기지 않으면(undefined) 스위치가 꺼졌을 때만 저장된 옛 후보 이름을 쓰고, 켜져 있으면 이름을 만들지 않는다 — 옛 이름 4개와 새 유형이 한 화면에 겹치지 않는다. null은 "이름 없음"이다.
+   */
+  typeTitle?: TypeTitle | null;
   idPrefix?: string;
   footer?: React.ReactNode;
 }) {
   const id = (name: string) => `${idPrefix}${name}`;
   const chart = saju ?? report.saju;
   const scoreGroups = scores ?? (report.base ? [{ title: "기질 · 성격", rows: report.base.temperament }, { title: "가까운 관계 반응(애착 경향)", rows: report.base.relationship }] : []);
-  const tendencyTitle = tendencyName ?? report.base?.tendency.name ?? null;
-  const tendency = tendencyPhrase(tendencyTitle);
+  const title = resolveTypeTitle(typeTitle, report.base?.tendency.name);
   // 출생 시각을 모르면 대운이 바뀌는 달이 달라질 수 있어 요약 카드의 기간 줄도 연도 "무렵"으로만 보인다(저장된 글은 그대로, 보이는 방식만)
   const hourUnknown = isHourUnknown(report);
   const summaryCards = hourUnknown ? report.summary.map((c) => (c.foot ? { ...c, foot: softenMonths(c.foot) } : c)) : report.summary;
@@ -114,16 +116,16 @@ export function ReadingReportView({
           <h2 id={id("headline")} className="text-[13px] font-semibold text-accent">
             핵심 해석
           </h2>
-          {tendencyTitle && (
+          {title && (
             <div className="mt-2.5">
-              <p className="text-[13px] text-ink-3">나의 대표 경향</p>
-              {/* 무료 리포트(FreePreviewBody)와 같이 후보 이름(~형)을 크게 보인다 — 심층에서 빠지면 무료에만 있는 이름이 된다. 이름 아래에 한 줄 특징이 바로 오고, 설명을 모르는 이름이어도 이름은 지우지 않는다 */}
-              <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-accent-strong md:text-[32px]">{tendencyTitle}</p>
-              {tendency && <p className="mt-2 inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-[14px] font-semibold text-accent-strong">{tendency}</p>}
+              <p className="text-[13px] text-ink-3">{title.kind === "legacy" ? "나의 대표 경향" : "나의 유형"}</p>
+              {/* 무료 리포트와 같은 이름을 크게 보인다 — 심층에서 빠지면 무료에만 있는 이름이 된다. 이름 아래에 한 줄 설명이 바로 오고, 설명을 모르는 이름이어도 이름은 지우지 않는다 */}
+              <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-accent-strong md:text-[32px]">{title.name}</p>
+              {title.line && <p className="mt-2 inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-[14px] font-semibold text-accent-strong">{title.line}</p>}
             </div>
           )}
           <p className="mt-2 text-[22px] leading-[1.4] font-bold tracking-tight md:text-[28px]">{report.headline}</p>
-          {tendencyTitle && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아니에요.</p>}
+          {title && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">{title.note}</p>}
           <SummaryCards cards={summaryCards} />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <a href={`#${id("tendency")}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-accent px-3 text-[15px] font-semibold text-white transition-colors hover:bg-accent-strong">
@@ -440,7 +442,7 @@ function FlowArticle({ report, id, story, hideLabel = false }: { report: Integra
               <Paragraphs items={flowView.lead} />
             </div>
           )}
-          <FlowTimeline view={{ hourUnknown: flowView.hourUnknown, items: flowView.items, notes: flowView.notes, axis: flowView.axis }} idPrefix={id("flow")} />
+          <FlowTimeline view={{ hourUnknown: flowView.hourUnknown, items: flowView.items, notes: flowView.notes, axis: flowView.axis, closing: flowView.closing }} idPrefix={id("flow")} />
           {flowView.fortify && <FortifyCards fortify={flowView.fortify} />}
           {flowView.rest.length > 0 && (
             <div className="mt-6">

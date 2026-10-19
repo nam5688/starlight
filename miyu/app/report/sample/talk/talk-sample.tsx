@@ -9,7 +9,7 @@ import { buildTalkModel } from "@/lib/report/reading/talk";
 import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
 import { ROOM_ORDER, type RoomId } from "@/lib/report/reading/talk-room";
 import { seoulDate } from "@/lib/saju/interpret/day-plain";
-import { sampleReport, SAMPLE_CHART } from "@/lib/samples/sample-report";
+import { SAMPLE_CHART, SAMPLE_TYPE_TITLE } from "@/lib/samples/sample-report";
 import { sampleReadingReport } from "@/lib/samples/sample-reading-report";
 
 /** 무료 맛보기 예시에서 가상 인물이 고른 응답 — 모두 "그렇다"(확인추구형으로 읽히는 예시) */
@@ -46,7 +46,7 @@ export async function SampleTalk({ room, tier = "paid" }: { room: RoomId; tier?:
       />
     );
   }
-  const model = buildTalkModel(sampleReadingReport, { tendencyName: sampleReport.tendency.name, saju: SAMPLE_CHART, today, chat: { state: "pending" } });
+  const model = buildTalkModel(sampleReadingReport, { typeTitle: SAMPLE_TYPE_TITLE, saju: SAMPLE_CHART, today, chat: { state: "pending" } });
   return (
     <TalkView
       model={model}

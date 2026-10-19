@@ -23,6 +23,7 @@ import { createMockModel } from "../lib/report/ai/mock-model.ts";
 import { isReadingReport } from "../lib/report/generator.ts";
 import { renderStory7DraftMarkdown, renderStoryDraftMarkdown } from "../lib/report/reading/render-draft.ts";
 import { renderReadingMarkdown } from "../lib/report/reading/render-text.ts";
+import { typeTitleFor } from "../lib/report/type-title.ts";
 import type { Story7DraftV1, StoryDraftV1 } from "../lib/report/reading/types.ts";
 import { extractJson } from "../lib/report/ai/generator.ts";
 import { normalizeStory7Draft } from "../lib/report/reading/story7-validate.ts";
@@ -189,8 +190,8 @@ try {
   draft = null;
 }
 safely("읽는 순서로 풀어 쓴 글", () => {
-  if (run.report && isReadingReport(run.report)) writeFileSync(join(dir, "readable.md"), renderReadingMarkdown(run.report));
-  else if (draft && Array.isArray((draft as { sections?: unknown }).sections)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStory7DraftMarkdown(draft as Story7DraftV1, { name: capture.info.nickname, tendencyName: built.input.summary.tendency.name })}`);
+  if (run.report && isReadingReport(run.report)) writeFileSync(join(dir, "readable.md"), renderReadingMarkdown(run.report, { typeTitle: typeTitleFor(built.input, built.input.summary.tendency.name) }));
+  else if (draft && Array.isArray((draft as { sections?: unknown }).sections)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStory7DraftMarkdown(draft as Story7DraftV1, { name: capture.info.nickname, typeTitle: typeTitleFor(built.input, built.input.summary.tendency.name) })}`);
   else if (draft && Array.isArray((draft as { areas?: unknown }).areas)) writeFileSync(join(dir, "readable.md"), `> 형식 검사에 걸려 저장되지 않은 글의 원문을 읽는 순서로 풀어 쓴 것입니다(내용은 그대로).\n\n${renderStoryDraftMarkdown(draft as StoryDraftV1)}`);
   else writeFileSync(join(dir, "readable.md"), `> 모델이 돌려준 글을 읽는 순서로 풀어 쓰지 못했습니다(JSON 모양이 아님). attempts/round1.txt 원문을 직접 읽어 주세요.\n\n${lastText ?? ""}`);
 });

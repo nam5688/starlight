@@ -2,7 +2,7 @@ import { MiyuAvatar } from "@/components/talk/miyu-character";
 import { buildTalkModel } from "@/lib/report/reading/talk";
 import { applyAction, startRoom, type TalkMood } from "@/lib/report/reading/talk-room";
 import { sampleReadingReport } from "@/lib/samples/sample-reading-report";
-import { sampleReport } from "@/lib/samples/sample-report";
+import { SAMPLE_TYPE_TITLE } from "@/lib/samples/sample-report";
 
 /**
  * 홈의 미유 예시 대화창(운영자 방향 2026-10-16: 미유 캐릭터 · 말풍선을 살리고, 인사와 실제 풀이 예시를 한 덩어리로. 2026-10-17부터는 첫 화면 바로 아래 "미유가 이렇게 풀어줘요" 구역에 둔다 — `sample-chat-section.tsx`).
@@ -14,7 +14,7 @@ import { sampleReport } from "@/lib/samples/sample-report";
 type Bubble = { from: "me"; text: string } | { from: "miyu"; mood: TalkMood; headline?: string; paragraphs: string[] };
 
 function exampleBubbles(): { bubbles: Bubble[]; chips: string[] } {
-  const model = buildTalkModel(sampleReadingReport, { tendencyName: sampleReport.tendency.name });
+  const model = buildTalkModel(sampleReadingReport, { typeTitle: SAMPLE_TYPE_TITLE });
   const start = startRoom(model, "main");
   const intro = start.lines.find((l) => l.from === "miyu" && l.say.kind === "text");
   const picked = applyAction(model, "main", start, { t: "group", id: "relation" });

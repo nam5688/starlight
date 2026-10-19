@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Evidence } from "../evidence.ts";
 import { readFileSync } from "node:fs";
-import { buildFlowView, completeClauseEnding, FLOW_HIT_PX, FLOW_MIN_BAR_PCT, isHourUnknown, softenMonths, splitClauses, splitSentences } from "./flow-view.ts";
+import { buildFlowView, completeClauseEnding, FLOW_CLOSING_COPY, FLOW_HIT_PX, FLOW_MIN_BAR_PCT, isHourUnknown, softenMonths, splitClauses, splitSentences } from "./flow-view.ts";
 import type { IntegratedReadingReport, LuckSlot } from "./types.ts";
 
 // 6번 장(앞으로의 운과 변화) 표시 계층 시험 — 저장된 글은 그대로이고 칸 · 시간축 · 개운 카드만 입력 값에서 만들어지는지 본다.
@@ -33,6 +33,7 @@ type Opts = {
   evidence?: Evidence[];
   timeline?: LuckSlot[];
   reference?: { year: number; month: number };
+  actions?: { title: string; detail: string }[];
 };
 
 const PAST = "지나온 시기를 돌아보면 만 7~16세 무렵에는 또래와 견주는 주제가 두드러졌을 수 있어요. 만 16세 무렵에는 관계가 달라지는 주제가 있었을 가능성이 있고, 만 16~26세 무렵에는 배우며 준비하는 시기였을 수 있어요. 도움을 받다 결정이 늦어진 느낌이 들 수도 있었어요. 만 20~21세 무렵에는 일의 환경이 바뀌는 주제가 겹쳤을 수 있어요. 지금의 모습은 현재의 것이고, 그때의 마음으로 이어서 말할 수는 없어요.";
@@ -73,6 +74,10 @@ function report(o: Opts = {}): IntegratedReadingReport {
       basis: { computed: [], tradition: [], answers: [], unknown: [] },
       evidence: [],
     },
+    actions: o.actions ?? [
+      { title: "고마웠던 사람에게 먼저 안부 묻기", detail: "작은 안부부터요." },
+      { title: "맡은 일의 범위를 한 번 적어 두기", detail: "기준을 눈에 보이게요." },
+    ],
     timeline: o.timeline ?? [slot("previous", "2012-12", "2022-11", "인성", "비겁"), slot("current", "2022-12", "2032-11"), slot("next", "2032-12", "2042-11", "관성", "재성")],
     timelineReference: o.reference ?? { year: 2026, month: 10 },
     saju: { status: "computed", pillars: [{ position: "시주", stem: "", branch: "", unknown: hourUnknown }], dayMaster: "", elements: [] },
@@ -413,4 +418,51 @@ test("끝맺음 보정은 정해진 여섯 어미에만 적용하고 이미 끝�
   assert.equal(completeClauseEnding("이미 끝난 문장이에요."), "이미 끝난 문장이에요.");
   assert.equal(completeClauseEnding("배우며 준비하는 시기였지만"), "배우며 준비하는 시기였지만", "표에 없는 이어 주는 말은 건드리지 않는다");
   assert.equal(completeClauseEnding("함께 공부하고"), "함께 공부하고");
+});
+
+// ───── 인생 그래프의 끝: 근거 있는 시기 막대 + 점선으로 구분한 "앞으로 만들어 갈 변화" (운영자 2026-10-19, 점수 · 확정적 상승 없음) ─────
+
+test("시간축 끝에 '앞으로 만들어 갈 변화'가 따로 있다 — 막대가 아니고, 준비 목록은 저장된 조언의 제목에서만 온다", () => {
+  const v = view();
+  assert.ok(v.closing && v.axis);
+  assert.equal(v.closing.title, "앞으로 만들어 갈 변화");
+  assert.equal(v.closing.axisLabel, "앞으로 만들어 갈 변화");
+  assert.deepEqual(v.closing.points, ["고마웠던 사람에게 먼저 안부 묻기", "맡은 일의 범위를 한 번 적어 두기"], "저장된 조언(7번 장 실천 행동)의 제목 그대로");
+  assert.ok(!v.axis.bars.some((b) => /closing|만들어/.test(`${b.key} ${b.label}`)), "마무리는 시기 막대가 아니다");
+  // 입력이 달라지면 준비 목록도 따라 달라진다 — 한 사람의 목록을 베껴 두지 않았다
+  const other = view({ actions: [{ title: "쉬는 날을 먼저 정하기", detail: "x" }] });
+  assert.deepEqual(other.closing?.points, ["쉬는 날을 먼저 정하기"]);
+  // 조언이 없는 리포트는 목록 없이 고정 문구만(새 조언을 지어내지 않는다)
+  assert.deepEqual(view({ actions: [] }).closing?.points, []);
+  // 조언이 많아도 세 개까지
+  assert.equal(view({ actions: [1, 2, 3, 4, 5].map((n) => ({ title: `준비 ${n}`, detail: "x" })) }).closing?.points.length, 3);
+});
+
+test("마무리 문구는 점수 · 확률 · 확정적 상승 · 보장을 말하지 않고, 읽은 시기와 내가 만들어 갈 몫을 구분한다", () => {
+  const c = FLOW_CLOSING_COPY;
+  const text = [c.title, c.axisLabel, c.lead, c.listLabel, c.pointsNote].join(" ");
+  assert.doesNotMatch(text.replace("7번 조언", "조언"), /\d|%|점/, "숫자(점수 · 퍼센트 · 연도)가 없다 — 장 번호(7번 조언)만 예외");
+  assert.doesNotMatch(text, /반드시|확실|보장|무조건|틀림없|꼭 좋아|우상향|올라갑|상승|좋아질 거|잘될 거|성공/, "확정적 상승 · 보장 표현이 없다");
+  assert.match(c.lead, /정해져 있지 않/, "앞으로의 모습이 정해져 있지 않다고 밝힌다");
+  assert.match(c.lead, /사주에서 읽은 시기/, "읽은 시기와 구분한다");
+  assert.match(c.lead, /만들어 갈 수 있어요/, "가능성의 말(수 있어요)로 마무리한다");
+});
+
+test("마무리를 더해도 시기 막대 · 연도 · 나이 매핑은 그대로다 — 막대는 예전과 같은 키 · 위치다", () => {
+  const v = view({ evidence: evidenceWith2017(), paragraphs: [PAST, NOW, NEXT, FORT_A, FORT_B] });
+  assert.equal(v.items.find((i) => i.key === "age-20-21")?.caption, "2017년 무렵");
+  assert.equal(v.items.find((i) => i.key === "age-16-16")?.caption, "2012년 무렵");
+  assert.ok(v.axis!.bars.length >= 5, "시기 막대가 그대로 있다");
+  for (const b of v.axis!.bars) assert.ok(["past", "now", "year", "next"].includes(b.kind), `${b.key}: 막대 종류는 시기뿐`);
+});
+
+test("화면: 시간축 끝은 점선으로 구분하고(막대와 다른 모양), 마무리 칸은 점선 테두리 · 점수 막대가 없으며 누르면 마무리로 이동한다", () => {
+  const src = readFileSync(new URL("../../../components/report/flow-timeline.tsx", import.meta.url), "utf8");
+  assert.match(src, /border-dashed/, "점선");
+  assert.match(src, /onClick=\{toClosing\}/);
+  assert.match(src, /id=\{id\} tabIndex=\{-1\} aria-label=\{closing\.title\}/);
+  const closingFn = src.slice(src.indexOf("function Closing"), src.indexOf("function Head"));
+  assert.doesNotMatch(closingFn, /style=\{\{\s*(height|width)/, "마무리에는 높이 · 너비로 정도를 나타내는 막대가 없다");
+  assert.doesNotMatch(closingFn, /%|점수/, "점수 · 퍼센트 표시가 없다");
+  assert.match(src, /min-h-11/, "누르는 영역 높이 44px 이상");
 });

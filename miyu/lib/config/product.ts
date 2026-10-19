@@ -111,11 +111,13 @@ export const CONCERN_RECORDS = { visible: false } as const;
 export const REPORT_BASIS = { visible: false } as const;
 
 /**
- * 개인 유형명 · ME:U 럭키 지수 노출 스위치(운영자 확정 2026-10-17: D1 고정 유형명 8~12개 · D2 럭키 지수 — 단 "계산 기준(규칙 · 분포)을 운영자가 확정하기 전에는 임의 점수를 화면에 표시하지 않는다").
- * 계산 코드(lib/assessment/personal-type.ts · lib/saju/interpret/lucky.ts) · 규칙 이력 · 분포 측정 · 개발용 확인 화면(/dev/identity, 이 PC에서만)은 만들어 두었고 **실제 화면은 둘 다 꺼 둔다.**
- * 운영자가 유형 목록 · 분류 규칙 · 점수표 · 분포를 확인한 뒤 한 줄로 켠다(`docs/personal-type-v1.md` · `docs/lucky-index-v1.md`). 켜면 무료 결과 화면의 맨 위에 카드가 한 장 더 보인다 — 저장된 결과는 바뀌지 않는다(저장하지 않고 열 때마다 계산한다).
+ * 개인 유형명 · ME:U 럭키 지수 노출 스위치(운영자 확정 2026-10-17: D1 고정 유형명 8~12개 · D2 럭키 지수).
+ * **개인 유형명(PERSONAL_TYPE)은 2026-10-19 운영자 지시로 켰다**(기존 10개 이름 + 혼합 경향, 새 분류 체계 · 계산 엔진 변경 없음): 무료 결과 화면 · 심층 리포트 상단 · 대화 분석 카드 · 읽기용 글이
+ * 같은 한 곳(`lib/report/type-title.ts`)에서 각자의 사주 원국 + 응답으로 계산한 이름을 보인다. 저장하지 않고 열 때마다 계산하며, 켜져 있는 동안 옛 후보 이름 4개(안정지향형 등)는 같은 자리에 보이지 않는다.
+ * 한 줄로 되돌릴 수 있다(false → 옛 후보 이름 + 설명이 예전 그대로 보인다). 저장된 결과는 바뀌지 않는다.
+ * **럭키 지수(LUCKY_INDEX)는 여전히 꺼 둔다** — 계산 기준(규칙 · 분포)을 운영자가 확정하기 전에는 임의 점수를 화면에 표시하지 않는다(`docs/lucky-index-v1.md`).
  */
-export const PERSONAL_TYPE = { visible: false } as const;
+export const PERSONAL_TYPE = { visible: true } as const;
 export const LUCKY_INDEX = { visible: false } as const;
 
 /**
@@ -302,7 +304,7 @@ export function productNameOf(productId: string): string {
  * free가 null이면 구매 후에만 보인다. 여기 적힌 것은 실제로 리포트에 들어 있어야 한다 (lib/report/preview.test.ts가 일부를 확인).
  */
 export const REPORT_SCOPE: { name: string; desc: string; free: string | null; paid: string }[] = [
-  { name: "대표 경향", desc: "지금의 응답에서 가장 두드러진 경향", free: "이름 전체 · 한 줄 요약 · 내 응답에서 읽은 해석 문단", paid: "무료와 같고, 아래 풀이 전체로 이어져요" },
+  { name: "나의 유형", desc: "사주 구조와 내 응답에서 가장 두드러진 경향", free: "이름 전체 · 한 줄 · 잘 쓰일 때 · 조절이 필요할 때 · 내 응답에서 읽은 해석 문단", paid: "무료와 같고, 아래 풀이 전체로 이어져요" },
   { name: "핵심 요약", desc: "편한 환경 · 반복되는 반응 · 스트레스 상황 · 바로 해볼 행동", free: "4가지 중 2가지 (나머지는 어떤 질문에 답하는지만)", paid: "4가지 전체" },
   { name: "사주 원국 풀이", desc: "원국 표, 오행이 뜻하는 것, 그래서 어떤 사람인지", free: "원국 표 · 쉬운 한 줄 풀이", paid: "일간의 잘하는 점 · 과해질 때 주의할 점 · 각 기운이 관계 · 일 · 선택에서 나타나는 모습" },
   { name: "내 원국이 던지는 질문", desc: "내 원국에서 나온 궁금한 점과 쉬운 말 답", free: "질문 2개", paid: "질문 전체와 답" },

@@ -1,8 +1,8 @@
 // 읽기 구조 리포트를 사람이 훑어 읽는 글(마크다운)로 옮긴다 — AI 비교의 블라인드 평가용 파일에 쓴다.
 // 화면에 보이는 본문(요약 · 예시 · 풀이 · 살펴볼 점 · 행동)만 담고, 코드가 근거 목록에서 만든 "분석 근거"와 내부 근거 ID는 넣지 않는다
 // (후보 사이에서 같은 값이라 평가에 도움이 되지 않고, 어느 후보인지 짐작하게 하지도 않는다).
-// 대표 경향 이름(~형)과 한 줄 특징은 응답에서 코드가 정한 값이라 같은 인물이면 후보와 상관없이 같다 — 화면과 같게 맨 위에 이름 → 한 줄 특징 순서로 보여 준다(어느 후보인지 알려 주지 않는다).
-import { tendencyPhrase } from "../../assessment/dev-rules.ts";
+// 나의 유형 이름(~형)과 한 줄은 그 사람의 사주 + 응답에서 코드가 정한 값이라 같은 인물이면 후보와 상관없이 같다 — 화면과 같게 맨 위에 이름 → 한 줄 순서로 보여 준다(어느 후보인지 알려 주지 않는다).
+import { resolveTypeTitle, type TypeTitle } from "../type-title.ts";
 import type { IntegratedReadingReport } from "./types.ts";
 
 const AREA_NAME: Record<string, string> = { core: "내 사주의 중심", relation: "가까운 관계", "work-money": "일과 재물", flow: "앞으로의 흐름" };
@@ -10,19 +10,23 @@ const AREA_NAME: Record<string, string> = { core: "내 사주의 중심", relati
 /** 7개 대주제(story-7) 리포트의 번호가 붙은 장 이름 — 1~5번은 blocks, 6번은 flow, 7번은 advice */
 const NUMBER = (n: number, topic: string) => `${n}. ${topic}`;
 
-/** 읽기용 글 맨 위의 대표 경향 줄 — 유형 이름(~형) → 바로 이어지는 한 줄 특징. 이름이 없으면 null(줄이 없다). 이름을 모르는 값이어도 이름은 지우지 않는다 */
-export function tendencyLine(name: string | null | undefined): string | null {
-  if (!name) return null;
-  const phrase = tendencyPhrase(name);
-  return `**나의 대표 경향** ${name}${phrase ? ` — ${phrase}` : ""} (응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아닙니다)`;
+/**
+ * 읽기용 글 맨 위의 유형 줄 — 유형 이름 → 바로 이어지는 한 줄 → 진단이 아니라는 안내. 화면(ReadingReportView)과 같은 값(TypeTitle)을 쓴다.
+ * 이름이 없으면 null(줄이 없다). 스위치가 꺼진 동안의 옛 후보 이름은 예전 모양 그대로다.
+ */
+export function typeTitleLine(title: TypeTitle | null | undefined): string | null {
+  if (!title) return null;
+  if (title.kind === "legacy") return `**나의 대표 경향** ${title.name}${title.line ? ` — ${title.line}` : ""} (응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아닙니다)`;
+  return `**나의 유형** ${title.name}${title.line ? ` — ${title.line}` : ""} (진단이나 평생 가는 유형이 아니라, 지금의 사주 구조와 응답에서 가장 두드러진 경향에 붙인 이름입니다)`;
 }
 
-export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { tendencyName?: string } = {}): string {
+export function renderReadingMarkdown(r: IntegratedReadingReport, opts: { typeTitle?: TypeTitle | null } = {}): string {
   const out: string[] = [];
   const p = (...lines: string[]) => out.push(...lines, "");
   p(`# ${r.personName} 님의 개인 통합 리포트`);
-  // 화면과 같은 순서 — 유형 이름(~형) → 바로 아래 한 줄 특징 → 핵심 해석. 이름을 모르는 값이어도 이름은 지우지 않는다(읽기용 글에서만 이름이 빠졌던 문제)
-  const tline = tendencyLine(opts.tendencyName ?? r.base?.tendency.name);
+  // 화면과 같은 순서 — 유형 이름(~형) → 바로 아래 한 줄 → 핵심 해석. 이름을 모르는 값이어도 이름은 지우지 않는다(읽기용 글에서만 이름이 빠졌던 문제).
+  // 화면과 같은 값이어야 하므로 호출하는 쪽이 그 사람의 사주 + 응답으로 계산한 TypeTitle을 넘긴다(넘기지 않으면 스위치가 꺼졌을 때만 저장된 옛 이름을 쓴다).
+  const tline = typeTitleLine(resolveTypeTitle(opts.typeTitle, r.base?.tendency.name));
   if (tline) p(tline);
   p(`**핵심 해석** ${r.headline}`);
   p(...r.summary.map((c) => `- ${c.label} · ${c.keyword} — ${c.note}`));

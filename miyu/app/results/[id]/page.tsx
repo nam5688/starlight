@@ -37,6 +37,7 @@ import { isConcernReport } from "@/lib/report/concern/types";
 import { isCompatReport, isPairReport } from "@/lib/report/compat/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
 import { buildIdentity } from "@/lib/report/identity";
+import { assessmentTypeTitle } from "@/lib/report/type-title";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import { quoteForCheckout } from "@/lib/services/benefit-service";
@@ -121,6 +122,8 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   const generator = reportGenerator();
   const usesContext = Boolean(generator.usesContext);
   const created = new Date(assessment.createdAt).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+  // 나의 유형 — 이 사람의 사주 + 응답으로 열 때마다 계산한다(저장하지 않음). 심층 리포트 상단 · 대화 카드 · 무료 결과가 같은 값을 쓴다
+  const typeTitle = assessmentTypeTitle(assessment);
   // 같은 결과로 받은 리포트 전부 (받은 리포트는 모두 기록으로 남는다) — 지금 열려 있는 것과 구분해 보여 준다
   const receivedRows = view.received.map((x) => receivedRowOf(x.order, x.report, assessment.id));
   const seq = receivedRows.find((x) => x.orderNumber === view.paidOrder?.orderNumber)?.seq ?? 1;
@@ -185,13 +188,13 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
           meta={`검사일 ${created} · 저장된 리포트${receivedRows.length > 1 ? ` · ${seq}번째로 받은 리포트` : ""}`}
           tone="main"
         />
-        {isReadingReport(content) && <TalkEntry id={assessment.id} tier="deep" chatReady={chatConnected()} rooms={availableRooms(buildTalkModel(content, { saju: assessment.saju, today: seoulDate(now()) }))} remembered={await peekRoomChoice()} />}
+        {isReadingReport(content) && <TalkEntry id={assessment.id} tier="deep" chatReady={chatConnected()} rooms={availableRooms(buildTalkModel(content, { typeTitle, saju: assessment.saju, today: seoulDate(now()) }))} remembered={await peekRoomChoice()} />}
         {isReadingReport(content) ? (
-          <ReadingReportView report={content} idPrefix="r-" footer={footer} />
+          <ReadingReportView report={content} typeTitle={typeTitle} idPrefix="r-" footer={footer} />
         ) : isPersonalV2(content) ? (
-          <PersonalV2View report={content} idPrefix="r-" footer={footer} />
+          <PersonalV2View report={content} typeTitle={typeTitle} idPrefix="r-" footer={footer} />
         ) : (
-          <FullReportView report={content} idPrefix="r-" footer={footer} />
+          <FullReportView report={content} typeTitle={typeTitle} idPrefix="r-" footer={footer} />
         )}
       </>
     );
@@ -208,7 +211,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   // 개인 유형명 · 럭키 지수 카드 — 운영자가 기준을 확정하기 전에는 스위치가 꺼져 있어 만들지도 보이지도 않는다(lib/config/product.ts). 저장하지 않고 열 때마다 계산한다.
   const identity = PERSONAL_TYPE.visible || LUCKY_INDEX.visible ? buildIdentity({ saju: assessment.saju, summary: assessment.summary }) : null;
   const freeRooms = availableRooms(
-    buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" }, taste: view.taste?.kind === "ready" ? view.taste.report : null }),
+    buildFreeTalkModel({ name: assessment.nickname, preview, saju: assessment.saju, today: seoulDate(now()), href: `/results/${assessment.id}#r-purchase`, owned: Boolean(view.paidOrder), chat: { state: "locked" }, taste: view.taste?.kind === "ready" ? view.taste.report : null, typeTitle: assessmentTypeTitle(assessment) }),
   );
   return (
     <>
@@ -222,7 +225,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
         expandAll={false}
         items={[
           ...(view.taste.kind !== "unavailable" ? [{ id: "r-taste", label: "맛보기 리포트" }] : []),
-          { id: "r-tendency", label: "대표 경향" },
+          { id: "r-tendency", label: PERSONAL_TYPE.visible ? "나의 유형" : "대표 경향" },
           { id: "r-self", label: "내 성향" },
           { id: "r-situations", label: "일 · 관계" },
           { id: "r-actions", label: "필요한 한 가지" },

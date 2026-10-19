@@ -9,6 +9,7 @@ import type { FullReport } from "../report/types.ts";
 import { sajuSection } from "../saju/display.ts";
 import type { SajuOk } from "../saju/engine.ts";
 import { calculateSaju } from "../saju/manseryeok-engine.ts";
+import { typeTitleFor } from "../report/type-title.ts";
 
 // 가상의 인물(서윤)의 생년월일을 실제 만세력 엔진으로 계산한 원국 — 리포트가 어떻게 풀리는지 보여 주는 예시용이다.
 export const SAMPLE_CHART = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40", gender: "female" }) as SajuOk;
@@ -124,3 +125,9 @@ export const sampleReport: FullReport = {
     reference: { year: 2026, month: 10 },
   }),
 };
+
+/**
+ * 가상 인물(서윤)의 "나의 유형" — 예시 화면 · 예시 대화가 보이는 이름이다. 고정한 이름이 아니라 서윤의 가상 원국(SAMPLE_CHART)과 가상 응답(sampleReport)에서
+ * 실제 서비스와 같은 코드(개인 유형 규칙)로 계산한다. 다른 사람의 값을 가져오지 않는다.
+ */
+export const SAMPLE_TYPE_TITLE = typeTitleFor({ saju: SAMPLE_CHART, summary: sampleReport }, sampleReport.tendency.name);

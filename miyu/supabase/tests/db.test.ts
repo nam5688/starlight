@@ -38,6 +38,7 @@ import { buildTalkModel } from "../../lib/report/reading/talk.ts";
 import { sampleReadingReport } from "../../lib/samples/sample-reading-report.ts";
 import { SAMPLE_CHART } from "../../lib/samples/sample-report.ts";
 import { closeRoom, deleteAllSummaries, listSavedSummaries, memoryFor, saveRoomSummary } from "../../lib/services/summary-service.ts";
+import { legacyTypeTitle } from "../../lib/report/type-title.ts";
 
 const URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
 const JWT_SECRET = process.env.JWT_SECRET ?? "local-test-jwt-secret-at-least-32-characters";
@@ -882,7 +883,7 @@ test("채팅 요약(14번 마이그레이션): 본인이 저장한 것만 보이
   assert.ok(mine.ok && theirs.ok);
   const aid = mine.ok ? mine.assessment.id : "";
   const vid = theirs.ok ? theirs.assessment.id : "";
-  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  const model = buildTalkModel(sampleReadingReport, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
   const free = (n: number) => ({ t: "free", q: `질문${n}`, a: [`답${n}이에요.`], topic: "love" });
   const input = (actions: unknown[], over: Record<string, unknown> = {}) => ({ userId: U.id, assessmentId: aid, roomKey: "love", room: "love", actions, model, ...over });
 
@@ -970,7 +971,7 @@ test("채팅 요약 표 · 열이 없어도(14번 적용 전) 대화 · 질문�
   const mine = await submitAssessment({ repo: server, saju: sajuEngine }, { userId: U.id, channel: "web", info: { ...info, nickname: "표없음요약" }, answers, today: new Date() });
   assert.ok(mine.ok);
   const aid = mine.ok ? mine.assessment.id : "";
-  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  const model = buildTalkModel(sampleReadingReport, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
   const free = (n: number) => ({ t: "free", q: `질문${n}`, a: [`답${n}이에요.`], topic: "love" });
   const input = (actions: unknown[]) => ({ userId: U.id, assessmentId: aid, roomKey: "love", room: "love", actions, model });
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

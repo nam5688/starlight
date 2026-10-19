@@ -6,8 +6,10 @@ import { Suspense } from "react";
 import { CompatReportView } from "@/components/report/compat-report-view";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { ReadingReportView } from "@/components/report/reading-report-view";
+import { IdentityCard } from "@/components/results/identity-card";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
+import { LUCKY_INDEX, PERSONAL_TYPE } from "@/lib/config/product";
 import { readLiveRun, type LiveRunDetail } from "@/server/dev-live";
 
 export const metadata: Metadata = { title: "궁합 실제 AI 시험 결과 · ME:U 미유", robots: { index: false } };
@@ -127,14 +129,18 @@ function OwnRun({ run, detail }: { run: string; detail: LiveRunDetail }) {
       <section id="own-free" className="mt-10 scroll-mt-16">
         <h2 className="text-[20px] font-bold">무료 리포트 (같은 입력 · 무료 화면 그대로)</h2>
         <p className="mt-1 text-[14px] leading-[1.7] text-ink-3">무료 분석을 마친 사람이 받는 화면이에요. 아래 심층 리포트와 같은 응답 · 같은 사주에서 만들어졌어요(AI를 쓰지 않아요).</p>
-        <div className="mt-5">{own.free ? <FreePreviewBody preview={own.free} idPrefix="own-f-" /> : <p className="rounded-xl bg-canvas p-4 text-[15px] text-ink-2">무료 리포트를 만들지 못했어요(입력 파일이 없거나 사주를 계산하지 못했어요).</p>}</div>
+        <div className="mt-5">{own.identity && (
+          <div className="-mx-5 mb-6">
+            <IdentityCard identity={own.identity} showType={PERSONAL_TYPE.visible} showLucky={LUCKY_INDEX.visible} idPrefix="own-f-id-" />
+          </div>
+        )}{own.free ? <FreePreviewBody preview={own.free} idPrefix="own-f-" /> : <p className="rounded-xl bg-canvas p-4 text-[15px] text-ink-2">무료 리포트를 만들지 못했어요(입력 파일이 없거나 사주를 계산하지 못했어요).</p>}</div>
       </section>
 
       <section id="own-deep" className="mt-14 scroll-mt-16">
         <h2 className="text-[20px] font-bold">심층 리포트 (실제 서비스 화면 그대로)</h2>
         {own.reading ? (
           <div className="mt-3 -mx-5">
-            <ReadingReportView report={own.reading} idPrefix="own-d-" />
+            <ReadingReportView report={own.reading} typeTitle={own.typeTitle} idPrefix="own-d-" />
           </div>
         ) : (
           <div className="mt-3 rounded-xl bg-caution-soft p-4 text-[15px] leading-[1.7] text-caution">

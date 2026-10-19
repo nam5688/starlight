@@ -17,6 +17,7 @@ import { closeRoom } from "./summary-service.ts";
 import { saveTalkRoom } from "./talk-service.ts";
 import { createMemoryBenefits } from "./testing/memory-benefits.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
+import { legacyTypeTitle } from "../report/type-title.ts";
 
 const CONTEXT: ChatContext = { room: { label: "연애", mode: "연애박사 미유", focus: "연애 · 관계" }, intake: null, topic: { title: "가까운 관계", headline: "확인이 되면 마음이 편해져요", summary: ["확인이 있으면 편해져요."], detail: [] }, overview: { headline: "확인을 중요하게 여겨요", tendency: null, strength: null, caution: null, flow: null }, followUp: false, taste: false };
 
@@ -379,7 +380,7 @@ test("이어지는 질문: 이 방에 저장된 앞선 질문과 답이 최근 2
 
 test("이전 대화의 참고: 이 방에서 이미 끝낸 대화의 질문 · 답이 memory로 함께 가고, 이번 대화에 아직 있는 질문은 중복해서 보내지 않는다", async () => {
   const { mine, repo, deps, asks } = await setup();
-  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  const model = buildTalkModel(sampleReadingReport, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
   const free = (n: number): RoomAction => ({ t: "free", q: `예전 질문${n}`, a: [`예전 답${n}이에요.`] });
   // 저장하지 않고 끝낸 이전 대화 (참고 기록으로만 남는다)
   await closeRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "love", room: "love", actions: [free(1), free(2)], model, keep: false });
@@ -396,7 +397,7 @@ test("이전 대화의 참고: 이 방에서 이미 끝낸 대화의 질문 · �
 
 test("이전 대화의 참고가 없으면 memory 항목 자체를 보내지 않는다 (다른 방의 이야기는 가져오지 않는다)", async () => {
   const { mine, repo, deps, asks } = await setup();
-  const model = buildTalkModel(sampleReadingReport, { tendencyName: "확인추구형", saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
+  const model = buildTalkModel(sampleReadingReport, { typeTitle: legacyTypeTitle("확인추구형"), saju: SAMPLE_CHART, today: { year: 2026, month: 10, day: 15 }, chat: { state: "ready" } });
   await closeRoom(repo, { userId: "u1", assessmentId: mine, roomKey: "money", room: "money", actions: [{ t: "free", q: "돈 질문", a: ["돈 답이에요."] }], model, keep: false });
   await askFreeQuestion(deps(), input(mine));
   assert.equal("memory" in asks[0], false);

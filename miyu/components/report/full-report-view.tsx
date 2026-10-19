@@ -1,3 +1,4 @@
+import type { TypeTitle } from "@/lib/report/type-title";
 import type { FullReport } from "@/lib/report/types";
 import { DetailSections, SajuChart } from "./detail-sections";
 import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
@@ -15,10 +16,13 @@ export function FullReportView({
   report,
   idPrefix = "",
   footer,
+  typeTitle,
 }: {
   report: FullReport;
   idPrefix?: string;
   footer?: React.ReactNode;
+  /** 나의 유형 — 호출하는 쪽이 사주 + 응답으로 계산해 넘긴다(lib/report/type-title.ts) */
+  typeTitle?: TypeTitle | null;
 }) {
   const id = (name: string) => `${idPrefix}${name}`;
   const extras = report.extras;
@@ -35,7 +39,7 @@ export function FullReportView({
   return (
     <ReportShell nav={nav}>
       <section aria-labelledby={id("tendency")}>
-        <TendencyBlock summary={report} headingId={id("tendency")} />
+        <TendencyBlock summary={report} headingId={id("tendency")} typeTitle={typeTitle} />
         <div className="mt-6">
           <CoreSummaryTable core={report.core} omit={["tryNow"]} />
         </div>

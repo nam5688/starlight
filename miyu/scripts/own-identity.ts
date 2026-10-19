@@ -1,5 +1,5 @@
 // 운영자 본인 입력으로 "개인 유형명(10개 + 혼합 경향)"이 어떻게 계산되는지만 화면(터미널)에 보여 준다 — 읽기 전용 · AI 호출 0 · 파일을 만들지도 고치지도 않는다.
-// 스위치(PERSONAL_TYPE)는 켜지 않는다. 화면에 보이는 유형명은 지금도 옛 후보 이름 4개(안정지향형 등)이고, 여기 나오는 값은 "켠다면 이렇게 계산된다"는 확인용이다.
+// 화면 · 읽기용 글에 보이는 "나의 유형"과 같은 코드(lib/report/type-title.ts)로 계산한다. 개인 유형 표시(PERSONAL_TYPE)는 2026-10-19 운영자 지시로 켜져 있고, 옛 후보 이름 4개(안정지향형 등)는 같은 자리에 보이지 않는다.
 //
 // 사용 (miyu 폴더, PowerShell):
 //   node scripts/own-identity.ts <결과 폴더 경로> [--birth-time-unknown]
@@ -46,7 +46,7 @@ const result = personalTypeOf({ saju, summary });
 const view = personalTypeView(result);
 
 const line = (s = "") => console.log(s);
-line(`개인 유형 계산 확인 — ${PERSONAL_TYPE_VERSION} (읽기 전용 · 스위치 꺼짐 상태 그대로 · AI 호출 0)`);
+line(`개인 유형 계산 확인 — ${PERSONAL_TYPE_VERSION} (읽기 전용 · 화면과 같은 계산 · AI 호출 0)`);
 line();
 line(`① 사주 갈래 세기 (${saju.hourPillarOmitted ? "시주 없이 다섯 자리" : "일곱 자리"} · 월지는 한 자리 더): ${Object.entries(tilt.counts).map(([g, n]) => `${g} ${n}`).join(" · ")}`);
 line(`   가장 많은 갈래(2 이상): ${tilt.candidates.length ? tilt.candidates.join(" · ") : "없음"} · 판정: ${tilt.reason}`);
@@ -65,7 +65,7 @@ line();
 line(`④ 결과: ${view.name}${result.kind === "mixed" ? `  (혼합 경향 이유: ${result.reason})` : ""}`);
 line(`   한 줄: ${view.line}`);
 line();
-line(`⑤ 지금 화면에 보이는 옛 후보 이름(4개): ${summary.tendency.name} — 저장된 결과 · 심층 리포트 맨 위 줄은 이 이름을 쓴다`);
+line(`⑤ 옛 후보 이름(4개 중): ${summary.tendency.name} — 저장된 요약에만 남아 있고 개인 유형이 켜져 있는 동안 화면 · 읽기용 글에는 보이지 않는다`);
 line(`   (옛 후보 이름 목록: ${Object.values(TENDENCY_NAMES).join(" · ")})`);
 line();
-line("표시 위치(켠다면): 무료 미리보기 결과 화면(/results/<번호>) 맨 위 제목 아래의 개인 유형 카드. 심층 리포트 본문에는 나오지 않는다.");
+line("표시 위치: 무료 결과 화면(/results/<번호>) 맨 위 카드 · 심층 리포트 맨 위 \"나의 유형\" · 대화 분석 카드 · 읽기용 글 맨 위 줄 — 모두 같은 값.");

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronIcon } from "@/components/ui/icons";
-import type { FlowBar, FlowItem, FlowView } from "@/lib/report/reading/flow-view";
+import type { FlowBar, FlowClosing, FlowItem, FlowView } from "@/lib/report/reading/flow-view";
 import { FLOW_HIT_PX } from "@/lib/report/reading/flow-metrics";
 import { Prose } from "./reading-parts";
 
@@ -10,8 +10,9 @@ import { Prose } from "./reading-parts";
 // 이 컴포넌트는 그리고 여닫기만 한다. 막대의 위치 · 길이는 기간일 뿐이고 높이나 색으로 좋고 나쁨을 나타내지 않는다.
 // 칸은 네이티브 <details data-fold>라서 스크립트 없이도 눌러서 열리고, 주제 이동 막대의 "전체 펼치기"도 함께 열고 닫는다.
 // 막대(버튼)를 누르면 같은 칸이 열리고 닫힌다. 막대 사이는 화살표 키로 옮긴다.
+// 시간축 끝의 점선 "앞으로 만들어 갈 변화"는 사주에서 읽은 시기(막대)가 아니라 행동형 마무리다 — 막대가 아니고 점수 · 높이가 없으며, 누르면 아래 마무리 칸으로 간다.
 
-type Data = Pick<FlowView, "hourUnknown" | "items" | "notes" | "axis">;
+type Data = Pick<FlowView, "hourUnknown" | "items" | "notes" | "axis" | "closing">;
 
 const BAR_H = 30; // 눈에 보이는 막대 높이(px)
 const LANE = FLOW_HIT_PX; // 줄 하나의 높이(px) — 눌리는 영역의 높이와 같아 위아래 줄의 눌리는 영역이 겹치지 않는다(막대는 줄 가운데에 놓인다)
@@ -30,7 +31,7 @@ const GROUPS: { id: string; title: string; kinds: FlowItem["kind"][] }[] = [
 ];
 
 export function FlowTimeline({ view, idPrefix }: { view: Data; idPrefix: string }) {
-  const { items, axis, notes } = view;
+  const { items, axis, notes, closing } = view;
   const root = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [open, setOpen] = useState<Set<string>>(() => new Set());
@@ -49,6 +50,14 @@ export function FlowTimeline({ view, idPrefix }: { view: Data; idPrefix: string 
     document.addEventListener("toggle", sync, true);
     return () => document.removeEventListener("toggle", sync, true);
   }, []);
+
+  function toClosing() {
+    const el = document.getElementById(cardId("closing"));
+    if (!el) return;
+    const reduce = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    el.focus({ preventScroll: true });
+  }
 
   function press(key: string) {
     const el = document.getElementById(cardId(key));
@@ -120,6 +129,18 @@ export function FlowTimeline({ view, idPrefix }: { view: Data; idPrefix: string 
               </span>
             ))}
           </div>
+          {closing && (
+            <button
+              type="button"
+              onClick={toClosing}
+              aria-controls={cardId("closing")}
+              aria-label={`${closing.axisLabel} — 사주에서 읽은 시기가 아니라 앞으로 내가 만들어 가는 몫이에요. 누르면 아래 마무리로 이동해요`}
+              className="mt-1 flex min-h-11 w-full items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+            >
+              <span aria-hidden="true" className="flex-1 border-t-2 border-dashed border-positive/70" />
+              <span className="shrink-0 rounded-full border border-dashed border-positive px-3 py-1.5 text-[13px] font-semibold text-positive">{closing.axisLabel} →</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -149,7 +170,35 @@ export function FlowTimeline({ view, idPrefix }: { view: Data; idPrefix: string 
           );
         })}
       </div>
+
+      {closing && <Closing closing={closing} id={cardId("closing")} />}
     </div>
+  );
+}
+
+/** 시간축 끝의 행동형 마무리 — 시기 칸(사주에서 읽은 가능성)과 다른 색 · 점선으로 구분하고, 점수 · 확률 · 상승 표현이 없다 */
+function Closing({ closing, id }: { closing: FlowClosing; id: string }) {
+  return (
+    <section id={id} tabIndex={-1} aria-label={closing.title} className="mt-7 rounded-xl border border-dashed border-positive/70 bg-positive-soft px-4 py-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong md:px-5">
+      <h4 className="text-[16px] font-bold text-positive">{closing.title}</h4>
+      <Prose text={closing.lead} className="mt-2 text-[16px] leading-[1.75]" />
+      {closing.points.length > 0 && (
+        <>
+          <p className="mt-4 text-[13px] font-semibold text-ink-3">{closing.listLabel}</p>
+          <ul className="mt-1.5 space-y-2">
+            {closing.points.map((p) => (
+              <li key={p} className="flex gap-2.5 text-[15px] leading-[1.65]">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-[3px] size-4 shrink-0 text-positive" aria-hidden="true">
+                  <path d="m5 12 5 5L19 7" />
+                </svg>
+                <span>{p}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-[13px] leading-[1.6] text-ink-3">{closing.pointsNote}</p>
+        </>
+      )}
+    </section>
   );
 }
 

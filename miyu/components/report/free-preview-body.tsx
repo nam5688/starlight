@@ -1,14 +1,16 @@
 import { StatusBadge } from "@/components/ui/source-badge";
-import { REPORT_BASIS } from "@/lib/config/product";
+import { PERSONAL_TYPE, REPORT_BASIS } from "@/lib/config/product";
 import { ChevronIcon } from "@/components/ui/icons";
 import type { FreePreview } from "@/lib/report/preview";
 import { SajuChart } from "./detail-sections";
+import { Prose } from "./reading-parts";
 import { AxisBar } from "./score-bar";
 import { SectionTitle } from "./summary-blocks";
 
 /**
  * 무료 리포트 본문(운영자 방향 2026-10-16) — 공개 범위의 내용을 한 사람의 풀이로 이어서 끝까지 보여 준다.
  * ① 핵심 문장(대표 경향) → ② 내 성향과 지나온 모습 → ③ 일과 가까운 관계 → ④ 지금 필요한 한 가지 → ⑤ 원국 · 분석 근거(접힘).
+ * 개인 유형(PERSONAL_TYPE)이 켜져 있으면 유형 이름 · 한 줄은 이 화면을 쓰는 페이지 맨 위의 IdentityCard가 보이고, ①의 옛 대표 경향 이름(4개 후보)은 보이지 않는다 — 두 이름이 한 화면에 겹치지 않는다.
  * 풀이 중간에 자물쇠 · "답은 구매 후" · 질문만 늘어놓는 구매 예고를 두지 않는다 — 구매 안내는 이 화면을 쓰는 페이지가 아래 한곳에서 한다.
  * 공개 범위는 그대로다(잠긴 내용은 서버가 만들지 않고, 이 화면에 보이지 않는 것을 새로 공개하지도 않는다).
  */
@@ -19,15 +21,19 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
 
   return (
     <div className="space-y-12">
-      {/* ① 핵심 문장 — 대표 경향의 이름과 한 줄 요약은 가리지 않고 완성된 문장으로 */}
-      <section aria-labelledby={id("tendency")}>
-        <h2 id={id("tendency")} className="scroll-mt-[44px] text-[13px] font-semibold text-accent md:scroll-mt-[52px]">
-          대표 경향
-        </h2>
-        <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">{tendency.name}</p>
-        <p className="mt-3 border-l-[3px] border-accent pl-4 text-[18px] font-semibold leading-relaxed md:text-[20px]">{tendency.line}</p>
-        <p className="mt-2 text-[13px] leading-relaxed text-ink-3">후보 유형 · 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아니에요.</p>
-      </section>
+      {/* ① 핵심 문장 — 대표 경향의 이름과 한 줄 요약은 가리지 않고 완성된 문장으로 (개인 유형이 꺼져 있을 때의 옛 후보 이름. 켜져 있으면 맨 위 IdentityCard가 유형을 보인다) */}
+      {!PERSONAL_TYPE.visible ? (
+        <section aria-labelledby={id("tendency")}>
+          <h2 id={id("tendency")} className="scroll-mt-[44px] text-[13px] font-semibold text-accent md:scroll-mt-[52px]">
+            대표 경향
+          </h2>
+          <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">{tendency.name}</p>
+          <p className="mt-3 border-l-[3px] border-accent pl-4 text-[18px] font-semibold leading-relaxed md:text-[20px]">{tendency.line}</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-ink-3">후보 유형 · 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아니에요.</p>
+        </section>
+      ) : (
+        <span id={id("tendency")} className="block scroll-mt-[44px] md:scroll-mt-[52px]" />
+      )}
 
       {/* ② 내 성향과 지나온 모습 */}
       <section aria-labelledby={id("self")}>
@@ -35,7 +41,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
         <div className="space-y-8">
           {lead.kind === "insight" && (
             <div>
-              <p className="text-[18px] font-semibold leading-relaxed md:text-[20px]">{lead.text}</p>
+              <Prose text={lead.text} className="text-[18px] font-semibold leading-relaxed md:text-[20px]" />
               <p className="mt-2 text-[13px] leading-relaxed text-ink-3">{lead.basisNote}</p>
             </div>
           )}
@@ -48,7 +54,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
                 나를 나타내는 글자(일간)는 <span className="font-semibold text-ink">{saju.dayMaster.label}</span>이고, 전통 해석에서는 <span className="font-semibold text-ink">{saju.dayMaster.image}</span>에 비유합니다.{" "}
                 {saju.dayMaster.trait}
               </p>
-              {saju.everyday.shown && <p className="mt-4 text-[16px] leading-relaxed">{saju.everyday.shown}</p>}
+              {saju.everyday.shown && <Prose text={saju.everyday.shown} className="mt-4 text-[16px] leading-relaxed" />}
             </div>
           ) : (
             <p className="flex flex-wrap items-center gap-2 text-[16px] text-ink-2">
@@ -62,7 +68,9 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
               {core.shown.map((r) => (
                 <div key={r.label} className="grid gap-1 border-b border-line px-1 py-4 md:grid-cols-[200px_minmax(0,1fr)] md:gap-6">
                   <dt className="text-[14px] font-semibold text-ink-2">{r.label}</dt>
-                  <dd className="text-[16px] leading-relaxed">{r.text}</dd>
+                  <dd className="text-[16px] leading-relaxed">
+                    <Prose as="div" text={r.text} />
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -106,9 +114,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
             {saju.status === "ok" && saju.relation && (
               <div>
                 <h3 className="text-[15px] font-semibold text-ink-2">가까운 관계에서는 이렇게 나타날 수 있어요</h3>
-                <p className="mt-2 text-[16px] leading-relaxed">
-                  {saju.relation.lead} — {saju.relation.text}
-                </p>
+                <Prose text={`${saju.relation.lead} — ${saju.relation.text}`} className="mt-2 text-[16px] leading-relaxed" />
                 <p className="mt-2 text-[14px] text-ink-3">전통 해석을 쉬운 말로 옮긴 한 가지이고, 성격을 확정하는 말이 아니에요.</p>
               </div>
             )}
@@ -121,7 +127,7 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
         <section aria-labelledby={id("actions")}>
           <SectionTitle id={id("actions")}>지금 나에게 필요한 한 가지</SectionTitle>
           <p className="text-[18px] font-semibold leading-snug md:text-[20px]">{action.shown.title}</p>
-          <p className="mt-2 text-[16px] leading-relaxed text-ink-2">{action.shown.detail}</p>
+          <Prose text={action.shown.detail} className="mt-2 text-[16px] leading-relaxed text-ink-2" />
         </section>
       )}
 

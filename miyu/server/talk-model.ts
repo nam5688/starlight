@@ -2,6 +2,7 @@ import "server-only";
 import { isReadingReport } from "@/lib/report/generator";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
+import { assessmentTypeTitle } from "@/lib/report/type-title";
 import { buildTalkModel, type TalkChat, type TalkModel } from "@/lib/report/reading/talk";
 import { buildFreeTalkModel } from "@/lib/report/reading/talk-free";
 import { ownedStateOf, type OwnedState } from "@/lib/report/reading/room-entry";
@@ -33,8 +34,10 @@ export function ownedState(view: ResultView): OwnedState | null {
 export function roomModelFor(view: ResultView, chat: { paid: TalkChat; free: TalkChat }, room?: RoomId): { tier: "paid" | "free"; model: TalkModel; noMaterial: boolean } {
   const { assessment, report } = view;
   const today = seoulDate(now());
+  // 나의 유형 — 이 사람의 사주 + 응답으로 계산(저장하지 않음). 무료 · 심층 대화 카드가 같은 값을 쓴다
+  const typeTitle = assessmentTypeTitle(assessment);
   if (viewTier(view) === "paid" && report?.content && isReadingReport(report.content)) {
-    return { tier: "paid", model: buildTalkModel(report.content, { saju: assessment.saju, today, chat: chat.paid }), noMaterial: false };
+    return { tier: "paid", model: buildTalkModel(report.content, { typeTitle, saju: assessment.saju, today, chat: chat.paid }), noMaterial: false };
   }
   const owned = Boolean(view.paidOrder);
   const model = buildFreeTalkModel({
@@ -46,6 +49,7 @@ export function roomModelFor(view: ResultView, chat: { paid: TalkChat; free: Tal
     owned,
     chat: chat.free,
     taste: view.taste?.kind === "ready" ? view.taste.report : null,
+    typeTitle,
   });
   // 재료가 없는 방은 무료 질문을 열지 않는다 (질문 횟수를 쓰지 않고, 리포트를 받으면 열린다는 안내만 보인다)
   const noMaterial = room !== undefined && !roomHasMaterial(model, room);

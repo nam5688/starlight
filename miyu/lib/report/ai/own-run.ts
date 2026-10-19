@@ -28,6 +28,7 @@ import { buildEvidence } from "./generator.ts";
 import { referenceFor, promptsFor } from "./compare-plan.ts";
 import type { Persona } from "./compare-personas.ts";
 import { estimateInputTokens } from "./budget.ts";
+import { typeTitleFor, type TypeTitle } from "../type-title.ts";
 
 /** /analyze에서 푼 입력을 이 PC의 파일로 내보낸 것(server/own-input.ts) */
 export type OwnCapture = { info: BasicInfo; answers: Answers; capturedAt: string | null };
@@ -50,6 +51,15 @@ export async function ownReportInput(capture: OwnCapture, today: Date): Promise<
   const saved = await submitAssessment({ repo, saju: manseryeokEngine }, { userId: "own-input-test", channel: "web", info: capture.info, answers: capture.answers, today });
   if (!saved.ok) return { ok: false, message: saved.message };
   return { ok: true, input: reportInputOf(saved.assessment) };
+}
+
+/** 저장된 입력 사본(input.json)에 그 실행에서 쓴 "출생 시각 미상" 옵션을 같게 맞춘다 — 사본은 원래 입력 그대로라서, 시각 없이 읽은 실행의 무료 화면 · 유형을 같은 입력으로 다시 만들 때 쓴다 */
+export const captureForRun = (capture: OwnCapture, hourUnknown: boolean): OwnCapture => (hourUnknown ? { ...capture, info: { ...capture.info, birthTimeUnknown: true, birthTime: "" } } : capture);
+
+/** 그 입력의 "나의 유형"(개인 유형 10개 + 혼합 경향) — 화면 · 읽기용 글과 같은 코드(lib/report/type-title.ts)로 그 사람의 사주 + 응답에서 계산한다. 계산하지 못하면 null */
+export async function ownTypeTitle(capture: OwnCapture, today: Date): Promise<TypeTitle | null> {
+  const built = await ownReportInput(capture, today);
+  return built.ok ? typeTitleFor(built.input, built.input.summary.tendency.name) : null;
 }
 
 export const ownPersona = (input: ReportInput): Persona => ({ id: "OWN", note: "운영자 본인 입력(22문항 직접 응답)", input });
@@ -100,7 +110,10 @@ export function describeOwnInput(opts: { input: ReportInput; capture: OwnCapture
   push();
   push("## 4. 응답에서 코드가 계산한 값 (0~100 환산값 · 화면에는 점수로 보이지 않고 AI에도 숫자로 가지 않음)");
   const s = opts.input.summary;
-  push(`- 대표 경향(후보 이름): **${s.tendency.name}**`);
+  const typeTitle = typeTitleFor(opts.input, s.tendency.name);
+  if (typeTitle) push(`- 나의 유형: **${typeTitle.name}**${typeTitle.line ? ` — ${typeTitle.line}` : ""} (화면 · 읽기용 글에 보이는 이름. 이 입력의 사주 + 응답에서 계산)`);
+  else push("- 나의 유형: (사주가 계산되지 않아 이름을 만들지 않음)");
+  push(`- 옛 대표 경향 후보 이름(화면에 보이지 않음 · 저장된 요약에만 있음): ${s.tendency.name}`);
   for (const [title, rows] of [["기질 · 성격", s.temperament], ["가까운 관계 반응", s.relationship]] as const) {
     push(`- ${title}: ${rows.map((r) => `${r.label} ${Math.round(r.score)}`).join(" · ")}`);
   }

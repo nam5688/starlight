@@ -1,3 +1,4 @@
+import { resolveTypeTitle, type TypeTitle } from "@/lib/report/type-title";
 import type { CoreSummary, FreeSummary } from "@/lib/report/types";
 import { REPORT_BASIS } from "@/lib/config/product";
 import { ANSWER_LABEL } from "@/lib/report/free-insight";
@@ -16,29 +17,44 @@ export function SectionTitle({ id, children, note }: { id?: string; children: Re
   );
 }
 
-/** 1) 대표 경향 + 2) 한 줄 요약 — 첫 화면. "이렇게 읽은 이유"는 접어 둔다 */
+/**
+ * 1) 나의 유형(개인 유형 10개 + 혼합 경향) + 2) 한 줄 — 첫 화면. "이렇게 읽은 이유"는 접어 둔다.
+ * typeTitle은 호출하는 쪽이 그 사람의 사주 + 응답으로 계산해 넘긴다. 넘기지 않으면(undefined) 스위치가 꺼졌을 때만 저장된 옛 후보 이름 + 옛 한 줄 요약을 보이고,
+ * 켜져 있으면 옛 이름 · 옛 한 줄 요약(옛 4개 후보에 딸린 문장)은 보이지 않는다.
+ */
 export function TendencyBlock({
   summary,
   headingId = "tendency",
+  typeTitle,
 }: {
   summary: Pick<FreeSummary, "tendency" | "oneLiner" | "insight">;
   headingId?: string;
+  typeTitle?: TypeTitle | null;
 }) {
   const insight = summary.insight;
+  const title = resolveTypeTitle(typeTitle, summary.tendency.name);
+  const legacy = title?.kind === "legacy";
   return (
     <div>
       <h2 id={headingId} className="scroll-mt-[44px] text-[13px] font-semibold text-accent md:scroll-mt-[52px]">
-        대표 경향
+        {title ? (legacy ? "대표 경향" : "나의 유형") : "내 응답에서 읽은 것"}
       </h2>
-      <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">{summary.tendency.name}</p>
-      <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">후보 유형 · 분류 규칙 확정 전. 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아니에요.</p>
-
-      <p className="mt-6 border-l-[3px] border-accent pl-3.5 text-[18px] leading-snug font-semibold md:text-[20px]">{summary.oneLiner}</p>
+      {title && (
+        <>
+          <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[32px]">{title.name}</p>
+          <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">{legacy ? "후보 유형 · 분류 규칙 확정 전. 지금의 응답에서 두드러진 경향이며, 고정된 성격 유형이 아니에요." : title.note}</p>
+          {legacy ? (
+            <p className="mt-6 border-l-[3px] border-accent pl-3.5 text-[18px] leading-snug font-semibold md:text-[20px]">{summary.oneLiner}</p>
+          ) : (
+            title.line && <p className="mt-6 border-l-[3px] border-accent pl-3.5 text-[18px] leading-snug font-semibold md:text-[20px]">{title.line}</p>
+          )}
+        </>
+      )}
 
       {insight && (
         <>
-          <p className="mt-6 text-[13px] font-semibold text-ink-3">내 응답에서 읽은 것</p>
-          <p className="mt-1.5 text-[16px] leading-[1.75]">{insight.text}</p>
+          {title && <p className="mt-6 text-[13px] font-semibold text-ink-3">내 응답에서 읽은 것</p>}
+          <p className={`${title ? "mt-1.5" : "mt-3"} text-[16px] leading-[1.75]`}>{insight.text}</p>
           {REPORT_BASIS.visible && (
             <FoldRow>
               <Fold label="이렇게 읽은 이유 보기" hint="이 문단에는 응답만 쓰였고, 사주와 합산하지 않았어요." wide>

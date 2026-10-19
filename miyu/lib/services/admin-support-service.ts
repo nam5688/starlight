@@ -8,6 +8,7 @@ import { nextRefundSteps, packRemaining, packShortfall, questionsLeft } from "..
 import { isValidOrderNumber } from "../commerce/order.ts";
 import { isReadingReport, type AnyReportContent } from "../report/generator.ts";
 import { renderReadingMarkdown } from "../report/reading/render-text.ts";
+import { assessmentTypeTitle, type TypeTitle } from "../report/type-title.ts";
 import type { AdminOrderRow } from "./admin-service.ts";
 import { orderStatusLabel, productName } from "./my-service.ts";
 import type { MiyuRepository, OrderRecord } from "./ports.ts";
@@ -180,7 +181,7 @@ export type AdminReportView =
   | { kind: "not-found" }
   /** 질문 결제 · 환불 · 결제 대기 주문처럼 볼 리포트가 없다 */
   | { kind: "no-report"; order: AdminOrderRow; reason: string }
-  | { kind: "ready"; order: AdminOrderRow; nickname: string; content: AnyReportContent; createdAt: string; generator: string | null; text: string | null };
+  | { kind: "ready"; order: AdminOrderRow; nickname: string; content: AnyReportContent; createdAt: string; generator: string | null; text: string | null; /** 고객에게 보이는 나의 유형(그 사람의 사주 + 응답으로 계산) — 읽기 전용 보기도 같은 값을 보인다 */ typeTitle: TypeTitle | null };
 
 /**
  * 주문번호로 저장된 리포트를 읽기 전용으로 꺼낸다. 고객에게 보이는 것과 같은 저장본이며 새로 만들지 않는다.
@@ -210,6 +211,7 @@ export async function adminReportView(repo: MiyuRepository, orderNumber: string,
   }
   const assessment = await repo.getAssessment(order.assessmentId);
   const content = report.content;
+  const typeTitle = assessment ? assessmentTypeTitle(assessment) : null;
   return {
     kind: "ready",
     order: row,
@@ -217,6 +219,7 @@ export async function adminReportView(repo: MiyuRepository, orderNumber: string,
     content,
     createdAt: report.createdAt,
     generator: report.generator ? `${report.generator} ${report.generatorVersion ?? ""}`.trim() : null,
-    text: isReadingReport(content) ? renderReadingMarkdown(content) : null,
+    text: isReadingReport(content) ? renderReadingMarkdown(content, { typeTitle }) : null,
+    typeTitle,
   };
 }
