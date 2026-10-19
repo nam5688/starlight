@@ -652,6 +652,12 @@ wd26 as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pairs' and column_name = 'relationship') as relationship_col
 ),
+wd27 as (
+  select
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'assessments' and column_name = 'my_hidden_at') as hidden_col,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'set_assessment_my_hidden') as hide_fn,
+    coalesce(has_function_privilege('service_role', 'public.set_assessment_my_hidden(uuid, uuid, boolean)', 'execute'), false) as service_grant
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -830,5 +836,11 @@ select * from (
          case when wd26.relationship_col then '적용됨' else '아직 안 함' end,
          '표 pairs의 사이(relationship) 열 — 리포트 궁합 새 초대에만 필요하다. 이 열이 없으면 새 초대 만들기만 준비 중으로 멈추고 기존 쌍 · 개인 리포트 · 무료 궁합 · 사주 궁합은 그대로 동작한다: ' || wd26.relationship_col::text
   from wd26
+  union all
+  select 27, '20261106000000_my_report_hide.sql',
+         case when wd27.hidden_col and wd27.hide_fn and wd27.service_grant then '적용됨'
+              when wd27.hidden_col or wd27.hide_fn or wd27.service_grant then '일부만' else '아직 안 함' end,
+         '열 assessments.my_hidden_at (MY 목록에서 숨긴 시각) / 함수 set_assessment_my_hidden (본인 것만 숨기기 · 다시 보이게 하기) / 서버 권한: ' || wd27.service_grant::text || ' — 이 열이 없으면 MY의 숨기기 버튼만 보이지 않고 나머지는 그대로 동작한다'
+  from wd27
 ) r
 order by "번호";

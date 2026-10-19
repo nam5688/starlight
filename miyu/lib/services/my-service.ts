@@ -142,17 +142,27 @@ export function receivedRowOf(
   };
 }
 
-export async function getMyPage(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<{ cards: MyReportCard[]; concerns: MyConcernCard[]; orders: MyOrderRow[] }> {
-  const [assessments, orders, reports, contexts, records] = await Promise.all([
+/**
+ * MY 화면 자료. `cards`는 "내 리포트" 목록에 보이는 것, `hiddenCards`는 본인이 목록에서 숨긴 것이다.
+ * 숨김은 MY 목록 표시만 나눈다 — 두 목록의 카드는 같은 모양이고 결과 · 채팅 · 주문 · 구매 여부 · 열람 권한은 숨김과 무관하다.
+ * `hideAvailable`이 false이면 숨김 열이 아직 없는 DB(27번 전)이므로 화면이 숨기기 버튼을 보이지 않는다(모든 카드가 `cards`에 있다).
+ */
+export type MyPage = { cards: MyReportCard[]; hiddenCards: MyReportCard[]; hideAvailable: boolean; concerns: MyConcernCard[]; orders: MyOrderRow[] };
+
+export async function getMyPage(repo: MiyuRepository, userId: string, now: Date = new Date()): Promise<MyPage> {
+  const [assessments, orders, reports, contexts, records, hiddenIds] = await Promise.all([
     repo.listAssessments(userId),
     repo.listOrdersForUser(userId),
     repo.listReportStatuses(userId),
     repo.listContexts(userId),
     repo.listConcernRecordSummaries(userId),
+    // 숨김 정보를 읽지 못해도 MY는 열린다(모두 보이는 예전 모양) — 숨긴 결과는 어디서도 지워지거나 바뀌지 않는다
+    repo.listHiddenAssessmentIds(userId).catch(() => null),
   ]);
   const mineOrders = orders.filter((o) => o.userId === userId);
+  const hidden = new Set(hiddenIds ?? []);
 
-  const cards = assessments
+  const allCards = assessments
     .filter((a) => a.userId === userId)
     .map((a): MyReportCard => {
       const related = mineOrders.filter((o) => o.assessmentId === a.id && isPersonalProduct(o.productId));
@@ -218,7 +228,39 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
     )
     .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 
-  return { cards, concerns, orders: rows };
+  return {
+    cards: allCards.filter((c) => !hidden.has(c.assessmentId)),
+    hiddenCards: allCards.filter((c) => hidden.has(c.assessmentId)),
+    hideAvailable: hiddenIds !== null,
+    concerns,
+    orders: rows,
+  };
+}
+
+export type HideReportResult =
+  | { kind: "hidden" | "restored" | "unchanged" }
+  /** 없거나 본인 것이 아님 — 둘을 구분해 알리지 않는다 */
+  | { kind: "not-found" }
+  /** 숨김 열이 아직 없는 DB(27번 전) */
+  | { kind: "db-not-ready" };
+
+/**
+ * 본인 검사 결과 하나를 MY 목록에서 숨기거나(hidden: true) 다시 보이게 한다.
+ * 바꾸는 것은 목록 표시 시각 하나뿐이다 — 검사 결과 · 리포트 · 주문 · 결제 · 질문권 · 채팅 · 동의 · 열람 권한은 읽지도 쓰지도 않는다.
+ * 소유자는 여기서 확인하고, 저장소(DB 함수)가 회원번호와 번호의 짝을 한 번 더 확인한다. 같은 요청을 여러 번 보내도 결과가 같다.
+ */
+export async function setReportHidden(repo: MiyuRepository, input: { userId: string; assessmentId: string; hidden: boolean }): Promise<HideReportResult> {
+  const assessment = await repo.getAssessment(input.assessmentId);
+  if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
+  try {
+    const result = await repo.setAssessmentMyHidden(input.userId, input.assessmentId, input.hidden);
+    if (result === "not-found") return { kind: "not-found" };
+    if (result === "unchanged") return { kind: "unchanged" };
+    return { kind: input.hidden ? "hidden" : "restored" };
+  } catch (e) {
+    if ((e as { code?: string } | null)?.code === "42P01") return { kind: "db-not-ready" };
+    throw e;
+  }
 }
 
 export type OrderTrace = {

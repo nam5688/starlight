@@ -34,6 +34,9 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const profiles = new Map<string, ProfileRecord>();
   const regions = new Map<string, { province: string; district: string }>();
   const assessments = new Map<string, AssessmentRecord>();
+  // MY 목록에서 숨긴 검사 결과 번호 → 숨긴 시각 (DB 27번의 assessments.my_hidden_at). myHide.ready=false이면 27번 적용 전 DB를 흉내 낸다
+  const myHidden = new Map<string, string>();
+  const myHide = { ready: true };
   const orders = new Map<string, OrderRecord>();
   /** 주문 상태가 바뀔 때 부르는 훅(테스트용 혜택 저장소가 DB 트리거 대신 등록한다) */
   const orderHooks: ((before: OrderRecord, after: OrderRecord) => void)[] = [];
@@ -254,6 +257,19 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async listAssessments(userId) {
       return [...assessments.values()].filter((a) => a.userId === userId);
+    },
+    async listHiddenAssessmentIds(userId) {
+      if (!myHide.ready) return null;
+      return [...assessments.values()].filter((a) => a.userId === userId && myHidden.has(a.id)).map((a) => a.id);
+    },
+    async setAssessmentMyHidden(userId, assessmentId, hidden) {
+      if (!myHide.ready) throw Object.assign(new Error("숨김 열이 없습니다 (DB 변경 27번 필요)"), { code: "42P01" });
+      const a = assessments.get(assessmentId);
+      if (!a || a.userId !== userId) return "not-found";
+      if (hidden === myHidden.has(assessmentId)) return "unchanged";
+      if (hidden) myHidden.set(assessmentId, iso());
+      else myHidden.delete(assessmentId);
+      return "changed";
     },
     async getOrderByNumber(orderNumber) {
       return [...orders.values()].find((o) => o.orderNumber === orderNumber) ?? null;
@@ -792,5 +808,5 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
   };
 
-  return { repo, newId: id, orderHooks, withdrawHooks, compatRequests, profiles, regions, assessments, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
+  return { repo, newId: id, orderHooks, withdrawHooks, compatRequests, profiles, regions, assessments, myHidden, myHide, orders, reports, events, consents, contexts, concernRecords, talkRooms, chatQuestions, chatSummaries, opsEvents, aiUsage, funnel, feedback, wallets, ledger, packs, chatReservations };
 }

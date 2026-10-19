@@ -404,6 +404,25 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
       return (data ?? []).map(toAssessment);
     },
 
+    async listHiddenAssessmentIds(userId) {
+      const { data, error } = await db.from("assessments").select("id").eq("user_id", userId).not("my_hidden_at", "is", null);
+      if (error) {
+        if (["42703", "PGRST204"].includes(error.code ?? "")) return null; // 27번 전 — 숨김 열이 없다
+        fail("숨긴 결과 조회", error);
+      }
+      return (data ?? []).map((r) => (r as Row).id as string);
+    },
+
+    async setAssessmentMyHidden(userId, assessmentId, hidden) {
+      const { data, error } = await db.rpc("set_assessment_my_hidden", { p_user_id: userId, p_assessment_id: assessmentId, p_hidden: hidden });
+      if (error) {
+        if (error.code === "22P02") return "not-found"; // uuid 형식이 아닌 번호
+        const missing = isMissingFunction(error) || isMissingTableError(error) || error.code === "42703";
+        fail("MY 목록 숨김 변경", missing ? { code: "42P01", message: "set_assessment_my_hidden 함수가 없습니다 (DB 변경 27번 필요)" } : error);
+      }
+      return data === "changed" ? "changed" : data === "unchanged" ? "unchanged" : "not-found";
+    },
+
     async getOrderByNumber(orderNumber) {
       const { data, error } = await db.from("orders").select().eq("order_number", orderNumber).maybeSingle();
       if (error) fail("주문 조회", error);

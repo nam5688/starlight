@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { hideReportAction, restoreReportAction } from "@/app/my/actions";
 import { retryReceivedReportAction, retryReportAction } from "@/app/results/[id]/actions";
 import { ReceivedReports } from "@/components/results/received-reports";
 import { StateBadge } from "@/components/my/state-badge";
 import { formatDate, formatDateTime } from "@/components/ui/format";
+import { ChevronIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
+import { textLink } from "@/components/ui/styles";
 import { CONCERN_RECORDS } from "@/lib/config/product";
 import { topicLabel } from "@/lib/personalization/context";
 import type { MyConcernCard, MyReportCard } from "@/lib/services/my-service";
@@ -53,30 +56,40 @@ export function ConcernRow({ card }: { card: MyConcernCard }) {
   );
 }
 
-/** 리포트 한 건: 제목 · 상태(무료 / 구매 완료 / 생성 중) · 대상 · 날짜 · 고민 주제와, 상태에 맞는 버튼만 */
-export function ReportRow({ card, paymentsReady }: { card: MyReportCard; paymentsReady: boolean }) {
+/** 리포트 카드의 상태 표시 — 목록의 카드와 숨긴 리포트의 줄이 같은 모양을 쓴다 */
+function ReportStateBadges({ card }: { card: MyReportCard }) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {card.entitlement === "refunded" ? (
+        <StateBadge kind="refunded">환불됨</StateBadge>
+      ) : card.entitlement === "free" ? (
+        <StateBadge kind="free">무료 결과</StateBadge>
+      ) : (
+        <>
+          <StateBadge kind="paid">구매 완료</StateBadge>
+          {card.generation === "in-progress" && <StateBadge kind="generating">생성 중</StateBadge>}
+          {card.generation === "failed" && <StateBadge kind="failed">생성 실패</StateBadge>}
+          {card.generation === "ready" && <StateBadge kind="ready">열람 가능</StateBadge>}
+        </>
+      )}
+      {card.source === "dev-scoring" && <StatusBadge>개발용 결과</StatusBadge>}
+    </div>
+  );
+}
+
+/**
+ * 리포트 한 건: 제목 · 상태(무료 / 구매 완료 / 생성 중) · 대상 · 날짜 · 고민 주제와, 상태에 맞는 버튼만.
+ * hideAvailable이면 맨 아래에 "목록에서 숨기기"가 있다 — 이 목록에서만 접어 두는 것이고 결과 · 대화 · 구매 기록 · 질문권은 그대로다.
+ */
+export function ReportRow({ card, paymentsReady, hideAvailable = false }: { card: MyReportCard; paymentsReady: boolean; hideAvailable?: boolean }) {
   const href = `/results/${card.assessmentId}`;
   const small = "inline-flex h-10 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
   const primary = `${small} bg-accent text-white hover:bg-accent-strong`;
   const secondary = `${small} border border-line-strong bg-canvas text-ink hover:bg-mist`;
   return (
-    <li className="rounded-xl border border-line bg-canvas p-4">
+    <li className="rounded-xl border border-line bg-canvas p-4" data-testid="my-report">
       <p className="text-[16px] leading-snug font-bold">{card.productName}</p>
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        {card.entitlement === "refunded" ? (
-          <StateBadge kind="refunded">환불됨</StateBadge>
-        ) : card.entitlement === "free" ? (
-          <StateBadge kind="free">무료 결과</StateBadge>
-        ) : (
-          <>
-            <StateBadge kind="paid">구매 완료</StateBadge>
-            {card.generation === "in-progress" && <StateBadge kind="generating">생성 중</StateBadge>}
-            {card.generation === "failed" && <StateBadge kind="failed">생성 실패</StateBadge>}
-            {card.generation === "ready" && <StateBadge kind="ready">열람 가능</StateBadge>}
-          </>
-        )}
-        {card.source === "dev-scoring" && <StatusBadge>개발용 결과</StatusBadge>}
-      </div>
+      <ReportStateBadges card={card} />
       <p className="mt-2.5 text-[14px] leading-[1.6] text-ink-2">{card.subject}</p>
       <p className="mt-1 text-[13px] leading-[1.6] text-ink-3">
         생성일 {formatDate(card.createdAt)}
@@ -135,6 +148,63 @@ export function ReportRow({ card, paymentsReady }: { card: MyReportCard; payment
       {card.entitlement === "purchased" && card.generation === "failed" && (
         <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">결제는 정상 처리되었어요. 다시 결제하지 말고 ‘다시 생성’을 눌러 주세요.</p>
       )}
+      {hideAvailable && (
+        <form action={hideReportAction.bind(null, card.assessmentId)} className="mt-3 border-t border-line pt-1">
+          <button
+            type="submit"
+            aria-label={`${card.productName}, ${card.subject}, 내 리포트 목록에서 숨기기`}
+            className={`${textLink} inline-flex min-h-11 items-center text-[14px] font-semibold text-ink-3`}
+          >
+            목록에서 숨기기
+          </button>
+        </form>
+      )}
     </li>
+  );
+}
+
+/** 목록에서 숨긴 리포트 — 접어 두었다가 펼쳐 다시 보이게 한다. 열어 보는 링크는 그대로 있다(숨김은 열람 권한과 무관) */
+export function HiddenReports({ cards }: { cards: MyReportCard[] }) {
+  if (cards.length === 0) return null;
+  const touch = "inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
+  return (
+    <details data-fold className="group mt-4 rounded-xl border border-line bg-canvas" data-testid="my-hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+        <span className="text-[15px] font-semibold">숨긴 리포트 {cards.length}개</span>
+        <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-line px-4 py-4">
+        <p className="text-[13px] leading-[1.6] text-ink-3">
+          목록에서만 숨겨 둔 리포트예요. 삭제나 탈퇴가 아니라서 결과 · 대화 · 구매 기록 · 질문권은 그대로이고, 아래에서 언제든 다시 보이게 할 수 있어요.
+        </p>
+        <ul className="mt-3 space-y-3">
+          {cards.map((card) => (
+            <li key={card.assessmentId} className="rounded-xl border border-line bg-page p-4" data-testid="my-hidden-report">
+              <p className="text-[15px] leading-snug font-bold">{card.productName}</p>
+              <ReportStateBadges card={card} />
+              <p className="mt-2.5 text-[14px] leading-[1.6] text-ink-2">{card.subject}</p>
+              <p className="mt-1 text-[13px] leading-[1.6] text-ink-3">
+                생성일 {formatDate(card.createdAt)}
+                {card.paidOrderNumber ? ` · 주문번호 ${card.paidOrderNumber}` : ""}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href={`/results/${card.assessmentId}`} className={`${touch} border border-line-strong bg-canvas text-ink hover:bg-mist`}>
+                  {card.entitlement === "purchased" && card.generation === "ready" ? "구매한 리포트 보기" : "결과 보기"}
+                </Link>
+                <form action={restoreReportAction.bind(null, card.assessmentId)}>
+                  <button
+                    type="submit"
+                    aria-label={`${card.productName}, ${card.subject}, 목록에 다시 보이기`}
+                    className={`${touch} bg-accent text-white hover:bg-accent-strong`}
+                  >
+                    목록에 다시 보이기
+                  </button>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }

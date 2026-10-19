@@ -287,6 +287,17 @@ export interface MiyuRepository {
   countAssessmentsSince(userId: string, since: string): Promise<number>;
   getAssessment(id: string): Promise<AssessmentRecord | null>;
   listAssessments(userId: string): Promise<AssessmentRecord[]>;
+  /**
+   * MY 목록에서 숨긴 검사 결과 번호들 (MY 목록 표시에만 쓴다 — 결과 · 채팅 · 주문 · 열람 권한 · 구매 여부와 무관).
+   * 숨김 열이 아직 없으면(DB 변경 27번 전) null — 호출한 쪽이 숨기기 기능을 보이지 않고 모든 결과를 예전처럼 보인다.
+   */
+  listHiddenAssessmentIds(userId: string): Promise<string[] | null>;
+  /**
+   * 본인 검사 결과 하나를 MY 목록에서 숨기거나(hidden: true) 다시 보이게 한다(false). 같은 요청을 여러 번 보내도 결과가 같다.
+   * 회원번호와 검사 결과 번호의 짝이 맞지 않으면(남의 것 · 없는 것) 둘을 구분하지 않고 "not-found". 서비스가 먼저 소유자를 확인한 뒤에만 부른다.
+   * 숨김 열 · 함수가 없으면 오류(코드 42P01).
+   */
+  setAssessmentMyHidden(userId: string, assessmentId: string, hidden: boolean): Promise<"changed" | "unchanged" | "not-found">;
 
   getOrderByNumber(orderNumber: string): Promise<OrderRecord | null>;
   listOrdersForAssessment(assessmentId: string): Promise<OrderRecord[]>;

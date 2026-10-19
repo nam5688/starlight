@@ -8,7 +8,7 @@ import { setMarketingAction } from "@/app/my/actions";
 import { LoginOptions } from "@/components/auth/login-options";
 import { MyHeader, MyHubList, MyStatCards } from "@/components/my/my-hub";
 import { hubCards, hubItems } from "@/components/my/my-hub-data";
-import { ConcernRow, ReportRow } from "@/components/my/report-rows";
+import { ConcernRow, HiddenReports, ReportRow } from "@/components/my/report-rows";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDate } from "@/components/ui/format";
@@ -82,7 +82,7 @@ async function MyContent() {
   reconcileUserInBackground(member.userId);
 
   const repo = await readRepository();
-  const [{ cards, concerns, orders }, cash, savedChats, benefits, compats, pairs] = await Promise.all([
+  const [{ cards, hiddenCards, hideAvailable, concerns, orders }, cash, savedChats, benefits, compats, pairs] = await Promise.all([
     getMyPage(repo, member.userId),
     getCashView(repo, member.userId, 1),
     repo.countVisibleChatSummaries(member.userId).catch(() => 0),
@@ -91,11 +91,13 @@ async function MyContent() {
     listMyPairs(pairDeps(), member.userId).catch(() => []),
   ]);
   const paymentsReady = paymentConfig().ok;
-  const talkHref = cards[0] ? `/results/${cards[0].assessmentId}/talk` : null;
+  // 채팅방 바로가기는 숨긴 결과여도 끊기지 않게 한다(숨김은 목록 표시만 바꾼다)
+  const talkTarget = cards[0] ?? hiddenCards[0];
+  const talkHref = talkTarget ? `/results/${talkTarget.assessmentId}/talk` : null;
   return (
     <>
       <MyStatCards cards={hubCards(benefits, cash.ready ? cash.questions : 0)} />
-      <MyHubList items={hubItems(benefits, cards.length)} />
+      <MyHubList items={hubItems(benefits, cards.length + hiddenCards.length)} />
 
       <section aria-labelledby="my-list" className="mt-12 scroll-mt-20">
         <h2 id="my-list" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
@@ -103,14 +105,22 @@ async function MyContent() {
         </h2>
         <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">저장한 결과와 구매한 리포트를 저장된 그대로 다시 볼 수 있어요.</p>
         {cards.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-8 text-[15px] text-ink-2">아직 저장한 결과가 없어요.</p>
+          <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-8 text-[15px] text-ink-2">
+            {hiddenCards.length > 0 ? "목록에 보이는 리포트가 없어요. 아래 ‘숨긴 리포트’에서 다시 보이게 할 수 있어요." : "아직 저장한 결과가 없어요."}
+          </p>
         ) : (
           <ul className="mt-3 space-y-3">
             {cards.map((card) => (
-              <ReportRow key={card.assessmentId} card={card} paymentsReady={paymentsReady} />
+              <ReportRow key={card.assessmentId} card={card} paymentsReady={paymentsReady} hideAvailable={hideAvailable} />
             ))}
           </ul>
         )}
+        {hideAvailable && cards.length > 0 && (
+          <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">
+            ‘목록에서 숨기기’는 이 목록에서만 접어 둬요. 삭제나 탈퇴가 아니라서 결과 · 대화 · 구매 기록 · 질문권은 그대로이고, ‘숨긴 리포트’에서 다시 보이게 할 수 있어요.
+          </p>
+        )}
+        {hideAvailable && <HiddenReports cards={hiddenCards} />}
       </section>
 
       {compats.length > 0 && (
