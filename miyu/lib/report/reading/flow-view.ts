@@ -9,10 +9,11 @@ import type { Evidence } from "../evidence.ts";
 import type { FiveElement } from "../../saju/engine.ts";
 import { FORTUNE_WORDS, fortifyCandidatesOf } from "../../saju/interpret/fortune.ts";
 import { periodPlain } from "../../saju/interpret/period-plain.ts";
+import { FLOW_HIT_PX, FLOW_MIN_BAR_PCT } from "./flow-metrics.ts";
 import { isHourUnknown, softenMonths } from "./hour-text.ts";
 import type { IntegratedReadingReport, LuckSlot } from "./types.ts";
 
-export { isHourUnknown, softenMonths };
+export { FLOW_HIT_PX, FLOW_MIN_BAR_PCT, isHourUnknown, softenMonths };
 
 export type FlowKind = "past" | "now" | "year" | "next";
 
@@ -108,6 +109,8 @@ type Draft = {
   theme?: string;
   plain?: { meaning: string; example: string };
   short: string;
+  /** 글에 적힌 나이 구간(지나온 시기 칸) — 칸 정렬 기준 */
+  age?: { from: number; to: number };
   /** 축에 놓는 구간(연도, 소수 가능) */
   span?: { from: number; to: number };
   /** 풀이에 담을 글 조각 */
@@ -116,23 +119,36 @@ type Draft = {
 
 type Cl = { text: string; item: string | null };
 
-function evidenceWindows(evidence: Evidence[]) {
+type Win = { id: string; age: { from: number; to: number }; from: string; to: string };
+
+function evidenceWindows(evidence: Evidence[]): Win[] {
   return evidence
     .filter((e) => e.period && e.ageWindows && e.ageWindows.length === 1 && !e.uncertain)
     .map((e) => ({ id: e.id, age: e.ageWindows![0], from: e.period!.from, to: e.period!.to }));
 }
 
-/** 근거에서 센 출생 연도와의 차이(만 나이 + 이 값 = 연도) — 가장 많이 나온 값. 근거가 없으면 null */
-function birthOffsetOf(wins: ReturnType<typeof evidenceWindows>): number | null {
+/**
+ * 근거의 기간과 나이 범위가 서로 맞는가 — 대운 하나가 통째로(기간 10년 · 나이 범위 10년), 세운 하나가 통째로(기간 1년 · 나이 범위 0~1년).
+ * 프레임은 나이의 하한(예: 연애는 만 16세 이후)에 맞춰 나이 범위만 좁게 자를 수 있고 그때도 기간(period)은 대운 전체를 그대로 담는다 —
+ * 그런 근거의 기간을 그 나이 칸의 기간으로 쓰면 만 16세 하나가 10년으로 보인다. 맞지 않는 근거는 연도를 정하는 데 쓰지 않는다(배경 범위일 뿐).
+ */
+const periodMatchesAge = (w: Win) => Math.abs(ymNum(w.to) - ymNum(w.from) - (w.age.to - w.age.from)) <= 2.2;
+
+/**
+ * 출생 연도와의 차이(만 나이 + 이 값 = 그 무렵의 연도) — 기간과 나이가 맞는 근거에서만 센다. 안전하게 정할 수 없으면 null이라 나이 칸에 연도를 붙이지 않는다:
+ * ① 맞는 근거가 하나도 없다 ② 맞는 근거끼리 한 해보다 더 어긋난다 ③ 나이 범위만 잘린 근거의 나이가 그 근거의 기간 밖(± 한 해)으로 나온다.
+ */
+function safeBirthOffset(wins: Win[]): number | null {
+  const whole = wins.filter(periodMatchesAge);
+  if (whole.length === 0) return null;
+  const offs = whole.map((w) => yearOf(w.from) - w.age.from);
+  if (Math.max(...offs) - Math.min(...offs) > 1) return null;
   const counts = new Map<number, number>();
-  for (const w of wins) counts.set(yearOf(w.from) - w.age.from, (counts.get(yearOf(w.from) - w.age.from) ?? 0) + 1);
-  let best: number | null = null;
-  let bestN = 0;
-  for (const [k, n] of counts) {
-    if (n > bestN) {
-      best = k;
-      bestN = n;
-    }
+  for (const o of offs) counts.set(o, (counts.get(o) ?? 0) + 1);
+  let best = offs[0];
+  for (const [o, n] of counts) if (n > (counts.get(best) ?? 0) || (n === counts.get(best) && o < best)) best = o;
+  for (const w of wins.filter((x) => !periodMatchesAge(x))) {
+    if (best + w.age.from < yearOf(w.from) - 1 || best + w.age.to > yearOf(w.to) + 1) return null;
   }
   return best;
 }
@@ -144,7 +160,7 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
   const hourUnknown = isHourUnknown(report);
   const evidence = report.generated?.evidence ?? [];
   const wins = evidenceWindows(evidence);
-  const offset = birthOffsetOf(wins);
+  const offset = safeBirthOffset(wins);
 
   const slot = (role: LuckSlot["role"]): Slot => report.timeline.find((s) => s.role === role);
   const cur = slot("current");
@@ -163,7 +179,7 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
   };
 
   // 코드가 계산한 시기 — 글에 문장이 없어도 칸은 있다
-  const ageOfSlot = (s: LuckSlot) => wins.find((w) => Math.abs(yearOf(w.from) - yearOf(s.from)) <= 1 && w.age.to - w.age.from >= 5)?.age ?? null;
+  const ageOfSlot = (s: LuckSlot) => wins.find((w) => periodMatchesAge(w) && Math.abs(yearOf(w.from) - yearOf(s.from)) <= 1 && w.age.to - w.age.from >= 5)?.age ?? null;
   const slotAge = (s: LuckSlot) => {
     const a = ageOfSlot(s);
     return a ? ` · ${ageLabel(a.from, a.to)}` : "";
@@ -184,14 +200,8 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
   const nextFrom = next ? yearOf(next.from) : null;
   const near = (a: number, b: number | null) => b !== null && Math.abs(a - b) <= 1;
 
-  /** 나이 구간을 연도 구간으로 — 근거의 시기와 같은 나이 구간이면 그 기간, 아니면 출생 연도 차이로 어림. 둘 다 없으면 null */
+  /** 나이 구간을 연도 구간으로 — 안전하게 정한 출생 연도 차이로만 어림한다(근거의 기간을 그대로 옮기지 않는다). 정할 수 없으면 null */
   const windowSpan = (a: number, b: number): { from: number; to: number } | null => {
-    const hit = wins.find((w) => w.age.from === a && w.age.to === b);
-    if (hit) {
-      const from = hourUnknown ? yearOf(hit.from) : ymNum(hit.from);
-      const to = hourUnknown ? yearOf(hit.to) : ymNum(hit.to);
-      return { from, to: Math.max(to, from + 1) };
-    }
     if (offset === null) return null;
     return { from: offset + a, to: offset + (b > a ? b : a + 1) };
   };
@@ -255,11 +265,11 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
   const ensurePast = (a: number, b: number, sp: { from: number; to: number } | null): string => {
     const key = `age-${a}-${b}`;
     if (!drafts.has(key)) {
-      const matchesPrev = prev && sp && Math.abs(Math.floor(sp.from) - yearOf(prev.from)) <= 1 && b - a >= 5;
+      // 부제(핵심 주제)는 이 나이 구간이 계산된 이전 큰 시기(대운) 하나와 나이 · 연도로 맞아떨어질 때만 그 시기의 이름을 쓴다
+      const matchesPrev = prev && sp && b - a >= 5 && Math.abs(sp.from - yearOf(prev.from)) <= 1 && Math.abs(sp.to - yearOf(prev.to)) <= 1.5;
       const p = matchesPrev ? periodPlain(prev.stemGroup, prev.branchGroup) : null;
-      const mark = hourUnknown ? "무렵" : "쯤";
-      const cap = sp ? `${Math.round(sp.from)}년 ${mark}${sp.to - sp.from >= 2 ? ` ~ ${Math.round(sp.to)}년 ${mark}` : ""}` : "지나온 시기";
-      add({ key, kind: "past", title: ageLabel(a, b), captionBase: cap, ...(p ? { theme: p.title } : {}), short: ageShort(a, b), ...(sp ? { span: sp } : {}), texts: [] });
+      const cap = sp ? `${Math.round(sp.from)}년 무렵${sp.to - sp.from >= 2 ? ` ~ ${Math.round(sp.to)}년 무렵` : ""}` : "나이로만 읽은 지나온 시기";
+      add({ key, kind: "past", title: ageLabel(a, b), captionBase: cap, ...(p ? { theme: p.title } : {}), short: ageShort(a, b), age: { from: a, to: b }, ...(sp ? { span: sp } : {}), texts: [] });
     }
     return key;
   };
@@ -311,7 +321,37 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
     }
   }
 
-  const items: FlowItem[] = order
+  // 칸이 코드가 만든 것뿐이고 글에서 나뉜 문장이 하나도 없으면 — 나눌 표지가 없는 글이라 예전 모양으로
+  const anyText = [...drafts.values()].some((d) => d.texts.length > 0);
+  if (!anyText && !fortifyParas) return null;
+  if (drafts.size === 0) return null;
+
+  // 정렬: 시간 순서(지나온 → 지금 → 가까운 해 → 다음). 지나온 칸끼리는 나이 구간(시작 나이 → 끝 나이)순 — 연도 위치가 아니라 글에 적힌 나이가 기준이다
+  const rank = (d: Draft) => (d.kind === "past" ? 0 : d.kind === "now" ? 1 : d.kind === "year" ? 2 : 3);
+  const seq = new Map(order.map((k, i) => [k, i]));
+  const sortedKeys = [...order].sort((x, y) => {
+    const a = drafts.get(x)!;
+    const b = drafts.get(y)!;
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    if (a.age && b.age) return a.age.from - b.age.from || a.age.to - b.age.to;
+    return (a.span?.from ?? 0) - (b.span?.from ?? 0) || seq.get(x)! - seq.get(y)!;
+  });
+
+  // 같은 부제(시기 이름)를 다른 시기 칸에서 되풀이하지 않는다 — 인접한 큰 시기의 천간 · 지지 그룹이 같으면 계산된 이름도 같아지는데, 그대로 두면 한 시기의 설명이 다른 시기에 복사된 것처럼 보인다.
+  // 지금 칸을 기준으로 두고 나머지(지나온 · 다음)는 이미 나온 이름이면 부제와 쉬운 말 설명을 뺀다(글 문장은 그대로).
+  const seenThemes = new Set<string>();
+  const nowDraft = drafts.get("now");
+  if (nowDraft?.theme) seenThemes.add(nowDraft.theme);
+  for (const k of sortedKeys) {
+    const d = drafts.get(k)!;
+    if (d.kind === "now" || d.kind === "year" || !d.theme) continue;
+    if (seenThemes.has(d.theme)) {
+      delete d.theme;
+      delete d.plain;
+    } else seenThemes.add(d.theme);
+  }
+
+  const sortedItems: FlowItem[] = sortedKeys
     .map((k) => drafts.get(k)!)
     .map((d) => ({
       key: d.key,
@@ -323,21 +363,6 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
       ...(d.plain ? { plain: d.plain } : {}),
       short: d.short,
     }));
-
-  // 칸이 코드가 만든 것뿐이고 글에서 나뉜 문장이 하나도 없으면 — 나눌 표지가 없는 글이라 예전 모양으로
-  const anyText = [...drafts.values()].some((d) => d.texts.length > 0);
-  if (!anyText && !fortifyParas) return null;
-  if (drafts.size === 0) return null;
-
-  // 정렬: 시간 순서(지나온 → 지금 → 가까운 해 → 다음). 지나온 칸끼리는 시작 나이순
-  const rank = (d: Draft) => (d.kind === "past" ? 0 : d.kind === "now" ? 1 : d.kind === "year" ? 2 : 3);
-  const sortedKeys = [...order].sort((x, y) => {
-    const a = drafts.get(x)!;
-    const b = drafts.get(y)!;
-    return rank(a) - rank(b) || (a.span?.from ?? 0) - (b.span?.from ?? 0);
-  });
-  const byKey = new Map(items.map((i) => [i.key, i]));
-  const sortedItems = sortedKeys.map((k) => byKey.get(k)!);
 
   const axis = buildAxis(
     sortedKeys.map((k) => drafts.get(k)!),
@@ -354,7 +379,7 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
 
 // ───────────── 시간축 ─────────────
 
-const MIN_BAR = 13; // 막대 최소 너비(%) — 좁은 화면(약 340px)에서 손가락으로 누를 수 있는 폭(약 44px)
+const MIN_BAR = FLOW_MIN_BAR_PCT;
 
 function buildAxis(drafts: Draft[], reference: { year: number; month: number }): FlowAxis | null {
   const placed = drafts.filter((d) => d.span);

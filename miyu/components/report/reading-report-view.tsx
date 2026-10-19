@@ -447,7 +447,7 @@ function FlowArticle({ report, id, story, hideLabel = false }: { report: Integra
               <Paragraphs items={flowView.rest} />
             </div>
           )}
-          <CaveatNote text={report.flow.caveat} />
+          {/* 6번 장 본문에는 고정 안내(report.flow.caveat — 저장된 값은 그대로)를 다시 붙이지 않는다: 같은 뜻의 일반 서비스 안내가 페이지 하단에 이미 있고 운영자가 이 자리의 반복 문구 삭제를 요청했다 */}
         </>
       ) : (
         <>

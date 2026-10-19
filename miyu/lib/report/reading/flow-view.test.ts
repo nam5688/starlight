@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Evidence } from "../evidence.ts";
-import { buildFlowView, isHourUnknown, softenMonths, splitClauses, splitSentences } from "./flow-view.ts";
+import { readFileSync } from "node:fs";
+import { buildFlowView, FLOW_HIT_PX, FLOW_MIN_BAR_PCT, isHourUnknown, softenMonths, splitClauses, splitSentences } from "./flow-view.ts";
 import type { IntegratedReadingReport, LuckSlot } from "./types.ts";
 
 // 6번 장(앞으로의 운과 변화) 표시 계층 시험 — 저장된 글은 그대로이고 칸 · 시간축 · 개운 카드만 입력 값에서 만들어지는지 본다.
@@ -149,7 +150,7 @@ test("시간축 — 모든 칸이 막대로 놓이고, 같은 줄에서 겹치�
   assert.equal(axis.bars.length, v.items.length, "칸마다 막대가 하나다");
   for (const b of axis.bars) {
     assert.ok(b.left >= 0 && b.left + b.width <= 100.0001, `${b.key} 막대가 축 안에 있다`);
-    assert.ok(b.width >= 13 - 1e-9, "손가락으로 누를 수 있는 최소 너비");
+    assert.ok(b.width >= FLOW_MIN_BAR_PCT - 1e-9, "손가락으로 누를 수 있는 최소 너비");
   }
   for (const lane of new Set(axis.bars.map((b) => b.lane))) {
     const row = axis.bars.filter((b) => b.lane === lane).sort((a, b) => a.left - b.left);
@@ -262,4 +263,90 @@ test("문장 · 쉼표 나누기", () => {
   assert.deepEqual(splitSentences("첫째예요. 둘째예요! 셋째예요?"), ["첫째예요.", "둘째예요!", "셋째예요?"]);
   assert.deepEqual(splitClauses("만 16세 무렵에는 관계가 달라지고, 만 16~26세 무렵에는 배워요."), ["만 16세 무렵에는 관계가 달라지고", "만 16~26세 무렵에는 배워요."]);
   assert.deepEqual(splitClauses("책임과 평가가 커지고, 주변이 달라져요."), ["책임과 평가가 커지고, 주변이 달라져요."], "시기 표지가 아닌 쉼표에서는 나누지 않는다");
+});
+
+test("막대의 눌리는 영역: 보이는 막대(30px)와 별개로 가로 · 세로 44px 이상 — 줄 간격이 곧 눌리는 높이이고 최소 너비는 가장 좁은 화면에서도 44px 이상", () => {
+  assert.equal(FLOW_HIT_PX, 44);
+  // 가장 좁은 화면(폭 320px − 쪽 여백 40px − 카드 안쪽 여백 24px = 막대 영역 256px)에서도 막대 최소 너비가 44px 이상이다
+  assert.ok((256 * FLOW_MIN_BAR_PCT) / 100 >= 44, `최소 너비 ${FLOW_MIN_BAR_PCT}%는 256px 영역에서 ${(256 * FLOW_MIN_BAR_PCT) / 100}px`);
+  const src = readFileSync(new URL("../../../components/report/flow-timeline.tsx", import.meta.url), "utf8");
+  assert.match(src, /const LANE = FLOW_HIT_PX;/, "줄 높이 = 눌리는 높이");
+  assert.match(src, /before:h-11/, "버튼의 눌리는 영역(의사요소)이 높이 44px");
+  assert.match(src, /before:w-\[max\(calc\(100%\+4px\),44px\)\]/, "눌리는 영역의 너비는 막대(테두리 1~2px까지 포함해 덮도록 안쪽 너비 + 4px)와 44px 중 큰 쪽");
+  const barButton = src.slice(src.indexOf("<button"), src.indexOf("</button>"));
+  assert.ok(!/overflow-hidden/.test(barButton.split("<span")[0]), "버튼 자체에 overflow-hidden이 없다(있으면 바깥으로 넓힌 눌리는 영역이 잘린다) — 글자 말줄임은 안쪽 span이 한다");
+});
+
+// ───── 나이 칸의 연도: 나이 하한에 맞춰 나이만 잘린 근거의 넓은 기간을 그 나이 칸의 기간으로 옮기지 않는다 ─────
+// 프레임은 나이의 하한(연애 만 16세 이후 등)에 맞춰 ageWindows만 좁게 자르고 period는 대운 전체를 그대로 담는다 — 만 16세 단일 칸이 10년으로 보이던 문제의 회귀 시험.
+
+const CLIPPED_PAST = "지나온 시기를 돌아보면 만 7~16세 무렵에는 또래와 견주는 주제가 두드러졌을 수 있어요. 만 16세 무렵에는 관계가 달라지는 주제가 있었을 가능성이 있고, 만 16~26세 무렵에는 배우며 준비하는 시기였을 수 있어요.";
+const clippedEvidence = (): Evidence[] => [
+  timingEvidence("saju.frame.L6.clip", "2002-12", "2012-11", 16, 16), // 대운 전체(2002.12~2012.11)가 period인데 나이 범위는 하한 16세로 잘려 {16,16}
+  timingEvidence("saju.frame.R3.whole", "2012-12", "2022-11", 16, 26),
+  timingEvidence("saju.frame.W8.cur", "2022-12", "2032-11", 26, 36),
+  timingEvidence("saju.frame.L6.nxt", "2032-12", "2042-11", 36, 46),
+  fortifyEvidence(TIE_FACT),
+];
+
+test("만 16세 단일 칸은 근거의 넓은 기간(10년)이 아니라 그 나이 한 해로 놓이고, 7~16세 칸보다 뒤에 나온다", () => {
+  const v = view({ evidence: clippedEvidence(), paragraphs: [CLIPPED_PAST, NOW, NEXT, FORT_A, FORT_B] });
+  const keys = v.items.filter((i) => i.kind === "past").map((i) => i.key);
+  assert.deepEqual(keys, ["age-7-16", "age-16-16", "age-16-26"], "나이순: 7~16 → 16 → 16~26");
+  const by = Object.fromEntries(v.items.map((i) => [i.key, i]));
+  assert.equal(by["age-16-16"].caption, "2012년 무렵", "16세는 그 나이의 한 해(무렵) — 2002~2012가 아니다");
+  assert.equal(by["age-7-16"].caption, "2003년 무렵 ~ 2012년 무렵");
+  assert.equal(by["age-16-26"].caption, "2012년 무렵 ~ 2022년 무렵");
+  assert.ok(!JSON.stringify(v).includes("2002"), "잘린 근거의 기간 시작(2002)이 어느 칸에도 붙지 않는다");
+  // 시간축: 16세 막대는 7~16세 막대의 끝 이후에 놓인다(한 해 폭 + 최소 눌림 폭)
+  const bar = (k: string) => v.axis!.bars.find((b) => b.key === k)!;
+  assert.ok(bar("age-7-16").left < bar("age-16-16").left, "7~16세 막대가 16세 막대보다 앞");
+  assert.ok(bar("age-16-16").left >= bar("age-7-16").left + 0.1);
+});
+
+test("글의 순서가 뒤바뀌어도 지나온 칸은 나이 구간 순서(시작 → 끝)로 정렬된다", () => {
+  const swapped = "만 16~26세 무렵에는 배우며 준비하는 시기였을 수 있어요. 만 16세 무렵에는 관계가 달라지는 주제가 있었을 가능성이 있어요. 만 7~16세 무렵에는 또래와 견주는 주제가 두드러졌을 수 있어요.";
+  const v = view({ evidence: clippedEvidence(), paragraphs: [swapped, NOW, NEXT, FORT_A, FORT_B] });
+  assert.deepEqual(v.items.filter((i) => i.kind === "past").map((i) => i.key), ["age-7-16", "age-16-16", "age-16-26"]);
+});
+
+test("연도를 안전하게 정할 수 없으면 나이 칸에 연도를 붙이지 않고 나이별 칸으로만 둔다(막대 없음)", () => {
+  const cases: { name: string; evidence: Evidence[] }[] = [
+    { name: "기간과 나이가 맞는 근거가 하나도 없음(잘린 근거뿐)", evidence: [timingEvidence("saju.frame.L6.clip", "2002-12", "2012-11", 16, 16), fortifyEvidence(TIE_FACT)] },
+    { name: "맞는 근거끼리 한 해보다 더 어긋남", evidence: [timingEvidence("a", "2012-12", "2022-11", 16, 26), timingEvidence("b", "2022-12", "2032-11", 24, 34), fortifyEvidence(TIE_FACT)] },
+    { name: "잘린 근거의 나이가 그 근거의 기간 밖으로 나옴(출생 연도 어림이 앞뒤가 맞지 않음)", evidence: [timingEvidence("a", "2012-12", "2022-11", 16, 26), timingEvidence("b", "2022-12", "2032-11", 26, 36), timingEvidence("clip", "2002-12", "2012-11", 24, 24), fortifyEvidence(TIE_FACT)] },
+  ];
+  for (const c of cases) {
+    const v = view({ evidence: c.evidence, paragraphs: [CLIPPED_PAST, NOW, NEXT, FORT_A, FORT_B] });
+    const past = v.items.filter((i) => i.kind === "past");
+    assert.deepEqual(past.map((i) => i.key), ["age-7-16", "age-16-16", "age-16-26"], `${c.name}: 나이 칸은 그대로`);
+    for (const i of past) assert.ok(!/\d{4}년/.test(i.caption), `${c.name}: ${i.title}에 연도가 없다 (${i.caption})`);
+    assert.ok(!v.axis!.bars.some((b) => b.kind === "past"), `${c.name}: 지나온 칸의 막대가 없다`);
+    // 지금 · 가까운 해 · 다음 큰 시기는 코드가 계산한 값이라 그대로 놓인다
+    assert.ok(v.axis!.bars.some((b) => b.key === "now") && v.axis!.bars.some((b) => b.key === "next"), `${c.name}: 지금 · 다음 막대는 있다`);
+  }
+});
+
+test("같은 부제(시기 이름)가 다른 시기 칸에 복사되지 않는다 — 인접한 대운의 천간 · 지지 그룹이 같으면 지금 칸에만 남긴다", () => {
+  const same = view({
+    evidence: clippedEvidence(),
+    paragraphs: [CLIPPED_PAST, NOW, NEXT, FORT_A, FORT_B],
+    timeline: [slot("previous", "2012-12", "2022-11", "인성", "식상"), slot("current", "2022-12", "2032-11", "인성", "식상"), slot("next", "2032-12", "2042-11", "인성", "식상")],
+  });
+  const themeOf = (v: ReturnType<typeof view>, key: string) => v.items.find((i) => i.key === key)?.theme;
+  assert.ok(themeOf(same, "now"), "지금 칸은 부제를 가진다");
+  assert.equal(themeOf(same, "age-16-26"), undefined, "이전 대운과 지금 대운의 이름이 같으면 이전 칸의 부제를 빼 복사된 것처럼 보이지 않게 한다");
+  assert.equal(themeOf(same, "next"), undefined);
+  assert.equal(same.items.find((i) => i.key === "next")?.plain, undefined, "같은 이름이면 쉬운 말 설명도 되풀이하지 않는다");
+  assert.match(same.items.find((i) => i.key === "age-16-26")!.text, /배우며 준비하는 시기/, "글의 문장은 그대로");
+  // 그룹이 다르면 각자 자기 시기의 이름을 가진다(이전 대운과 나이 · 연도가 맞는 칸에만)
+  const diff = view({
+    evidence: clippedEvidence(),
+    paragraphs: [CLIPPED_PAST, NOW, NEXT, FORT_A, FORT_B],
+    timeline: [slot("previous", "2012-12", "2022-11", "관성", "재성"), slot("current", "2022-12", "2032-11", "식상", "인성"), slot("next", "2032-12", "2042-11", "비겁", "비겁")],
+  });
+  const names = ["age-16-26", "now", "next"].map((k) => themeOf(diff, k));
+  assert.ok(names.every(Boolean) && new Set(names).size === 3, `세 칸이 서로 다른 이름: ${names.join(" / ")}`);
+  assert.equal(themeOf(diff, "age-7-16"), undefined, "이전 대운과 맞지 않는 나이 칸(7~16)에는 부제가 없다");
+  assert.equal(themeOf(diff, "age-16-16"), undefined);
 });

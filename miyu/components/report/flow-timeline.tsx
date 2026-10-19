@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronIcon } from "@/components/ui/icons";
 import type { FlowBar, FlowItem, FlowView } from "@/lib/report/reading/flow-view";
+import { FLOW_HIT_PX } from "@/lib/report/reading/flow-metrics";
 import { Prose } from "./reading-parts";
 
 // 6번 장 "앞으로의 운과 변화"의 시기별 칸 + 시간축 그래프. 값은 모두 서버가 저장된 리포트에서 계산해 넘긴다(lib/report/reading/flow-view.ts) —
@@ -12,7 +13,8 @@ import { Prose } from "./reading-parts";
 
 type Data = Pick<FlowView, "hourUnknown" | "items" | "notes" | "axis">;
 
-const LANE = 36; // 줄 하나의 높이(px) — 막대 30px + 간격
+const BAR_H = 30; // 눈에 보이는 막대 높이(px)
+const LANE = FLOW_HIT_PX; // 줄 하나의 높이(px) — 눌리는 영역의 높이와 같아 위아래 줄의 눌리는 영역이 겹치지 않는다(막대는 줄 가운데에 놓인다)
 
 const BAR_STYLE: Record<FlowBar["kind"], string> = {
   past: "border border-line-strong bg-mist text-ink-2",
@@ -28,7 +30,7 @@ const GROUPS: { id: string; title: string; kinds: FlowItem["kind"][] }[] = [
 ];
 
 export function FlowTimeline({ view, idPrefix }: { view: Data; idPrefix: string }) {
-  const { items, axis, notes, hourUnknown } = view;
+  const { items, axis, notes } = view;
   const root = useRef<HTMLDivElement>(null);
   const barRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [open, setOpen] = useState<Set<string>>(() => new Set());
@@ -77,10 +79,7 @@ export function FlowTimeline({ view, idPrefix }: { view: Data; idPrefix: string 
 
   return (
     <div ref={root} className="mt-5">
-      <p className="text-[13px] leading-[1.6] text-ink-3">
-        막대나 아래 칸을 누르면 풀이가 열려요. 막대의 위치와 길이는 기간을 보여 줄 뿐 좋고 나쁨이 아니에요.
-        {hourUnknown ? " 출생 시각을 몰라 해는 “무렵”으로만 보여요." : ""}
-      </p>
+      <p className="text-[13px] leading-[1.6] text-ink-3">막대나 아래 칸을 누르면 풀이가 열려요.</p>
 
       {axis && (
         <div className="mt-3 rounded-xl bg-canvas px-3 pt-3 pb-2 shadow-soft md:px-4" role="group" aria-label="시기 타임라인 — 막대를 누르면 해당 풀이가 열려요">
@@ -105,10 +104,10 @@ export function FlowTimeline({ view, idPrefix }: { view: Data; idPrefix: string 
                     aria-controls={cardId(b.key)}
                     aria-label={b.label}
                     title={b.label}
-                    className={`absolute inline-flex h-[30px] items-center justify-center overflow-hidden rounded-md px-1 text-[12px] font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong ${BAR_STYLE[b.kind]} ${isOpen ? "ring-2 ring-accent-strong ring-offset-1" : ""}`}
-                    style={{ left: `${b.left}%`, width: `${b.width}%`, top: b.lane * LANE }}
+                    className={`absolute inline-flex h-[30px] items-center justify-center rounded-md px-1 text-[12px] font-semibold whitespace-nowrap before:absolute before:top-1/2 before:left-1/2 before:h-11 before:w-[max(calc(100%+4px),44px)] before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong ${BAR_STYLE[b.kind]} ${isOpen ? "ring-2 ring-accent-strong ring-offset-1" : ""}`}
+                    style={{ left: `${b.left}%`, width: `${b.width}%`, top: b.lane * LANE + (LANE - BAR_H) / 2 }}
                   >
-                    {b.short}
+                    <span className="block max-w-full overflow-hidden text-ellipsis">{b.short}</span>
                   </button>
                 );
               })}
