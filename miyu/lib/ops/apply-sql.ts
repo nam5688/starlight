@@ -163,3 +163,104 @@ commit;
 ${checkSql.trimEnd()}
 `;
 }
+
+/**
+ * **DB 변경 25번(후기)만** 적용하는 파일 — 테스트 전용 Supabase 프로젝트처럼 19~22번(혜택)이 없는 DB에도 쓸 수 있다.
+ * 25번은 후기 표 3개 · 함수 · 탈퇴 트리거 · funnel_events 이름 검사만 더하고 19~22번의 표를 직접 쓰지 않는다(보상 지급은 서버가 혜택 설정이 켜졌을 때만 한다).
+ * 마이그레이션 내용은 한 글자도 고치지 않고 이어 붙이고, 시작 조건 확인 · 끝 확인(아니면 전체 취소) · 하나의 트랜잭션 · 마지막 읽기 전용 확인 조회를 더한다.
+ * 이 함수는 문자열만 다룬다(파일을 읽고 쓰는 것은 scripts/render-apply-sql.ts --reviews).
+ */
+export function buildReviewsApplySql(opts: { migration: MigrationFile; postSql: string }): string {
+  const { migration, postSql } = opts;
+  const NAMES = "'visit', 'analyze_start', 'analyze_complete', 'preview_view', 'report_view', 'review_section_view', 'review_all_click'";
+  return `-- ME:U(미유) DB 변경 25번(후기) 단독 적용 파일 — SQL Editor에서 한 번 실행한다
+--
+-- 이 파일은 supabase/migrations/${migration.name}을 한 글자도 고치지 않고 가운데에 붙인 것이다.
+-- (scripts/render-apply-sql.ts --reviews 가 만든다 — 직접 고치지 않는다. 내용이 바뀌면 서버 테스트가 알려 준다.)
+--
+-- ⚠️ 테스트 전용 프로젝트(wdvrwwajakjdfrajgxcm)에 적용하기 위한 파일이다. 운영 DB에는 운영자가 따로 승인하기 전에는 실행하지 않는다.
+--
+-- 사용 순서
+--  1) supabase/review-25-precheck.sql을 먼저 실행해 "종합"이 OK인지 확인한다(읽기 전용).
+--  2) 이 파일을 SQL Editor에 모두 붙여넣고 Run (한 번만).
+--  3) supabase/review-25-postcheck.sql을 실행해 "종합"이 OK인지 확인한다(읽기 전용). 이 파일 끝의 확인 조회와 같은 것이다.
+--
+-- 안전장치
+--  - 시작 조건: 필요한 표 · 열 · 역할이 있고, 25번이 만드는 것이 하나도 없으며, funnel_events의 기존 이름이 새 허용 목록 안에 있어야 한다.
+--    아니면 아무것도 바꾸지 않고 "시작 조건 불충족"으로 멈춘다(이미 한 번 실행한 뒤 다시 실행해도 여기서 멈춘다 — 문제가 아니다).
+--  - 전체가 하나의 트랜잭션이다. 끝 확인(표 · 권한 · 정책 · 함수 · 트리거 · 이름 검사)이 하나라도 어긋나면 이 파일이 한 일이 모두 취소된다.
+--  - 기존 회원 · 검사 · 주문 · 결제 · 리포트 · 방문 단계 데이터는 지우거나 고치지 않는다. 바뀌는 기존 항목은 funnel_events의 이름 검사 하나뿐이다(허용 이름 5개 → 7개).
+--  - 이 파일을 적용하는 것만으로는 아무 후기도 만들어지지 않고 질문권이 지급되지 않는다(보상은 혜택 설정 feature.review_reward가 꺼져 있는 동안 지급하지 않는다).
+--
+-- Supabase가 "위험한 작업이 포함되어 있다"는 확인 창을 보여 주면: funnel_events의 제약 조건 교체(허용값을 넓히는 변경) 때문이다. 기존 데이터를 지우지 않으므로 실행해도 된다.
+
+begin;
+
+do $check$
+declare
+  problems text[] := '{}';
+  bad_names text;
+begin
+  if to_regclass('public.profiles') is null then problems := problems || '표 profiles(1~3번)'::text; end if;
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'withdrawn_at') then problems := problems || '프로필의 withdrawn_at 열(10번)'::text; end if;
+  if to_regclass('public.funnel_events') is null then problems := problems || '표 funnel_events(8번)'::text; end if;
+  if to_regclass('auth.users') is null then problems := problems || '표 auth.users(Supabase Auth)'::text; end if;
+  if (select count(*) from pg_roles where rolname in ('service_role', 'authenticated', 'anon')) <> 3 then problems := problems || '역할 service_role · authenticated · anon'::text; end if;
+  if cardinality(problems) > 0 then
+    raise exception '시작 조건 불충족 — 필요한 것이 없습니다: %. 아무것도 바꾸지 않았습니다. 이 파일을 실행하지 말고 review-25-precheck.sql 결과를 알려 주세요.', array_to_string(problems, ' / ');
+  end if;
+
+  if to_regclass('public.reviews') is not null then problems := problems || '표 reviews'::text; end if;
+  if to_regclass('public.review_admin_log') is not null then problems := problems || '표 review_admin_log'::text; end if;
+  if to_regclass('public.review_reports') is not null then problems := problems || '표 review_reports'::text; end if;
+  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('submit_review_report', 'review_admin_apply', 'reviews_on_withdraw', 'reviews_touch')) then problems := problems || '후기 함수'::text; end if;
+  if exists (select 1 from pg_trigger where tgname = 'profiles_reviews_withdraw' and not tgisinternal) then problems := problems || '트리거 profiles_reviews_withdraw'::text; end if;
+  if cardinality(problems) > 0 then
+    raise exception '시작 조건 불충족 — 25번이 만드는 것이 이미 있습니다: %. 아무것도 바꾸지 않았습니다. 이 파일을 다시 실행하지 말고 review-25-precheck.sql 결과를 알려 주세요.', array_to_string(problems, ' / ');
+  end if;
+
+  select string_agg(distinct name, ', ' order by name) into bad_names from public.funnel_events where name not in (${NAMES});
+  if bad_names is not null then
+    raise exception '시작 조건 불충족 — funnel_events에 새 허용 목록 밖의 이름이 있습니다: %. 25번의 이름 검사를 바꿀 수 없어 아무것도 바꾸지 않았습니다. 결과를 알려 주세요.', bad_names;
+  end if;
+end
+$check$;
+
+-- ═════════════════════════════════════════════════════════════════
+-- 25번: ${migration.name}   (아래는 supabase/migrations 파일 내용 그대로)
+-- ═════════════════════════════════════════════════════════════════
+${migration.sql.trimEnd()}
+
+-- ═════════════════════════════════════════════════════════════════
+-- 끝 확인 — 하나라도 어긋나면 위의 모든 변경이 취소된다
+-- ═════════════════════════════════════════════════════════════════
+do $verify$
+declare
+  def text;
+begin
+  if to_regclass('public.reviews') is null or to_regclass('public.review_admin_log') is null or to_regclass('public.review_reports') is null then raise exception '끝 확인 실패 — 후기 표가 없습니다'; end if;
+  if (select count(*) from pg_class where oid in (to_regclass('public.reviews'), to_regclass('public.review_admin_log'), to_regclass('public.review_reports')) and relrowsecurity) <> 3 then raise exception '끝 확인 실패 — 행 단위 접근 제한(RLS)이 모두 켜지지 않았습니다'; end if;
+  if (select count(*) from pg_policies where schemaname = 'public' and tablename = 'reviews') <> 1 or (select count(*) from pg_policies where schemaname = 'public' and tablename in ('review_admin_log', 'review_reports')) <> 0 then raise exception '끝 확인 실패 — 정책이 예상과 다릅니다'; end if;
+  if has_table_privilege('anon', 'public.reviews', 'select') or has_table_privilege('anon', 'public.review_admin_log', 'select') or has_table_privilege('anon', 'public.review_reports', 'select') then raise exception '끝 확인 실패 — anon이 후기 표를 읽을 수 있습니다'; end if;
+  if not has_table_privilege('authenticated', 'public.reviews', 'select') or has_table_privilege('authenticated', 'public.reviews', 'insert') or has_table_privilege('authenticated', 'public.reviews', 'update') or has_table_privilege('authenticated', 'public.reviews', 'delete') or has_table_privilege('authenticated', 'public.review_admin_log', 'select') or has_table_privilege('authenticated', 'public.review_reports', 'select') then raise exception '끝 확인 실패 — authenticated 권한이 예상과 다릅니다'; end if;
+  if not (has_table_privilege('service_role', 'public.reviews', 'insert') and has_table_privilege('service_role', 'public.review_admin_log', 'insert') and has_table_privilege('service_role', 'public.review_reports', 'update')) then raise exception '끝 확인 실패 — service_role 권한이 부족합니다'; end if;
+  if not (has_function_privilege('service_role', 'public.submit_review_report(uuid,text,text)', 'execute') and has_function_privilege('service_role', 'public.review_admin_apply(uuid,text,text,text,uuid)', 'execute'))
+     or has_function_privilege('anon', 'public.submit_review_report(uuid,text,text)', 'execute') or has_function_privilege('authenticated', 'public.submit_review_report(uuid,text,text)', 'execute')
+     or has_function_privilege('anon', 'public.review_admin_apply(uuid,text,text,text,uuid)', 'execute') or has_function_privilege('authenticated', 'public.review_admin_apply(uuid,text,text,text,uuid)', 'execute') then
+    raise exception '끝 확인 실패 — 함수 실행 권한이 예상과 다릅니다';
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'profiles_reviews_withdraw' and not tgisinternal) then raise exception '끝 확인 실패 — 탈퇴 트리거가 없습니다'; end if;
+  select pg_get_constraintdef(oid) into def from pg_constraint where conrelid = to_regclass('public.funnel_events') and conname = 'funnel_events_name_check';
+  if def is null or def not like '%review_section_view%' or def not like '%review_all_click%' then raise exception '끝 확인 실패 — 방문 단계 이름 검사가 바뀌지 않았습니다'; end if;
+  if (select count(*) from public.reviews) <> 0 then raise exception '끝 확인 실패 — 후기가 만들어졌습니다'; end if;
+end
+$verify$;
+
+commit;
+
+-- ═════════════════════════════════════════════════════════════════
+-- 확인: 25번 적용 결과 (읽기 전용 — supabase/review-25-postcheck.sql과 같다. 아무것도 바꾸지 않는다)
+-- ═════════════════════════════════════════════════════════════════
+${postSql.trimEnd()}
+`;
+}

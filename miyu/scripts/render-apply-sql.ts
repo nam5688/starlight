@@ -1,10 +1,11 @@
 // supabase/migrations의 4~10번을 SQL Editor에서 한 번에 실행하는 통합 파일(supabase/apply-4-to-10.sql)로 묶는다.
 // 마이그레이션 내용은 그대로이고, 시작 조건 확인 · 트랜잭션 · 마지막 확인 조회만 더한다 (lib/ops/apply-sql.ts).
 // 실행: node scripts/render-apply-sql.ts            → supabase/apply-4-to-10.sql
+//       node scripts/render-apply-sql.ts --reviews  → supabase/apply-25-reviews.sql (DB 변경 25번 후기만 · 19~22번이 없는 테스트 DB에도 쓸 수 있다)
 //       node scripts/render-apply-sql.ts --staging  → supabase/apply-staging-all.sql (아무것도 없는 새 스테이징 프로젝트 전용 · 1번부터 전체 · 운영 DB에는 쓰지 않는다)
 // (miyu 폴더에서)
 import { readFileSync as readRaw, readdirSync, writeFileSync } from "node:fs";
-import { buildApplySql, buildStagingApplySql } from "../lib/ops/apply-sql.ts";
+import { buildApplySql, buildReviewsApplySql, buildStagingApplySql } from "../lib/ops/apply-sql.ts";
 
 // Windows에서 git이 줄바꿈을 CRLF로 받아 와도 합본은 항상 LF로 만든다 — CRLF만 LF로 바꾸고 그 밖의 글자는 그대로(합본이 마이그레이션과 같은지 시험이 확인한다)
 const readFileSync = (url: URL, encoding: "utf8") => readRaw(url, encoding).replace(/\r\n/g, "\n");
@@ -25,4 +26,14 @@ if (process.argv.includes("--staging")) {
   const staging = buildStagingApplySql({ migrations: all, checkSql });
   writeFileSync(new URL("../supabase/apply-staging-all.sql", import.meta.url), staging);
   console.log(`supabase/apply-staging-all.sql: ${all.length}개 파일(${all[0].name} ~ ${all[all.length - 1].name}) ${staging.length.toLocaleString("ko-KR")}자`);
+}
+
+// DB 변경 25번(후기)만 — 시작 조건 · 끝 확인 · 트랜잭션을 더한 단독 적용 파일
+if (process.argv.includes("--reviews")) {
+  const name = files.find((f) => f.includes("_reviews.sql"))!;
+  const migration = { name, sql: readFileSync(new URL(name, dir), "utf8") };
+  const postSql = readFileSync(new URL("../supabase/review-25-postcheck.sql", import.meta.url), "utf8");
+  const out25 = buildReviewsApplySql({ migration, postSql });
+  writeFileSync(new URL("../supabase/apply-25-reviews.sql", import.meta.url), out25);
+  console.log(`supabase/apply-25-reviews.sql: ${name} ${out25.length.toLocaleString("ko-KR")}자`);
 }

@@ -91,3 +91,52 @@ test("스테이징 통합 파일: 운영 DB에 실수로 실행되지 않게 시
   assert.equal(stagingCommitted.match(/\ncommit;\n/g)?.length, 1);
   assert.ok(stagingCommitted.slice(verify).includes(checkSql.trimEnd()), "마지막은 읽기 전용 확인 조회");
 });
+
+// ── DB 변경 25번(후기)만 적용하는 단독 파일: supabase/apply-25-reviews.sql (테스트 전용 DB처럼 19~22번이 없는 DB에도 쓴다) ──
+import { buildReviewsApplySql } from "../lib/ops/apply-sql.ts";
+
+const reviewsFile = files.find((f) => f.endsWith("_reviews.sql"))!;
+const reviewsMigration = { name: reviewsFile, sql: readSource(new URL(reviewsFile, dir)) };
+const reviewsPost = readSource(new URL("../supabase/review-25-postcheck.sql", import.meta.url));
+const reviewsPre = readSource(new URL("../supabase/review-25-precheck.sql", import.meta.url));
+const reviewsCommitted = readSource(new URL("../supabase/apply-25-reviews.sql", import.meta.url));
+
+test("후기 25번 단독 파일은 마이그레이션 · 사후 확인에서 만든 그대로다 (바뀌었다면 node scripts/render-apply-sql.ts --reviews를 다시 실행)", () => {
+  assert.equal(reviewsFile, "20261104000000_reviews.sql");
+  assert.equal(reviewsCommitted, buildReviewsApplySql({ migration: reviewsMigration, postSql: reviewsPost }));
+  assert.ok(reviewsCommitted.includes(reviewsMigration.sql.trimEnd()), "마이그레이션 내용이 한 글자도 바뀌지 않고 들어 있다");
+});
+
+test("후기 25번 단독 파일: 하나의 트랜잭션 — 시작 조건 확인 → 마이그레이션 → 끝 확인(어긋나면 전체 취소) → commit → 읽기 전용 확인 조회", () => {
+  const begin = reviewsCommitted.indexOf("\nbegin;\n");
+  const check = reviewsCommitted.indexOf("do $check$");
+  const body = reviewsCommitted.indexOf(reviewsMigration.sql.trimEnd());
+  const verify = reviewsCommitted.indexOf("do $verify$");
+  const commit = reviewsCommitted.indexOf("\ncommit;\n");
+  const tail = reviewsCommitted.indexOf("-- 확인: 25번 적용 결과");
+  assert.ok(begin > 0 && begin < check && check < body && body < verify && verify < commit && commit < tail, JSON.stringify({ begin, check, body, verify, commit, tail }));
+  assert.equal(reviewsCommitted.match(/\nbegin;\n/g)?.length, 1);
+  assert.equal(reviewsCommitted.match(/\ncommit;\n/g)?.length, 1);
+  assert.match(reviewsCommitted, /시작 조건 불충족/);
+  assert.match(reviewsCommitted, /아무것도 바꾸지 않았습니다/);
+  assert.match(reviewsCommitted, /끝 확인 실패/);
+});
+
+test("후기 25번 단독 파일: 19~22번(혜택) 표를 직접 보지 않고(보상은 서버가 설정이 켜졌을 때만), 새 허용 이름 7개 밖의 기존 이름이 있으면 멈추며, 문자열 배열 이어 붙이기는 모두 ::text로 쓴다", () => {
+  const guard = reviewsCommitted.slice(reviewsCommitted.indexOf("do $check$"), reviewsCommitted.indexOf("-- 25번:"));
+  assert.ok(!reviewsCommitted.slice(reviewsCommitted.indexOf("begin;")).includes("public.credit_"), "후기 파일이 질문권 표를 직접 쓰지 않는다");
+  assert.match(guard, /funnel_events where name not in \('visit', 'analyze_start', 'analyze_complete', 'preview_view', 'report_view', 'review_section_view', 'review_all_click'\)/);
+  for (const m of reviewsCommitted.matchAll(/problems := problems \|\| '[^']*'(?!::text)/g)) assert.fail(`::text 없는 배열 이어 붙이기: ${m[0]}`);
+});
+
+test("후기 25번 사전 · 사후 확인은 읽기 전용 조회 하나다(쓰기 문장 없음) — 사전은 막힘/OK/참고, 사후는 이상/OK/참고로 종합을 낸다", () => {
+  for (const [name, sql] of [["사전", reviewsPre], ["사후", reviewsPost]] as const) {
+    const code = sql.replace(/--.*$/gm, "");
+    assert.doesNotMatch(code, /\b(insert\s+into|update\s+public|delete\s+from|drop\s|alter\s|create\s|truncate|grant\s|revoke\s)/i, `${name} 확인에 쓰기 문장이 없다`);
+    assert.match(code, /종합/);
+  }
+  assert.match(reviewsPre, /다시 실행하지 않는다|막힘/);
+  assert.match(reviewsPost, /이상/);
+  // 사후 확인은 적용 파일 끝의 확인 조회와 같은 글이다
+  assert.ok(reviewsCommitted.endsWith(`${reviewsPost.trimEnd()}\n`));
+});
