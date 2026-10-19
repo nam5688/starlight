@@ -139,15 +139,18 @@
 
 위 시안은 **내부 참고용 편집 시안이지 품질 승인이 아니다.** 시안 안의 **"그 주제가 크게 느껴지는 시기" · "이 모양과 이어져요"**처럼 읽는 사람이 무엇을 가리키는지 바로 알기 어려운 추상 표현은 향후 실제 AI 글을 평가할 때 점검 대상으로 남긴다(`real-ai-evaluation-rubric.md` 4-4장 #2). 참고로 "그 주제가 … 크게 느껴질 수 있다"는 말은 근거 `cue`(`lib/saju/interpret/rules.ts` · `fortune.ts`)에 있는 전통 해석 문장이라 실제 모델도 그대로 옮길 가능성이 있다 — 근거 문장은 이번에 바꾸지 않았다(2단 후보). 지금 새 리포트나 새 해석을 만들지 않았고 시안도 고치지 않았다.
 
-## 7. 운영자 PC 전용 검사 — **준비만 했고 실행하지 않았다**
+## 7. 운영자 PC 전용 검사 — **준비만 했고 이 세션은 실행하지 않았다** (순서 분리: 승인 반영 전 → 승인 반영 → 비용 없는 검사)
 
-운영자 PC 세션이 '연결되지 않음'(기기 재로그인 요청)이라고 운영자가 확인했고, 이 세션은 PC에 어떤 명령도 보내지 않았다. 아래는 운영자가 검토한 뒤 직접 칠 수 있는 명령이다. **AI를 부르는 명령은 하나도 없다.**
+운영자 PC 세션은 '연결되지 않음'(기기 재로그인 요청) 상태였고, 이 세션은 PC에 어떤 명령도 보내지 않았다. 운영자가 2026-10-19에 "다음 단계 1 재로그인 · 2 준비된 비용 없는 검사 · 3 실제 AI 1회"를 승인했고(`runsApproved 5 / runsDone 4`, 새 호출 정확히 1회 · 800원 · 총 6,000원 그대로), 실제 1회의 사전검사 · 실행 명령 · 가드는 `real-ai-run-guide.md` 14장에 있다. **아래 3단계 가운데 어디에도 AI를 부르는 명령은 없다.**
 
-| # | 명령(PowerShell, `Desktop\starlight-work\miyu`) | 목적 | 영향 | 전제 |
+| 순서 | 명령(PowerShell, `Desktop\starlight-work\miyu`) | 목적 | 영향 | 기대 |
 | --- | --- | --- | --- | --- |
-| 1 | `git pull origin claude/miyu-claude-code-setup-klw8ms` 그리고 `Select-String -Path lib\report\reading\story7-plan.ts -Pattern "story-7-prompt-0.7"` | 최신 코드(0.7) 반영 확인 | 파일만 갱신(`.env.local` · `pilot-data`는 git이 건드리지 않음) | 한 줄이 나와야 한다 |
+| 0 (**git pull 전에**) | `node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/report/ai/compare-plan.ts')]).then(([a,b])=>{const s=a.COMPARE_STAGES.find(x=>x.name==='story7-own');console.log('story7-own 마친/허용: '+s.restrict.runsDone+'/'+s.restrict.runsApproved+' · 1회 상한 '+s.restrict.runCeilingKrw+'원 · 총액 '+s.capKrw+'원');const w=b.checkStageRestriction(s,{variant:'story-7',only:'A',persona:'OWN',alreadySpentGiven:true,twoRoundWorstKrw:700,execute:true});console.log(w.length?'실제 호출 거절됨: '+w.join(' / '):'실제 호출 허용 상태(횟수 남음)')})" 2>$null` — **모델도 키도 만들지 않는 상태 조회라 네트워크 호출이 일어날 수 없다**(`ai-candidates.ts`와 `compare-plan.ts`의 순수 함수만 불러 판정을 출력한다) | 승인 반영 **전**의 `4/4 소진`이 실제 호출을 거절하는지 확인 | 호출 없음 · 파일 변경 없음 | `story7-own 마친/허용: 4/4 …` → `실제 호출 거절됨: 이 승인(4건)은 이미 실행했습니다 … 새 실행은 운영자가 다시 승인해야 합니다.`. **4/4가 아니면(3/4 등) PC 코드가 4차 기록 이전이다 — 거절 확인으로 세지 말고 그 화면을 알려 주세요.** (예전의 `run-own-story.ts --execute` 거절 확인은 위험한 호출 경로를 지나가므로 생략한다) |
+| 1 | `git pull origin claude/miyu-claude-code-setup-klw8ms` 그리고 `Select-String -Path lib\config\ai-candidates.ts -Pattern "runsApproved: 5"` · `Select-String -Path lib\report\reading\story7-plan.ts -Pattern "story-7-prompt-0.7"` | 최신 코드(지시문 0.7 + 5차 승인 기록) 반영 확인 | 파일만 갱신(`.env.local` · `pilot-data`는 git이 건드리지 않음) | 두 `Select-String`이 각각 한 줄씩 나와야 한다 |
 | 2 | `node scripts/recheck-own-draft.ts pilot-data\ai-compare\story7-own-20261018-151241 --birth-time-unknown` | 4차 원문을 **호출 없이(0원)** 새 검사로 다시 확인: ① 새 경고 "본문에 명리 용어"가 몇 문단에 걸리는지 = 현재 기준선 ② `readable-rechecked.md`에서 `{name}`이 닉네임으로 채워졌는지 ③ 4차의 BLOCK 2가 새 검사에서도 같은지 | 결과 폴더에 `recheck.md` · `readable-rechecked.md`를 새로 쓴다. 원문(`attempts/round1.txt`)은 고치지 않는다. 키 필요 없음 | 4차 결과 폴더가 PC에 있어야 한다 |
-| 3 | (선택) `node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3694.51 --birth-time-unknown` — **`--execute` 없이** | 승인 가드가 `runsDone 4/4`로 **실행을 거절**하는지 확인(기대: "승인 범위 확인 — 실행할 수 없습니다") · 0.7의 호출 1회 최악 비용 확인 | 호출 없음(드라이런). 입력 확인 파일(`pilot-data\own-input\input-check.md`)을 다시 쓴다 | 거절되지 않고 실행 가능으로 나오면 **실행하지 말고** 그 화면을 알려 주세요 |
+| 3 | `node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3694.51 --birth-time-unknown` — **`--execute` 없이** | 승인 반영 **후**의 드라이런: 허용 횟수가 한 번 남았는지(`4/5회 마침`) · 호출 1회의 최악이 800원 이하인지 · 키가 들어 있는지 | 호출 없음. 입력 확인 파일을 다시 쓴다 | `real-ai-run-guide.md` 14장 "사전검사 합격 기준" 다섯 줄. **최악이 800원을 넘거나 "실행할 수 없습니다"가 나오면 실행하지 말고 그 화면을 알려 주세요** |
+
+**이전 판의 기대 문구 정정**: 이 표의 옛 3번은 `--execute` 없이 돌리면서 "4/4 소진 거절"을 기대한다고 적었는데, 코드는 횟수 확인을 `--execute`일 때만 한다(`compare-plan.ts`의 `checkStageRestriction`) — 드라이런은 4/4여도 거절하지 않고 "4/4회 마침"만 보여 준다. 그래서 거절 확인은 위 0번(`--execute` + 키 · 승인 값 없음)으로 분리했다.
 
 이 검사들의 결과가 있어야 "4차 글이 새 기준에서 어떻게 보이는지"를 말할 수 있다 — 지금은 결과가 없다.
 

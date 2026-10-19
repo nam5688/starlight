@@ -343,3 +343,110 @@ npm.cmd run dev
    - **3차와 비교**: `compare-with-<3차 폴더>.md` — 장별 글자 수 · BLOCK/WARN · 조언 낱말 · 각 장의 첫 문장 · **4-2장: 과거 공감 · 연애 · 배우자운 · 재물운 · 시기별 풀이(나이 표기 · 연도)를 세고 처음 나온 문장을 나란히** 보인다(낱말을 센 어림이며 어느 글이 좋은지는 읽어서 정한다).
 
 **시험 뒤에 하지 않는 것**: 재작성 · 재시도 · 추가 호출 · 지시문 · 프레임 · 검사 수정. 새 글이 충분하다고 운영자가 판단하면 개인 심층 콘텐츠(지시문 0.6 · 프레임 17개)를 동결한다. 출시를 막는 실제 오류(명리 계산 오류 · 근거 없는 사건 단정 · 나이 범위 어긋남)만 그 오류만 최소 수정한다. 이 시험의 결과 폴더는 운영자 PC의 `pilot-data`에만 있고(저장소에 올라가지 않는다) 클라우드 세션은 읽지 못한다 — 글 평가는 운영자가 읽고 정한다.
+
+
+## 14. 개인 심층 5차 시험(지시문 0.7 · 고객용 서술) — 운영자 신규 승인 2026-10-19 · 준비만 마침(이 개발 세션은 실제 호출을 하지 않았다)
+
+**승인 기록(코드 `lib/config/ai-candidates.ts`의 `story7-own`)**: `runsApproved 5 · runsDone 4` — 기존 4회 + 신규 1회. 새 실제 호출은 **정확히 1회**, 자동 재작성 · 재시도 **0회**, 이번 호출 상한 **800원 그대로**, 누적 총 승인 **6,000원 그대로**, 이미 쓴 금액 **3,694.51원**(남은 2,305.49원). `runsDone 4`와 4차까지의 비용 · 원문 기록(`lastRun`)은 되돌리지 않았다. 지시문은 현재 코드의 `story-7-prompt-0.7`, 입력은 PC의 같은 본인 입력(`--birth-time-unknown`, 2~4차와 같은 조건 — 조건을 바꾸려면 운영자가 알려 준다). 승인 문장: 운영자 "123 해줘"(다음 단계 1 Windows 재로그인 · 2 준비된 비용 없는 검사 · 3 실제 AI 1회).
+
+### 14-1. 호출이 정확히 1번만 나가는지 — 코드로 확인한 것 (실제 호출 없이)
+
+| 가능한 두 번째 호출 | 막는 곳 | 확인 |
+| --- | --- | --- |
+| 형식 검사에 걸린 글을 자동으로 고쳐 쓰는 호출 | `scripts/run-own-story.ts` 134~136행이 `repairRepeats: false · maxRepairs: 0 · maxRetries: 0`으로 부른다. 생성기의 라운드 반복(`for (round = 0; round <= maxRepairs …)`, `lib/report/ai/generator.ts` 386행)은 0이면 첫 응답에서 끝나고 BLOCK이면 `retry()`가 메시지만 쌓은 채 반복이 끝나 오류로 빠진다(두 번째 `call`이 없다) | `own-run.test.ts` "호출 한 번(story-7)" — 걸리는 글을 받아도 `calls === 1` |
+| JSON 형식이 아니거나 닫는 괄호가 빠진 글 | 같은 반복 안에서 같은 길(`extractJson` 실패 → `retry` → 반복 끝) | 위와 같음 |
+| 제공사 일시 오류(429 · 5xx · 연결 오류)의 자동 재시도 | `lib/report/ai/model-caller.ts` 59행 `attempt < maxRetries` — 0이면 던지고 끝난다 | `own-run.test.ts` "호출 한 번: 제공사 일시 오류도 다시 시도하지 않고" — `calls === 1` |
+| 시간 초과(300초)의 재시도 | 시간 초과는 `retryable: true`로 분류되지만 같은 `maxRetries 0`에 막힌다. 응답은 받지 못해도 요청은 나갔으므로 **제공사에서는 청구됐을 수 있다**(결과 불명) | 위와 같음 |
+| 제공사 SDK의 자동 재시도 | **SDK를 쓰지 않는다**(`package.json`에 제공사 패키지 없음). `lib/integrations/ai/providers.ts`의 `post()`가 Node 기본 `fetch`를 `complete()`당 한 번만 부르고 재시도 코드가 없다 | **내 컴퓨터(127.0.0.1)의 가짜 서버로 실제 `fetch`를 보내 서버가 받은 요청 수를 센 시험**(`lib/integrations/ai/one-call.test.ts` — 정상 응답 · 529 · 429 · 500 · 요청을 받은 서버가 연결을 끊음 · 응답이 없어 시간 초과(중단 뒤 0.4초 더 기다려 늦은 재전송도 확인)): 모두 **서버가 받은 요청 1개**. 바깥 네트워크로는 아무것도 보내지 않았다 |
+| 한 번 더 실행하는 사람의 실수 | **이것만 코드가 자동으로 막지 못한다** — 허용 횟수 `runsDone`은 코드 상수라 실행 때 저절로 오르지 않는다. 그래서 **호출 직후 바로 14-4의 기록 절차로 `runsDone 5`를 적는다** | 14-4 |
+| 비용이 한도를 넘는 호출 | `BudgetGuard`가 `min(남은 2,305.49원, 상한 800원)`을 하드스톱으로 쓰고, 최악 비용이 넘으면 제공사에 요청이 나가지 않는다. 드라이런의 "호출 1회 최악"이 800원을 넘으면 `checkStageRestriction`이 실행을 거절한다(반올림 없이 비교) | `own-run.test.ts` 승인 범위 시험 |
+
+**보장하지 못하는 것(숨기지 않는다)**: ① 위 시험은 이 프로젝트의 코드와 Node 기본 `fetch`가 한 요청을 한 번만 보낸다는 것까지다 — 인터넷 중간(프록시 · 회사망 · 제공사 앞단)에서 요청이 두 번 전달되는 일은 이 코드로 막을 수 없다(재전송 코드는 없다) ② 결과 불명 · 시간 초과 때 제공사에 실제로 청구됐는지는 Anthropic 콘솔 사용량으로만 안다(코드는 최악 비용으로 센다) ③ 한 번 실행한 뒤 같은 명령을 사람이 다시 치는 것(위). **②③은 "다시 호출하지 않는다"로 처리한다 — 어떤 결과(성공 · 형식 검사 불통과 · 연결 오류 · 시간 초과 · 화면이 끊김)여도 14-3의 실행 명령을 다시 치지 않는다.**
+
+### 14-2. 순서와 명령 (PowerShell, `$HOME\Desktop\starlight-work\miyu` — 위에서 아래로, 앞 단계가 합격이어야 다음으로)
+
+**0. (git pull 전에) 4/4 소진 확인 — 네트워크 호출이 일어날 수 없는 상태 조회.** 모델도 키도 만들지 않고 승인 판정 함수만 부른다:
+
+```powershell
+cd $HOME\Desktop\starlight-work\miyu
+node -e "Promise.all([import('./lib/config/ai-candidates.ts'),import('./lib/report/ai/compare-plan.ts')]).then(([a,b])=>{const s=a.COMPARE_STAGES.find(x=>x.name==='story7-own');console.log('story7-own 마친/허용: '+s.restrict.runsDone+'/'+s.restrict.runsApproved+' · 1회 상한 '+s.restrict.runCeilingKrw+'원 · 총액 '+s.capKrw+'원');const w=b.checkStageRestriction(s,{variant:'story-7',only:'A',persona:'OWN',alreadySpentGiven:true,twoRoundWorstKrw:700,execute:true});console.log(w.length?'실제 호출 거절됨: '+w.join(' / '):'실제 호출 허용 상태(횟수 남음)')})" 2>$null
+```
+
+기대: `story7-own 마친/허용: 4/4 · …` 다음 줄 `실제 호출 거절됨: 이 승인(4건)은 이미 실행했습니다 … 새 실행은 운영자가 다시 승인해야 합니다.` 4/4가 아니면(3/4 등) PC 코드가 4차 기록 이전이므로 거절 확인으로 세지 말고 화면을 알려 준다. (예전 방식인 `run-own-story.ts --execute`로 거절을 확인하는 단계는 위험한 호출 경로를 지나가므로 생략한다.)
+
+**1. 승인 반영(git pull) + 확인.**
+
+```powershell
+git pull origin claude/miyu-claude-code-setup-klw8ms
+Select-String -Path lib\config\ai-candidates.ts -Pattern "runsApproved: 5"
+Select-String -Path lib\config\ai-candidates.ts -Pattern "runsDone: 4,"
+Select-String -Path lib\report\reading\story7-plan.ts -Pattern "story-7-prompt-0.7"
+```
+
+세 `Select-String`이 각각 한 줄씩 나와야 한다. `git pull`이 "local changes would be overwritten"로 막히면 PC에 고친 파일이 있다는 뜻이다 — 지우지 말고 화면을 알려 준다.
+
+**2. 상태 조회 한 번 더(위 0번과 같은 명령)** — 기대: `story7-own 마친/허용: 4/5 …` 다음 줄 `실제 호출 허용 상태(횟수 남음)`.
+
+**3. 비용 없는 검사 — 4차 원문을 새 검사로 다시 보기(호출 0, 키 불필요).**
+
+```powershell
+node scripts/recheck-own-draft.ts pilot-data\ai-compare\story7-own-20261018-151241 --birth-time-unknown
+```
+
+기대: `recheck.md` · `readable-rechecked.md`가 만들어지고 `{name}`이 닉네임으로 채워져 읽힌다. 원문(`attempts\round1.txt`)은 바뀌지 않는다.
+
+**4. 사전검사 = 드라이런(호출 없음, `--execute` 없음).**
+
+```powershell
+node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3694.51 --birth-time-unknown
+```
+
+**합격 기준 — 다섯 가지가 모두 맞을 때만 5번으로 간다:**
+1. `승인 범위: story-7 · 후보 A · 본인 입력 1건 · 승인된 실행 4/5회 마침`
+2. `호출 1회 최악: NNN원`에서 NNN이 **800 이하** (클라우드의 같은 지시문 · 본인 입력 사본 기준 698원, PC 값은 이보다 5원쯤 다를 수 있다). 한 줄 뒤에 `(참고) 재작성까지 가는 최악 …`이 1,000원을 넘어도 괜찮다 — 이 시험은 재작성을 하지 않는다.
+3. `한도: 승인 총액 6,000원 − 이미 쓴 3,695원 = 남은 2,305원 · 1회 상한 800원`
+4. `키 입력 확인: ANTHROPIC_API_KEY 있음`
+5. 마지막 줄 `호출하지 않았습니다 (드라이런).`
+
+하나라도 다르거나 `승인 범위 확인 — 실행할 수 없습니다`가 나오면 **실행하지 말고 그 화면을 알려 준다.**
+
+**5. 실제 호출 1회 + 곧바로 기록(한 덩어리로 붙여 넣는다 — 앞 줄이 끝나야 다음 줄이 실행된다).** 맨 위 줄은 "이 실행 뒤에 생긴 결과 폴더"를 찾기 위한 시각이고, 새 폴더가 있을 때만 기록하므로 승인 확인에서 거절된 경우(폴더가 안 생김)는 소진으로 적지 않는다. 폴더가 생겼으면 호출이 나갔거나 나가려던 것이라 **안전 쪽으로 소진으로 센다.**
+
+```powershell
+$t0 = Get-Date
+node --env-file=.env.local scripts/run-own-story.ts --already-spent-krw 3694.51 --birth-time-unknown --execute --approved-cap-krw 6000 --approved-on 2026-10-19
+
+# ↓ 위 명령이 끝나면(성공 · 형식 검사 불통과 · 오류 · 시간 초과 모두) 이어서 자동으로 실행된다. 이 줄들을 지우거나 다시 붙여 넣지 않는다
+$d = Get-ChildItem pilot-data\ai-compare -Directory -Filter "story7-own-*" | Where-Object { $_.LastWriteTime -gt $t0 } | Sort-Object LastWriteTime | Select-Object -Last 1
+if ($d) {
+  $p = (Resolve-Path lib\config\ai-candidates.ts).Path
+  $txt = [System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)
+  if (([regex]::Matches($txt, "runsDone: 4,")).Count -eq 1) { [System.IO.File]::WriteAllText($p, $txt.Replace("runsDone: 4,", "runsDone: 5,"), (New-Object System.Text.UTF8Encoding($false))); Write-Host "기록: runsDone 4 -> 5 (이 PC의 ai-candidates.ts, 커밋하지 않음)" } else { Write-Host "경고: runsDone 4, 가 정확히 1곳이 아닙니다 — 직접 5로 고치지 말고 화면을 알려 주세요" }
+  $line = "{0} | story7-own 5차 | {1}" -f (Get-Date -Format "s"), $d.FullName
+  $cj = Join-Path $d.FullName "cost-and-checks.json"
+  if (Test-Path $cj) { $c = Get-Content $cj -Raw -Encoding UTF8 | ConvertFrom-Json; $line += (" | calls={0} | spent={1}원 | cumulative={2}원 | result={3}" -f $c.calls, $c.spentKrw, $c.cumulativeSpentKrw, $c.result) } else { $line += " | cost-and-checks.json 없음(비용 불명 — Anthropic 콘솔 사용량 확인)" }
+  Add-Content -Encoding UTF8 pilot-data\ai-compare\RUN-LEDGER.txt $line
+  Write-Host $line
+} else { Write-Host "새 결과 폴더가 없습니다 — 호출 전에 중단된 것으로 보고 소진 기록을 올리지 않았습니다. 화면의 중단 문구를 알려 주세요." }
+```
+
+실행 중에는 **두 번째 창에서 같은 명령을 치지 않는다**(보통 몇 분 걸린다, 창을 닫지 않는다). 창이 닫히거나 화면이 끊겼으면 같은 명령을 다시 치지 말고 아래 "수동 기록"만 한다: `$t0 = (Get-Date).AddHours(-3)`로 바꿔 위 `$d = …` 이후 줄만 붙여 넣는다.
+
+**6. 읽기 · 검사 · 4차와 비교(호출 0).** `<새 폴더>`는 5번 마지막 줄(또는 `RUN-LEDGER.txt`)의 폴더 이름:
+
+```powershell
+node scripts/recheck-own-draft.ts pilot-data\ai-compare\<새 폴더> --birth-time-unknown
+node scripts/compare-own-runs.ts pilot-data\ai-compare\story7-own-20261018-151241 pilot-data\ai-compare\<새 폴더> --birth-time-unknown
+```
+
+원문 전문은 `pilot-data\ai-compare\<새 폴더>\attempts\round1.txt`(AI가 준 그대로, 고치지 않는다), 읽는 순서 글은 `readable.md`, 화면은 `npm.cmd run dev` 뒤 `http://localhost:3000/dev/live/<새 폴더 이름>`이다.
+
+### 14-3. 실행 뒤 이 개발방이 하는 일
+
+운영자가 Windows 결과(폴더 이름 · `RUN-LEDGER.txt` 마지막 줄 · 화면의 비용)를 이 방에 전달하면 ① `runsDone 5` · `lastRun`(날짜 · 호출 수 · 비용 · 결과) · 누적 비용을 코드에 기록해 커밋 · 푸시한다 ② 그 전에 **PC에서 `git pull`을 하기 전에** 아래를 한다: `git checkout -- lib\config\ai-candidates.ts`(PC에서 14-2의 5번이 고친 한 줄은 이 개발방의 최종 기록으로 대체되므로 되돌려도 된다. 되돌리지 않으면 `git pull`이 "local changes would be overwritten"로 멈춘다). 글 평가는 운영자가 읽고 정한다 — 합격 · 동결을 이 문서가 선언하지 않는다.
+
+### 14-4. 이중 실행 방지 — 최소 절차(요약)
+
+1. 호출 직후 14-2의 5번 아래 줄이 `runsDone 4 -> 5`를 적고(이 PC의 `ai-candidates.ts`, 커밋하지 않음) `RUN-LEDGER.txt`에 폴더 · 비용 · 결과를 한 줄 적는다.
+2. 상태 조회(14-2의 0번 명령)를 다시 쳐서 `story7-own 마친/허용: 5/5` · `실제 호출 거절됨: 이 승인(5건)은 이미 실행했습니다`가 나오는지 본다 — 이 조회는 네트워크 호출이 없어 몇 번이든 안전하다.
+3. 그다음 어떤 이유로도 `--execute`를 다시 치지 않는다. 새 호출이 필요하면 운영자가 다시 승인한다.
