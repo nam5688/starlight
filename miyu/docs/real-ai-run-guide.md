@@ -445,7 +445,7 @@ node scripts/compare-own-runs.ts pilot-data\ai-compare\story7-own-20261018-15124
 
 ### 14-3. 실행 뒤 — Windows가 최종 기록을 받는 방법 (로컬 5/5 보호 · 되돌리는 checkout 없음)
 
-개발방은 5차 결과(`runsDone 5` · `lastRun` · 누적 3,998.44원 · 폴더 이름)를 코드에 기록해 푸시했다. Windows `ai-candidates.ts`에는 14-2의 5번이 고친 `runsDone: 5,` 한 줄이 커밋 없이 남아 있고, 가져올 쪽도 같은 줄과 이웃한 줄(`lastRun` · 주석)을 바꿔서 그냥 `git pull`하면 "local changes would be overwritten"로 멈춘다. **`git checkout -- lib\config\ai-candidates.ts`(작업 파일을 커밋된 상태로 되돌리는 것)는 하지 않는다 — 커밋된 파일은 `4/5`(실제 호출 허용 상태)라, 되돌린 순간부터 pull이 끝날 때까지 이 PC가 한 번 더 호출을 허용하는 상태가 되기 때문이다.** 대신 아래 순서는 가져올 쪽의 `5/5` 파일을 **먼저 확인**한 뒤에만 바꾸고, 어느 순간에도 파일이 `4/x`로 읽히지 않는다(내 컴퓨터의 임시 복제본에서 위 상황을 만들어 확인했다 — 아래 "확인한 것").
+개발방은 5차 결과(`runsDone 5` · `lastRun` · 누적 3,998.44원 · 폴더 이름)를 코드에 기록해 푸시했다. Windows `ai-candidates.ts`에는 14-2의 5번이 고친 `runsDone: 5,` 한 줄이 커밋 없이 남아 있고, 가져올 쪽도 같은 줄과 이웃한 줄(`lastRun` · 주석)을 바꿔서 그냥 `git pull`하면 "local changes would be overwritten"로 멈춘다. **작업 파일을 커밋된 상태로 되돌리는 checkout(파일 경로만 적는 형태 — 복사해 칠 수 없게 명령은 적지 않는다)은 하지 않는다 — 그때 커밋된 파일은 `4/5`(실제 호출 허용 상태)라, 되돌린 순간부터 pull이 끝날 때까지 이 PC가 한 번 더 호출을 허용하는 상태가 되기 때문이다.** 대신 아래 순서는 가져올 쪽의 `5/5` 파일을 **먼저 확인**한 뒤에만 바꾸고, 어느 순간에도 파일이 `4/x`로 읽히지 않는다(내 컴퓨터의 임시 복제본에서 위 상황을 만들어 확인했다 — 아래 "확인한 것").
 
 ```powershell
 cd $HOME\Desktop\starlight-work\miyu
@@ -583,7 +583,7 @@ node scripts/compare-own-runs.ts pilot-data\ai-compare\story7-own-20261019-01470
 1. 호출 직후 위 5번 아래 줄이 `runsDone 5 -> 6`을 적고(이 PC의 `ai-candidates.ts`, 커밋하지 않음) `RUN-LEDGER.txt`에 한 줄을 적는다.
 2. 상태 조회(0번 명령)를 다시 쳐서 `story7-own 마친/허용: 6/6` · `실제 호출 거절됨: 이 승인(6건)은 이미 실행했습니다`가 나오는지 본다 — 네트워크 호출이 없어 몇 번이든 안전하다.
 3. 그다음 어떤 이유로도 `--execute`를 다시 치지 않는다. 새 호출이 필요하면 운영자가 다시 승인한다.
-4. 운영자가 결과(폴더 이름 · `RUN-LEDGER.txt` 마지막 줄 · 화면의 비용)를 이 방에 전달하면 개발방이 `lastRun` · 누적 비용을 코드에 기록해 푸시한다. 그다음 PC 동기화는 14-3의 순서를 쓰되 ②의 확인 문자열 `runsDone: 5,`를 `runsDone: 6,`으로 바꾼다. 글 평가는 운영자가 읽고 정한다 — 합격 · 동결을 이 문서가 선언하지 않는다.
+4. 운영자가 결과(폴더 이름 · `RUN-LEDGER.txt` 마지막 줄 · 화면의 비용)를 이 방에 전달하면 개발방이 `lastRun` · 누적 비용을 코드에 기록해 푸시한다. 그다음 PC 동기화는 **15-4의 6/6 순서**(가져올 쪽 파일 확인 → 로컬 사본 보관 → `origin/<브랜치>`의 파일 한 개 받기 → `git pull --ff-only`)를 쓴다 — 5/5를 전제로 한 14-3의 명령을 그대로 치지 않는다. 글 평가는 운영자가 읽고 정한다 — 합격 · 동결을 이 문서가 선언하지 않는다.
 
 ### 15-4. 6차 결과(운영자 PC의 Windows 세션 보고 기준 2026-10-19) · Windows가 최종 기록을 받는 방법
 
@@ -603,7 +603,7 @@ node scripts/compare-own-runs.ts pilot-data\ai-compare\story7-own-20261019-01470
 
 #### Windows 동기화 (로컬 6/6 보호 · 되돌리는 checkout 없음 — 14-3과 같은 절차, 확인 문자열만 6)
 
-Windows `ai-candidates.ts`에는 위 `runsDone: 6,` 한 줄이 커밋 없이 남아 있고, 가져올 쪽도 같은 줄과 이웃한 줄(`lastRun` · 주석)을 바꿨으므로 그냥 `git pull`하면 "local changes would be overwritten"로 멈춘다. **`git checkout -- lib\config\ai-candidates.ts`(작업 파일을 커밋된 상태로 되돌리는 것)는 하지 않는다 — 커밋된 `0df1ee4`의 파일은 `5/6`(실제 호출 허용 상태)이라, 되돌린 순간부터 pull이 끝날 때까지 이 PC가 한 번 더 호출을 허용하는 상태가 되기 때문이다.** 아래 순서는 가져올 쪽의 `6/6` 파일을 **먼저 확인**한 뒤에만 파일을 바꾸므로 어느 순간에도 `5/x`로 읽히지 않는다.
+Windows `ai-candidates.ts`에는 위 `runsDone: 6,` 한 줄이 커밋 없이 남아 있고, 가져올 쪽도 같은 줄과 이웃한 줄(`lastRun` · 주석)을 바꿨으므로 그냥 `git pull`하면 "local changes would be overwritten"로 멈춘다. **작업 파일을 커밋된 상태로 되돌리는 checkout(파일 경로만 적는 형태 — 복사해 칠 수 없게 명령은 적지 않는다)은 하지 않는다 — 동기화 전에 커밋된 `0df1ee4`의 파일은 `5/6`(실제 호출 허용 상태)이라, 되돌린 순간부터 pull이 끝날 때까지 이 PC가 한 번 더 호출을 허용하는 상태가 되기 때문이다.** 아래 순서는 가져올 쪽의 `6/6` 파일을 **먼저 확인**한 뒤에만 파일을 바꾸므로 어느 순간에도 `5/x`로 읽히지 않는다. (`origin/<브랜치>`를 지정해 가져올 쪽 파일 한 개를 받는 `git checkout origin/<브랜치> -- 파일`은 되돌리기가 아니라 6/6 확인 뒤에만 쓰는 이 순서의 한 단계다. 동기화를 마친 뒤 커밋된 파일은 `6/6`이라 그 뒤에는 어떤 경로로 되돌려도 잠금이 풀리지 않는다.)
 
 ```powershell
 cd $HOME\Desktop\starlight-work\miyu
@@ -650,3 +650,5 @@ npm.cmd run dev
 ```
 
 `export-readable-display.ts`는 새 파일 `readable-display.md` 하나만 만들고 `round1.txt`(원문) · `report.json` · `readable.md`는 건드리지 않는다(해시를 비교하려면 실행 전후 `Get-FileHash`). 6번 장에서 볼 것: ① 시기 칸을 누르면 풀이가 열리는지 ② 막대를 누르면 같은 칸이 열리는지 ③ 연-월(예: `2022.12`)이나 "N개월"이 없는지 ④ 개운 카드가 금 · 목 같은 무게로 보이는지. 이상하면 화면 캡처와 함께 알려 준다 — 같은 명령으로 호출이 나가지 않는다(AI 호출 코드는 이번에 바뀌지 않았고 6/6에서 `--execute`는 거절된다).
+
+**실제로 수행한 동기화(Windows 세션 보고 2026-10-19, 개발 환경의 임시 복제본 시험과 별개로 실제 PC에서 확인된 값)**: 이 순서 그대로 — 가져올 쪽 `ai-candidates.ts`의 `runsDone: 6,`가 정확히 한 줄인지 확인 → 로컬 고유 사본 보관 → `origin/<브랜치>`의 파일 한 개 받기 → `git pull --ff-only` — 로 끝냈고, 5/6으로 되돌린 순간은 없었다. 결과: `HEAD a368f52` · `git status` 깨끗 · 네트워크 없는 상태 조회 6/6 거절 · `lastRun` 316.45원 · 누적 4,314.89원 · `RUN-LEDGER.txt` 2행 · 원문(4 · 5 · 6차 `round1.txt`) · 6차 `readable.md` · `.env.local` 해시 불변 · `own-run` 무료 시험 14개 통과. 추가 AI 호출 0. 이후 이 파일을 건드리는 커밋이 없는 한(예: 화면 수정 커밋 `b675c75`는 `ai-candidates.ts`를 바꾸지 않았다) 그냥 `git pull --ff-only`로 충분하다.
