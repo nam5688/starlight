@@ -10,7 +10,7 @@
 import type { CompatRelationship } from "../../compat/relationship.ts";
 
 export const COMPAT_REPORT_KIND = "compat-saju-v1" as const;
-export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.6";
+export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.7";
 
 /**
  * 두 사람의 시기(대운 · 세운)를 계산하는가 — 계산한다(compat-timing.ts, 각자의 계산 결과를 나란히 놓는 범위). 근거 목록에 compat.timing.*이 있으면 5번 장(연애와 결혼 궁합)이 한 문단으로 쓰고,
@@ -47,7 +47,7 @@ const ALL_SECTIONS: CompatSectionPlan[] = [
   {
     id: "harmony",
     topic: "두 사람의 사주와 오행 조화",
-    ask: "각자 힘의 분포(compat.chart)가 어떻게 생겼는지를 사람의 방식으로 풀고(어떤 힘이 많고 적은지), 서로 비어 있는 쪽을 채우는지 · 같은 쪽이 둘 다 강한지 · 두 일간 사이(같은 기운 · 상생 · 상극 · 합)가 함께 계획하고 정할 때 어떤 모습인지 쓴다. 오행 개수는 천간 · 지지 글자 기준이고 시주를 모르는 사람은 세 기둥 기준임을 밝힌다. 개운(색 · 방향)은 7번 장의 몫이다",
+    ask: "각자 오행 분포(compat.chart)는 개수 · 있고 없음을 나열하지 않고, 서로 비어 있는 쪽을 채우는지 · 같은 쪽이 겹치는지 · 두 일간 사이(같은 기운 · 상생 · 상극 · 합)가 함께 정할 때 일을 나누고 서로의 방식을 확인하는 모습으로 쓴다(능력이 없다고 단정하지 않는다). 시주를 모르는 사람은 세 기둥 기준임을 밝힌다. 개운(색 · 방향)은 7번 장의 몫이다",
     sources: "compat.chart · compat.day-stem · compat.element.fill · compat.element.overlap",
     paragraphs: { min: 2, max: 4 },
   },
@@ -110,7 +110,7 @@ export const COMPAT_SECTIONS: CompatSectionPlan[] = ALL_SECTIONS.filter((s) => !
 // 사주 궁합과 같은 엔진 · 같은 위쪽 요약(cardOf) · 같은 여섯 장에, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*, pair-evidence.ts)로 6번 "서로에게 어떤 사람일까?"를 더한다.
 // 저장되는 글에는 이름 · 생년월일 · 응답 원문 · 점수가 없다 — 본문은 "A님 · B님"이고 화면이 읽는 사람에게 누가 누구인지 알려 준다.
 export const PAIR_REPORT_KIND = "compat-pair-v1" as const;
-export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.4";
+export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.5";
 
 /** 리포트 궁합의 장 — 일곱 장 모두 항상 쓴다(비교한 응답이 없으면 6번은 사주만으로, 응답을 지어내지 않는다) */
 export const PAIR_SECTIONS: CompatSectionPlan[] = ALL_SECTIONS;

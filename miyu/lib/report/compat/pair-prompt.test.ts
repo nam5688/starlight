@@ -1,5 +1,5 @@
-// 실행: npm test — 리포트 궁합 지시문: 사주 궁합 지시문(0.6)과 리포트 궁합 지시문(0.4)은 보관본과 같고(2026-10-19 고객용 서술 개편), 리포트 궁합 지시문은 응답 비교 규칙과 6번 장(서로에게 어떤 사람일까?)을 더한 별도 판이다.
-// 이전 판(0.5 · 0.3 — 명리 용어를 풀이와 함께 충분히 쓰던 판, 0.4 — 새 구성 이전의 다섯 영역 + 시기 + 응답 구성)은 보관만 한다.
+// 실행: npm test — 리포트 궁합 지시문: 사주 궁합 지시문(0.7)과 리포트 궁합 지시문(0.5)은 보관본과 같고(2026-10-19 고객용 서술 개편 · 같은 날 검수 보정), 리포트 궁합 지시문은 응답 비교 규칙과 6번 장(서로에게 어떤 사람일까?)을 더한 별도 판이다.
+// 이전 판(0.5 · 0.3 — 명리 용어를 풀이와 함께 충분히 쓰던 판, 0.4 — 새 구성 이전의 다섯 영역 + 시기 + 응답 구성, 0.6 · 0.4 — 개편 직후 판)은 보관만 한다.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Evidence } from "../evidence.ts";
@@ -7,17 +7,17 @@ import { readSource } from "../test-source.ts";
 import { PAIR_PROMPT_VERSION, PAIR_SECTIONS, COMPAT_SECTIONS } from "./plan.ts";
 import { buildCompatUserMessage, buildPairUserMessage, COMPAT_PROMPT_MARK, COMPAT_PROMPT_VERSION, COMPAT_SYSTEM_PROMPT, PAIR_PROMPT_MARK, PAIR_SYSTEM_PROMPT } from "./prompt.ts";
 
-const SAVED = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.6.txt", import.meta.url));
-const SAVED_PAIR = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.4.txt", import.meta.url));
+const SAVED = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.7.txt", import.meta.url));
+const SAVED_PAIR = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.5.txt", import.meta.url));
 const SAVED_PREV = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.5.txt", import.meta.url));
 const SAVED_PREV_PAIR = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.3.txt", import.meta.url));
 const SAVED_OLD = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.4.txt", import.meta.url));
 
 const ev = (id: string, fact: string): Evidence => ({ id, source: id.startsWith("pair.") ? "survey" : "saju", topics: ["relationship"], strength: "moderate", fact, cue: "읽는 방식입니다." });
 
-test("사주 궁합 지시문(0.6) · 리포트 궁합 지시문(0.4)은 보관본(docs/samples/prompts)과 글자 하나도 다르지 않고, 이전 판(0.5 · 0.3 · 0.4)은 보관만 한다", () => {
-  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.6");
-  assert.equal(PAIR_PROMPT_VERSION, "pair-v1-prompt-0.4");
+test("사주 궁합 지시문(0.7) · 리포트 궁합 지시문(0.5)은 보관본(docs/samples/prompts)과 글자 하나도 다르지 않고, 이전 판(0.5 · 0.3 · 0.4)은 보관만 한다", () => {
+  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.7");
+  assert.equal(PAIR_PROMPT_VERSION, "pair-v1-prompt-0.5");
   assert.equal(COMPAT_SYSTEM_PROMPT, SAVED);
   assert.equal(PAIR_SYSTEM_PROMPT, SAVED_PAIR);
   assert.ok(SAVED_OLD.includes("compat.timing") && SAVED_OLD !== COMPAT_SYSTEM_PROMPT, "이전 판 보관본은 남아 있고 지금 지시문과 다르다");
@@ -26,7 +26,7 @@ test("사주 궁합 지시문(0.6) · 리포트 궁합 지시문(0.4)은 보관�
   assert.notEqual(SAVED_PREV_PAIR, PAIR_SYSTEM_PROMPT);
 });
 
-test("고객용 서술(0.6 · 0.4): '명리 용어를 풀이와 함께 충분히 쓰기' 목표가 두 지시문 · 모든 장 질문에서 사라졌고, 두 사람의 모습 → 나타나는 상황 → 해 볼 행동 순서와 용어만 바꾼 추상 문장 금지가 들어 있다", () => {
+test("고객용 서술(0.7 · 0.5): '명리 용어를 풀이와 함께 충분히 쓰기' 목표가 두 지시문 · 모든 장 질문에서 사라졌고, 두 사람의 모습 → 나타나는 상황 → 해 볼 행동 순서와 용어만 바꾼 추상 문장 금지가 들어 있다", () => {
   for (const prompt of [COMPAT_SYSTEM_PROMPT, PAIR_SYSTEM_PROMPT]) {
     assert.ok(!prompt.includes("명리 풀이가 이 글의 중심이다"));
     assert.ok(!/풀이를 붙여 충분히|풀이와 함께 써서 설명|명리 용어를 풀이와 함께|처음 쓸 때 바로 괄호/.test(prompt), "용어를 풀이와 함께 충분히 쓰라는 문구가 남아 있으면 안 된다");
@@ -34,7 +34,19 @@ test("고객용 서술(0.6 · 0.4): '명리 용어를 풀이와 함께 충분히
   }
   // 장마다 묻는 질문도 용어 해설이 아니라 사람의 모습으로 — 두 상품이 같은 질문이다
   for (const s of COMPAT_SECTIONS) assert.ok(!/명리 용어|풀이와 함께/.test(s.ask), `${s.id}: ${s.ask.slice(0, 40)}`);
-  assert.ok(COMPAT_SECTIONS.find((s) => s.id === "harmony")!.ask.includes("사람의 방식으로 풀고"));
+  const harmonyAsk = COMPAT_SECTIONS.find((s) => s.id === "harmony")!.ask;
+  assert.ok(harmonyAsk.includes("개수 · 있고 없음을 나열하지 않고") && harmonyAsk.includes("일을 나누고 서로의 방식을 확인하는 모습") && harmonyAsk.includes("능력이 없다고 단정하지 않는다"));
+  assert.ok(!/어떤 힘이 많고 적은지|힘의 분포/.test(harmonyAsk), "오행 개수를 힘의 개수로 옮겨 나열하라는 질문이 남아 있으면 안 된다");
+});
+
+test("고객용 서술 보정(0.7 · 0.5): 오행 개수를 힘의 개수 · 능력 부족으로 옮기지 않고, 개운은 후보마다 대응만 묶어 가정형으로, 두 시기의 주제가 다르다고 같은 고민을 단정하지 않는다", () => {
+  for (const prompt of [COMPAT_SYSTEM_PROMPT, PAIR_SYSTEM_PROMPT]) {
+    assert.ok(!prompt.includes("시작하고 키우는 힘 · 드러내는 힘"), "오행을 다섯 가지 힘으로 번역해 쓰라는 문구가 없다");
+    assert.ok(prompt.includes("개수 · 있고 없음을 나열하거나 능력 부족으로 쓰지 않고"));
+    assert.ok(!prompt.includes("이미 가진 것으로"), "가진 물건을 추정하게 하는 문구가 없다");
+    assert.ok(prompt.includes("후보마다 그 기운의 대응만 묶어 쓰고(동점이면 순서 · 우열 없이)") && prompt.includes("\"있다면 활용해 보세요\"처럼 가정형으로"));
+    assert.ok(prompt.includes("고민이 같은지 다른지 단정하지 말고") && prompt.includes("요즘 집중하는 일이 다를 수 있으니 서로 무엇을 우선하는지 물어보세요"));
+  }
 });
 
 test("리포트 궁합 지시문은 별도 판이다 — 표지 · 버전이 다르고 응답 비교 규칙이 들어 있다", () => {

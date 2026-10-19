@@ -37,8 +37,8 @@ const clone = (d: CompatDraftV1) => JSON.parse(JSON.stringify(d)) as CompatDraft
 const love = (d: CompatDraftV1) => d.sections.find((s) => s.id === "love")!;
 
 test("지시문(시스템 프롬프트)은 바뀌지 않았다 — 사이는 사용자 메시지로만 가고, 사이가 없으면 메시지가 예전과 글자까지 같다", () => {
-  const saved = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.6.txt", import.meta.url));
-  const savedPair = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.4.txt", import.meta.url));
+  const saved = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.7.txt", import.meta.url));
+  const savedPair = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.5.txt", import.meta.url));
   assert.equal(COMPAT_SYSTEM_PROMPT, saved);
   assert.equal(PAIR_SYSTEM_PROMPT, savedPair);
   const neutral = buildCompatUserMessage(evidence, result.cautions);

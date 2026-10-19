@@ -134,7 +134,7 @@ test("지시문: 사주 궁합의 일(명리 풀이 · 장면 · 조율 · 개�
   }
   for (const s of COMPAT_SECTIONS) assert.ok(COMPAT_SYSTEM_PROMPT.includes(` ${s.id} (${s.topic}`), s.id);
   assert.ok(!COMPAT_SYSTEM_PROMPT.includes(" view ("), "사주 궁합에는 6번(응답 비교) 장이 없다");
-  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.6");
+  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.7");
   assert.equal(COMPAT_TIMING_BUILT, true, "두 사람의 시기(각자의 대운 · 세운을 나란히 놓는 범위)는 계산한다 — 바꾸면 이 시험 · 지시문 · 검사 · 화면 안내를 함께 바꾼다");
 });
 

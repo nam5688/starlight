@@ -26,13 +26,13 @@ const HIGHLIGHT_LIFE: Record<string, string> = {
   "다른 자리에서도 방식이 부딪히는 관계가 읽혀요": "일상 습관이나 활동 방식이 달라 사소한 일정에서 어긋날 수 있어요.",
 };
 
-/** 오행 이름 → 그 기운이 사람에게서 하는 일(customer-voice 표현 예시와 같은 말) */
-const ELEMENT_POWER: Record<string, string> = {
-  목: "시작하고 키우는 힘",
-  화: "드러내고 표현하는 힘",
-  토: "안정시키고 이어 가는 힘",
-  금: "기준을 세우고 정리하는 힘",
-  수: "생각하고 쉬어 가는 힘",
+/** 오행 이름 → 두 사람이 같은 쪽에 기울 때 같은 방식을 택하기 쉬운 일의 장면(힘의 크기 · 능력이 아니라 함께 일을 풀 때의 방식) */
+const ELEMENT_SCENE: Record<string, string> = {
+  목: "새로 벌이고 키워 가는 일",
+  화: "생각과 마음을 바로 드러내는 일",
+  토: "정해 둔 대로 꾸준히 이어 가는 일",
+  금: "기준을 세워 매듭짓는 일",
+  수: "한 걸음 물러나 생각을 정리하는 일",
 };
 
 const OVERLAP = /^(.+) 기운이 둘 다 두드러져서 같은 곳에서 같이 막힐 수 있어요$/;
@@ -43,8 +43,8 @@ export function lifeHighlightOf(engineText: string): string | null {
   if (exact) return exact;
   const m = OVERLAP.exec(engineText);
   if (m) {
-    const powers = m[1]!.split(" · ").map((el) => ELEMENT_POWER[el.trim()]);
-    if (powers.every(Boolean)) return `두 사람 모두 ${powers.join(" · ")}이 강하게 읽혀서, 같은 방식에 같이 기대기 쉬워요. 다른 방법을 하나씩 내 보면 좋아요.`;
+    const scenes = m[1]!.split(" · ").map((el) => ELEMENT_SCENE[el.trim()]);
+    if (scenes.every(Boolean)) return `${scenes.join(", ")}에서 두 사람이 비슷한 방식을 택하기 쉬워요. 막히는 일이 생기면 서로 다른 방법을 하나씩 내 보면 좋아요.`;
   }
   return null;
 }
@@ -93,10 +93,10 @@ export const PART_LABEL_LIFE: Record<string, string> = {
   "day-branch": "가까운 사이에서 대하는 방식 (일지)",
   "cross-pull": "일상 · 바깥 활동에서 맞는 정도 (월지 · 년지 · 월간)",
   "cross-clash": "일상 · 바깥 활동에서 부딪히는 정도 (월지 · 년지)",
-  "element-fill": "서로 약한 쪽을 채워 주는 정도 (오행)",
-  "element-overlap": "같은 쪽 힘이 둘 다 강한 정도 (오행)",
+  "element-fill": "서로 다른 생각이 보태지는 정도 (오행)",
+  "element-overlap": "비슷한 방식을 택하기 쉬운 정도 (오행)",
 };
-export const SCORE_BASIS_LIFE = "서로의 타고난 성향, 가까운 사이에서 대하는 방식, 일상과 바깥 활동에서의 호흡과 부딪힘, 서로 약한 쪽을 채워 주는지를 미유의 규칙으로 점수로 옮긴 값이에요.";
+export const SCORE_BASIS_LIFE = "서로의 타고난 성향, 가까운 사이에서 대하는 방식, 일상과 바깥 활동에서의 호흡과 부딪힘, 서로 다른 생각이 보태지는지를 미유의 규칙으로 점수로 옮긴 값이에요.";
 
 export const partLabelLife = (p: Pick<CompatPart, "id" | "label">): string => PART_LABEL_LIFE[p.id] ?? p.label;
 
@@ -179,7 +179,7 @@ const SCENES: Record<CompatRelationship, SceneTable> = {
     "branch-clash": "함께 지낼 모습을 구체적으로 그릴수록 쉬는 방식이나 집에서 보내는 시간이 다르게 느껴질 수 있어요. 같이 살기 전에 미리 말로 맞춰 두세요.",
     "cross-pull": "생활 환경과 바깥 활동에서도 호흡이 맞기 쉬워요. 준비하며 나눠 맡을 일을 정할 때 그 호흡을 써 보세요.",
     "cross-clash": "생활 방식이나 바깥 활동의 기준이 달라 준비 중 일정에서 어긋날 수 있어요. 정해야 할 항목으로 적어 두면 부딪힘이 줄어요.",
-    fill: "함께 살림을 계획할 때 서로의 부족한 곳을 나눠 맡기 수월한 편이에요. 해 보며 역할을 정하고, 한 사람에게 몰리지 않는지 확인해 보세요.",
+    fill: "함께 살림을 계획할 때 서로 다른 방식을 살려 일을 나눠 맡기 수월한 편이에요. 해 보며 역할을 정하고, 한 사람에게 몰리지 않는지 확인해 보세요.",
     overlap: "비슷한 쪽이 둘 다 강하게 읽히는 조합이라 준비하는 방식도 쉽게 같아질 수 있어요. 둘 다 놓친 항목은 없는지 한 사람이 일부러 반대 입장에서 점검해 보세요.",
   },
   some: {
@@ -191,7 +191,7 @@ const SCENES: Record<CompatRelationship, SceneTable> = {
     "branch-clash": "가까워질수록 표현하는 방식이나 속도가 다르게 느껴질 수 있어요. 서로의 선이 어디인지 가볍게 물어보며 맞춰 가요.",
     "cross-pull": "일상(일, 모임, 취미)에서도 호흡이 맞기 쉬워요. 같이 할 수 있는 일을 하나 정해 보면 서로를 알기 쉬워요.",
     "cross-clash": "일상 습관이나 활동 방식이 달라 사소한 일정에서 어긋날 수 있어요. 서로 편한 방식을 물어보면 풀려요.",
-    fill: "서로 다른 쪽에 힘이 실려 있는 조합이라, 이야기를 나누면 새로운 관점이 생기기 쉬워요. 각자 즐기는 것과 낯선 것을 하나씩 소개해 보세요.",
+    fill: "서로 생각하는 방식이 달라서 이야기를 나누면 새로운 관점이 생기기 쉬워요. 각자 즐기는 것과 낯선 것을 하나씩 소개해 보세요.",
     overlap: "비슷한 쪽이 둘 다 강하게 읽히는 조합이에요. 같은 반응이 오가면 서로 눈치만 볼 수 있어서, 먼저 가볍게 말을 건네는 쪽을 번갈아 정해 보세요.",
   },
   married: {
@@ -203,7 +203,7 @@ const SCENES: Record<CompatRelationship, SceneTable> = {
     "branch-clash": "함께 지낼수록 쉬는 방식이나 하루를 마무리하는 방식이 다르게 느껴질 수 있어요. 다툰 뒤 풀 때 필요한 것을 서로 말해 두세요.",
     "cross-pull": "일상과 바깥 활동에서도 호흡이 맞기 쉬워요. 함께 정할 일이 생기면 나눠 맡는 방법부터 가볍게 이야기해 보세요.",
     "cross-clash": "생활 방식이나 바깥 활동의 기준이 달라 사소한 일정과 방식으로 부딪힐 수 있어요. 반복되는 주제는 따로 시간을 잡아 이야기해 보세요.",
-    fill: "집안일과 일정을 나눠 맡을 때 서로 모자란 곳을 채우기 수월한 편이에요. 맡은 일을 가끔 바꿔 보며 한쪽에 쏠리지 않는지 확인해 보세요.",
+    fill: "집안일과 일정을 나눠 맡을 때 서로 다른 방식이 보태져 수월한 편이에요. 맡은 일을 가끔 바꿔 보며 한쪽에 쏠리지 않는지 확인해 보세요.",
     overlap: "비슷한 쪽이 둘 다 강하게 읽히는 조합이라 같은 방식에 같이 기대기 쉬워요. 막히는 일이 생기면 서로 다른 방법을 하나씩 내 보세요.",
   },
   friend: {

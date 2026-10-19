@@ -185,3 +185,13 @@ test("같은 사이를 골라도 두 사람의 사주가 다르면 글이 다르
   const f = relationFrameOf("lover" as CompatRelationship, { pull: 1, friction: 1, pace: "mixed" });
   assert.deepEqual([f.goodScenes, f.careScenes], [[], []]);
 });
+
+test("같은 오행이 둘 다 두드러진다는 엔진 문장은 '힘이 강하다'가 아니라 같은 방식을 택하기 쉬운 일의 장면으로 옮긴다", () => {
+  for (const [el, scene] of [["목", "새로 벌이고 키워 가는 일"], ["화", "생각과 마음을 바로 드러내는 일"], ["토", "정해 둔 대로 꾸준히 이어 가는 일"], ["금", "기준을 세워 매듭짓는 일"], ["수", "한 걸음 물러나 생각을 정리하는 일"]]) {
+    const t = lifeHighlightOf(`${el} 기운이 둘 다 두드러져서 같은 곳에서 같이 막힐 수 있어요`);
+    assert.ok(t && t.includes(scene), el);
+    assert.doesNotMatch(t!, /힘이|기운|개수|많|적/, `${el}: 힘 · 개수 · 많고 적음으로 옮기지 않는다`);
+  }
+  const two = lifeHighlightOf("목 · 토 기운이 둘 다 두드러져서 같은 곳에서 같이 막힐 수 있어요");
+  assert.ok(two && two.includes("새로 벌이고 키워 가는 일") && two.includes("정해 둔 대로 꾸준히 이어 가는 일"));
+});
