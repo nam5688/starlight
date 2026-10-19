@@ -5,9 +5,11 @@ import type { BenefitFormState } from "@/app/my/benefits/actions";
 import { BenefitsView } from "@/components/my/benefits/benefits-view";
 import type { BenefitAction } from "@/components/my/benefits/form-message";
 import { MyHeader, MyHubList, MyStatCards } from "@/components/my/my-hub";
+import { OrdersFold } from "@/components/my/orders-fold";
 import { hubCards, hubItems } from "@/components/my/my-hub-data";
 import { BENEFIT_FEATURES, COUPON_REASON_TEXT, DEFAULT_BENEFIT_SETTINGS, type BenefitFeature, type BenefitSettings } from "@/lib/commerce/benefits";
 import type { BenefitOverview } from "@/lib/services/benefit-service";
+import type { MyOrderRow } from "@/lib/services/my-service";
 
 // 개발용 미리보기 — MY 허브 첫 부분과 /my/benefits의 모든 상태를 가상 값으로 한 화면에 보여 준다.
 // 실제 화면과 같은 조각 · 같은 규칙(hubCards · hubItems · BenefitsView)을 쓰며, 서버 동작 대신 아무것도 바꾸지 않는 동작을 넘긴다. 값은 모두 고정 문자열이다(렌더마다 달라지지 않는다).
@@ -26,6 +28,12 @@ const EMPTY: Omit<BenefitOverview, "ready" | "settings"> = {
 };
 
 const SOON = "2026-11-03T05:12:00.000Z";
+
+/** 결제내역 접힘 미리보기용 가상 주문 — 실제 주문이 아니다 */
+const FAKE_ORDERS: MyOrderRow[] = [
+  { orderNumber: "MEU-00000000-PREVIEW01", productName: "심층 리포트", amount: 9900, status: "paid", statusLabel: "결제 완료", paymentEnv: "live", approvedAt: "2026-10-19T03:00:00.000Z", createdAt: "2026-10-19T02:58:00.000Z", assessmentId: "preview" },
+  { orderNumber: "MEU-00000000-PREVIEW02", productName: "유료 질문 3개", amount: 2500, status: "pending", statusLabel: "결제 대기", paymentEnv: "test", approvedAt: null, createdAt: "2026-10-18T02:58:00.000Z", assessmentId: "preview" },
+];
 
 /** A. 모두 켜짐 · 소멸 임박 · 회수 못한 몫 · 초대 링크 있음 */
 const FULL: BenefitOverview = {
@@ -129,6 +137,12 @@ export function MyPreview() {
       <Hub overview={OFF} paid={0} reports={0} />
       <Label note="혜택 표가 없으면 포인트 카드 · 초대 · 쿠폰 줄이 없고 질문권 카드는 눌리지 않는 카드로 결제해 둔 질문 수만 보인다.">허브 D · 혜택 준비 중(DB 변경 전)</Label>
       <Hub overview={NOT_READY} paid={2} reports={1} />
+
+      <Label note="기본은 접혀 있고 건수만 보인다. 누르거나 Enter · Space로 펼치면 주문 목록과 안내가 나온다. 가상 주문이다.">결제내역 · 기본 접힘</Label>
+      <Frame>
+        <h2 className="mt-6 border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">결제내역</h2>
+        <OrdersFold orders={FAKE_ORDERS} />
+      </Frame>
 
       <Label note="앵커 #points · #credits · #invite · #coupons. 소멸 임박 안내 · 묶음별 소멸일/D-day · 회수하지 못한 몫 · 초대 링크와 복사 · 쿠폰 성공 메시지.">혜택 A · 모두 켜짐 · 소멸 임박 · 링크 있음</Label>
       <Benefits overview={FULL} paid={2} id="a" initial={{ ok: true, message: "질문권 1개가 들어왔어요." }} />

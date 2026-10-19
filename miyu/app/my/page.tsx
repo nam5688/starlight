@@ -7,19 +7,19 @@ import { signOut } from "@/app/auth/actions";
 import { setMarketingAction } from "@/app/my/actions";
 import { LoginOptions } from "@/components/auth/login-options";
 import { MyHeader, MyHubList, MyStatCards } from "@/components/my/my-hub";
+import { OrdersFold } from "@/components/my/orders-fold";
 import { hubCards, hubItems } from "@/components/my/my-hub-data";
 import { ConcernRow, DeletedRecords, ReportRow } from "@/components/my/report-rows";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, buttonSecondary, textLink } from "@/components/ui/styles";
 import { formatDate } from "@/components/ui/format";
-import { CONCERN_RECORDS, formatKrw } from "@/lib/config/product";
-import { ROOM_COPY } from "@/lib/report/reading/talk-room";
+import { CONCERN_RECORDS } from "@/lib/config/product";
 import { getBenefitOverview, type BenefitOverview } from "@/lib/services/benefit-service";
 import { getCashView } from "@/lib/services/cash-service";
 import { listMyCompat } from "@/lib/services/compat-service";
 import { listMyPairs } from "@/lib/services/pair-service";
 import { pairDeps } from "@/server/pair";
-import { deleteNoticeOf, getMyPage, PAYMENT_ENV_LABEL } from "@/lib/services/my-service";
+import { deleteNoticeOf, getMyPage } from "@/lib/services/my-service";
 import { isAuthConfigured, paymentConfig } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { logError } from "@/server/ops";
@@ -83,18 +83,14 @@ async function MyContent({ searchParams }: { searchParams: Promise<{ notice?: st
 
   const repo = await readRepository();
   const notice = deleteNoticeOf((await searchParams).notice);
-  const [{ cards, deletedRecords, deleteAvailable, concerns, orders }, cash, savedChats, benefits, compats, pairs] = await Promise.all([
+  const [{ cards, deletedRecords, deleteAvailable, concerns, orders }, cash, benefits, compats, pairs] = await Promise.all([
     getMyPage(repo, member.userId),
     getCashView(repo, member.userId, 1),
-    repo.countVisibleChatSummaries(member.userId).catch(() => 0),
     readBenefits(member.userId),
     listMyCompat(repo, member.userId).catch(() => []),
     listMyPairs(pairDeps(), member.userId).catch(() => []),
   ]);
   const paymentsReady = paymentConfig().ok;
-  // 채팅방 바로가기는 리포트를 삭제한 기록이어도 끊기지 않게 한다(삭제해도 채팅방은 그대로 열린다)
-  const talkTarget = cards[0] ?? deletedRecords[0];
-  const talkHref = talkTarget ? `/results/${talkTarget.assessmentId}/talk` : null;
   return (
     <>
       <MyStatCards cards={hubCards(benefits, cash.ready ? cash.questions : 0)} />
@@ -175,38 +171,6 @@ async function MyContent({ searchParams }: { searchParams: Promise<{ notice?: st
         </section>
       )}
 
-      <section aria-labelledby="my-chats" className="mt-12">
-        <h2 id="my-chats" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
-          {ROOM_COPY.summary.pageTitle}
-        </h2>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl bg-canvas px-4 py-4 shadow-soft">
-          <p className="text-[14px] leading-[1.6] text-ink-2">
-            {savedChats > 0 ? `채팅방에서 저장한 요약이 ${savedChats}개 있어요.` : "채팅방의 [저장하기]를 누르면 나눈 이야기가 요약으로 쌓여요."}
-          </p>
-          <Link href="/my/chats" className={buttonSecondary}>
-            저장한 채팅 요약 보기
-          </Link>
-        </div>
-      </section>
-
-      {cash.ready && cash.questions > 0 && (
-        <section aria-labelledby="my-cash" className="mt-12">
-          <h2 id="my-cash" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
-            결제해 둔 질문
-          </h2>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl bg-canvas px-4 py-4 shadow-soft">
-            <p className="text-[14px] leading-[1.6] text-ink-2">
-              결제하고 아직 쓰지 않은 질문이 있어요. 위의 ‘남은 질문권’ 숫자에 합쳐서 보여요. 채팅방에서 질문을 적어 보내면 바로 쓰여요.
-            </p>
-            {talkHref && (
-              <Link href={talkHref} className={buttonSecondary}>
-                채팅방으로 가기
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
-
       {CONCERN_RECORDS.visible && concerns.length > 0 && (
         <section aria-labelledby="my-concerns" className="mt-12">
           <h2 id="my-concerns" className="border-t-2 border-accent pt-3 text-[18px] leading-snug font-bold tracking-tight">
@@ -228,26 +192,8 @@ async function MyContent({ searchParams }: { searchParams: Promise<{ notice?: st
         {orders.length === 0 ? (
           <p className="mt-3 rounded-xl border border-line bg-canvas px-4 py-6 text-[15px] text-ink-2">결제내역이 없어요.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-canvas">
-            {orders.map((o) => (
-              <li key={o.orderNumber}>
-                <Link href={`/my/orders/${o.orderNumber}`} className="block px-4 py-3.5 hover:bg-mist/60">
-                  <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                    <span className="text-[15px] font-semibold">{o.productName}</span>
-                    <span className="text-[15px] font-semibold tabular-nums">{formatKrw(o.amount)}</span>
-                  </span>
-                  <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-3">
-                    <span className={o.status === "paid" ? "font-semibold text-positive" : "font-semibold text-ink-2"}>{o.statusLabel}</span>
-                    <span>· {formatDate(o.approvedAt ?? o.createdAt)}</span>
-                    <span className="tabular-nums">· {o.orderNumber}</span>
-                    {PAYMENT_ENV_LABEL[o.paymentEnv] && <StatusBadge>{PAYMENT_ENV_LABEL[o.paymentEnv]}</StatusBadge>}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <OrdersFold orders={orders} />
         )}
-        <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">주문을 누르면 결제 승인 기록과 리포트 제공 상태를 주문번호 기준으로 볼 수 있어요.</p>
       </section>
 
       <section aria-labelledby="my-account" className="mt-12">

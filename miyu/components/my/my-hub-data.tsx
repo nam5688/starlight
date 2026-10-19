@@ -1,6 +1,7 @@
 import { couponsVisible, pointsVisible, readyOverview, referralVisible } from "@/components/my/benefits/visibility";
 import type { HubItem, StatCardData } from "@/components/my/my-hub";
 import { ChatBubbleIcon, DocumentIcon, GiftIcon, PairIcon, PencilIcon, TicketIcon } from "@/components/ui/icons";
+import { ROOM_COPY } from "@/lib/report/reading/talk-room";
 import type { BenefitOverview } from "@/lib/services/benefit-service";
 
 // MY 첫 부분에 무엇이 보이는지 정하는 규칙 — 실제 /my 화면과 개발용 미리보기(/dev/my-preview)가 같은 함수를 쓴다.
@@ -36,7 +37,7 @@ export function hubItems(overview: BenefitOverview | null, reportCount: number):
       note: "사주 궁합 · 리포트 궁합은 준비 중이에요",
       icon: <PairIcon />,
     },
-    { id: "chats", title: "미유와 대화하기", description: "지난 상담 이어보기", href: "/my/chats", icon: <ChatBubbleIcon /> },
+    { id: "chats", title: ROOM_COPY.history.hub, description: ROOM_COPY.history.hubDescription, href: "/my/chats", icon: <ChatBubbleIcon /> },
     { id: "reviews", title: "내가 작성한 리뷰", description: "이용한 리포트 · 궁합 · 상담에 후기 남기기", href: "/my/reviews", icon: <PencilIcon /> },
   ];
   if (o && referralVisible(o)) {
