@@ -3,9 +3,9 @@
 // 그 세 가지를 고친 뒤 남는 것은 실령 한 곳(꾸미는 말만 있는 풀이)이다. 이 시험은 그 상태를 고정해 두고, 같은 글에서 오탐이 되돌아오지 않는지 본다.
 // 주의: 검사는 이 글을 본 뒤에 고쳤다(사후 수정). 고친 규칙이 설명 없는 용어 · 지어낸 판정을 더 많이 통과시키지 않는지는 terms.test.ts · prompt-pack.test.ts의 반대 사례가 함께 지킨다.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { canonicalSha256 } from "../test-source.ts";
 import { buildPersonas } from "../ai/compare-personas.ts";
 import { buildEvidence } from "../ai/generator.ts";
 import { checkReadingDepth } from "./depth.ts";
@@ -59,7 +59,8 @@ test("운 보장 검사: 기운이 들어온다는 해석은 막지 않고, 운�
 });
 
 test("원문 보존: 실제 AI 원문 파일은 바뀌지 않았다(해시) — 편집은 검토 후 수정본에서만 한다", () => {
-  assert.equal(createHash("sha256").update(readFileSync(FIXTURE)).digest("hex"), ORIGINAL_SHA256);
+  // 줄바꿈(CRLF ↔ LF)만 눈감는 해시 — Windows에서 CRLF로 받아도 같고, 글자가 바뀌면 달라진다(test-source.ts)
+  assert.equal(canonicalSha256(readFileSync(FIXTURE)), ORIGINAL_SHA256);
 });
 
 test("원문의 검사 결과를 성격별로 가른다: 내용 오류 0 · 형식 1(실령 설명 방식) · 품질 0 — 처음 실행에서 걸린 15개는 형식 14 · 내용 1이었고 15개 모두 오탐이 아니라 14개가 오탐이었다", () => {

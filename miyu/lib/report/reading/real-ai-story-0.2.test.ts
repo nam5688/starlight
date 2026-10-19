@@ -2,9 +2,9 @@
 // 그 글은 재작성까지 두 번 모두 형식 검사를 통과하지 못해 리포트로 저장되지 않았다(기록은 docs/samples/real-ai/). 실제 실행 당시의 검사는 4문장 한 건만 잡았고,
 // 없는 십성("식상은 보이지 않아서 … 부담")을 생활 부담으로 푼 문장은 잡지 못했다 — 글을 본 뒤 검사를 넓혔다(사후 수정). 이 시험은 그 상태를 고정한다.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { canonicalSha256 } from "../test-source.ts";
 import { buildPersonas } from "../ai/compare-personas.ts";
 import { buildEvidence } from "../ai/generator.ts";
 import { checkReadingDepth } from "./depth.ts";
@@ -20,7 +20,7 @@ const ORIGINAL_SHA256 = "142a01c977418d93aa38a3598b91de066791adf4dde9b4a1634c1eb
 
 test("실제 AI의 story-v1 0.2 글(P01, 재작성 뒤): 원문이 그대로이고, 지금 검사는 4문장 1건 + 없는 십성 풀이 1건 + 작성 과정 문장 2건 + 재물 비어 있음 1건을 잡는다", () => {
   const buf = readFileSync(FIXTURE);
-  assert.equal(createHash("sha256").update(buf).digest("hex"), ORIGINAL_SHA256, "실제 AI 원문은 바꾸지 않는다");
+  assert.equal(canonicalSha256(buf), ORIGINAL_SHA256, "실제 AI 원문은 바꾸지 않는다(줄바꿈 CRLF ↔ LF 차이만 눈감는다)");
   const p = buildPersonas(2)[0];
   const evidence = buildEvidence(p.input, { year: 2026, month: 10 });
   const raw = JSON.parse(buf.toString("utf8")) as StoryDraftV1;

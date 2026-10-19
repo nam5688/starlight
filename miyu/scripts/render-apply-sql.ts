@@ -3,8 +3,11 @@
 // 실행: node scripts/render-apply-sql.ts            → supabase/apply-4-to-10.sql
 //       node scripts/render-apply-sql.ts --staging  → supabase/apply-staging-all.sql (아무것도 없는 새 스테이징 프로젝트 전용 · 1번부터 전체 · 운영 DB에는 쓰지 않는다)
 // (miyu 폴더에서)
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync as readRaw, readdirSync, writeFileSync } from "node:fs";
 import { buildApplySql, buildStagingApplySql } from "../lib/ops/apply-sql.ts";
+
+// Windows에서 git이 줄바꿈을 CRLF로 받아 와도 합본은 항상 LF로 만든다 — CRLF만 LF로 바꾸고 그 밖의 글자는 그대로(합본이 마이그레이션과 같은지 시험이 확인한다)
+const readFileSync = (url: URL, encoding: "utf8") => readRaw(url, encoding).replace(/\r\n/g, "\n");
 
 const dir = new URL("../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();

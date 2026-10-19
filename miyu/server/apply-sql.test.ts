@@ -1,15 +1,16 @@
 // 실행: npm test — supabase/apply-4-to-10.sql(SQL Editor에서 한 번에 실행하는 통합 파일)이 마이그레이션 4~10번과 어긋나지 않았는지 확인한다.
 // 실제 DB에서의 동작(임시 Postgres 16: 순차 적용과 구조 동일 · 기존 데이터 보존 · 재실행 중단 · 오류 시 전체 취소)은 이 테스트가 아니라 개발 환경에서 따로 확인했다.
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { test } from "node:test";
 import { buildApplySql } from "../lib/ops/apply-sql.ts";
+import { readSource } from "../lib/report/test-source.ts";
 
 const dir = new URL("../supabase/migrations/", import.meta.url);
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
-const migrations = files.slice(3, 10).map((name) => ({ name, sql: readFileSync(new URL(name, dir), "utf8") }));
-const checkSql = readFileSync(new URL("../supabase/check-migrations.sql", import.meta.url), "utf8");
-const committed = readFileSync(new URL("../supabase/apply-4-to-10.sql", import.meta.url), "utf8");
+const migrations = files.slice(3, 10).map((name) => ({ name, sql: readSource(new URL(name, dir)) }));
+const checkSql = readSource(new URL("../supabase/check-migrations.sql", import.meta.url));
+const committed = readSource(new URL("../supabase/apply-4-to-10.sql", import.meta.url));
 
 test("통합 파일은 마이그레이션 4~10번에서 만든 그대로다 (마이그레이션을 고쳤다면 node scripts/render-apply-sql.ts를 다시 실행)", () => {
   assert.equal(migrations.length, 7);
@@ -57,8 +58,8 @@ test("마지막은 읽기 전용 확인 조회이고, 통합 파일 어디에도
 // ── 스테이징(비어 있는 새 프로젝트) 전용 통합 파일: supabase/apply-staging-all.sql ──
 import { buildStagingApplySql } from "../lib/ops/apply-sql.ts";
 
-const all = files.map((name) => ({ name, sql: readFileSync(new URL(name, dir), "utf8") }));
-const stagingCommitted = readFileSync(new URL("../supabase/apply-staging-all.sql", import.meta.url), "utf8");
+const all = files.map((name) => ({ name, sql: readSource(new URL(name, dir)) }));
+const stagingCommitted = readSource(new URL("../supabase/apply-staging-all.sql", import.meta.url));
 
 test("스테이징 통합 파일은 마이그레이션 전체에서 만든 그대로다 (마이그레이션이 늘거나 바뀌면 node scripts/render-apply-sql.ts --staging을 다시 실행)", () => {
   assert.ok(all.length >= 25, "1~25번이 모두 있다");

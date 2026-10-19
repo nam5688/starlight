@@ -271,7 +271,8 @@ test("연결 점검(정적) CRLF 회귀: Windows(core.autocrlf=true)처럼 소�
   // 글자는 바꾸지 않는다: 정규화한 CRLF 글은 원본(LF)과 한 글자도 다르지 않다
   const lf = readFileSync(new URL("../../server/talk-model.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.equal(normalizeEol(raw), lf);
-  assert.equal(normalizeEol("a\r\nb\rc\nd"), "a\nb\nc\nd");
+  // CRLF만 LF로 바꾼다 — 낱개 CR은 그대로 둔다(줄바꿈 차이가 아닌 변경을 눈감지 않는다)
+  assert.equal(normalizeEol("a\r\nb\rc\nd"), "a\nb\rc\nd");
 });
 
 test("연결 점검(정적)은 비어 있는 점검이 아니다: 연결이 끊긴 소스를 넣으면 문제를 찾아낸다", () => {

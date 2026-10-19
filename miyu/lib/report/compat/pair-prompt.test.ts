@@ -1,15 +1,15 @@
 // 실행: npm test — 리포트 궁합 지시문: 사주 궁합 지시문(0.5)은 리포트 궁합을 더하면서 글자 하나도 바뀌지 않았고(보관본과 같다), 리포트 궁합 지시문(0.3)은 응답 비교 규칙과 6번 장(서로에게 어떤 사람일까?)을 더한 별도 판이다.
 // 이전 판(compat-v1-prompt-0.4.txt)은 보관만 한다(새 구성 이전의 다섯 영역 + 시기 + 응답 구성).
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { Evidence } from "../evidence.ts";
+import { readSource } from "../test-source.ts";
 import { PAIR_PROMPT_VERSION, PAIR_SECTIONS, COMPAT_SECTIONS } from "./plan.ts";
 import { buildCompatUserMessage, buildPairUserMessage, COMPAT_PROMPT_MARK, COMPAT_PROMPT_VERSION, COMPAT_SYSTEM_PROMPT, PAIR_PROMPT_MARK, PAIR_SYSTEM_PROMPT } from "./prompt.ts";
 
-const SAVED = readFileSync(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.5.txt", import.meta.url), "utf8");
-const SAVED_PAIR = readFileSync(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.3.txt", import.meta.url), "utf8");
-const SAVED_OLD = readFileSync(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.4.txt", import.meta.url), "utf8");
+const SAVED = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.5.txt", import.meta.url));
+const SAVED_PAIR = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.3.txt", import.meta.url));
+const SAVED_OLD = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.4.txt", import.meta.url));
 
 const ev = (id: string, fact: string): Evidence => ({ id, source: id.startsWith("pair.") ? "survey" : "saju", topics: ["relationship"], strength: "moderate", fact, cue: "읽는 방식입니다." });
 
