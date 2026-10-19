@@ -7,10 +7,10 @@
 
 | 구분 | 내용 | 검증 |
 | --- | --- | --- |
-| **A. 이전 커밋 `99f2ae4`** (CRLF 호환 수정 + miutest AI 가드 문서) | 이 기능이 **없는** 코드 | **Windows 실제 무료검사 완료**(운영자 보고): 원격과 0/0 clean · `npm run check` 1회 exit 0 — typecheck/lint 통과 · test **1448/1448**(실패 0 · 취소 0 · skip 0) · `test:saju` 5/5 · build 95/95 성공 · 이전 CRLF 7개 해소 · 사전 39개 통과 · pilot-data 66개 / 6차 11개 / ledger 2행 · 4·5·6차 원문 및 6차 report/input/readable/표시 파일 · `.env.local` 전후 해시 동일 · 승인 6/6 소진 · 네트워크 없는 조회 거절 유지 · PC 서버 6차 화면 200 |
-| **B. 이 문서의 새 기능** (관계 · 성별 · 풀이 연결) | 아직 Windows로 전달하지 않았다 | **이 클라우드 세션의 로컬 검증만**(아래 7장). Windows 무료검사 · miutest 반영 확인 · 외부 DB · 실제 AI 품질은 **미실행** |
+| **A. 이전 커밋 `99f2ae4`** (CRLF 호환 수정 + miutest AI 가드 문서) | 이 기능이 **없는** 코드 | (참고: 이 줄은 `99f2ae4`만의 검증이다) **Windows 실제 무료검사 완료**(운영자 보고): 원격과 0/0 clean · `npm run check` 1회 exit 0 — typecheck/lint 통과 · test **1448/1448**(실패 0 · 취소 0 · skip 0) · `test:saju` 5/5 · build 95/95 성공 · 이전 CRLF 7개 해소 · 사전 39개 통과 · pilot-data 66개 / 6차 11개 / ledger 2행 · 4·5·6차 원문 및 6차 report/input/readable/표시 파일 · `.env.local` 전후 해시 동일 · 승인 6/6 소진 · 네트워크 없는 조회 거절 유지 · PC 서버 6차 화면 200 |
+| **B. 이 문서의 새 기능** (관계 · 성별 · 풀이 연결) — 커밋 `6ecca92` + 문구 후속 `f99896d` | Windows 무료검사 · miutest 반영 확인 완료(아래) | **Windows 실제 무료검사 통과(운영자 보고, 2026-10-19)**: 대상 HEAD `f99896d`(pull 시점에 문구 후속이 이미 원격에 있어 `6ecca92` 단독이 아니라 `f99896d`가 검사 대상 · 문구 후속 diff는 사후 확인 · 보호 영역 변경 없음) · 원격과 일치 · working tree clean · `npm run check` 1회 exit 0 — 타입 · 린트 · 테스트 **1491/1491** · `test:saju` 5/5 · 빌드 95/95 · 비공개 원문 / 6차 입력 · 표시 파일 / ledger / `.env` 해시 전후 동일 · 파일 개수(66 / 11 / 2) 보존 · 승인 6/6 소진 · 상한 800 / 6,000원 · 누적 4,314.89원 유지 · 실제 AI 0 · DB 적용 0. **miutest 공개 화면 확인(운영자 보고)**: `f99896d` 배포 Ready · `/privacy` 3-2 · 3-3 · Anthropic 용도 정정 게시 확인 · `/compat`에서 이름 안내 · 각자 성별 · 6관계 순서 · 같은 가상 입력으로 친구 / 연인 풀이가 달라지고 지수 66은 같음 · 390px 가로 넘침 없음 · 새로고침 입력 유지 · 다른 두 사람 입력 초기화 · 실제 AI 호출 0. **아직 미실행**: 외부 Supabase(migration 26) 적용 · 외부 DB QA · **실제 AI 사이별 글 품질** · 실제 휴대폰 · 카카오 / 토스 복귀 · 법률 검토 |
 
-위 A의 Windows 결과는 `99f2ae4`만의 검증이다. **B의 통과 근거로 쓰지 않는다.**
+위 A의 Windows 결과(`99f2ae4`)와 B의 Windows 결과(`f99896d`)는 **서로 다른 검사 대상**이다 — A의 결과를 B의 근거로 쓰지 않고, B는 위 줄의 `f99896d` 검사로만 말한다. 무료검사 통과는 실제 AI 글 품질 · 외부 DB · 실기기 확인이 아니다.
 
 ## 1. 지시 → 구현 위치
 
@@ -92,6 +92,42 @@ alter table public.pairs
 | (참고) 리포트 궁합 판매 스위치 | 기본 꺼짐이라 일반 사용자에게는 원래 열리지 않는다 |
 
 실제 PostgREST로 확인(로컬 임시 DB, 적용 전): 없는 열 insert → `PGRST204 / 400 "Could not find the 'relationship' column"` → 저장소 `createPair`가 `42P01`("DB 변경 26번 필요")을 던짐 · 읽기 정상 · 쌍 행 불변.
+
+### 5-1. 외부 DB에 26번을 넣기 전의 선행 조건 (2026-10-19 · 읽기 전용 정리 — 외부 DB는 건드리지 않았다)
+
+Windows 방의 읽기 전용 사전점검에서 외부 Supabase(`wdvrwwajakjdfrajgxcm`, 사용자가 "미유 테스트 전용"으로 확정)의 OpenAPI에 public 표 22개만 보이고 `pairs`가 없었다. **26번은 `pairs`(24번이 만든다)에 열을 더하는 파일이라 `pairs`가 없으면 단독 적용할 수 없다 — 단독 적용 전제는 맞지 않는다.** 아래는 이 저장소의 마이그레이션 파일을 읽어 센 값이다.
+
+| 번호 | 파일 | 새로 만드는 표 | 누적 표 수 |
+| --- | --- | --- | --- |
+| 1 | init | profiles · assessments · user_regions · orders · payment_events · reports | 6 |
+| 2 | consents | user_consents | 7 |
+| 3 · 4 | profile_backfill · payment_env | (열 · 데이터 보정) | 7 |
+| 5 | personal_context | personal_contexts | 8 |
+| 6 | ops_events | ops_events | 9 |
+| 7 | ai_usage | ai_usage | 10 |
+| 8 | funnel_feedback | funnel_events · report_feedback | 12 |
+| 9 · 10 | performance · account_withdrawal | (인덱스 · 탈퇴 함수) | 12 |
+| 11 | concern_records | concern_records | 13 |
+| 12 | talk_rooms | talk_rooms · chat_questions | 15 |
+| 13 | miyu_cash | cash_wallets · cash_ledger | 17 |
+| 14 | chat_summaries | chat_summaries | 18 |
+| 15 | admin_credit_question | (함수) | 18 |
+| 16 | question_packs | question_packs | 19 |
+| 17 | taste_reports | taste_reports | 20 |
+| **18** | invites | invites · invite_discounts | **22** |
+| 19 | benefits_core | benefit_settings · benefit_settings_history · benefit_failures · benefit_ops · point_lots · point_ledger · credit_lots · credit_ledger | 30 |
+| 20 | coupons_free_orders | coupons · coupon_redemptions · benefit_order_grants (+ **orders 제약 완화 1건 — 운영자 승인 필요 항목**) | 33 |
+| 21 | referrals | referral_links · referral_visits · referral_signups · referral_first_purchases | 37 |
+| 22 | benefit_finance_ai | benefit_expenses | 38 |
+| 23 | compat_requests | compat_requests | 39 |
+| **24** | pair_reports | **pairs** (+ `pair_join` · `pair_unlink` · `pair_withdraw_consent` · 탈퇴 트리거) | 40 |
+| 25 | reviews | reviews · review_admin_log · review_reports (+ funnel_events 이름 검사 확장) | 43 |
+| **26** | pair_relationship | (표 없음 — `pairs.relationship` 열 하나) | 43 |
+
+- **관찰(결론 아님)**: 누적 표 수가 **18번에서 정확히 22**다. 외부 OpenAPI의 22개가 모든 표를 보여 준 목록이라면 외부 DB는 1~18번 수준이고 19~26번이 없다는 뜻이 되지만, **PostgREST의 OpenAPI는 요청한 키(역할)가 권한을 가진 표만 보여 준다**(로컬 전체 적용 DB에서 `authenticated`는 43개 중 23개만, `anon`은 0개를 볼 수 있다 — 호스팅 Supabase의 기본 권한은 달라서 이 값을 그대로 옮길 수 없다). 그래서 REST에 안 보인다는 것만으로 표가 없다고 단정하지 않는다 — **실제 카탈로그는 `supabase/check-migrations.sql`(읽기 전용)이 `to_regclass`로 확인한다.**
+- **순서**: 마이그레이션은 번호 순서로 "아직 안 함"인 것만 적용한다(이미 적용한 파일을 다시 실행하지 않는다). `apply-staging-all.sql`은 **표가 하나도 없는 새 프로젝트 전용**이라 표가 있는 DB에서는 멈춘다 — 부분 적용 DB에는 쓰지 않는다. `apply-4-to-10.sql`은 4~10번 묶음이다.
+- **26번만 보고 "pairs가 없어서 26번을 건너뛴다"고 하지 않는다**: 26번이 필요해지는 것은 리포트 궁합 쌍이 생기는 24번 이후뿐이고, 24번의 선행은 1번(profiles · assessments · orders) · 10번(탈퇴 함수와 연결되는 프로필 트리거) 등 앞 번호 전부다. 19~22번(혜택)은 스위치가 꺼진 채 시작하지만 **20번의 orders 제약 완화는 별도 승인 항목**이고, 23번(사주 궁합)은 24번의 선행은 아니지만 같은 번호 순서에 있다.
+- 이 정리는 **외부 DB 적용 승인이 아니다.** 적용 전 순서: `check-migrations.sql` 결과 확인 → 적용 범위(몇 번부터 몇 번까지)와 20번 제약 완화 승인 → 번호 순서대로 적용 → 다시 `check-migrations.sql`.
 
 ## 6. 기존 데이터 호환
 
