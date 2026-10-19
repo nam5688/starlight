@@ -233,7 +233,7 @@ test("초안은 별도 버전이다: scenario-v1.ts는 다른 모듈을 불러�
       if (["node_modules", ".next", "docs", "pilot-data", "external-data"].includes(name) || name.startsWith(".")) continue;
       const p = join(dir, name);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ts|tsx)$/.test(name) && !/scenario-/.test(name) && /scenario-(?:v1|evidence|cases)/.test(readFileSync(p, "utf8"))) hits.push(p.slice(root.length));
+      else if (/\.(ts|tsx)$/.test(name) && !/scenario-/.test(name) && /scenario-(?:v1|evidence|cases)/.test(readFileSync(p, "utf8"))) hits.push(p.slice(root.length).replaceAll("\\", "/")); // Windows의 \ 구분자를 /로 맞춰 허용 목록과 비교한다
     }
   };
   for (const d of ["app", "components", "server", "lib/services", "lib/report", "lib/commerce", "lib/assessment/modules", "lib/assessment/provenance.ts"]) {

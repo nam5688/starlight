@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Evidence } from "../evidence.ts";
 import { readFileSync } from "node:fs";
-import { buildFlowView, FLOW_HIT_PX, FLOW_MIN_BAR_PCT, isHourUnknown, softenMonths, splitClauses, splitSentences } from "./flow-view.ts";
+import { buildFlowView, completeClauseEnding, FLOW_HIT_PX, FLOW_MIN_BAR_PCT, isHourUnknown, softenMonths, splitClauses, splitSentences } from "./flow-view.ts";
 import type { IntegratedReadingReport, LuckSlot } from "./types.ts";
 
 // 6번 장(앞으로의 운과 변화) 표시 계층 시험 — 저장된 글은 그대로이고 칸 · 시간축 · 개운 카드만 입력 값에서 만들어지는지 본다.
@@ -114,9 +114,10 @@ test("글을 시기별 칸으로 나눈다 — 지나온 시기는 원문 구간
   assert.ok(!byKey["age-20-21"].text.includes("그때의 마음"));
 });
 
-test("글자는 바꾸지 않는다 — 칸 · 묶음 말 · 앞머리에 나눈 문장을 이으면 개운 문단을 뺀 원문과 (쉼표만 빼고) 같다", () => {
+test("글자는 바꾸지 않는다 — 칸 · 묶음 말 · 앞머리에 나눈 문장을 이으면 개운 문단을 뺀 원문과 (쉼표만 빼고, 쉼표에서 나뉜 앞쪽 절의 이어 주는 어미만 끝맺음으로 바꾼 것을 빼고) 같다", () => {
   const v = view();
-  const original = [PAST, NOW, NEXT].join(" ");
+  // 쉼표에서 나뉜 앞쪽 절 "…가능성이 있고,"는 표시에서만 "…가능성이 있어요."로 끝맺는다 — 그 한 곳 말고는 모두 같아야 한다
+  const original = [PAST, NOW, NEXT].join(" ").replace("가능성이 있고, 만 16~26세", "가능성이 있어요. 만 16~26세");
   const parts = [...v.lead, ...v.items.filter((i) => i.kind === "past").map((i) => i.text), ...v.notes.past, ...v.items.filter((i) => i.kind === "now" || i.kind === "year").map((i) => i.text), ...v.notes.now, ...v.items.filter((i) => i.kind === "next").map((i) => i.text), ...v.notes.next].join(" ");
   const norm = (s: string) => s.replace(/[,\s]/g, "");
   assert.equal(norm(parts), norm(original));
@@ -349,4 +350,67 @@ test("같은 부제(시기 이름)가 다른 시기 칸에 복사되지 않는�
   assert.ok(names.every(Boolean) && new Set(names).size === 3, `세 칸이 서로 다른 이름: ${names.join(" / ")}`);
   assert.equal(themeOf(diff, "age-7-16"), undefined, "이전 대운과 맞지 않는 나이 칸(7~16)에는 부제가 없다");
   assert.equal(themeOf(diff, "age-16-16"), undefined);
+});
+
+// ───── 6번 장 회귀(운영자 6차 확인): 명시된 단일 연도 보존 · 쉼표에서 나뉜 절의 끝맺음 ─────
+
+// 세운 하나(2017년 한 해)를 통째로 가리키는 근거 — 나이 범위 만 20~21세(해의 앞뒤가 두 나이에 걸친다)
+const W8_2017 = (): Evidence => timingEvidence("saju.frame.W8.2017", "2017-01", "2018-01", 20, 21);
+const evidenceWith2017 = (): Evidence[] => [...clippedEvidence().slice(0, 4), W8_2017(), fortifyEvidence(TIE_FACT)];
+
+test("만 20~21세 칸의 연도는 근거에 명시된 2017년을 그대로 쓴다 — 출생 연도 차이(1996)로 어림한 2016년이 덮어쓰지 않는다", () => {
+  const v = view({ evidence: evidenceWith2017(), paragraphs: [PAST, NOW, NEXT, FORT_A, FORT_B] });
+  const by = Object.fromEntries(v.items.map((i) => [i.key, i]));
+  assert.equal(by["age-20-21"].caption, "2017년 무렵", "근거 saju.frame.W8.2017이 명시한 해");
+  assert.ok(!JSON.stringify(by["age-20-21"]).includes("2016"), "2016년 무렵이 붙지 않는다");
+  // 같은 입력에서 16세(넓은 기간을 가진 잘린 근거)는 그 나이 한 해(2012), 근거에 없는 연도는 만들지 않는다
+  assert.equal(by["age-16-16"].caption, "2012년 무렵");
+  assert.ok(!JSON.stringify(v).includes("2002"));
+  assert.equal(by["age-7-16"].caption, "2003년 무렵 ~ 2012년 무렵");
+  // 시간축: 2017년 한 해 막대가 2012년 무렵 막대와 2022년 무렵 사이에 놓인다
+  const bar = (k: string) => v.axis!.bars.find((b) => b.key === k)!;
+  assert.ok(bar("age-16-16").left < bar("age-20-21").left && bar("age-20-21").left < bar("now").left);
+});
+
+test("근거에 명시된 해가 없으면 만 20~21세는 출생 연도 차이로 어림한 해를 쓴다(2016년 무렵) — 명시된 해가 있을 때와 달라진다", () => {
+  const v = view({ evidence: clippedEvidence(), paragraphs: [PAST, NOW, NEXT, FORT_A, FORT_B] });
+  assert.equal(v.items.find((i) => i.key === "age-20-21")!.caption, "2016년 무렵");
+});
+
+test("같은 문장에 적힌 단일 연도는 나이 범위 안에 있을 때만 쓰고, 범위와 어긋나면 어림한 해로 둔다", () => {
+  const inside = "지나온 시기를 돌아보면 만 20~21세 무렵(2017년)에는 일의 환경이 바뀌는 주제가 겹쳤을 수 있어요.";
+  const outside = "지나온 시기를 돌아보면 만 20~21세 무렵(2002년)에는 일의 환경이 바뀌는 주제가 겹쳤을 수 있어요.";
+  const a = view({ evidence: clippedEvidence(), paragraphs: [inside, NOW, NEXT, FORT_A, FORT_B] });
+  assert.equal(a.items.find((i) => i.key === "age-20-21")!.caption, "2017년 무렵", "나이 범위(2016~2017) 안의 명시 연도는 유지");
+  const b = view({ evidence: clippedEvidence(), paragraphs: [outside, NOW, NEXT, FORT_A, FORT_B] });
+  assert.equal(b.items.find((i) => i.key === "age-20-21")!.caption, "2016년 무렵", "나이와 어긋난 연도(2002)는 쓰지 않는다");
+  assert.ok(!JSON.stringify(b.axis).includes("2002"));
+});
+
+test("근거끼리 어긋나 출생 연도 차이를 안전하게 정할 수 없으면 명시된 해가 있어도 연도를 붙이지 않는다(연도 보류)", () => {
+  const conflict: Evidence[] = [timingEvidence("a", "2012-12", "2022-11", 16, 26), timingEvidence("b", "2022-12", "2032-11", 26, 36), timingEvidence("c", "2005-01", "2006-01", 20, 21), fortifyEvidence(TIE_FACT)];
+  const v = view({ evidence: conflict, paragraphs: [PAST, NOW, NEXT, FORT_A, FORT_B] });
+  for (const i of v.items.filter((x) => x.kind === "past")) assert.ok(!/\d{4}년/.test(i.caption), `${i.title}: ${i.caption}`);
+});
+
+test("쉼표에서 나뉜 앞쪽 절은 이어 주는 어미 대신 같은 뜻의 끝맺음으로 보인다 — 16세 칸은 '…가능성이 있어요.'로 끝난다", () => {
+  const v = view({ evidence: evidenceWith2017(), paragraphs: [PAST, NOW, NEXT, FORT_A, FORT_B] });
+  const t16 = v.items.find((i) => i.key === "age-16-16")!.text;
+  assert.equal(t16, "만 16세 무렵에는 관계가 달라지는 주제가 있었을 가능성이 있어요.");
+  assert.ok(!/있고[.,]?$/.test(t16));
+  // 쉼표로 나뉘지 않은 마지막 절 · 다른 칸의 글은 원문 그대로
+  assert.equal(v.items.find((i) => i.key === "age-16-26")!.text.startsWith("만 16~26세 무렵에는 배우며 준비하는 시기였을 수 있어요."), true);
+  assert.match(v.items.find((i) => i.key === "age-7-16")!.text, /두드러졌을 수 있어요\.$/);
+});
+
+test("끝맺음 보정은 정해진 여섯 어미에만 적용하고 이미 끝맺은 절 · 다른 어미는 그대로 둔다(새 내용을 더하지 않는다)", () => {
+  assert.equal(completeClauseEnding("관계가 달라지는 주제가 있었을 가능성이 있고"), "관계가 달라지는 주제가 있었을 가능성이 있어요.");
+  assert.equal(completeClauseEnding("기회가 없고"), "기회가 없어요.");
+  assert.equal(completeClauseEnding("조금 힘든 때였고"), "조금 힘든 때였어요.");
+  assert.equal(completeClauseEnding("일을 많이 했고"), "일을 많이 했어요.");
+  assert.equal(completeClauseEnding("일이 바뀌었고"), "일이 바뀌었고", "표에 없는 어미(-었고)는 건드리지 않는다");
+  assert.equal(completeClauseEnding("새 환경이 됐고"), "새 환경이 됐어요.");
+  assert.equal(completeClauseEnding("이미 끝난 문장이에요."), "이미 끝난 문장이에요.");
+  assert.equal(completeClauseEnding("배우며 준비하는 시기였지만"), "배우며 준비하는 시기였지만", "표에 없는 이어 주는 말은 건드리지 않는다");
+  assert.equal(completeClauseEnding("함께 공부하고"), "함께 공부하고");
 });

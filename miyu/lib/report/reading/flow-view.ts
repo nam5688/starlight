@@ -99,6 +99,25 @@ export function splitClauses(sentence: string): string[] {
   return parts.map((p) => p.trim()).filter(Boolean);
 }
 
+/**
+ * 한 문장을 쉼표에서 나눠 다른 시기 칸에 담을 때 앞쪽 절 끝에 남는 이어 주는 어미("…가능성이 있고")를 같은 뜻의 끝맺음("…가능성이 있어요.")으로 바꾼다 — 표시용 칸에서만.
+ * 바꾸는 어미는 아래 여섯 가지뿐이고(새 내용을 더하지 않는다) 그 밖의 절은 그대로 둔다. 저장된 글 · 원문 파일은 바꾸지 않는다.
+ */
+const CLAUSE_ENDINGS: [RegExp, string][] = [
+  [/있고$/, "있어요."],
+  [/없고$/, "없어요."],
+  [/이었고$/, "이었어요."],
+  [/였고$/, "였어요."],
+  [/했고$/, "했어요."],
+  [/됐고$/, "됐어요."],
+];
+export function completeClauseEnding(clause: string): string {
+  const t = clause.trimEnd();
+  if (/[.!?]$/.test(t)) return clause;
+  for (const [re, to] of CLAUSE_ENDINGS) if (re.test(t)) return t.replace(re, to);
+  return clause;
+}
+
 type Slot = LuckSlot | undefined;
 
 type Draft = {
@@ -200,10 +219,24 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
   const nextFrom = next ? yearOf(next.from) : null;
   const near = (a: number, b: number | null) => b !== null && Math.abs(a - b) <= 1;
 
-  /** 나이 구간을 연도 구간으로 — 안전하게 정한 출생 연도 차이로만 어림한다(근거의 기간을 그대로 옮기지 않는다). 정할 수 없으면 null */
-  const windowSpan = (a: number, b: number): { from: number; to: number } | null => {
+  /**
+   * 나이 구간을 연도 구간으로. 안전하게 정한 출생 연도 차이(offset)가 없으면 연도를 붙이지 않는다(null). 있으면 순서는
+   * ① 명시된 해 — 근거 하나가 한 해(세운)를 통째로 가리키고 그 나이 범위가 이 칸과 같으면 근거에 적힌 그 해 그대로,
+   *   또는 같은 문장에 적힌 단일 연도가 이 나이 범위의 연도 안에 있으면 그 해 (출생 연도 차이로 어림한 값이 명시된 해를 덮어쓰지 않는다)
+   * ② 출생 연도 차이로 어림(근거의 넓은 기간을 그대로 옮기지 않는다).
+   * 명시된 해가 나이 범위와 어긋나면 쓰지 않고 ②로 간다 — 새 연도를 지어내지 않는다.
+   */
+  const windowSpan = (a: number, b: number, hintYear?: number): { from: number; to: number } | null => {
     if (offset === null) return null;
-    return { from: offset + a, to: offset + (b > a ? b : a + 1) };
+    const lo = offset + a;
+    const hi = offset + (b > a ? b : a + 1);
+    const wholeYear = wins.find((w) => periodMatchesAge(w) && ymNum(w.to) - ymNum(w.from) <= 1.2 && w.age.from === a && w.age.to === b);
+    if (wholeYear) {
+      const y = yearOf(wholeYear.from);
+      if (y >= lo - 1 && y <= hi) return { from: y, to: y + 1 };
+    }
+    if (hintYear !== undefined && hintYear >= lo && hintYear <= hi) return { from: hintYear, to: hintYear + 1 };
+    return { from: lo, to: hi };
   };
 
   // 글을 문단 → 문장 → 쉼표로 이어진 시기 표지 단위로 나눠 칸에 담는다
@@ -238,7 +271,8 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
     if (ages.length > 0) {
       const a = Number(ages[0][1]);
       const b = ages[0][2] ? Number(ages[0][2]) : a;
-      const sp = windowSpan(a, b);
+      const distinctYears = [...new Set(years)];
+      const sp = windowSpan(a, b, distinctYears.length === 1 ? distinctYears[0] : undefined);
       if (sp && nowFrom !== null && nowTo !== null) {
         const mid = (sp.from + sp.to) / 2;
         if (mid < nowFrom) return { text: c, item: ensurePast(a, b, sp) };
@@ -288,10 +322,12 @@ export function buildFlowView(report: IntegratedReadingReport): FlowView | null 
     const seenInPara = new Map<string, true>();
     const lastAtStart = last;
     for (const sentence of splitSentences(para)) {
-      for (const clause of splitClauses(sentence)) {
+      const clauses = splitClauses(sentence);
+      for (const [ci, clause] of clauses.entries()) {
         const placed: Cl = place(clause, seenInPara);
         const item: string | null = placed.item ?? last;
-        entries.push({ text: clause, item: placed.item });
+        // 쉼표에서 나뉘어 다른 칸으로 갈 수 있는 앞쪽 절은 이어 주는 어미 대신 끝맺음으로 보인다(마지막 절은 원문 그대로)
+        entries.push({ text: ci < clauses.length - 1 ? completeClauseEnding(clause) : clause, item: placed.item });
         if (item) {
           seenInPara.set(item, true);
           last = item;
