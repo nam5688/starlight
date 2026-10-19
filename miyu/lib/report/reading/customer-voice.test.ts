@@ -76,7 +76,7 @@ test("표현 예시표: 없음 검사에 쓰는 어구(stems)는 명리 말이 �
 // ───── 지시문 0.7 ─────
 
 test("지시문 0.7: 버전 · 새 블록 · 옛 용어 지시가 남지 않음", () => {
-  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.7");
+  assert.equal(STORY7_PROMPT_VERSION, "story-7-prompt-0.8");
   assert.match(STORY7_SYSTEM_PROMPT, /\[고객이 읽는 글 — 풀이는 사주로 하고, 글은 이 사람의 이야기로 쓴다/);
   assert.match(STORY7_SYSTEM_PROMPT, /\[표현 예시 — 명리 말을 옮길 때의 참고다/);
   assert.match(STORY7_SYSTEM_PROMPT, /\[명리 용어 — 본문에는 쓰지 않는다\]/);
