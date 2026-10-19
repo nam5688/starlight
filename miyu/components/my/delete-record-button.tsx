@@ -42,6 +42,39 @@ export const DELETE_RECORD_COPY = {
   pending: "삭제하는 중…",
 } as const;
 
+/**
+ * 삭제 범위 — "all": 삭제 범위 확대(DB 29번)가 있는 DB. 채팅방 · 나눈 대화 · 저장한 요약도 함께 지운다. "legacy": 29번 전 DB(예전 범위, 채팅방은 읽기용 기록으로 남는다).
+ * 확인창 문구는 실제로 일어날 일과 같아야 하므로 서버가 이 DB의 범위를 확인해 넘겨 준다(lib/services/my-service.ts의 deleteReportRecord가 같은 확인으로 삭제한다).
+ */
+export type DeleteScope = "all" | "legacy";
+
+/** 삭제 범위 확대(29번) 때의 안내 — 삭제되는 것 · 남는 것 · 참고 (supabase/migrations/20261108000000_record_delete_scope.sql 머리말과 같은 내용) */
+const DELETE_SCOPE_ALL = {
+  removed: [
+    "이 결과로 받은 리포트 본문 (무료 리포트 · 심층 리포트)",
+    "맛보기 리포트 글",
+    "고민 반영 리포트와 적어 둔 고민",
+    "이 기록의 채팅방과 나눈 대화, 저장한 채팅 요약",
+    "채팅을 이어 가려고 보관하던 분석 입력 정보 (리포트 궁합에 쓰이는 중이면 그 궁합이 쓰는 동안은 남아요)",
+    "삭제한 뒤에는 결과 화면 · 미리보기 · 전체 리포트 · 채팅방을 다시 열 수 없고, 지운 글과 대화는 복구할 수 없어요.",
+  ],
+  kept: [
+    "남은 질문권 (다른 기록의 채팅방에서 그대로 쓸 수 있어요)",
+    "주문 · 결제 · 환불 기록과 계정 · 동의 정보",
+    "질문을 몇 번 썼는지 같은 이용 기록 (대화 내용은 없어요)",
+    "다른 분석 결과와 사주 궁합 · 리포트 궁합 (이 삭제와는 따로예요)",
+  ],
+  notes: [
+    "이미 결제한 리포트라도 삭제한 기록은 다시 만들어 주거나 다시 구매하게 하지 않아요.",
+    "맛보기 리포트는 계정당 한 번이라 삭제해도 다시 받을 수 없어요.",
+    "이전에 삭제한 기록의 채팅방은 이번에 함께 지우지 않고 그대로 남아 있어요.",
+    "새 분석을 시작하면 새 리포트를 받을 수 있어요.",
+  ],
+} as const;
+
+/** 삭제 범위에 맞는 확인창 문구 */
+export const deleteCopyOf = (scope: DeleteScope) => (scope === "all" ? { ...DELETE_RECORD_COPY, ...DELETE_SCOPE_ALL } : DELETE_RECORD_COPY);
+
 /** 아래 고정 줄 — 안내가 아무리 길어도 취소 · 삭제하기는 늘 화면 안에 있다 (짧은 가로 화면에서는 줄여 안내 몫을 남긴다) */
 function Buttons({ onCancel, onDone }: { onCancel: () => void; onDone: () => void }) {
   const { pending } = useFormStatus();
@@ -87,6 +120,7 @@ type SheetProps = {
   onDone: () => void;
   /** 카드 안에 펼친 경우 — 안내를 안에서 스크롤하지 않고 문서 흐름대로 길게 보인다 */
   inline?: boolean;
+  scope: DeleteScope;
 };
 
 /**
@@ -94,7 +128,8 @@ type SheetProps = {
  * 서버 액션을 부르는 <form>은 아래 고정 줄(취소 · 삭제하기)만 감싼다 — 안내 전체를 감싸 중첩 flex로 높이를 나누는 구조는
  * 브라우저에 따라 높이가 0이 되어 창이 보이지 않을 수 있어(실기기 보고) 쓰지 않는다. 위 · 가운데 · 아래는 모두 확인창의 직접 자식이다.
  */
-function ConfirmSheet({ assessmentId, productName, subject, created, ids, titleRef, onCancel, onDone, inline = false }: SheetProps) {
+function ConfirmSheet({ assessmentId, productName, subject, created, ids, titleRef, onCancel, onDone, inline = false, scope }: SheetProps) {
+  const copy = deleteCopyOf(scope);
   return (
     <>
       <div data-testid="delete-record-head" className="shrink-0 px-5 pt-5 pb-3 [@media(max-height:480px)]:px-4 [@media(max-height:480px)]:pt-3 [@media(max-height:480px)]:pb-2">
@@ -124,18 +159,18 @@ function ConfirmSheet({ assessmentId, productName, subject, created, ids, titleR
       >
         <h3 className="text-[14px] font-bold text-ink-2">{DELETE_RECORD_COPY.removedTitle}</h3>
         <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[14px] leading-[1.6] text-ink-2">
-          {DELETE_RECORD_COPY.removed.map((t) => (
+          {copy.removed.map((t) => (
             <li key={t}>{t}</li>
           ))}
         </ul>
         <h3 className="mt-4 text-[14px] font-bold text-ink-2">{DELETE_RECORD_COPY.keptTitle}</h3>
         <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[14px] leading-[1.6] text-ink-2">
-          {DELETE_RECORD_COPY.kept.map((t) => (
+          {copy.kept.map((t) => (
             <li key={t}>{t}</li>
           ))}
         </ul>
         <ul className="mt-4 space-y-1 text-[13px] leading-[1.6] text-ink-3">
-          {DELETE_RECORD_COPY.notes.map((t) => (
+          {copy.notes.map((t) => (
             <li key={t}>{t}</li>
           ))}
         </ul>
@@ -161,7 +196,7 @@ function ConfirmSheet({ assessmentId, productName, subject, created, ids, titleR
  *  - 확인창 높이를 나누던 중첩 flex(`flex-1` 0% 기준)와 본문 고정(`position: fixed`)은 브라우저에 따라 창이 0 높이가 되거나 화면 밖에 놓일 수 있어 없앴다(위 · 가운데 · 아래가 확인창의 직접 자식, 가운데는 `flex: auto`).
  *  - 그래도 열자마자 보이는지 두 번 그린 뒤 확인하고(`isVisiblyRendered`), 보이지 않으면 확인창을 닫고 같은 내용을 카드 안에 펼친다 — 어두운 배경만 남은 채 막히지 않는다.
  */
-export function DeleteRecordButton({ assessmentId, productName, subject, created }: { assessmentId: string; /** 카드의 리포트명 (예: 심층 리포트) */ productName: string; /** 카드의 표시 이름 · 분석 대상 (예: 지민 님 · 1995. 4. 12.) */ subject: string; /** 카드의 생성일 (이미 화면에 보이는 값) */ created: string }) {
+export function DeleteRecordButton({ assessmentId, productName, subject, created, scope = "legacy" }: { assessmentId: string; /** 카드의 리포트명 (예: 심층 리포트) */ productName: string; /** 카드의 표시 이름 · 분석 대상 (예: 지민 님 · 1995. 4. 12.) */ subject: string; /** 카드의 생성일 (이미 화면에 보이는 값) */ created: string; /** 이 DB의 삭제 범위 — 확인창 문구가 실제로 일어날 일과 같아지게 서버가 확인해 넘긴다 */ scope?: DeleteScope }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -252,7 +287,7 @@ export function DeleteRecordButton({ assessmentId, productName, subject, created
         }}
         className="confirm-sheet rounded-3xl bg-canvas p-0 text-ink shadow-pop backdrop:bg-black/40"
       >
-        <ConfirmSheet assessmentId={assessmentId} productName={productName} subject={subject} created={created} ids={dialogIds} titleRef={titleRef} onCancel={close} onDone={onDone} />
+        <ConfirmSheet assessmentId={assessmentId} productName={productName} subject={subject} created={created} ids={dialogIds} titleRef={titleRef} onCancel={close} onDone={onDone} scope={scope} />
       </dialog>
       {inline && (
         <section
@@ -265,7 +300,7 @@ export function DeleteRecordButton({ assessmentId, productName, subject, created
           }}
           className="mt-2 rounded-2xl border border-line-strong bg-canvas text-ink shadow-soft"
         >
-          <ConfirmSheet assessmentId={assessmentId} productName={productName} subject={subject} created={created} ids={inlineIds} titleRef={inlineTitleRef} onCancel={cancelInline} onDone={onDone} inline />
+          <ConfirmSheet assessmentId={assessmentId} productName={productName} subject={subject} created={created} ids={inlineIds} titleRef={inlineTitleRef} onCancel={cancelInline} onDone={onDone} inline scope={scope} />
         </section>
       )}
     </>

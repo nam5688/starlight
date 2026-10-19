@@ -36,7 +36,9 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
   const regions = new Map<string, { province: string; district: string }>();
   const assessments = new Map<string, AssessmentRecord>();
   // myDelete.ready=false이면 28번(기록 삭제) 적용 전 DB를 흉내 낸다 — 삭제 열이 없어 recordDeletedAt이 비어 있고(undefined) 삭제 함수는 42P01
-  const myDelete = { ready: true };
+  // myDelete.purge=true이면 29번(삭제 범위 확대) 적용 후 DB를 흉내 낸다 — 기본은 false(예전 범위 삭제만 있는 DB)라서 28번 시험이 그대로 통과한다.
+  // pairRefs에 검사 번호를 넣으면 리포트 궁합 쌍이 그 결과를 가리키는 것으로 본다(분석 원자료를 비우지 않는다)
+  const myDelete = { ready: true, purge: false, pairRefs: new Set<string>() };
   const orders = new Map<string, OrderRecord>();
   /** 주문 상태가 바뀔 때 부르는 훅(테스트용 혜택 저장소가 DB 트리거 대신 등록한다) */
   const orderHooks: ((before: OrderRecord, after: OrderRecord) => void)[] = [];
@@ -161,7 +163,8 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       const { recordDeletedAt: _unused, ...rest } = a; // eslint-disable-line @typescript-eslint/no-unused-vars
       return rest;
     }
-    return { ...a, recordDeletedAt: a.recordDeletedAt ?? null };
+    // 29번 열(삭제 범위 확대)이 없는 DB는 값이 비어 있다(undefined)
+    return myDelete.purge ? { ...a, recordDeletedAt: a.recordDeletedAt ?? null, recordPurgedAt: a.recordPurgedAt ?? null } : { ...a, recordDeletedAt: a.recordDeletedAt ?? null };
   };
 
   const repo: MiyuRepository = {
@@ -317,6 +320,55 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         }
       }
       assessments.set(assessmentId, { ...a, recordDeletedAt: iso() });
+      return "deleted";
+    },
+    async purgeAvailable() {
+      return myDelete.ready && myDelete.purge;
+    },
+    async purgeAssessmentRecord(userId, assessmentId) {
+      // DB 함수 delete_assessment_record_v2(29번)와 같은 규칙 — 소유자 · 이미 삭제 · 진행 중 확인 → 대화(방 · 요약 · 읽기용 기록) · 리포트 본문 · 고민 · 맛보기 글 삭제 → 분석 원자료 비우기(쌍이 가리키지 않을 때) → 삭제 표시 둘
+      if (!myDelete.ready || !myDelete.purge) throw Object.assign(new Error("delete_assessment_record_v2 함수가 없습니다 (DB 변경 29번 필요)"), { code: "PURGE_UNAVAILABLE" });
+      const a = assessments.get(assessmentId);
+      if (!a || a.userId !== userId || a.contentVersion === "withdrawn") return "not-found";
+      if (a.recordDeletedAt) return "unchanged";
+      const nowMs = now().getTime();
+      const isReportOrder = (productId: string) => productId === "personal-integrated-report" || productId.startsWith("personal-integrated-report:r") || productId.startsWith("concern-report:");
+      const mine = [...orders.values()].filter((o) => o.assessmentId === assessmentId);
+      const generating = [...reports.values()].some((r) => r.assessmentId === assessmentId && (r.status === "queued" || r.status === "generating") && nowMs - new Date(r.updatedAt).getTime() < 15 * 60_000);
+      const pendingOrder = mine.some((o) => o.status === "pending" && nowMs - new Date(o.createdAt).getTime() < 60 * 60_000 && !o.productId.startsWith("cash-charge:"));
+      const compatWithoutReport = mine.some((o) => o.status === "paid" && (o.productId.startsWith("saju-compat:") || o.productId.startsWith("report-compat:")) && ![...reports.values()].some((r) => r.orderId === o.id));
+      const t = tasteReports.get(userId);
+      const tastePending = !!t && t.assessmentId === assessmentId && t.status === "pending" && t.until !== null && t.until > nowMs;
+      const chatInFlight = chatReservations.some((r) => r.assessmentId === assessmentId && r.until > nowMs) || chatQuestions.some((c) => c.assessmentId === assessmentId && nowMs - new Date(c.createdAt).getTime() < 30_000);
+      const spentJustNow = ledger.some((l) => l.userId === userId && l.kind === "spend" && nowMs - new Date(l.createdAt).getTime() < 30_000);
+      if (generating || pendingOrder || compatWithoutReport || tastePending || chatInFlight || spentJustNow) return "busy";
+
+      // 대화 내용(방 · 요약 · 읽기용 기록)은 이 결과의 것만 지운다. 질문 횟수(chatQuestions) · 질문권 장부는 내용이 없는 사용 이력이라 그대로 둔다
+      for (const k of [...talkRooms.keys()]) if (talkRooms.get(k)!.assessmentId === assessmentId) talkRooms.delete(k);
+      for (let i = chatSummaries.length - 1; i >= 0; i--) if (chatSummaries[i].assessmentId === assessmentId && chatSummaries[i].userId === userId) chatSummaries.splice(i, 1);
+      for (const k of [...transcripts.keys()]) if (transcripts.get(k)!.assessmentId === assessmentId && transcripts.get(k)!.userId === userId) transcripts.delete(k);
+      for (const r of [...reports.values()]) {
+        const o = orders.get(r.orderId);
+        if (r.assessmentId === assessmentId && o && isReportOrder(o.productId)) {
+          reports.delete(r.id);
+          feedback.delete(r.id);
+        }
+      }
+      contexts.delete(assessmentId);
+      for (const c of [...concernRecords.values()]) if (c.assessmentId === assessmentId) concernRecords.delete(c.id);
+      if (t && t.assessmentId === assessmentId) {
+        if (t.status === "pending") tasteReports.delete(userId);
+        else {
+          t.content = { deleted: true };
+          t.generator = null;
+          t.generatorVersion = null;
+        }
+      }
+      const stamp = iso();
+      const scrub = myDelete.pairRefs.has(assessmentId)
+        ? {}
+        : ({ nickname: "삭제", calendar: "solar", isLeapMonth: false, birthYear: 1900, birthMonth: 1, birthDay: 1, birthTime: null, knownMbti: null, answers: {}, summary: {}, saju: {}, contentVersion: "record-deleted" } as unknown as Partial<AssessmentRecord>);
+      assessments.set(assessmentId, { ...a, ...scrub, recordDeletedAt: stamp, recordPurgedAt: stamp });
       return "deleted";
     },
     async listTalkTranscripts(assessmentId) {
@@ -554,6 +606,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async upsertTalkRoom(input) {
       if (assessments.get(input.assessmentId)?.userId !== input.userId) throw new Error("talk room owner mismatch");
+      if (assessments.get(input.assessmentId)?.recordPurgedAt) throw new Error("record_purged"); // DB 트리거(29번)와 같다: 삭제를 마친 기록에는 대화방을 만들거나 고치지 않는다
       // 이미 있는 방은 요약 위치(savedUpto)를 그대로 둔다 (DB의 upsert가 넣은 열만 바꾸는 것과 같다)
       const prev = talkRooms.get(`${input.assessmentId}|${input.roomKey}`);
       talkRooms.set(`${input.assessmentId}|${input.roomKey}`, { assessmentId: input.assessmentId, roomKey: input.roomKey, userId: input.userId, actions: input.actions, updatedAt: iso(), savedUpto: prev?.savedUpto ?? 0 });
@@ -578,6 +631,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
     },
     async insertChatSummary(input) {
       if (assessments.get(input.assessmentId)?.userId !== input.userId) throw new Error("chat summary owner mismatch");
+      if (assessments.get(input.assessmentId)?.recordPurgedAt) throw new Error("record_purged");
       const row: ChatSummaryRecord = { id: id(), userId: input.userId, assessmentId: input.assessmentId, room: input.room, visible: input.visible, items: input.items, createdAt: iso() };
       chatSummaries.push(row);
       return row;
@@ -628,6 +682,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       for (const old of hidden.slice(keep)) chatSummaries.splice(chatSummaries.indexOf(old), 1);
     },
     async addChatQuestion(input) {
+      if (assessments.get(input.assessmentId)?.recordPurgedAt) throw new Error("record_purged");
       chatQuestions.push({ ...input, createdAt: iso() });
     },
     async countChatQuestionsSince(userId, since) {
@@ -640,6 +695,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
       // DB reserve_chat_question과 같은 규칙 — 확인과 예약이 한 번에(await 없이) 일어나 동시에 와도 한도를 넘지 않는다
       const nowMs = now().getTime();
       for (let i = chatReservations.length - 1; i >= 0; i--) if (chatReservations[i].userId === userId && chatReservations[i].until <= nowMs) chatReservations.splice(i, 1);
+      if (assessments.get(assessmentId)?.recordPurgedAt) throw new Error("record_purged");
       const used = chatQuestions.filter((q) => q.userId === userId && q.roomKey === roomKey).length + liveReservations(userId, roomKey);
       if (used >= max) return null;
       const id = ++reservationSeq;
@@ -651,6 +707,7 @@ export function createMemoryRepository(now: () => Date = () => new Date()) {
         const i = chatReservations.findIndex((r) => r.id === reservation.id);
         if (i >= 0) chatReservations.splice(i, 1);
       }
+      if (assessments.get(input.assessmentId)?.recordPurgedAt) throw new Error("record_purged");
       chatQuestions.push({ ...input, createdAt: iso() });
     },
     async releaseChatQuestion(reservation, input) {

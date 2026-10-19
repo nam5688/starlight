@@ -14,10 +14,13 @@ export type TalkSaveResult = { ok: true } | { ok: false; reason: "not-found" | "
 
 const missingTable = (e: unknown) => (e as { code?: string } | null)?.code === "42P01";
 
-/** 검사 결과의 주인인지 — 대화 저장 · 자유 질문 모두 이 확인을 먼저 한다 */
+/**
+ * 검사 결과의 주인인지 — 대화 저장 · 자유 질문 모두 이 확인을 먼저 한다.
+ * "삭제 범위 확대"(DB 29번)로 삭제를 마친 기록(recordPurgedAt)은 채팅방 · 대화 · 요약까지 지운 것이라 대화에 관한 모든 읽기 · 쓰기에서 없는 기록으로 본다(DB 장치도 같은 쓰기를 막는다).
+ */
 export async function owns(repo: MiyuRepository, userId: string, assessmentId: string): Promise<boolean> {
   const a = await repo.getAssessment(assessmentId);
-  return Boolean(a && a.userId === userId);
+  return Boolean(a && a.userId === userId && !a.recordPurgedAt);
 }
 
 /** 내 검사 결과이면서 "기록 삭제"하지 않은 것 — 리포트 · 맛보기 · 초대처럼 삭제한 기록에서는 쓸 수 없는 기능이 쓴다(채팅은 삭제한 기록에서도 이어지므로 owns를 쓴다) */
@@ -60,7 +63,7 @@ export function roomEpochOf(deleted: boolean, transcripts: readonly { roomKey: s
 export async function saveTalkRoom(repo: MiyuRepository, input: { userId: string; assessmentId: string; roomKey: string; actions: unknown; /** 삭제한 기록의 방에서만 쓴다 — 화면이 열릴 때 받은 표지(roomEpochOf) */ epoch?: unknown }): Promise<TalkSaveResult> {
   if (!TALK_ROOM_KEY.test(input.roomKey)) return { ok: false, reason: "invalid" };
   const assessment = await repo.getAssessment(input.assessmentId);
-  if (!assessment || assessment.userId !== input.userId) return { ok: false, reason: "not-found" };
+  if (!assessment || assessment.userId !== input.userId || assessment.recordPurgedAt) return { ok: false, reason: "not-found" };
   // 삭제한 기록: 삭제 전에 열어 둔 화면(표지가 없거나 다름)이 옛 대화 전체를 되돌려 쓰지 못하게 한다 — 옛 대화는 읽기용 대화 기록으로 옮겨져 있다
   if (assessment.recordDeletedAt) {
     const expected = roomEpochOf(true, await repo.listTalkTranscripts(input.assessmentId), input.roomKey);

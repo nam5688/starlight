@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { retryReceivedReportAction, retryReportAction } from "@/app/results/[id]/actions";
-import { DeleteRecordButton } from "@/components/my/delete-record-button";
+import { DeleteRecordButton, type DeleteScope } from "@/components/my/delete-record-button";
 import { ReceivedReports } from "@/components/results/received-reports";
 import { StateBadge } from "@/components/my/state-badge";
 import { formatDate, formatDateTime } from "@/components/ui/format";
@@ -79,7 +79,7 @@ function ReportStateBadges({ card }: { card: MyReportCard }) {
  * 리포트 한 건: 제목 · 상태(무료 / 구매 완료 / 생성 중) · 대상 · 날짜 · 고민 주제와, 상태에 맞는 버튼만.
  * deleteAvailable이면 맨 아래에 "기록 삭제"가 있다 — 누르면 확인창이 열리고, 확인해야 리포트 본문 · 맛보기 글 · 고민이 되돌릴 수 없게 지워진다(대화 · 질문권 · 주문 · 결제 기록은 남는다).
  */
-export function ReportRow({ card, paymentsReady, deleteAvailable = false }: { card: MyReportCard; paymentsReady: boolean; deleteAvailable?: boolean }) {
+export function ReportRow({ card, paymentsReady, deleteAvailable = false, deleteScope = "legacy" }: { card: MyReportCard; paymentsReady: boolean; deleteAvailable?: boolean; deleteScope?: DeleteScope }) {
   const href = `/results/${card.assessmentId}`;
   const small = "inline-flex h-10 items-center justify-center rounded-lg px-4 text-[14px] font-semibold";
   const primary = `${small} bg-accent text-white hover:bg-accent-strong`;
@@ -148,7 +148,7 @@ export function ReportRow({ card, paymentsReady, deleteAvailable = false }: { ca
       )}
       {deleteAvailable && (
         <div className="mt-3 border-t border-line pt-1">
-          <DeleteRecordButton assessmentId={card.assessmentId} productName={card.productName} subject={card.subject} created={formatDate(card.createdAt)} />
+          <DeleteRecordButton assessmentId={card.assessmentId} productName={card.productName} subject={card.subject} created={formatDate(card.createdAt)} scope={deleteScope} />
         </div>
       )}
     </li>

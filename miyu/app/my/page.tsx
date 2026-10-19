@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { signOut } from "@/app/auth/actions";
 import { setMarketingAction } from "@/app/my/actions";
 import { LoginOptions } from "@/components/auth/login-options";
+import type { DeleteScope } from "@/components/my/delete-record-button";
 import { MyHeader, MyHubList, MyStatCards } from "@/components/my/my-hub";
 import { OrdersFold } from "@/components/my/orders-fold";
 import { hubCards, hubItems } from "@/components/my/my-hub-data";
@@ -83,8 +84,10 @@ async function MyContent({ searchParams }: { searchParams: Promise<{ notice?: st
 
   const repo = await readRepository();
   const notice = deleteNoticeOf((await searchParams).notice);
-  const [{ cards, deletedRecords, deleteAvailable, concerns, orders }, cash, benefits, compats, pairs] = await Promise.all([
+  const [{ cards, deletedRecords, deleteAvailable, concerns, orders }, deleteScope, cash, benefits, compats, pairs] = await Promise.all([
     getMyPage(repo, member.userId),
+    // 이 DB가 삭제 범위 확대(29번)를 갖췄는지 — 확인창 문구가 실제 삭제 범위와 같아지게 한다(비밀키 저장소로만 확인할 수 있다. 읽지 못하면 예전 범위 문구)
+    writeRepository().purgeAvailable().then((ok): DeleteScope => (ok ? "all" : "legacy"), (): DeleteScope => "legacy"),
     getCashView(repo, member.userId, 1),
     readBenefits(member.userId),
     listMyCompat(repo, member.userId).catch(() => []),
@@ -117,13 +120,15 @@ async function MyContent({ searchParams }: { searchParams: Promise<{ notice?: st
         ) : (
           <ul className="mt-3 space-y-3">
             {cards.map((card) => (
-              <ReportRow key={card.assessmentId} card={card} paymentsReady={paymentsReady} deleteAvailable={deleteAvailable} />
+              <ReportRow key={card.assessmentId} card={card} paymentsReady={paymentsReady} deleteAvailable={deleteAvailable} deleteScope={deleteScope} />
             ))}
           </ul>
         )}
         {deleteAvailable && cards.length > 0 && (
           <p className="mt-2 text-[13px] leading-[1.6] text-ink-3">
-            ‘기록 삭제’를 누르면 확인창이 열려요. 삭제하면 리포트 글은 되돌릴 수 없지만, 채팅방 · 남은 질문권 · 주문 기록은 그대로 남아요.
+            {deleteScope === "all"
+              ? "‘기록 삭제’를 누르면 확인창이 열려요. 삭제하면 리포트 글과 이 기록의 채팅방 · 지난 대화는 되돌릴 수 없지만, 남은 질문권 · 주문 · 결제 기록은 그대로 남아요."
+              : "‘기록 삭제’를 누르면 확인창이 열려요. 삭제하면 리포트 글은 되돌릴 수 없지만, 채팅방 · 남은 질문권 · 주문 기록은 그대로 남아요."}
           </p>
         )}
         {deleteAvailable && <DeletedRecords records={deletedRecords} />}

@@ -240,8 +240,9 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
     .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 
   // 삭제한 기록 — 채팅방이 몇 개 남아 있는지 센다(이어 가는 중인 방 + 읽기용 대화 기록이 있는 방. 읽지 못하면 0으로 보고 화면은 그대로 열린다)
+  // 삭제 범위 확대(29번)로 삭제를 마친 기록은 채팅방 · 대화까지 지웠으므로 이 목록에 없다(열 것이 남아 있지 않다 — 주문 · 결제 기록은 아래 결제내역에 그대로 있다)
   const deletedRecords: MyDeletedRecord[] = [];
-  for (const a of mine.filter((x) => x.recordDeletedAt)) {
+  for (const a of mine.filter((x) => x.recordDeletedAt && !x.recordPurgedAt)) {
     const live = await repo.listTalkRoomKeys(a.id).catch(() => [] as string[]);
     const archived = (await repo.listTalkTranscripts(a.id).catch(() => [])).map((t) => t.roomKey);
     deletedRecords.push({ assessmentId: a.id, subject: `${a.nickname} 님 · ${formatAssessmentBirth(a)}`, deletedAt: a.recordDeletedAt as string, chatRooms: new Set([...live, ...archived]).size });
@@ -252,7 +253,8 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
 }
 
 export type DeleteRecordResult =
-  | { kind: "deleted" | "unchanged" | "busy" }
+  /** deleted-all: 삭제 범위 확대(29번) — 리포트 · 맛보기 · 고민에 더해 채팅방 · 대화 · 요약도 지웠다. deleted: 예전 범위(28번) — 채팅방은 읽기용 기록으로 남는다 */
+  | { kind: "deleted" | "deleted-all" | "unchanged" | "busy" }
   /** 대화를 읽기용 기록으로 옮기지 못해 삭제하지 않았다(아무것도 지우지 않음) */
   | { kind: "transcript-failed" }
   /** 없거나 본인 것이 아님 — 둘을 구분해 알리지 않는다 */
@@ -263,6 +265,7 @@ export type DeleteRecordResult =
 /** 삭제 결과를 MY 화면 맨 위에 알리는 말 — 주소의 notice 값이 이 목록에 있을 때만 쓴다(없는 값은 보이지 않는다) */
 export const DELETE_NOTICE: Record<DeleteRecordResult["kind"], { tone: "ok" | "warn"; text: string }> = {
   deleted: { tone: "ok", text: "기록을 삭제했어요. 리포트 글은 지워졌고, 채팅방 · 남은 질문권 · 주문 기록은 그대로예요." },
+  "deleted-all": { tone: "ok", text: "기록을 삭제했어요. 리포트 글과 이 기록의 채팅방 · 지난 대화 · 저장한 요약은 지워졌고, 남은 질문권 · 주문 · 결제 기록은 그대로예요." },
   unchanged: { tone: "ok", text: "이미 삭제한 기록이에요. 바뀐 것은 없어요." },
   busy: { tone: "warn", text: "지금 리포트를 만들거나 결제 · 질문을 처리하고 있어서 삭제하지 않았어요. 잠시 뒤에 다시 눌러 주세요." },
   "transcript-failed": { tone: "warn", text: "지난 대화를 읽기용 기록으로 옮기지 못해서 삭제하지 않았어요. 아무것도 지우지 않았으니 잠시 뒤에 다시 눌러 주세요." },
@@ -289,6 +292,16 @@ export async function deleteReportRecord(repo: MiyuRepository, input: { userId: 
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
   if (assessment.recordDeletedAt) return { kind: "unchanged" };
+  // 삭제 범위 확대(DB 29번): 함수가 있으면 대화까지 한 번에 지운다 — 읽기용 대화 기록으로 옮기는 단계가 없으므로 renderRoom은 쓰지 않는다. 없는 DB에서는 아래 예전 범위(28번)로 이어 간다
+  if (await repo.purgeAvailable().catch(() => false)) {
+    try {
+      const result = await repo.purgeAssessmentRecord(input.userId, input.assessmentId);
+      return result === "deleted" ? { kind: "deleted-all" } : result === "not-found" ? { kind: "not-found" } : { kind: result };
+    } catch (e) {
+      // 확인과 호출 사이에 함수가 사라졌거나(29번 되돌림) 열이 없는 경우만 예전 범위로 — 그 밖의 오류는 아무것도 지우지 않은 채 그대로 알린다
+      if ((e as { code?: string } | null)?.code !== "PURGE_UNAVAILABLE") throw e;
+    }
+  }
   try {
     for (let attempt = 0; attempt < DELETE_RETRIES; attempt++) {
       const transcripts: TranscriptInput[] = [];

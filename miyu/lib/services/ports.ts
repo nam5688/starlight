@@ -47,6 +47,12 @@ export type AssessmentRecord = {
    * 삭제한 기록은 결과 화면 · 리포트 · 구매 안내에서 다시 보이지 않고 새 리포트가 만들어지지 않는다(채팅은 이어진다). 분석 원자료는 대화를 위해 남는다.
    */
   recordDeletedAt?: string | null;
+  /**
+   * "삭제 범위 확대"(DB 변경 29번)로 삭제를 마친 시각 — 이 값이 있으면 채팅방 · 나눈 대화 · 저장한 채팅 요약 · 읽기용 대화 기록도 함께 지웠고 분석 원자료는 다른 서비스가 쓰지 않을 때 비웠다.
+   * 비어 있으면(null) 삭제하지 않았거나 예전 범위(28번)로 삭제한 기록이다(소급해서 바꾸지 않는다). 값이 아예 없으면(undefined) 29번 전 DB다.
+   * 이 값이 있는 기록에서는 채팅(대화 · 질문 · 요약)을 할 수 없고 리포트 · 주문도 생기지 않는다.
+   */
+  recordPurgedAt?: string | null;
 };
 export type NewAssessment = Omit<AssessmentRecord, "id" | "createdAt">;
 
@@ -305,6 +311,15 @@ export interface MiyuRepository {
    * 진행 중인 리포트 생성 · 최근 결제 대기 주문 · 방금 오간 질문이 있으면 "busy"(지우지 않음). 서비스가 먼저 소유자를 확인한 뒤에만 부른다. 삭제 함수가 없으면 오류(코드 42P01).
    */
   deleteAssessmentRecord(userId: string, assessmentId: string, transcripts: TranscriptInput[]): Promise<"deleted" | "unchanged" | "busy" | "stale" | "not-found">;
+  /**
+   * 삭제 범위 확대(DB 변경 29번 함수 delete_assessment_record_v2): 위 삭제에 더해 이 결과의 채팅방 · 나눈 대화 · 저장한 채팅 요약 · 읽기용 대화 기록도 지우고(읽기용 기록으로 옮기는 단계가 없다),
+   * 분석 원자료는 리포트 궁합 쌍이 이 결과를 가리키지 않을 때만 비운다. 질문권 · 질문 횟수 · 주문 · 결제 · 환불 기록 · 다른 분석 결과 · 궁합은 그대로다.
+   * 같은 요청을 여러 번(동시에도) 보내도 한 번만 처리하고 나머지는 "unchanged"(예전 범위로 삭제한 기록은 소급해서 바꾸지 않는다). 남의 것 · 없는 것은 구분 없이 "not-found". 진행 중인 생성 · 결제 · 질문이 있으면 "busy".
+   * 29번 전 DB(함수가 없음)에서는 코드 PURGE_UNAVAILABLE 오류를 던진다 — 호출한 쪽이 예전 범위 삭제로 이어 간다.
+   */
+  purgeAssessmentRecord(userId: string, assessmentId: string): Promise<"deleted" | "unchanged" | "busy" | "not-found">;
+  /** 삭제 범위 확대 함수(29번)가 있는 DB인가 — 아무것도 바꾸지 않는 확인이다(결과는 잠깐 기억한다). 읽지 못하면 false */
+  purgeAvailable(): Promise<boolean>;
   /** 삭제한 기록의 읽기용 대화 기록 — 방 이름 순. 테이블이 없으면(DB 변경 28번 전) 빈 목록 */
   listTalkTranscripts(assessmentId: string): Promise<TalkTranscriptRecord[]>;
   /** 한 방의 읽기용 대화 기록을 지운다 ("이 채팅방 새로 시작하기" — 회원이 직접 대화를 지우는 것이다). 없으면 그대로 */

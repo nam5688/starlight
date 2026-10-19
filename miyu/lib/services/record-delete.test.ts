@@ -26,7 +26,8 @@ import { deleteNoticeOf, deleteReportRecord, getMyPage, traceOrder, type RenderR
 import { confirmPayment, startCheckout } from "./order-service.ts";
 import type { PaymentGateway } from "./ports.ts";
 import { claimReport, ensureReport, getResultView, listMyItems, queueReport } from "./report-service.ts";
-import { loadTalkRoom, loadTranscripts, listSavedRoomKeys, roomEpochOf, saveTalkRoom } from "./talk-service.ts";
+import { saveRoomSummary } from "./summary-service.ts";
+import { loadTalkRoom, loadTranscripts, listSavedRoomKeys, resetTalkRoom, roomEpochOf, saveTalkRoom } from "./talk-service.ts";
 import { requestTasteReport } from "./taste-service.ts";
 import { createMemoryRepository } from "./testing/memory-repository.ts";
 
@@ -435,4 +436,229 @@ test("삭제한 기록에서도 직접 적는 질문이 된다: 무료 질문이
   // 남의 계정은 이 기록의 방에서 물을 수 없다
   assert.equal((await askFreeQuestion(deps, { userId: OTHER, assessmentId: w.target.id, roomKey: "love", question: "남의 질문" })).ok, false);
   assert.equal(asked.length, 1);
+});
+
+// ───────────────────────────── 삭제 범위 확대(DB 29번) ─────────────────────────────
+// 29번 적용 후 DB는 메모리 저장소의 myDelete.purge = true로 흉내 낸다(기본 false라 위의 28번 시험은 그대로 예전 범위로 돈다).
+// 확인하는 것: 연결된 대화방 · 저장한 요약 · 읽기용 기록이 함께 지워짐 / 질문권 · 주문 · 결제 · 환불 증빙 · 질문 횟수 · 다른 분석은 그대로 / 같은 요청 여러 번 · 남의 번호 /
+// 삭제 뒤 대화 · 질문 · 요약 · 옛 화면의 늦은 저장 차단 / 분석 원자료는 쌍이 쓰는 동안만 남김 / 진행 중이면 지우지 않음 / 예전 범위로 삭제한 기록은 소급 정리하지 않음 / 29번 전 DB로 되돌아가는 경로.
+const purgeWorld = async () => {
+  const w = await world();
+  w.mem.myDelete.purge = true;
+  // 삭제 전에 쌓인 대화 흔적: 저장한 요약 · 예전 범위로 만든 읽기용 기록(실제로는 28번 범위로 삭제한 다른 기록에서만 생기지만, 같은 결과의 것도 지워지는지 본다)
+  await w.mem.repo.insertChatSummary({ userId: USER, assessmentId: w.target.id, room: "love", visible: true, items: { read: ["연애 풀이"], qa: [{ q: "삭제될 질문", a: "삭제될 답" }] } });
+  w.mem.transcripts.set(`${w.target.id}|work`, { assessmentId: w.target.id, roomKey: "work", userId: USER, lines: [{ from: "miyu", text: "삭제될 읽기용 말" }], createdAt: w.clock.now.toISOString() });
+  // 다른 분석 결과(같은 회원) — 삭제와 무관해야 한다
+  const sibling = await submitAssessment({ repo: w.mem.repo, saju: sajuEngine }, { userId: USER, channel: "web", info: { ...INFO, nickname: "다른분석" }, answers: answersAll(3), today: T0 });
+  assert.ok(sibling.ok);
+  const siblingId = sibling.ok ? sibling.assessment.id : "";
+  await w.mem.repo.upsertTalkRoom({ assessmentId: siblingId, userId: USER, roomKey: "love", actions: [{ t: "topic", id: "love" }] });
+  await w.mem.repo.insertChatSummary({ userId: USER, assessmentId: siblingId, room: "love", visible: true, items: { read: [], qa: [{ q: "남는 질문", a: "남는 답" }] } });
+  return { ...w, siblingId };
+};
+
+test("삭제 범위 확대: 리포트 · 맛보기 · 고민에 더해 채팅방 · 저장한 요약 · 읽기용 기록도 지워지고, 질문권 · 주문 · 결제 · 질문 횟수 · 동의 · 다른 분석은 그대로다", async () => {
+  const w = await purgeWorld();
+  assert.equal(await w.mem.repo.purgeAvailable(), true);
+  assert.equal(await w.mem.repo.countVisibleChatSummaries(USER), 2);
+  const before = await kept(w);
+  const balance = await w.mem.repo.getCashBalance(USER);
+  assert.ok(balance > 0);
+  const calls: string[] = [];
+
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer(calls) }), { kind: "deleted-all" });
+  assert.deepEqual(calls, [], "읽기용 기록으로 옮기는 단계가 없다 — 대화를 렌더하지 않는다");
+
+  // 지워졌다 — 이 결과의 대화 내용 셋(방 · 요약 · 읽기용 기록)과 리포트 · 맛보기 · 고민
+  assert.equal([...w.mem.talkRooms.values()].filter((r) => r.assessmentId === w.target.id).length, 0, "대화방");
+  assert.equal(w.mem.chatSummaries.filter((s) => s.assessmentId === w.target.id).length, 0, "저장한 요약");
+  assert.equal([...w.mem.transcripts.values()].filter((t) => t.assessmentId === w.target.id).length, 0, "읽기용 기록");
+  assert.equal([...w.mem.reports.values()].filter((r) => r.assessmentId === w.target.id).length, 0);
+  assert.equal(w.mem.feedback.size, 0);
+  assert.equal(w.mem.contexts.has(w.target.id), false);
+  assert.equal([...w.mem.concernRecords.values()].filter((c) => c.assessmentId === w.target.id).length, 0);
+  const taste = await w.mem.repo.getTasteReport(USER);
+  assert.deepEqual(taste?.content, { deleted: true }, "맛보기는 글만 비우고 줄은 남는다(무료 한 번)");
+  assert.equal(JSON.stringify([...w.mem.talkRooms.values(), ...w.mem.chatSummaries, ...w.mem.transcripts.values()]).includes("삭제될"), false, "지운 대화 내용이 어느 곳에도 남지 않았다");
+
+  // 분석 원자료는 쌍이 쓰지 않으므로 비워졌고, 삭제 표시 둘이 찍혔다
+  const a = w.mem.assessments.get(w.target.id)!;
+  assert.equal(a.nickname, "삭제");
+  assert.deepEqual([a.birthYear, a.birthMonth, a.birthDay, a.answers, a.summary, a.saju, a.knownMbti, a.birthTime], [1900, 1, 1, {}, {}, {}, null, null]);
+  assert.ok(a.recordDeletedAt && a.recordPurgedAt && a.recordDeletedAt === a.recordPurgedAt);
+
+  // 남는다 — 주문 · 결제 · 환불 증빙 · 질문권 · 질문 횟수 · 동의 · 프로필(분석 원자료 열만 제외하고 비교)
+  const keptNow = JSON.parse(await kept(w));
+  const keptBefore = JSON.parse(before);
+  delete keptNow.assessment;
+  delete keptBefore.assessment;
+  assert.deepEqual(keptNow, keptBefore);
+  assert.equal(await w.mem.repo.getCashBalance(USER), balance, "남은 질문권은 그대로");
+  assert.equal(w.mem.chatQuestions.length, 1, "질문 횟수 줄은 남는다(내용 없음)");
+  assert.deepEqual(Object.keys(w.mem.chatQuestions[0]).sort(), ["assessmentId", "createdAt", "roomKey", "userId"].sort(), "질문 횟수 줄에는 대화 내용 열이 없다");
+  // 다른 분석 결과의 대화 · 요약은 그대로
+  assert.equal([...w.mem.talkRooms.values()].filter((r) => r.assessmentId === w.siblingId).length, 1);
+  assert.equal(w.mem.chatSummaries.filter((s) => s.assessmentId === w.siblingId).length, 1);
+  assert.equal(w.mem.assessments.get(w.siblingId)?.nickname, "다른분석");
+
+  // 화면 자료 — 삭제한 기록 목록에는 열 것이 없으므로 나오지 않고, 결제내역은 그대로
+  const page = await getMyPage(w.mem.repo, USER, w.clock.now);
+  assert.deepEqual(page.cards.map((c) => c.assessmentId), [w.siblingId]);
+  assert.deepEqual(page.deletedRecords, []);
+  assert.equal(page.orders.length, 2);
+  const view = await getResultView(w.mem.repo, { userId: USER, assessmentId: w.target.id });
+  assert.equal(view?.deleted, true);
+  assert.equal(view?.purged, true);
+  assert.equal(view?.report, null);
+  const trace = await traceOrder(w.mem.repo, w.mem.repo, { userId: USER, orderNumber: w.orderNumber, now: w.clock.now });
+  assert.equal(trace?.recordDeleted, true);
+  assert.equal(trace?.entitled, true, "결제 기록은 그대로");
+});
+
+test("삭제 범위 확대: 같은 요청을 여러 번(동시에도) 보내도 한 번만 처리되고 남의 번호 · 없는 번호는 아무것도 바꾸지 않는다", async () => {
+  const w = await purgeWorld();
+  const burst = await Promise.all(Array.from({ length: 6 }, () => deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() })));
+  assert.equal(burst.filter((r) => r.kind === "deleted-all").length, 1, JSON.stringify(burst));
+  assert.equal(burst.filter((r) => r.kind === "unchanged").length, 5);
+  const stamp = w.mem.assessments.get(w.target.id)?.recordPurgedAt;
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "unchanged" });
+  assert.equal(w.mem.assessments.get(w.target.id)?.recordPurgedAt, stamp);
+
+  const w2 = await purgeWorld();
+  const talkBefore = w2.mem.talkRooms.size;
+  assert.deepEqual(await deleteReportRecord(w2.mem.repo, { userId: OTHER, assessmentId: w2.target.id }, { renderRoom: renderer() }), { kind: "not-found" });
+  assert.deepEqual(await deleteReportRecord(w2.mem.repo, { userId: USER, assessmentId: w2.other.id }, { renderRoom: renderer() }), { kind: "not-found" });
+  assert.deepEqual(await deleteReportRecord(w2.mem.repo, { userId: USER, assessmentId: "00000000-0000-4000-8000-000000000000" }, { renderRoom: renderer() }), { kind: "not-found" });
+  assert.equal(w2.mem.talkRooms.size, talkBefore);
+  assert.equal(w2.mem.assessments.get(w2.target.id)?.recordPurgedAt ?? null, null);
+  assert.equal(w2.mem.assessments.get(w2.other.id)?.recordPurgedAt ?? null, null);
+  assert.equal(w2.mem.assessments.get(w2.other.id)?.nickname, "남의결과", "남의 분석 원자료는 그대로");
+});
+
+test("삭제 범위 확대 뒤: 옛 화면의 늦은 저장 · 질문 · 요약 · 직접 호출이 모두 막혀 지운 대화가 되살아나지 않는다", async () => {
+  const w = await purgeWorld();
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "deleted-all" });
+
+  // 서비스: 모든 대화 읽기 · 쓰기가 없는 기록으로 취급
+  assert.deepEqual(await loadTalkRoom(w.mem.repo, { userId: USER, assessmentId: w.target.id, roomKey: "love" }), []);
+  assert.deepEqual(await listSavedRoomKeys(w.mem.repo, { userId: USER, assessmentId: w.target.id }), []);
+  assert.deepEqual(await loadTranscripts(w.mem.repo, { userId: USER, assessmentId: w.target.id }), []);
+  // 삭제 직전에 열려 있던 화면이 늦게 저장하려는 경우(표지가 맞든 틀리든)
+  for (const epoch of [undefined, null, "none"]) {
+    assert.deepEqual(await saveTalkRoom(w.mem.repo, { userId: USER, assessmentId: w.target.id, roomKey: "love", actions: [{ t: "topic", id: "love" }], epoch }), { ok: false, reason: "not-found" }, `epoch=${String(epoch)}`);
+  }
+  assert.deepEqual(await resetTalkRoom(w.mem.repo, { userId: USER, assessmentId: w.target.id, roomKey: "love" }), { ok: false, reason: "not-found" });
+  const saved = await saveRoomSummary(w.mem.repo, { userId: USER, assessmentId: w.target.id, roomKey: "love", room: "love", actions: [{ t: "topic", id: "love" }], model: {} as never });
+  assert.deepEqual(saved, { ok: false, reason: "not-found" });
+  // 질문은 소유 확인에서 막히고 AI를 부르지 않는다
+  let called = 0;
+  const answerer: ChatAnswerer = { provider: "test", model: "scripted", async answer() { called++; return { paragraphs: ["부르면 안 된다"] }; } };
+  const context: ChatContext = { room: { label: "연애", mode: "연애박사 미유", focus: "연애 · 관계" }, intake: null, topic: { title: "가까운 관계", headline: "x", summary: ["x"], detail: [] }, overview: { headline: "x", tendency: null, strength: null, caution: null, flow: null }, followUp: false, taste: false };
+  const deps: AskDeps = { repo: w.mem.repo, answerer, now: () => w.clock.now, config: { extraQuestions: 0 }, newRef: () => "q-late", loadAsk: async () => ({ context, referenceDate: "2026-10-19", tier: "free", room: "love", roomKey: "love" }) };
+  const late = await askFreeQuestion(deps, { userId: USER, assessmentId: w.target.id, roomKey: "love", question: "늦게 도착한 질문" });
+  assert.equal(late.ok, false);
+  assert.equal(called, 0);
+
+  // 저장소 마지막 방어선(DB 트리거와 같다): 서비스를 우회한 직접 쓰기도 거절
+  await assert.rejects(w.mem.repo.upsertTalkRoom({ assessmentId: w.target.id, userId: USER, roomKey: "love", actions: [{ t: "topic", id: "love" }] }), /record_purged/);
+  await assert.rejects(w.mem.repo.insertChatSummary({ userId: USER, assessmentId: w.target.id, room: "love", visible: true, items: { read: [], qa: [] } }), /record_purged/);
+  await assert.rejects(w.mem.repo.addChatQuestion({ userId: USER, assessmentId: w.target.id, roomKey: "love" }), /record_purged/);
+  await assert.rejects(w.mem.repo.reserveChatQuestion({ userId: USER, assessmentId: w.target.id, roomKey: "love", max: 2 }), /record_purged/);
+  assert.equal([...w.mem.talkRooms.values()].filter((r) => r.assessmentId === w.target.id).length, 0);
+  assert.equal(w.mem.chatSummaries.filter((s) => s.assessmentId === w.target.id).length, 0);
+  assert.equal(w.mem.chatQuestions.length, 1, "질문 횟수가 늘지 않았다");
+
+  // 리포트 · 구매 경로도 28번과 같이 막힌다
+  assert.deepEqual(await startCheckout({ repo: w.mem.repo, now: () => w.clock.now }, { userId: USER, assessmentId: w.target.id }), { kind: "record-deleted" });
+  assert.equal(await queueReport({ repo: w.mem.repo }, [...w.mem.orders.values()].find((o) => o.productId === "personal-integrated-report")!), null);
+});
+
+test("삭제 범위 확대 뒤: 남은 질문권은 다른 분석 결과의 채팅방에서 그대로 쓰인다(무료 질문이 먼저, 잔액은 줄지 않는다)", async () => {
+  const w = await purgeWorld();
+  const balance = await w.mem.repo.getCashBalance(USER);
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "deleted-all" });
+  assert.equal(await w.mem.repo.getCashBalance(USER), balance, "삭제로 잔액이 바뀌지 않는다");
+  const context: ChatContext = { room: { label: "연애", mode: "연애박사 미유", focus: "연애 · 관계" }, intake: null, topic: { title: "가까운 관계", headline: "x", summary: ["x"], detail: [] }, overview: { headline: "x", tendency: null, strength: null, caution: null, flow: null }, followUp: false, taste: false };
+  const asked: string[] = [];
+  const answerer: ChatAnswerer = { provider: "test", model: "scripted", async answer(ask) { asked.push(ask.question); return { paragraphs: ["천천히 해 보면 좋겠어요."] }; } };
+  let n = 0;
+  const deps: AskDeps = { repo: w.mem.repo, answerer, now: () => w.clock.now, config: { extraQuestions: 0 }, newRef: () => `q-sib-${++n}`, loadAsk: async () => ({ context, referenceDate: "2026-10-19", tier: "free", room: "love", roomKey: "love" }) };
+  const r = await askFreeQuestion(deps, { userId: USER, assessmentId: w.siblingId, roomKey: "love", question: "다른 분석에서 이어 묻는 질문" });
+  assert.ok(r.ok && r.kind === "answer", JSON.stringify(r));
+  assert.deepEqual(asked, ["다른 분석에서 이어 묻는 질문"]);
+  assert.equal(await w.mem.repo.getCashBalance(USER), balance, "무료 질문이 먼저라 결제해 둔 질문권은 줄지 않는다");
+  // 다른 분석 결과의 대화는 저장도 된다
+  assert.deepEqual(await saveTalkRoom(w.mem.repo, { userId: USER, assessmentId: w.siblingId, roomKey: "love", actions: [{ t: "topic", id: "love" }] }), { ok: true });
+});
+
+test("삭제 범위 확대: 리포트 궁합 쌍이 이 결과를 쓰는 동안은 분석 원자료를 남기고 대화 · 리포트는 지운다", async () => {
+  const w = await purgeWorld();
+  w.mem.myDelete.pairRefs.add(w.target.id);
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "deleted-all" });
+  const a = w.mem.assessments.get(w.target.id)!;
+  assert.equal(a.nickname, "삭제대상", "쌍이 쓰는 분석 원자료는 그대로");
+  assert.ok(a.recordPurgedAt, "삭제 표시는 찍힌다");
+  assert.equal([...w.mem.talkRooms.values()].filter((r) => r.assessmentId === w.target.id).length, 0);
+  assert.equal([...w.mem.reports.values()].filter((r) => r.assessmentId === w.target.id).length, 0);
+});
+
+test("삭제 범위 확대: 진행 중인 생성 · 결제 대기 · 방금 쓴 질문권이 있으면 지우지 않고(busy) 아무것도 바뀌지 않는다", async () => {
+  const w = await purgeWorld();
+  const pending = await w.mem.repo.insertOrder({ orderNumber: createOrderNumber(T0), userId: USER, assessmentId: w.target.id, productId: "personal-integrated-report:r2:p", amount: 9900, paymentEnv: "test" });
+  assert.ok(pending.ok);
+  const before = JSON.stringify({ rooms: [...w.mem.talkRooms.values()], summaries: w.mem.chatSummaries, reports: [...w.mem.reports.values()], a: w.mem.assessments.get(w.target.id) });
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "busy" });
+  assert.equal(JSON.stringify({ rooms: [...w.mem.talkRooms.values()], summaries: w.mem.chatSummaries, reports: [...w.mem.reports.values()], a: w.mem.assessments.get(w.target.id) }), before, "busy는 아무것도 지우지 않는다");
+});
+
+test("예전 범위(28번)로 삭제한 기록은 29번 뒤에도 소급해서 정리하지 않는다: 읽기용 대화 기록과 채팅방이 그대로 남고 삭제한 기록 목록에 계속 나온다", async () => {
+  const w = await world();
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "deleted" });
+  assert.equal(w.mem.transcripts.size, 2);
+  w.mem.myDelete.purge = true; // 나중에 29번이 적용됐다
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "unchanged" });
+  assert.equal(w.mem.transcripts.size, 2, "읽기용 기록은 그대로");
+  assert.equal(w.mem.assessments.get(w.target.id)?.nickname, "삭제대상", "분석 원자료도 그대로");
+  assert.equal(w.mem.assessments.get(w.target.id)?.recordPurgedAt ?? null, null);
+  const page = await getMyPage(w.mem.repo, USER, w.clock.now);
+  assert.deepEqual(page.deletedRecords.map((d) => d.assessmentId), [w.target.id]);
+  assert.equal((await getResultView(w.mem.repo, { userId: USER, assessmentId: w.target.id }))?.purged, false);
+  // 예전 범위로 삭제한 기록의 채팅은 이어진다(28번 동작 그대로)
+  assert.equal((await loadTranscripts(w.mem.repo, { userId: USER, assessmentId: w.target.id })).length, 2);
+});
+
+test("29번이 없는 DB(또는 확인 뒤 함수가 사라진 경우)에서는 예전 범위(28번) 삭제로 이어 가고, 그 밖의 오류는 아무것도 지우지 않은 채 그대로 알린다", async () => {
+  const w = await world(); // purge=false → purgeAvailable false
+  assert.equal(await w.mem.repo.purgeAvailable(), false);
+  assert.deepEqual(await deleteReportRecord(w.mem.repo, { userId: USER, assessmentId: w.target.id }, { renderRoom: renderer() }), { kind: "deleted" });
+
+  // 확인(purgeAvailable)은 통과했는데 호출 때 함수가 없다고 나오는 경우 → 예전 범위로
+  const w2 = await world();
+  const vanishing = { ...w2.mem.repo, purgeAvailable: async () => true, purgeAssessmentRecord: async () => { throw Object.assign(new Error("없음"), { code: "PURGE_UNAVAILABLE" }); } };
+  assert.deepEqual(await deleteReportRecord(vanishing, { userId: USER, assessmentId: w2.target.id }, { renderRoom: renderer() }), { kind: "deleted" });
+  assert.equal(w2.mem.transcripts.size, 2, "예전 범위: 읽기용 기록으로 남는다");
+
+  // 그 밖의 오류는 예전 범위로 넘어가지 않고 던진다 — 아무것도 지워지지 않았다
+  const w3 = await world();
+  const broken = { ...w3.mem.repo, purgeAvailable: async () => true, purgeAssessmentRecord: async () => { throw new Error("연결 끊김"); } };
+  await assert.rejects(deleteReportRecord(broken, { userId: USER, assessmentId: w3.target.id }, { renderRoom: renderer() }), /연결 끊김/);
+  assert.equal(w3.mem.assessments.get(w3.target.id)?.recordDeletedAt ?? null, null);
+  assert.equal(w3.mem.transcripts.size, 0);
+  assert.equal(w3.mem.talkRooms.size, 2);
+
+  // 확인 자체가 실패하면 예전 범위(검증된 쪽)로
+  const w4 = await world();
+  const unknown = { ...w4.mem.repo, purgeAvailable: async () => { throw new Error("확인 실패"); } };
+  assert.deepEqual(await deleteReportRecord(unknown, { userId: USER, assessmentId: w4.target.id }, { renderRoom: renderer() }), { kind: "deleted" });
+});
+
+test("삭제 결과 안내: 새 범위 안내는 지워지는 대화를 사실대로 밝히고 알려진 값만 보인다", () => {
+  const n = deleteNoticeOf("deleted-all");
+  assert.equal(n?.tone, "ok");
+  assert.match(n?.text ?? "", /채팅방/);
+  assert.match(n?.text ?? "", /지난 대화/);
+  assert.match(n?.text ?? "", /질문권/);
+  assert.match(n?.text ?? "", /결제 기록/);
+  // 예전 범위 문구는 채팅방이 남는다고 말한다(바꾸지 않았다)
+  assert.match(deleteNoticeOf("deleted")?.text ?? "", /채팅방 · 남은 질문권/);
 });

@@ -169,6 +169,14 @@ wd28 as (
     coalesce(not has_function_privilege('anon', 'public.delete_assessment_record(uuid, uuid, jsonb)', 'execute') and not has_function_privilege('authenticated', 'public.delete_assessment_record(uuid, uuid, jsonb)', 'execute'), false) as browser_blocked,
     exists (select 1 from pg_trigger where tgname in ('reports_block_deleted_record', 'orders_block_deleted_record', 'taste_reports_block_deleted_record') having count(*) = 3) as guard_triggers
 ),
+wd29 as (
+  select
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'assessments' and column_name = 'record_purged_at') as purged_col,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'delete_assessment_record_v2') as delete_fn,
+    coalesce(has_function_privilege('service_role', 'public.delete_assessment_record_v2(uuid, uuid)', 'execute'), false) as service_grant,
+    coalesce(not has_function_privilege('anon', 'public.delete_assessment_record_v2(uuid, uuid)', 'execute') and not has_function_privilege('authenticated', 'public.delete_assessment_record_v2(uuid, uuid)', 'execute'), false) as browser_blocked,
+    exists (select 1 from pg_trigger where tgname in ('talk_rooms_block_purged', 'chat_summaries_block_purged', 'talk_transcripts_block_purged', 'chat_questions_block_purged') having count(*) = 4) as guard_triggers
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -359,5 +367,11 @@ select * from (
               when wd28.deleted_col or wd28.transcripts_table or wd28.delete_fn or wd28.guard_triggers then '일부만' else '아직 안 함' end,
          '열 assessments.record_deleted_at / 표 talk_transcripts(읽기용 대화 기록) / 함수 delete_assessment_record(서버만 실행: ' || wd28.service_grant::text || ' · 브라우저 실행 막힘: ' || wd28.browser_blocked::text || ') / 삭제한 기록에 새 리포트 · 주문 · 맛보기 글을 막는 장치 3개: ' || wd28.guard_triggers::text || ' — 이 열이 없으면 MY의 기록 삭제 버튼만 보이지 않고 나머지는 그대로 동작한다'
   from wd28
+  union all
+  select 29, '20261108000000_record_delete_scope.sql',
+         case when wd29.purged_col and wd29.delete_fn and wd29.service_grant and wd29.browser_blocked and wd29.guard_triggers then '적용됨'
+              when wd29.purged_col or wd29.delete_fn or wd29.guard_triggers then '일부만' else '아직 안 함' end,
+         '열 assessments.record_purged_at(삭제 완료 표시) / 함수 delete_assessment_record_v2(서버만 실행: ' || wd29.service_grant::text || ' · 브라우저 실행 막힘: ' || wd29.browser_blocked::text || ') / 삭제를 마친 기록에 대화방 · 요약 · 읽기용 기록 · 질문 횟수가 다시 생기지 않게 막는 장치 4개: ' || wd29.guard_triggers::text || ' — 이 함수가 없으면 MY의 기록 삭제는 예전 범위(채팅방은 읽기용 기록으로 남음)로 동작하고 나머지는 그대로 동작한다'
+  from wd29
 ) r
 order by "번호";

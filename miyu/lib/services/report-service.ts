@@ -291,9 +291,11 @@ export type ResultView = {
   taste: TasteViewState;
   /**
    * 회원이 "기록 삭제"한 결과다 — 리포트 · 주문 · 맛보기 · 고민 입력은 없는 것으로 돌려준다(주문은 결제 기록으로만 남아 있다). 결과 화면 · 구매 안내는 보이지 않고, 채팅방만 이어진다.
-   * 분석 원자료(assessment)는 대화를 위해 그대로 담긴다.
+   * 분석 원자료(assessment)는 대화를 위해 그대로 담긴다(예전 범위로 삭제한 기록).
    */
   deleted: boolean;
+  /** "삭제 범위 확대"(DB 29번)로 삭제를 마친 기록이다 — 채팅방 · 나눈 대화 · 저장한 요약까지 지웠으므로 채팅방도 열리지 않는다. 예전 범위로 삭제했거나 삭제하지 않았으면 false */
+  purged: boolean;
 };
 
 /**
@@ -308,7 +310,7 @@ export async function getResultView(
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return null;
   // 삭제한 기록 — 지운 리포트 · 맛보기 · 고민 입력은 없는 것으로 돌려준다(기존 결제 주문이 남아 있어도 다시 만들거나 구매로 이끌지 않는다)
-  if (assessment.recordDeletedAt) return { assessment, paidOrder: null, refunded: false, report: null, context: null, received: [], taste: { kind: "unavailable" }, deleted: true };
+  if (assessment.recordDeletedAt) return { assessment, paidOrder: null, refunded: false, report: null, context: null, received: [], taste: { kind: "unavailable" }, deleted: true, purged: Boolean(assessment.recordPurgedAt) };
   const orders = await repo.listOrdersForAssessment(assessment.id);
   const paid = paidPersonalOrders(orders);
   const refunded = paid.length === 0 && orders.some((o) => o.status === "refunded" && parsePersonalSeq(o.productId) !== null);
@@ -317,7 +319,7 @@ export async function getResultView(
   const chosen =
     (input.orderNumber ? received.find((r) => r.order.orderNumber === input.orderNumber) : undefined) ?? received.find((r) => r.report?.status === "ready") ?? received[0] ?? null;
   const taste = await tasteStateFor(repo, input.userId, assessment.id).catch((): TasteViewState => ({ kind: "unavailable" }));
-  return { assessment, paidOrder: chosen?.order ?? null, refunded, report: chosen?.report ?? null, context, received, taste, deleted: false };
+  return { assessment, paidOrder: chosen?.order ?? null, refunded, report: chosen?.report ?? null, context, received, taste, deleted: false, purged: false };
 }
 
 export type MyItem = {

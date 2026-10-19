@@ -68,7 +68,7 @@ test("지우는 버튼은 확인창 안의 '삭제하기'로만 서버 액션을
   for (const part of ["{productName}", "{subject}", "{created}", "DELETE_RECORD_COPY.targetTitle", "DELETE_RECORD_COPY.createdPrefix"]) assert.ok(target.includes(part), `확인창 대상 표시에 ${part}`);
   assert.match(dialogEl, /aria-describedby=\{`\$\{dialogIds\.target\} \$\{dialogIds\.lead\} \$\{dialogIds\.body\}`\}/, "보조기기도 대상 · 경고를 먼저 읽는다");
   const rows = read("components/my/report-rows.tsx");
-  assert.match(rows, /<DeleteRecordButton assessmentId=\{card\.assessmentId\} productName=\{card\.productName\} subject=\{card\.subject\} created=\{formatDate\(card\.createdAt\)\} \/>/, "카드가 보여 주는 값 그대로 넘긴다");
+  assert.match(rows, /<DeleteRecordButton assessmentId=\{card\.assessmentId\} productName=\{card\.productName\} subject=\{card\.subject\} created=\{formatDate\(card\.createdAt\)\} scope=\{deleteScope\} \/>/, "카드가 보여 주는 값 그대로 넘기고, 삭제 범위(문구)도 서버가 확인한 값을 넘긴다");
   // 취소 · 삭제하기: 같은 크기(48px) · 보내는 중에는 둘 다 잠긴다(두 번 눌러도 한 번)
   assert.match(src, /useFormStatus/);
   const buttons = src.slice(src.indexOf("function Buttons"), src.indexOf("type SheetProps"));
@@ -88,7 +88,7 @@ test("지우는 버튼은 확인창 안의 '삭제하기'로만 서버 액션을
   assert.match(body, /"data-scroll-ok": ""/, "모달 안에서 스크롤할 수 있는 칸 표시(손가락 이동 허용)");
   assert.ok(!head.includes("overflow-y-auto") && !buttons.includes("overflow-y-auto"), "위 · 아래 영역은 스크롤하지 않는다");
   assert.match(buttons, /shrink-0/, "아래 고정 영역은 줄어들지 않는다");
-  for (const part of ["DELETE_RECORD_COPY.removedTitle", "DELETE_RECORD_COPY.removed.map", "DELETE_RECORD_COPY.keptTitle", "DELETE_RECORD_COPY.kept.map", "DELETE_RECORD_COPY.notes.map"]) assert.ok(body.includes(part), `긴 안내(스크롤 영역)에 ${part}`);
+  for (const part of ["DELETE_RECORD_COPY.removedTitle", "copy.removed.map", "DELETE_RECORD_COPY.keptTitle", "copy.kept.map", "copy.notes.map"]) assert.ok(body.includes(part), `긴 안내(스크롤 영역)에 ${part}`);
   // 초기 포커스: 열자마자 제목(스크롤 없이) — 삭제하기 · 취소 버튼에 autofocus를 주지 않는다
   assert.doesNotMatch(src, /autoFocus|autofocus/, "삭제 확인창에는 autofocus를 쓰지 않는다");
   assert.match(src, /titleRef\.current\?\.focus\(\{ preventScroll: true \}\)/);
@@ -224,10 +224,15 @@ test("삭제한 기록: 결과 화면은 리포트 · 미리보기 · 구매 안
   const notice = read("components/results/deleted-record.tsx");
   // 구매 · 다시 만들기 링크나 동작이 없다(문장으로 "다시 구매하지 않아요"라고 알리는 것은 있다)
   assert.doesNotMatch(notice, /#r-purchase|\/checkout|buyHref|startCheckout|retry|구매하기|결제하기/);
-  assert.deepEqual([...notice.matchAll(/href="([^"]+)"|href=\{([^}]+)\}/g)].map((m) => m[1] ?? m[2]).sort(), ["/analyze", "/my", 'talkRoomPath(assessmentId, "main")']);
+  assert.deepEqual([...new Set([...notice.matchAll(/href="([^"]+)"|href=\{([^}]+)\}/g)].map((m) => m[1] ?? m[2]))].sort(), ["/analyze", "/my", 'talkRoomPath(assessmentId, "main")']);
+  // 삭제 범위 확대(29번)로 삭제한 기록은 채팅방까지 지웠으므로 안내에 채팅방 링크가 없다
+  const purgedNotice = notice.slice(notice.indexOf("if (purged) {"), notice.indexOf("  return (\n    <div className={`${pageNarrow} py-14 md:py-20`} data-testid=\"deleted-record\">"));
+  assert.ok(purgedNotice.includes('data-scope="purged"') && !/talkRoomPath|채팅방 열기/.test(purgedNotice), "삭제를 마친 기록의 안내에는 열 채팅방이 없다");
   // 채팅방(삭제한 기록): 이어 갈 수 없는 방은 읽기 전용 + 이유, 구매 안내는 하지 않는다
   const room = read("app/results/[id]/talk/talk-room-content.tsx");
   assert.match(room, /if \(view\.deleted\) return <DeletedRecordRoom/);
+  assert.ok(room.indexOf("if (view.purged) return <DeletedRecordNotice") > 0 && room.indexOf("if (view.purged) return <DeletedRecordNotice") < room.indexOf("if (view.deleted) return <DeletedRecordRoom"), "삭제를 마친 기록은 읽기용 채팅방보다 먼저 삭제 안내로 끝난다");
+  assert.match(page, /<DeletedRecordNotice assessmentId=\{id\} purged=\{view\.purged\} \/>/);
   const archivedRoom = read("components/talk/archived-room.tsx");
   assert.doesNotMatch(archivedRoom, /buyHref|구매하기|#r-purchase|9,900/);
   const model = read("server/talk-model.ts");
@@ -261,4 +266,24 @@ test("삭제 시험 파일이 있고 DB 시험 목록에 들어 있다", () => {
   const pkg = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
   assert.match(pkg.scripts["test:db"], /supabase\/tests\/record-delete\.db\.test\.ts/);
   assert.doesNotMatch(pkg.scripts["test:db"], /my-hide/);
+});
+
+test("삭제 확인창 문구는 삭제 범위(29번 유무)에 맞게 바뀐다: 새 범위 문구는 채팅방 · 대화도 지운다고 말하고, 예전 범위 문구는 채팅방이 남는다고 말한다", () => {
+  const src = read("components/my/delete-record-button.tsx");
+  assert.match(src, /export type DeleteScope = "all" \| "legacy"/);
+  assert.match(src, /export const deleteCopyOf = \(scope: DeleteScope\) => \(scope === "all" \? \{ \.\.\.DELETE_RECORD_COPY, \.\.\.DELETE_SCOPE_ALL \} : DELETE_RECORD_COPY\)/);
+  const all = src.slice(src.indexOf("const DELETE_SCOPE_ALL"), src.indexOf("export const deleteCopyOf"));
+  assert.match(all, /채팅방과 나눈 대화, 저장한 채팅 요약/, "새 범위: 채팅방 · 대화 · 요약도 지운다");
+  assert.match(all, /남은 질문권/);
+  assert.match(all, /주문 · 결제 · 환불 기록/);
+  assert.doesNotMatch(all, /읽기만 할 수 있는 기록으로 남아요/, "새 범위 문구에 예전 범위의 '대화가 남는다'는 말이 없다");
+  assert.match(src, /채팅방과 지난 대화 \(읽기만 할 수 있는 기록으로 남아요\)/, "예전 범위 문구는 그대로");
+  // 서버가 확인한 범위를 MY 페이지가 카드에 넘긴다(비밀키 저장소로만 확인할 수 있다)
+  const my = read("app/my/page.tsx");
+  assert.match(my, /writeRepository\(\)\.purgeAvailable\(\)\.then\(\(ok\): DeleteScope => \(ok \? "all" : "legacy"\), \(\): DeleteScope => "legacy"\)/);
+  assert.match(my, /deleteScope=\{deleteScope\}/);
+  // 실제 삭제도 같은 확인으로 고른다 — 문구와 동작이 어긋나지 않는다
+  const svc = read("lib/services/my-service.ts");
+  assert.match(svc, /await repo\.purgeAvailable\(\)\.catch\(\(\) => false\)/);
+  assert.match(svc, /code !== "PURGE_UNAVAILABLE"\) throw e/, "함수가 없을 때만 예전 범위로 이어 가고 다른 오류는 그대로 던진다");
 });

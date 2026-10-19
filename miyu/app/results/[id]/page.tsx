@@ -119,7 +119,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   const view = await getResultView(await readRepository(), { userId: member.userId, assessmentId: id, orderNumber: chosen });
   if (!view) notFound();
   // 사용자가 직접 삭제한 기록 — 리포트 · 미리보기 · 분석 자료는 보이지 않고 구매 · 다시 만들기를 권하지도 않는다
-  if (view.deleted) return <DeletedRecordNotice assessmentId={id} />;
+  if (view.deleted) return <DeletedRecordNotice assessmentId={id} purged={view.purged} />;
 
   const { assessment, report } = view;
   const generator = reportGenerator();

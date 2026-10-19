@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { LoginOptions } from "@/components/auth/login-options";
+import { DeletedRecordNotice } from "@/components/results/deleted-record";
 import { ArchivedRoom } from "@/components/talk/archived-room";
 import { talkRoomPath } from "@/components/talk/room-paths";
 import { LockedRoom } from "@/components/talk/locked-room";
@@ -56,6 +57,8 @@ export async function TalkRoomContent({ id, room, paid = null }: { id: string; r
   const roomHrefs = Object.fromEntries(ROOM_ORDER.map((r) => [r, talkRoomPath(id, r)]));
   const repo = await readRepository();
   // 리포트를 삭제한 기록 — 채팅방은 그대로 열리고, 삭제 전에 오간 대화는 읽기용으로 보인다(리포트 · 구매 안내는 없다)
+  // 삭제 범위 확대(29번)로 삭제한 기록은 채팅방 · 지난 대화까지 지웠으므로 열 방이 없다 — 삭제했다는 안내만 보인다
+  if (view.purged) return <DeletedRecordNotice assessmentId={id} purged />;
   if (view.deleted) return <DeletedRecordRoom view={view} userId={member.userId} id={id} room={room} paid={paid} created={created} roomHrefs={roomHrefs} />;
   /** 서버에 저장된 이 방의 대화와 저장된 방 목록 — 폰을 바꿔도 이어 본다 */
   const persistFor = async (model: TalkModel) => ({

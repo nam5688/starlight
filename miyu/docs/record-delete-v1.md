@@ -1,5 +1,7 @@
 # MY 리포트 "기록 삭제" (사용자가 직접 누르는 삭제)
 
+> **범위 확대(2026-10-19, DB 29번 — 로컬 시험만, 외부 DB 미적용): 연결된 채팅방 · 나눈 대화 · 저장한 요약 · 읽기용 대화 기록도 함께 지우고, 분석 원자료는 리포트 궁합 쌍이 쓰지 않을 때 비운다. 이 문서의 아래 내용은 28번(예전 범위) 기준이며, 29번이 적용된 DB에서는 `docs/record-delete-scope-v1.md`가 우선한다. 29번이 없는 DB에서는 앱이 아래 28번 범위로 그대로 동작한다.**
+
 사용자 정정(2026-10-19): "내가 누르면 기록 삭제가 가능해야지 숨김이 아니다." 이전의 목록 숨김(27번)을 고객 화면에서 걷어 내고, 확인창을 거치는 **되돌릴 수 없는 삭제**로 바꿨다. 사용자의 앞선 선택(대화 · 질문권 · 계정 보존)은 그대로다.
 
 - 코드: `lib/services/my-service.ts`(`deleteReportRecord`) · `app/my/actions.ts`(`deleteReportRecordAction`) · `server/talk-transcript.ts` · `components/my/delete-record-button.tsx` · `components/my/report-rows.tsx`(`DeletedRecords`) · `app/results/[id]/talk/talk-room-content.tsx`(`DeletedRecordRoom`) · `components/talk/archive-lines.tsx` · `archived-room.tsx`

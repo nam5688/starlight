@@ -42,6 +42,11 @@ const noSession = { auth: { persistSession: false, autoRefreshToken: false } };
 const admin = createClient(URL, SERVICE_KEY, noSession);
 const anon = createClient(URL, ANON_KEY, noSession);
 const server = createSupabaseRepository(admin);
+/**
+ * 이 파일은 28번의 삭제 범위(리포트 · 맛보기 · 고민 삭제 + 대화는 읽기용 기록으로 보존)를 시험한다. 로컬 DB에는 29번(삭제 범위 확대)도 적용돼 있으므로,
+ * 서비스(deleteReportRecord)가 29번 함수를 고르지 않도록 "29번 없음"으로 보이게 한 저장소를 쓴다 — 29번 동작은 record-purge.db.test.ts가 시험한다.
+ */
+const legacy = { ...server, purgeAvailable: async () => false } as typeof server;
 
 const PG = ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres", "-d", "postgres"];
 /** 시험용 SQL 한 줄 실행 — 결과를 글로 돌려준다 */
@@ -197,7 +202,7 @@ test("삭제: 리포트 본문 · 만족도 · 고민 · 맛보기 글은 실제
   assert.ok(balance0 > 0, "시작 상태: 결제해 둔 질문이 있다");
 
   const mine = createSupabaseRepository(A.client);
-  const result = await deleteReportRecord(server, { userId: A.id, assessmentId: f.id }, { renderRoom: renderer });
+  const result = await deleteReportRecord(legacy, { userId: A.id, assessmentId: f.id }, { renderRoom: renderer });
   assert.deepEqual(result, { kind: "deleted" });
 
   // 실제로 지워졌다 — 본문은 어디에도 없다
@@ -255,7 +260,7 @@ test("멱등 · 동시성: 같은 요청을 여러 번(동시에도) 보내도 �
   assert.equal((await admin.from("assessments").select("record_deleted_at").eq("id", f.id).single()).data?.record_deleted_at, stamp, "다시 눌러도 처음 삭제한 시각 그대로");
   assert.equal((await server.listTalkTranscripts(f.id)).length, 2, "읽기용 기록이 겹쳐 쌓이지 않는다");
   // 서비스 흐름도 마찬가지
-  assert.deepEqual(await deleteReportRecord(server, { userId: U.id, assessmentId: f.id }, { renderRoom: renderer }), { kind: "unchanged" });
+  assert.deepEqual(await deleteReportRecord(legacy, { userId: U.id, assessmentId: f.id }, { renderRoom: renderer }), { kind: "unchanged" });
 });
 
 test("소유자 확인: 남의 번호 · 없는 번호 · 형식이 틀린 번호는 아무것도 지우지 않고 서로 구분되지 않는다", async () => {
@@ -264,9 +269,9 @@ test("소유자 확인: 남의 번호 · 없는 번호 · 형식이 틀린 번�
   const kept0 = await keptSnapshot(f);
   const payload = await transcriptsOf(f.id);
   assert.equal(await server.deleteAssessmentRecord(B.id, f.id, payload), "not-found");
-  assert.deepEqual(await deleteReportRecord(server, { userId: B.id, assessmentId: f.id }, { renderRoom: renderer }), { kind: "not-found" });
-  assert.deepEqual(await deleteReportRecord(server, { userId: U.id, assessmentId: randomUUID() }, { renderRoom: renderer }), { kind: "not-found" });
-  assert.deepEqual(await deleteReportRecord(server, { userId: U.id, assessmentId: "not-a-uuid" }, { renderRoom: renderer }), { kind: "not-found" });
+  assert.deepEqual(await deleteReportRecord(legacy, { userId: B.id, assessmentId: f.id }, { renderRoom: renderer }), { kind: "not-found" });
+  assert.deepEqual(await deleteReportRecord(legacy, { userId: U.id, assessmentId: randomUUID() }, { renderRoom: renderer }), { kind: "not-found" });
+  assert.deepEqual(await deleteReportRecord(legacy, { userId: U.id, assessmentId: "not-a-uuid" }, { renderRoom: renderer }), { kind: "not-found" });
   assert.equal(await server.deleteAssessmentRecord(U.id, "not-a-uuid", payload), "not-found");
   assert.equal(await server.deleteAssessmentRecord(U.id, f.id, "이상한값" as unknown as TranscriptInput[]), "not-found");
   assert.equal((await admin.from("assessments").select("record_deleted_at").eq("id", f.id).single()).data?.record_deleted_at, null);
@@ -294,13 +299,13 @@ test("읽은 뒤 대화방이 바뀌면(동시 대화) 지우지 않고 다시 �
 
   // 서비스는 다시 읽어 시도한다 — 마지막 읽기에서 모두 옮겨진다
   const seen: string[] = [];
-  const result = await deleteReportRecord(server, { userId: U.id, assessmentId: f.id }, { renderRoom: async ({ roomKey }) => (seen.push(roomKey), renderer({ roomKey, actions: [] })) });
+  const result = await deleteReportRecord(legacy, { userId: U.id, assessmentId: f.id }, { renderRoom: async ({ roomKey }) => (seen.push(roomKey), renderer({ roomKey, actions: [] })) });
   assert.deepEqual(result, { kind: "deleted" });
   assert.deepEqual((await server.listTalkTranscripts(f.id)).map((t) => t.roomKey).sort(), ["career", "love", "main"]);
 
   // 옮기지 못하면(렌더 실패) 아무것도 지우지 않는다
   const g = await fixture(U.id, "옮기기실패", { taste: false, pack: false });
-  const failed = await deleteReportRecord(server, { userId: U.id, assessmentId: g.id }, { renderRoom: async () => { throw new Error("렌더 실패"); } });
+  const failed = await deleteReportRecord(legacy, { userId: U.id, assessmentId: g.id }, { renderRoom: async () => { throw new Error("렌더 실패"); } });
   assert.deepEqual(failed, { kind: "transcript-failed" });
   assert.equal((await admin.from("assessments").select("record_deleted_at").eq("id", g.id).single()).data?.record_deleted_at, null);
   assert.equal((await server.listTalkRoomKeys(g.id)).length, 2);
@@ -549,7 +554,7 @@ test("28번 전 DB(삭제 열 · 함수 없음): 삭제 기능만 꺼지고 MY�
     assert.equal(view?.deleted, false);
     assert.equal(view?.report?.status, "ready", "리포트는 예전처럼 열린다");
     // 삭제를 시도하면 '준비 중'으로 멈추고 아무것도 바뀌지 않는다
-    assert.deepEqual(await deleteReportRecord(server, { userId: U.id, assessmentId: f.id }, { renderRoom: renderer }), { kind: "db-not-ready" });
+    assert.deepEqual(await deleteReportRecord(legacy, { userId: U.id, assessmentId: f.id }, { renderRoom: renderer }), { kind: "db-not-ready" });
     assert.equal((await server.listTalkRoomKeys(f.id)).length, 2);
     assert.equal((await admin.from("reports").select("id").eq("assessment_id", f.id)).data?.length, 2);
   } finally {
@@ -562,7 +567,8 @@ test("28번 전 DB(삭제 열 · 함수 없음): 삭제 기능만 꺼지고 MY�
 
 test("실제 Supabase와 같은 기본 권한(새 표에 서버 역할 모든 권한이 자동으로 붙는 조건)에서도 새 표의 권한은 정확하고, 28번은 기존 표 · 함수의 권한을 바꾸지 않는다", () => {
   const dir = join(import.meta.dirname, "..", "migrations");
-  const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  // 28번까지의 파일만 쓴다(뒤에 29번 같은 파일이 더 생겨도 이 시험은 28번의 권한 변화만 본다)
+  const files = readdirSync(dir).filter((f) => f.endsWith(".sql") && f <= "20261107000000_record_delete.sql").sort();
   assert.equal(files.at(-1), "20261107000000_record_delete.sql");
   const base = ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres"];
   const db = `acl28_${process.pid}`;

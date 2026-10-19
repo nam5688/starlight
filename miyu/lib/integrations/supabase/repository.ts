@@ -144,6 +144,8 @@ function toAssessment(r: Row): AssessmentRecord {
     createdAt: r.created_at as string,
     // 삭제 열이 없는 DB(28번 전)는 값이 아예 없다(undefined) — 삭제하지 않은 기록(null)과 구분한다
     recordDeletedAt: r.record_deleted_at === undefined ? undefined : ((r.record_deleted_at as string | null) ?? null),
+    // 29번 전 DB는 이 열도 없다(undefined)
+    recordPurgedAt: r.record_purged_at === undefined ? undefined : ((r.record_purged_at as string | null) ?? null),
   };
 }
 
@@ -290,6 +292,9 @@ const REPORT_COLUMNS: Record<string, string> = {
   readyAt: "ready_at",
 };
 
+/** 삭제 범위 확대 함수(29번)가 있는지 확인한 결과 — 같은 DB를 보는 요청이 매번 확인하지 않게 서버 프로세스 안에서 잠깐 기억한다(있으면 5분, 없으면 20초 — 적용한 뒤 곧 반영된다) */
+let purgeProbe: { ok: boolean; at: number } | null = null;
+
 export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
   async function readProfile(userId: string) {
     const { data, error } = await db
@@ -415,6 +420,27 @@ export function createSupabaseRepository(db: SupabaseClient): MiyuRepository {
         fail("기록 삭제", missing ? { code: "42P01", message: "delete_assessment_record 함수가 없습니다 (DB 변경 28번 필요)" } : error);
       }
       return data === "deleted" ? "deleted" : data === "unchanged" ? "unchanged" : data === "busy" ? "busy" : data === "stale" ? "stale" : "not-found";
+    },
+
+    async purgeAssessmentRecord(userId, assessmentId) {
+      const { data, error } = await db.rpc("delete_assessment_record_v2", { p_user_id: userId, p_assessment_id: assessmentId });
+      if (error) {
+        if (error.code === "22P02") return "not-found"; // uuid 형식이 아닌 번호
+        // 함수가 없는 DB(29번 전) — 호출한 쪽이 예전 범위(28번) 삭제로 이어 간다. 열이 없는 경우(42703)도 같다
+        if (isMissingFunction(error) || error.code === "42703") throw Object.assign(new Error("delete_assessment_record_v2 함수가 없습니다 (DB 변경 29번 필요)"), { code: "PURGE_UNAVAILABLE" });
+        fail("기록 삭제", error);
+      }
+      return data === "deleted" ? "deleted" : data === "unchanged" ? "unchanged" : data === "busy" ? "busy" : "not-found";
+    },
+
+    async purgeAvailable() {
+      // 번호를 비워 부르면 함수는 아무것도 건드리지 않고 not_found를 돌려준다 — 있는지 없는지만 알 수 있다
+      const cached = purgeProbe;
+      if (cached && Date.now() - cached.at < (cached.ok ? 5 * 60_000 : 20_000)) return cached.ok;
+      const { error } = await db.rpc("delete_assessment_record_v2", { p_user_id: null, p_assessment_id: null });
+      const ok = !error;
+      purgeProbe = { ok, at: Date.now() };
+      return ok;
     },
 
     async listTalkTranscripts(assessmentId) {

@@ -140,3 +140,56 @@ test("후기 25번 사전 · 사후 확인은 읽기 전용 조회 하나다(쓰
   // 사후 확인은 적용 파일 끝의 확인 조회와 같은 글이다
   assert.ok(reviewsCommitted.endsWith(`${reviewsPost.trimEnd()}\n`));
 });
+
+// ── 기록 삭제 범위 확대(29번): 단독 마이그레이션 + 읽기 전용 사전 / 사후 확인 ──
+const scopeFile = files.find((f) => f.endsWith("_record_delete_scope.sql"))!;
+const scopeSql = readSource(new URL(scopeFile, dir));
+const scopePre = readSource(new URL("../supabase/delete-scope-29-precheck.sql", import.meta.url));
+const scopePost = readSource(new URL("../supabase/delete-scope-29-postcheck.sql", import.meta.url));
+
+test("기록 삭제 범위 확대 29번: 새 파일이고 28번 파일은 건드리지 않으며, 더하기만 한다(기존 표 · 열을 지우거나 바꾸지 않는다)", () => {
+  assert.equal(scopeFile, "20261108000000_record_delete_scope.sql");
+  assert.equal(files.at(-1), scopeFile, "29번이 마지막 번호");
+  const code = scopeSql.replace(/--.*$/gm, "");
+  assert.doesNotMatch(code, /\b(drop\s+(table|column|function|trigger)|truncate|alter\s+table\s+\S+\s+(drop|rename|alter))/i, "기존 표 · 열을 지우거나 바꾸지 않는다(열 추가뿐)");
+  // 29번이 하는 쓰기는 삭제 함수 안(본인 결과 한 건)뿐이다: 함수 밖의 최상위 문장은 열 추가 · 함수 · 트리거 · 권한이다
+  const topLevel = code.replace(/\$\$[\s\S]*?\$\$/g, "$$$$");
+  assert.doesNotMatch(topLevel, /\b(insert\s+into|update\s+public|delete\s+from)/i, "함수 밖에서 데이터를 바꾸는 문장이 없다");
+  assert.match(code, /alter table public\.assessments\s+add column record_purged_at timestamptz;/);
+  assert.equal((code.match(/create trigger /g) ?? []).length, 4);
+  assert.match(code, /revoke all on function public\.block_write_on_purged_record\(\) from public, anon, authenticated;/);
+  assert.match(code, /revoke all on function public\.delete_assessment_record_v2\(uuid, uuid\) from public, anon, authenticated;\s*grant execute on function public\.delete_assessment_record_v2\(uuid, uuid\) to service_role;/);
+  // 두 함수 모두 security definer + 빈 search_path
+  assert.equal((code.match(/security definer\s+set search_path = ''/g) ?? []).length, 2);
+  // 질문 횟수 · 질문권 장부 · 주문 · 결제 증빙 표는 삭제하지 않는다
+  const fnBody = scopeSql.slice(scopeSql.indexOf("create or replace function public.delete_assessment_record_v2"));
+  assert.doesNotMatch(fnBody, /delete from public\.(chat_questions|cash_ledger|cash_wallets|question_packs|orders|payment_events|profiles|user_consents|ai_usage)/);
+  assert.match(fnBody, /delete from public\.talk_rooms/);
+  assert.match(fnBody, /delete from public\.chat_summaries where assessment_id = p_assessment_id and user_id = p_user_id/);
+  assert.match(fnBody, /delete from public\.talk_transcripts where assessment_id = p_assessment_id and user_id = p_user_id/);
+  // 리포트 궁합 쌍 표는 있을 때만 확인한다(없는 DB에서도 적용된다)
+  assert.match(fnBody, /to_regclass\('public\.pairs'\) is not null/);
+});
+
+test("기록 삭제 범위 확대 29번 사전 · 사후 확인은 읽기 전용 조회 하나다(쓰기 문장 없음) — 종합 판정을 내고 사전은 28번까지 적용된 DB에서만 OK다", () => {
+  for (const [name, sql] of [["사전", scopePre], ["사후", scopePost]] as const) {
+    const code = sql.replace(/--.*$/gm, "").replace(/'(?:[^']|'')*'/g, "''"); // 주석 · 문자열 안의 안내 글은 문장이 아니다
+    assert.doesNotMatch(code, /\b(insert\s+into|update\s+public|delete\s+from|drop\s|alter\s|create\s|truncate|grant\s|revoke\s|notify\s)/i, `${name} 확인에 쓰기 문장이 없다`);
+    assert.match(sql, /'종합'/);
+    assert.equal((code.match(/;/g) ?? []).length, 1, `${name} 확인은 문장 하나`);
+  }
+  assert.match(scopePre, /29번을 실행하지 말고/);
+  assert.match(scopePost, /이상/);
+  assert.match(scopePre, /노출|참고/);
+  // 사전: 19~22 · 25번에 기대지 않는다 — 혜택 · 후기 표가 없어도 OK 판정에 영향이 없다(참고로만 보인다)
+  assert.match(scopePre, /\(6, '19~22번\(혜택\) · 25번\(후기\)에 기대지 않는다[^']*', '참고'/);
+  // 사후 확인의 번호 13은 notify를 안내만 하고 실행하지 않는다
+  assert.match(scopePost, /notify pgrst, ''reload schema'';/);
+});
+
+test("적용 이력 확인(check-migrations.sql)에 29번 줄이 있다 — 열 · 함수 · 권한 · 트리거 4개로 적용됨 / 일부만 / 아직 안 함을 가른다", () => {
+  assert.match(checkSql, /select 29, '20261108000000_record_delete_scope\.sql'/);
+  assert.match(checkSql, /wd29 as \(/);
+  assert.match(checkSql, /record_purged_at/);
+  assert.match(checkSql, /talk_rooms_block_purged/);
+});
