@@ -150,6 +150,10 @@ wd25 as (
     exists (select 1 from pg_constraint where conname = 'funnel_events_name_check' and pg_get_constraintdef(oid) like '%review_section_view%') as funnel_names,
     coalesce((select has_table_privilege('service_role', 'public.reviews', 'insert') from information_schema.tables where table_schema = 'public' and table_name = 'reviews'), false) as service_grant
 ),
+wd26 as (
+  select
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pairs' and column_name = 'relationship') as relationship_col
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -323,5 +327,10 @@ select * from (
               when wd25.reviews or wd25.admin_fn or wd25.withdraw_trigger or wd25.funnel_names or wd25.service_grant then '일부만' else '아직 안 함' end,
          '표 reviews (이용 후기 · 보상 한 번 · 삭제는 묘비) · review_admin_log · review_reports / 함수 review_admin_apply · submit_review_report / 탈퇴 시 후기를 지우는 트리거: ' || wd25.withdraw_trigger::text || ' / 방문 단계 이름에 후기 이벤트 포함: ' || wd25.funnel_names::text || ' / 서버 권한: ' || wd25.service_grant::text
   from wd25
+  union all
+  select 26, '20261105000000_pair_relationship.sql',
+         case when wd26.relationship_col then '적용됨' else '아직 안 함' end,
+         '표 pairs의 사이(relationship) 열 — 리포트 궁합 새 초대에만 필요하다. 이 열이 없으면 새 초대 만들기만 준비 중으로 멈추고 기존 쌍 · 개인 리포트 · 무료 궁합 · 사주 궁합은 그대로 동작한다: ' || wd26.relationship_col::text
+  from wd26
 ) r
 order by "번호";

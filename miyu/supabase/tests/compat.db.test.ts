@@ -35,7 +35,7 @@ const server = createSupabaseRepository(admin);
 
 const answers = Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i, n) => [i.id, (n % 5) + 1])));
 const info = { ...EMPTY_BASIC_INFO, nickname: "궁합시험", birthYear: "1996", birthMonth: "3", birthDay: "29", birthTime: "09:30", gender: "female" as const };
-const PARTNER = { nickname: "남수", calendar: "solar", isLeapMonth: false, birthYear: "1994", birthMonth: "11", birthDay: "2", birthTime: "09:30", birthTimeUnknown: false };
+const PARTNER = { nickname: "남수", gender: "male", calendar: "solar", isLeapMonth: false, birthYear: "1994", birthMonth: "11", birthDay: "2", birthTime: "09:30", birthTimeUnknown: false };
 const nowFn = () => new Date();
 
 const gateway: PaymentGateway = {
@@ -70,7 +70,7 @@ async function person() {
 }
 
 const start = (p: { U: { id: string }; aid: string }, partner: unknown = PARTNER) =>
-  startCompatCheckout({ repo: server, now: nowFn, saleOpen: true, generatorReady: true }, { userId: p.U.id, assessmentId: p.aid, partner });
+  startCompatCheckout({ repo: server, now: nowFn, saleOpen: true, generatorReady: true }, { userId: p.U.id, assessmentId: p.aid, partner, relationship: "friend", myGender: "female" });
 
 test("상대 출생정보 표는 서버만 읽는다 — 본인 로그인으로도 읽을 수 없고, 서버는 읽고 쓴다", async () => {
   const p = await person();
@@ -150,4 +150,20 @@ test("탈퇴하면 결제하지 않고 남긴 상대 정보도 지워진다", as
   const after = await server.getCompatRequestByOrder(r.order.id);
   assert.equal(after?.partner ?? null, null);
   assert.ok(after?.scrubbedAt);
+});
+
+test("사이 · 상대 성별은 migration 없이 상대 입력(jsonb)에 함께 보관되고, 리포트가 완성되면 상대 입력과 함께 지워진다 — 리포트에는 사이만 남는다", async () => {
+  const p = await person();
+  const r = await start(p, { ...PARTNER, gender: "female" });
+  assert.equal(r.kind, "order");
+  if (r.kind !== "order") return;
+  const req = await server.getCompatRequestByOrder(r.order.id);
+  assert.equal(req?.partner?.relationship, "friend");
+  assert.equal(req?.partner?.gender, "female");
+  // 사이를 고르지 않으면 주문 없이 막힌다
+  const none = await startCompatCheckout({ repo: server, now: nowFn, saleOpen: true, generatorReady: true }, { userId: p.U.id, assessmentId: p.aid, partner: PARTNER, myGender: "female" });
+  assert.equal(none.kind, "invalid");
+  assert.equal(await server.scrubCompatRequest(r.order.id), true);
+  const after = await server.getCompatRequestByOrder(r.order.id);
+  assert.equal(after?.partner, null);
 });

@@ -18,7 +18,7 @@ export async function CompatLevels() {
       </h2>
       <ul className="mt-4 space-y-3 text-[15px] leading-[1.7] text-ink-2">
         <li>
-          <span className="font-semibold text-ink">간단 궁합</span> <StatusBadge>지금 이용 가능</StatusBadge> — 커플 유형과 궁합 지수 한 장. 두 사람의 사주만 봐요.
+          <span className="font-semibold text-ink">간단 궁합</span> <StatusBadge>지금 이용 가능</StatusBadge> — 궁합 지수와, 알려 주신 사이에 맞춘 풀이 한 장. 두 사람의 사주만 봐요.
         </li>
         <li>
           <span className="font-semibold text-ink">사주 궁합</span> <StatusBadge>{sajuOpen ? "지금 이용 가능" : "준비 중"}</StatusBadge> — 두 사람의 타고난 관계 흐름을 자세히 풀어요. 간단 궁합과 같은 계산을 길게 읽는 거예요.

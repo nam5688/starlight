@@ -33,7 +33,7 @@ export async function renderCardPng(card: TalkCard, options: Options): Promise<B
   return await drawLayoutPng(layoutCard(card, { ...options, measure }), { colorOf, font, character });
 }
 
-/** 간단 궁합 공유 카드 — 이름 · 커플 유형 · 궁합 지수 · 핵심 한 줄만 담긴다(생년월일 없음). 이 기기 안에서 만들어지며 서버로 보내지 않는다 */
+/** 간단 궁합 공유 카드 — 이름 · 사이 · 커플 유형(연인 · 결혼준비중 · 결혼함) 또는 사이의 제목 · 궁합 지수 · 핵심 한 줄만 담긴다(생년월일 없음). 이 기기 안에서 만들어지며 서버로 보내지 않는다 */
 export async function renderCompatCardPng(card: SimpleCompatCard): Promise<Blob> {
   // 궁합 카드는 연애 · 궁합 영역이라 윙크 · 하트의 핑크
   const { colorOf, font, character, measure } = await prepare("love");

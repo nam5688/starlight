@@ -2,12 +2,15 @@
 // DB 변경 24번이 없으면(표 · 함수 없음) 코드 42P01로 통일해 던진다 — 호출한 쪽이 "준비 중"으로 다루고 기존 화면은 그대로 동작한다.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { JoinPairResult, NewPair, PairChangeResult, PairRecord, PairRepository, PairStatus } from "../../services/pair-ports.ts";
+import { parseRelationship } from "../../compat/relationship.ts";
 import type { InsertResult } from "../../services/ports.ts";
 
 type Row = Record<string, unknown>;
 type DbError = { message: string; code?: string };
 
 const MISSING = new Set(["PGRST202", "42883", "PGRST205", "42P01"]);
+/** 사이(relationship) 열이 없다(DB 변경 26번 전) — 쌍 만들기에서만 쓴다. 다른 조회에는 새 열을 이름으로 부르지 않아 영향이 없다 */
+const NO_RELATIONSHIP_COLUMN = new Set(["PGRST204", "42703"]);
 const UNIQUE_VIOLATION = "23505";
 
 function fail(context: string, error: DbError, status?: number): never {
@@ -38,6 +41,8 @@ export function toPair(r: Row): PairRecord {
     unlinkedAt: nstr(r.unlinked_at),
     unlinkedBy: nstr(r.unlinked_by),
     expiresAt: str(r.expires_at),
+    // 열이 없거나(26번 전) 비어 있으면 null — 특정 관계로 채우지 않는다
+    relationship: parseRelationship(r.relationship),
     createdAt: str(r.created_at),
   };
 }
@@ -56,11 +61,17 @@ export function createSupabasePairRepository(db: SupabaseClient): PairRepository
     async createPair(p: NewPair): Promise<InsertResult<PairRecord>> {
       const { data, error, status } = await db
         .from("pairs")
-        .insert({ id: p.id, token: p.token, a_user_id: p.aUserId, a_assessment_id: p.aAssessmentId, a_consent_at: p.aConsentAt, a_consent_version: p.aConsentVersion, expires_at: p.expiresAt })
+        .insert({ id: p.id, token: p.token, a_user_id: p.aUserId, a_assessment_id: p.aAssessmentId, a_consent_at: p.aConsentAt, a_consent_version: p.aConsentVersion, expires_at: p.expiresAt, relationship: p.relationship })
         .select()
         .single();
       if (error) {
         if (error.code === UNIQUE_VIOLATION) return { ok: false, reason: "conflict" };
+        // 사이를 담을 열이 아직 없으면 사이를 빼고 만든 척하지 않고 "준비 중"(db-not-ready)으로 멈춘다
+        if (error.code && NO_RELATIONSHIP_COLUMN.has(error.code)) {
+          const e = new Error("쌍 만들기: 사이(relationship) 열이 없습니다 (DB 변경 26번 필요)") as Error & { code?: string };
+          e.code = "42P01";
+          throw e;
+        }
         fail("쌍 만들기", error, status);
       }
       return { ok: true, value: toPair(data) };

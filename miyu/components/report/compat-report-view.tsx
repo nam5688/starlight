@@ -1,5 +1,6 @@
 import { ChevronIcon, InfoIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
+import { headingOf, neutralWording, parseRelationship, RELATIONSHIP_LABEL, relationLensOf, showsCoupleType } from "@/lib/compat/relationship";
 import { COMPAT_STEP_GROUPS, type CompatStepGroupId } from "@/lib/report/compat/plan";
 import type { CompatReport, PairReport } from "@/lib/report/compat/types";
 
@@ -31,6 +32,9 @@ function stepOwner(id: CompatStepGroupId, viewer: "a" | "b" | null | undefined):
  */
 export function CompatReportView({ report, viewer }: { report: CompatReport | PairReport; viewer?: "a" | "b" | null }) {
   const s = report.summary;
+  // 구매자가 알려 준 사이 — 이 기능 이전에 만든 글에는 없다(그 글은 예전 모양 그대로, 특정 관계로 채우지 않는다)
+  const rel = parseRelationship(report.relationship);
+  const showType = showsCoupleType(rel);
   const pair = report.kind === "compat-pair-v1" ? report : null;
   const names = report.kind === "compat-saju-v1" ? report.names : null;
   // 리포트 궁합: 읽는 사람의 실천 묶음을 먼저 보인다(두 사람이 같은 글을 보지만 각자 먼저 읽을 곳이 다르다)
@@ -46,8 +50,9 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
       <div className="rounded-2xl bg-canvas p-6 text-center shadow-soft md:p-8">
         <p className="text-[14px] font-medium text-ink-3">{names ? `${names.a} × ${names.b}` : "A님 × B님"}</p>
         {pair && viewer && <p className="mt-1 text-[13px] text-ink-3">이 글에서 {viewer === "a" ? "A님은 나, B님은 상대" : "B님은 나, A님은 상대"}예요.</p>}
-        <h2 className="mt-2 text-[26px] leading-tight font-bold tracking-tight text-accent-strong md:text-[32px]">{s.typeName}</h2>
-        <p className="mx-auto mt-3 max-w-[30rem] text-[16px] leading-[1.65] text-ink">{s.typeLine}</p>
+        {rel && <p className="mx-auto mt-2 w-fit rounded-full bg-accent-soft px-3 py-1 text-[13px] font-semibold text-accent-strong">{RELATIONSHIP_LABEL[rel]} 사이로 읽었어요</p>}
+        <h2 className="mt-2 text-[26px] leading-tight font-bold tracking-tight break-keep text-accent-strong md:text-[32px]">{rel ? headingOf(rel, s.typeName) : s.typeName}</h2>
+        <p className="mx-auto mt-3 max-w-[30rem] text-[16px] leading-[1.65] text-ink">{showType ? s.typeLine : relationLensOf(rel!)}</p>
         <div className="mt-5 border-t border-line pt-5">
           <p className="text-[13px] font-semibold text-ink-3">궁합 지수</p>
           <p className="mt-1 text-[48px] leading-none font-bold tracking-tight text-ink tabular-nums" aria-label={`궁합 지수 ${s.score}`}>
@@ -56,10 +61,12 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
           <p className="mx-auto mt-3 max-w-[30rem] text-[14px] leading-[1.7] text-ink-2">{s.scoreMeaning}</p>
           <p className="mx-auto mt-2 max-w-[30rem] text-[13px] leading-[1.7] text-ink-3">{s.scoreNotProbability}</p>
         </div>
-        <p className="mx-auto mt-5 max-w-[30rem] rounded-xl bg-accent-soft px-4 py-3 text-[15px] leading-[1.65] font-semibold text-accent-strong">
-          <span className="block text-[13px] font-semibold text-accent">우리 커플 핵심</span>
-          {s.core}
-        </p>
+        {showType && (
+          <p className="mx-auto mt-5 max-w-[30rem] rounded-xl bg-accent-soft px-4 py-3 text-[15px] leading-[1.65] font-semibold text-accent-strong">
+            <span className="block text-[13px] font-semibold text-accent">우리 커플 핵심</span>
+            {s.core}
+          </p>
+        )}
       </div>
 
       <div className="px-1">
@@ -148,12 +155,12 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
             <ChevronIcon className="size-5 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
           </summary>
           <div className="pb-4 text-[14px] leading-[1.75] text-ink-2">
-            <p>{s.scoreBasis}</p>
+            <p>{neutralWording(s.scoreBasis, rel)}</p>
             {s.parts.length > 0 && (
               <ul className="mt-3 space-y-1.5">
                 {s.parts.map((b) => (
                   <li key={b.label}>
-                    <span className="font-semibold text-ink">{b.label}</span> — {b.direction}
+                    <span className="font-semibold text-ink">{neutralWording(b.label, rel)}</span> — {b.direction}
                   </li>
                 ))}
               </ul>

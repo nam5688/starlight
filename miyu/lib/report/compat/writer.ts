@@ -1,6 +1,7 @@
 // 사주 궁합 풀이 쓰기 — 모델에 한 번 묻고, 검사(validate.ts)에 걸리면 이유를 알려 한 번 고쳐 쓰게 한다. 그래도 걸리면 실패로 돌려준다(잘못된 글을 보이지 않는다).
 // 호출마다 사용 기록(ctx.onUsage)을 남기고 시간 제한을 둔다. 제공사를 직접 부르지 않는다 — TextModel 약속으로만.
 // 아직 서비스에 연결하지 않았다(판매 · 저장 · 승인 가드 연결 전) — 개발용 화면과 시험에서만 쓴다.
+import type { CompatRelationship } from "../../compat/relationship.ts";
 import type { Evidence } from "../evidence.ts";
 import type { GenerateContext } from "../generator.ts";
 import { extractJson } from "../ai/generator.ts";
@@ -25,7 +26,7 @@ export class CompatWriteError extends Error {
 export type CompatWriterOptions = { model: TextModel; maxRepairs?: number; maxRetries?: number; sleep?: (ms: number) => Promise<void>; /** 기본은 사주 궁합, pair는 리포트 궁합(응답 비교 근거 포함) */ mode?: "saju" | "pair" };
 
 export interface CompatWriter {
-  write(input: { evidence: Evidence[]; cautions?: string[] }, ctx?: GenerateContext): Promise<CompatDraftV1>;
+  write(input: { evidence: Evidence[]; cautions?: string[]; /** 사용자가 알려 준 두 사람의 사이(없으면 중립) */ relationship?: CompatRelationship | null }, ctx?: GenerateContext): Promise<CompatDraftV1>;
   readonly provider: string;
   readonly model: string;
   readonly promptVersion: string;
@@ -42,7 +43,7 @@ export function createCompatWriter(opts: CompatWriterOptions): CompatWriter {
     model: opts.model.model,
     promptVersion,
     async write(input, ctx = {}) {
-      const messages: ModelMessage[] = [{ role: "user", content: (pair ? buildPairUserMessage : buildCompatUserMessage)(input.evidence, input.cautions) }];
+      const messages: ModelMessage[] = [{ role: "user", content: (pair ? buildPairUserMessage : buildCompatUserMessage)(input.evidence, input.cautions, input.relationship) }];
       let lastErrors: string[] = [];
       for (let round = 0; round <= maxRepairs; round++) {
         let call: Awaited<ReturnType<typeof caller.call>>;
@@ -60,7 +61,7 @@ export function createCompatWriter(opts: CompatWriterOptions): CompatWriter {
         } catch {
           parsed = null;
         }
-        const check = validateCompatDraft(parsed, input.evidence, pair ? { pair: true } : {});
+        const check = validateCompatDraft(parsed, input.evidence, { ...(pair ? { pair: true } : {}), ...(input.relationship ? { relationship: input.relationship } : {}) });
         if (check.ok) {
           caller.recordResult(ctx, spec, call, "ok");
           // 경고(WARN)만 있는 글은 고쳐 쓰기를 부르지 않고 그대로 받는다 — 경고는 시도 기록에 남는다(운영자 정책 2026-10-17)

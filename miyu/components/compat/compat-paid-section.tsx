@@ -4,6 +4,7 @@ import { LoginOptions } from "@/components/auth/login-options";
 import { CompatBuyForm } from "@/components/compat/compat-buy-form";
 import { buttonPrimary } from "@/components/ui/styles";
 import { formatKrw, SAJU_COMPAT } from "@/lib/config/product";
+import { genderOfSaju } from "@/lib/saju/engine";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
 import { saleOpenOf } from "@/server/sale-switch";
@@ -50,7 +51,7 @@ export async function CompatPaidSection() {
   }
   return (
     <Frame>
-      <CompatBuyForm assessmentId={latest.id} myName={latest.nickname} priceLabel={formatKrw(SAJU_COMPAT.priceKrw)} />
+      <CompatBuyForm assessmentId={latest.id} myName={latest.nickname} priceLabel={formatKrw(SAJU_COMPAT.priceKrw)} savedGender={genderOfSaju(latest.saju)} />
     </Frame>
   );
 }

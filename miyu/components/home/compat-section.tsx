@@ -13,7 +13,7 @@ const WAYS = [
   {
     name: "간단 궁합",
     badge: "무료",
-    lines: ["두 사람의 생년월일만 넣어요.", "두 사주에서 읽힌 커플 유형과 궁합 지수를 한 장으로 보여 줘요."],
+    lines: ["두 사람의 생년월일과 성별, 지금의 사이를 알려 줘요.", "두 사주에서 읽힌 궁합 지수와 그 사이에 맞춘 풀이를 한 장으로 보여 줘요."],
     href: "/compat",
     cta: "무료로 궁합 보기",
   },
@@ -76,7 +76,7 @@ export function CompatSection() {
           </summary>
           <ul className="space-y-2.5 pb-5 text-[14px] leading-[1.7] text-ink-2">
             <li>
-              <span className="font-semibold text-ink">간단 궁합</span> — 한 사람이 두 사람의 생년월일(출생 시간은 선택)을 넣어 보는 가벼운 화면이에요. 입력한 정보는 저장하지 않고, 커플 유형 · 궁합 지수 · 핵심 한 줄까지만 보여 줘요.
+              <span className="font-semibold text-ink">간단 궁합</span> — 한 사람이 두 사람의 생년월일(출생 시간은 선택)과 성별, 지금의 사이를 넣어 보는 가벼운 화면이에요. 입력한 정보는 서버에 저장하지 않고, 궁합 지수와 그 사이에 맞춘 풀이까지만 보여 줘요.
             </li>
             <li>
               <span className="font-semibold text-ink">사주 궁합</span> — 간단 궁합과 같은 계산을 영역별로 길게 풀어 주는 방식으로 준비하고 있어요. 상대의 성격이나 애착을 대신 입력해 검사한 것처럼 만들지 않고, 두 사주에서 읽히는 관계의 특징까지만 풀어요.

@@ -46,6 +46,7 @@ export function createMemoryPairs(mem: Mem, now: () => Date = () => new Date()) 
         unlinkedAt: null,
         unlinkedBy: null,
         expiresAt: n.expiresAt,
+        relationship: n.relationship ?? null,
         createdAt: stamp(),
       };
       pairs.set(rec.id, rec);

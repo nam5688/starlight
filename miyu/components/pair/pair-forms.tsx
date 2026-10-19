@@ -2,8 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { createPairInviteAction, joinPairAction, startPairCheckoutAction, unlinkPairAction, withdrawPairConsentAction } from "@/app/pair/actions";
+import { GenderField, RelationshipField } from "@/components/compat/choice-fields";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
+import { GENDER_HELP, GENDER_LABEL, RELATIONSHIP_LABEL, type CompatGender, type CompatRelationship } from "@/lib/compat/relationship";
 import { PAIR_CONSENT } from "@/lib/report/compat/pair-consent";
+
+/** 분석 때 입력한 성별이 있으면 알려 주고, 같게 골라야 한다는 것을 밝힌다 — 다르게 고르면 서버가 덮어쓰지 않고 멈춰서 알려 준다 */
+const genderHelpOf = (saved: CompatGender | null) => (saved ? `분석할 때 입력한 성별은 "${GENDER_LABEL[saved]}"예요. 궁합은 그 분석 결과를 그대로 쓰기 때문에 같게 선택해야 해요. ${GENDER_HELP}` : GENDER_HELP);
+
+type FieldErrors = { relationship?: string; myGender?: string };
 
 /** 성공하면 서버가 다른 화면으로 보내므로(redirect) 여기에 오는 것은 실패뿐이다 — 이동은 오류처럼 던져져서 그대로 다시 던진다 */
 const rethrowRedirect = (err: unknown) => {
@@ -20,8 +27,11 @@ function ConsentCheck({ id, checked, onChange }: { id: string; checked: boolean;
 }
 
 /** 초대 링크 만들기 — 내 동의(체크)가 있어야 한다 */
-export function PairInviteForm({ assessmentId, myName }: { assessmentId: string; myName: string }) {
+export function PairInviteForm({ assessmentId, myName, savedGender }: { assessmentId: string; myName: string; savedGender: CompatGender | null }) {
   const [consent, setConsent] = useState(false);
+  const [relationship, setRelationship] = useState<"" | CompatRelationship>("");
+  const [myGender, setMyGender] = useState<"" | CompatGender>("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const submit = (e: React.FormEvent) => {
@@ -30,8 +40,11 @@ export function PairInviteForm({ assessmentId, myName }: { assessmentId: string;
     setMessage(null);
     start(async () => {
       try {
-        const out = await createPairInviteAction({ assessmentId, consent });
-        if (out && !out.ok) setMessage(out.message);
+        const out = await createPairInviteAction({ assessmentId, consent, relationship, myGender });
+        if (out && !out.ok) {
+          setErrors(out.errors ?? {});
+          setMessage(out.message);
+        }
       } catch (err) {
         rethrowRedirect(err);
         setMessage("만들지 못했어요. 잠시 뒤에 다시 시도해 주세요.");
@@ -43,6 +56,9 @@ export function PairInviteForm({ assessmentId, myName }: { assessmentId: string;
       <p className="text-[15px] leading-[1.75] text-ink-2">
         <span className="font-semibold text-ink">{myName} 님</span>의 분석 결과로 초대 링크를 만들어요. 상대가 링크를 열고 자기 분석 결과로 동의하면 연결돼요.
       </p>
+      <GenderField prefix="pair-me" legend="본인의 성별" value={myGender} error={errors.myGender} onChange={(g) => { setMyGender(g); setErrors((x) => ({ ...x, myGender: undefined })); }} help={genderHelpOf(savedGender)} />
+      <RelationshipField prefix="pair-rel" value={relationship} error={errors.relationship} onChange={(r) => { setRelationship(r); setErrors((x) => ({ ...x, relationship: undefined })); }} />
+      <p className="text-[13px] leading-[1.7] text-ink-3">고른 사이는 초대받는 분에게 그대로 보이고, 두 분이 같은 글을 읽을 때 풀이의 관점이 돼요. 사이가 다르면 새 초대를 만들어 주세요.</p>
       <ConsentCheck id="pair-invite-consent" checked={consent} onChange={setConsent} />
       {message && (
         <p role="alert" className="text-[15px] font-medium text-danger">
@@ -57,8 +73,10 @@ export function PairInviteForm({ assessmentId, myName }: { assessmentId: string;
 }
 
 /** 초대받은 사람이 동의하고 연결한다 */
-export function PairJoinForm({ token, myName }: { token: string; myName: string }) {
+export function PairJoinForm({ token, myName, relationship, savedGender }: { token: string; myName: string; relationship: CompatRelationship | null; savedGender: CompatGender | null }) {
   const [consent, setConsent] = useState(false);
+  const [myGender, setMyGender] = useState<"" | CompatGender>("");
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const submit = (e: React.FormEvent) => {
@@ -67,8 +85,11 @@ export function PairJoinForm({ token, myName }: { token: string; myName: string 
     setMessage(null);
     start(async () => {
       try {
-        const out = await joinPairAction({ token, consent });
-        if (out && !out.ok) setMessage(out.message);
+        const out = await joinPairAction({ token, consent, myGender });
+        if (out && !out.ok) {
+          setErrors(out.errors ?? {});
+          setMessage(out.message);
+        }
       } catch (err) {
         rethrowRedirect(err);
         setMessage("연결하지 못했어요. 잠시 뒤에 다시 시도해 주세요.");
@@ -80,6 +101,12 @@ export function PairJoinForm({ token, myName }: { token: string; myName: string 
       <p className="text-[15px] leading-[1.75] text-ink-2">
         <span className="font-semibold text-ink">{myName} 님</span>의 가장 최근 분석 결과로 연결해요.
       </p>
+      {relationship && (
+        <p className="rounded-xl bg-accent-soft px-4 py-3 text-[15px] leading-[1.7] text-accent-strong">
+          초대한 분이 두 분의 사이를 <span className="font-semibold">“{RELATIONSHIP_LABEL[relationship]}”</span>로 알려 줬어요. 이 사이를 기준으로 풀이를 읽어요. 실제와 다르면 연결하지 말고 초대한 분께 새 링크를 부탁해 주세요.
+        </p>
+      )}
+      <GenderField prefix="pair-join-me" legend="본인의 성별" value={myGender} error={errors.myGender} onChange={(g) => { setMyGender(g); setErrors((x) => ({ ...x, myGender: undefined })); }} help={genderHelpOf(savedGender)} />
       <ConsentCheck id="pair-join-consent" checked={consent} onChange={setConsent} />
       {message && (
         <p role="alert" className="text-[15px] font-medium text-danger">

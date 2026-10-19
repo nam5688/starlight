@@ -3,6 +3,7 @@
 // - AI 생성기(ai/generator.ts) → IntegratedReadingReport(읽기 구조, 기본) · PersonalReportV2(이전 형식) (계산 결과 → 근거 → AI 서술 → 형식 검사)
 // 저장된 리포트는 kind로 구분해 그대로 다시 보여준다 (v1에는 kind가 없다).
 
+import type { CompatRelationship } from "../compat/relationship.ts";
 import type { ContextTopic, PersonalContextInput } from "../personalization/context.ts";
 import type { SajuOk, SajuResult } from "../saju/engine.ts";
 import type { CompatReport, PairReport } from "./compat/types.ts";
@@ -44,13 +45,15 @@ export type CompatInput = {
   b: SajuOk;
   /** 시기(대운 · 세운)를 읽는 기준 연 · 월 (없으면 지금, 한국 날짜 기준) */
   reference?: { year: number; month: number };
+  /** 구매자가 알려 준 두 사람의 사이(풀이의 관점 · 표현에만 쓴다). 없으면(이 기능 이전의 주문) 중립으로 읽는다 */
+  relationship?: CompatRelationship | null;
 };
 
 /** 리포트 궁합의 한 사람 — 사주 계산 결과와 직접 답한 응답 요약(점수 · 원문은 AI에 가지 않고 비교 근거 문장만 간다) */
 export type PairPerson = { saju: SajuOk; summary: Pick<FreeSummary, "temperament" | "relationship" | "mbti">; knownMbti: string | null };
 
 /** 리포트 궁합을 쓸 때 받는 값 — 두 사람의 사주 · 응답. 이름 · 생년월일 원문은 AI에 보내지 않는다 */
-export type PairInput = { a: PairPerson; b: PairPerson; reference?: { year: number; month: number } };
+export type PairInput = { a: PairPerson; b: PairPerson; reference?: { year: number; month: number }; /** 초대한 사람이 알려 준 두 사람의 사이 — 없으면(이 기능 이전의 쌍) 중립 */ relationship?: CompatRelationship | null };
 
 /** 개인 통합 리포트 생성 결과 (개발용 v1 · AI 읽기 구조 reading-v1 · 이전 AI 형식 v2) */
 export type ReportContent = FullReport | PersonalReportV2 | IntegratedReadingReport;

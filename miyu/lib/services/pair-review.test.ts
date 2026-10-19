@@ -60,10 +60,10 @@ async function setup() {
   const pairDeps: PairDeps = { repo: mem.repo, pairs: mp.repo, now: () => clock.now, saleOpen: true, generatorReady: true, newId: () => `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`, newToken: () => `rev${String(n).padStart(2, "0")}${"x".repeat(19)}` };
   const generator = createAiReportGenerator({ model: createMockModel(), now: () => T0, sleep: async () => {} });
   const reviewDeps = (): ReviewDeps => ({ repo: mem.repo, reviews: rev.repo, benefits: ben.repo, pair: createPairReviewEligibility({ repo: mem.repo, pairs: mp.repo, benefits: ben.repo }), now: () => clock.now });
-  const inv = await createPairInvite(pairDeps, { userId: A, assessmentId: a.id, consent: true });
+  const inv = await createPairInvite(pairDeps, { userId: A, assessmentId: a.id, consent: true, relationship: "lover", myGender: "female" });
   assert.equal(inv.kind, "created");
   if (inv.kind !== "created") throw new Error("invite");
-  assert.equal((await joinPairInvite(pairDeps, { token: inv.pair.token, userId: B, consent: true })).kind, "joined");
+  assert.equal((await joinPairInvite(pairDeps, { token: inv.pair.token, userId: B, consent: true, myGender: "male" })).kind, "joined");
   const buy = async (userId: string) => {
     const r = await startPairCheckout(pairDeps, { userId, pairId: inv.pair.id });
     if (r.kind !== "order") throw new Error(`order ${r.kind}`);

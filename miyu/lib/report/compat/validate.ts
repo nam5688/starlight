@@ -3,6 +3,7 @@
 // 2026-10-17 운영자 확정: 전통 해석 · 개운법은 허용하고 보장하는 말만 막는다 · 명리 풀이를 위해 용어 한도를 넓혔다 · **반복은 낱말 횟수 · 구절 되풀이만으로 저장을 막지 않는다**(같은 구절 · 같은 말로 여는 문단은 읽기 전 지표로만 보고, 새 정보 없이 결론을 되풀이하는지는 사람이 읽고 판단한다).
 // 출생 시각을 모르는 사람이 있으면(근거 compat.chart에 "세 기둥(시주 제외)") 오행 · 십성의 없음 · 적음은 범위를 밝히게 하고 시주 풀이(자녀 · 말년) · 신강/신약은 막는다(reading/hour-scope.ts).
 // 한계: 낱말 · 길이 · 표지를 센 어림이다. 말을 바꿔 쓴 속마음 단정 · 관계의 좋고 나쁨 판정은 못 찾는다 — 지시문(prompt.ts)과 사람이 읽는 평가가 본다. 좋은 글의 보증이 아니다.
+import { relationshipIssues, type CompatRelationship } from "../../compat/relationship.ts";
 import { compatFortifyElementsOf, compatFortifyHasTie } from "../../saju/interpret/compat-extra.ts";
 import { FORTIFY_TIE_VERDICT, fortuneMentions } from "../../saju/interpret/fortune.ts";
 import type { Evidence } from "../evidence.ts";
@@ -53,10 +54,16 @@ export const TIMING_VERDICT = /시기(?:가|는|도)\s*(?:더\s*)?(?:좋|나쁘|
  */
 const EVENT_STEM = /처음\s*만났|처음\s*만난|다퉜|다투었|싸웠|싸운\s*(?:적|뒤|후)|헤어졌|헤어진\s*(?:적|뒤|후)|이별했|재결합|재회했|사귀었|사귀고\s*있|사귀는\s*(?:중|사이)|결혼했|결혼한\s*(?:사이|지)|동거했|동거하고|고백했|연락이\s*끊|바람을\s*피|외도|이혼했|임신했|출산했|화해했|상처받았|참아\s*왔|참아왔/;
 const HEDGED = /수\s*있|기\s*쉬|있었을\s*(?:거|수)|[ㄹ을]\s*수도|일\s*수도|(?:이|가)\s*있다면|다면|라면|면\s*[^.!?]{0,12}(?:어요|해요)|거예요|것\s*같|(?:읽혀|보여)요/;
-export function unfoundedEventIn(text: string): string | null {
+/**
+ * rel은 사용자가 직접 알려 준 사이다 — 그 사이를 말하는 것은 지어낸 사건이 아니므로 허용한다(결혼함 → "결혼한 사이", 연인 → "사귀고 있"). 다른 사이의 사건은 그대로 막는다
+ */
+export function unfoundedEventIn(text: string, rel?: CompatRelationship | null): string | null {
   for (const sentence of text.split(/(?<=[.!?])\s+/)) {
     const m = EVENT_STEM.exec(sentence);
-    if (m && !HEDGED.test(sentence)) return m[0];
+    if (!m || HEDGED.test(sentence)) continue;
+    if (rel === "married" && /^결혼했|^결혼한/.test(m[0])) continue;
+    if (rel === "lover" && /^사귀고\s*있|^사귀는/.test(m[0])) continue;
+    return m[0];
   }
   return null;
 }
@@ -152,6 +159,8 @@ const ATTACHMENT_TYPE = /(?:안정|불안|회피|혼란)\s*(?:형|애착)|애착
 export type CompatValidateOptions = {
   /** 리포트 궁합 — 영역에 응답(response)이 더해지고(비교 근거가 있을 때) 응답을 읽어 주는 말 검사가 달라진다 */
   pair?: boolean;
+  /** 사용자가 알려 준 두 사람의 사이 — 있으면 그 사이에 맞지 않는 말(친구 · 기타의 연애 · 결혼 이야기, 썸의 마음 확정, 결혼 사이의 앞날 보장 등)을 막는다. 없으면 예전 검사 그대로 */
+  relationship?: CompatRelationship | null;
 };
 
 export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: CompatValidateOptions = {}): CompatValidation {
@@ -291,10 +300,13 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: Co
     const inTiming = where.startsWith("sections.love") && hasTimingEvidence(evidence);
     if (!inTiming && TIMING_TALK.test(t)) errors.push(`${where}: 두 사람의 시기("${TIMING_TALK.exec(t)![0]}")는 ${hasTimingEvidence(evidence) ? "5번 장(연애와 결혼 궁합)에서만" : "시기 근거가 없어"} 쓰지 않습니다.`);
     if (inTiming && TIMING_VERDICT.test(t)) errors.push(`${where}: 두 사람의 시기에 좋고 나쁨을 매기지 않습니다("${TIMING_VERDICT.exec(t)![0]}") — 시기 문단은 두 시기의 주제가 겹치는지 다른지만 쓰세요.`);
-    const ev = unfoundedEventIn(t);
+    const ev = unfoundedEventIn(t, opts.relationship);
     if (ev) errors.push(`${where}: 입력받지 않은 두 사람의 사건("${ev}")을 아는 사실처럼 쓰지 않습니다 — "~했던 때가 있었을 수 있어요"처럼 조건 · 추측으로 쓰거나 장면의 가능성("~기 쉬워요")으로 바꾸세요.`);
     if (inTiming && TIMING_NOT_COMPUTED.test(t)) errors.push(`${where}: "${TIMING_NOT_COMPUTED.exec(t)![0]}"는 계산하지 않은 시기 이야기라 쓰지 않습니다 — 근거(compat.timing.*)에 적힌 시기 · 연도 안에서 두 시기의 주제가 겹치는지 다른지만 쓰세요.`);
   }
+
+  // 알려 준 사이에 맞는 글인가 — 사이를 고른 것으로 풀이의 관점만 바뀌고, 사이에 맞지 않는 단정은 저장하지 않는다
+  for (const issue of relationshipIssues(texts, opts.relationship)) errors.push(`${issue.where}: ${issue.message}`);
 
   // 되풀이 — 같은 구절 · 같은 말로 여는 문단은 읽기 전 지표로만 센다(2026-10-17 운영자: 낱말 · 구절 반복만으로 저장을 막지 않는다). 앞 장의 결론을 새 정보 없이 되풀이하는지는 사람이 읽고 판단한다
   const repeats = findRepeatedPhrasesIn(texts);

@@ -15,8 +15,8 @@ import { now, readRepository, reportGenerator, writeRepository } from "@/server/
  * 간단 궁합(무료) — 두 사람의 출생정보로 계산한 결과 카드를 돌려준다.
  * 입력한 생년월일 · 이름은 이 계산에만 쓰고 저장하거나 기록하지 않는다(로그 · 운영 기록 · 알림에도 남기지 않는다). 로그인 없이 쓸 수 있다.
  */
-export async function simpleCompatAction(input: { a: unknown; b: unknown }): Promise<SimpleCompatOutcome> {
-  return computeSimpleCompat(input?.a, input?.b, new Date());
+export async function simpleCompatAction(input: { a: unknown; b: unknown; relationship?: unknown }): Promise<SimpleCompatOutcome> {
+  return computeSimpleCompat(input?.a, input?.b, new Date(), input?.relationship);
 }
 
 export type CompatStartOutcome = { ok: false; message: string; errors?: Record<string, string> };
@@ -33,7 +33,7 @@ const MESSAGE: Record<Exclude<StartCompatResult["kind"], "order" | "invalid" | "
  * 판매 스위치가 꺼져 있거나(지금) AI가 연결되지 않았으면 주문을 만들지 않고 이유만 돌려준다 — 돈이 빠지지 않는다.
  * 금액 · 소유자 · 입력 확인은 모두 서버가 다시 한다. 상대 입력은 결제 주문과 함께 리포트가 만들어지는 동안에만 보관한다.
  */
-export async function startCompatCheckoutAction(input: { assessmentId: string; partner: unknown }): Promise<CompatStartOutcome> {
+export async function startCompatCheckoutAction(input: { assessmentId: string; partner: unknown; relationship?: unknown; myGender?: unknown }): Promise<CompatStartOutcome> {
   if (!saleOpenOf("saju-compat")) return { ok: false, message: MESSAGE["not-open"] };
   const assessmentId = typeof input?.assessmentId === "string" ? input.assessmentId : "";
   if (!/^[0-9a-f-]{36}$/.test(assessmentId)) return { ok: false, message: "내 검사 결과를 찾을 수 없어요." };
@@ -43,7 +43,7 @@ export async function startCompatCheckoutAction(input: { assessmentId: string; p
   if (!config.ok) return { ok: false, message: "결제가 아직 설정되지 않았어요." };
   const result = await startCompatCheckout(
     { repo: writeRepository(), now, gate: saleGateCheck, generatorReady: Boolean(reportGenerator().generateCompat), saleOpen: saleOpenOf("saju-compat") },
-    { userId: member.userId, assessmentId, partner: input.partner, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition() },
+    { userId: member.userId, assessmentId, partner: input.partner, relationship: input.relationship, myGender: input.myGender, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition() },
   );
   if (result.kind === "order") redirect(`/checkout/${result.order.orderNumber}`);
   if (result.kind === "not-found") notFound();

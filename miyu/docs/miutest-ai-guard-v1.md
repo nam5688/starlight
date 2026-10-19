@@ -70,8 +70,8 @@
 
 ## 6. 외부 흐름 QA 전 체크리스트
 
-- [ ] 3장 값 1~5를 운영자가 확인해 알려 줬다(키는 열지 않았다).
-- [ ] A(또는 운영자가 정한 다른 안)를 적용하고 **재배포**했다 — 환경변수만 바꾸고 재배포하지 않았다면 아직 옛 값으로 돈다.
+- [ ] 3장 값 1~5를 운영자가 확인해 알려 줬다(키는 열지 않았다). → 1번은 8장에서 확인됨(둘 다 비움), 2~4번은 값을 받지 못했다(미확인).
+- [x] A(또는 운영자가 정한 다른 안)를 적용하고 **재배포**했다 — 8장(운영자 보고, 이 세션이 확인한 것은 아님).
 - [ ] 5장의 방법으로 채팅 입력창이 "준비 중"임을 확인했다(질문 전송 없이).
 - [ ] 외부 Supabase를 쓰는 QA는 **DB의 용도 · 연결 격리가 확인되기 전까지 보류**(운영자 결정) — 로컬 모의 QA만 진행한다.
 - [ ] 궁합 2종의 결제 · 공동 열람은 AI 연결이 없으면 시험되지 않는다는 것을 알고 있다(`pwa-and-staging-plan-v1.md` 6-5).
@@ -79,3 +79,21 @@
 ## 7. 로컬 모의 QA에는 영향이 없다
 
 로컬 QA는 가짜 AI 서버(`AI_PROVIDER=mock-local`, 127.0.0.1)만 쓴다. 이 서버는 코드가 로컬 주소만 받게 막고 있어서 실제 Anthropic으로 나가지 않으며, 이 세션에서 **실제 AI 호출은 0회**다(승인 6/6 · 누적 4,314.89원 그대로).
+
+## 8. 적용된 조치 — 운영자가 직접 수행 (2026-10-19, 운영자 보고 기준 · 이 세션은 Vercel을 열지 않았고 아무것도 바꾸지 않았다)
+
+운영자가 명시 승인("AI를 끄고 바로 접속되게 해줘")한 뒤 Vercel `miutest`에서 직접 했다:
+
+| 조치 | 내용 | 확인 |
+| --- | --- | --- |
+| 실제 AI 연결 끄기(4장 A안) | 공유 Config 변수 **`AI_PROVIDER` · `AI_CHAT_PROVIDER`**(Production + Preview에 같은 값)을 `anthropic` → **빈 값**으로 저장 | 각각 Empty / 성공 알림 확인(운영자) |
+| 건드리지 않은 것 | `ANTHROPIC_API_KEY` · `AI_APPROVED_KRW` · `AI_APPROVED_CALLS` · `AI_APPROVED_FROM` · `AI_APPROVED_THROUGH`(키 삭제 · 승인 횟수 / 금액 / 기간 변경 없음) | 운영자 |
+| 재배포 | `99f2ae4` 기반 배포 `CxsCZFCe4vaHuSW4Vc8zmuUXHVdg` | **Ready** |
+| 접근 보호 | **Standard Protection** 저장 + 새로고침 뒤 유지 확인 → stable domain(`miutest.vercel.app`)은 Vercel 로그인 없이 열림. 미유 자체 로그인은 그대로 | 운영자 |
+| 공개 접속 확인(Windows, 쿠키 · 토큰 · 인증 헤더 없는 GET) | `miutest.vercel.app/` HTTP 200 · 리다이렉트 없음 · 미유 제목/본문 / `/compat` HTTP 200 · 폼 1 · 입력 16. generated 주소(`miutest-and5g68u4-nam568887-2050.vercel.app`)의 `/`와 `/compat`는 **HTTP 302 → Vercel SSO로 차단**(따라가거나 우회하지 않음) | Windows |
+
+**이 확인이 말해 주는 것 / 아닌 것**
+- 말해 주는 것: 저장된 provider 값이 빈 값이고 새 배포가 Ready이며, 코드(1장: `aiConfig` · `chatAiConfig`)는 provider가 `anthropic`이 아니면 실제 AI를 연결하지 않는다 → **provider 값 + 새 배포 + 코드 해석에 근거한 "실제 AI 꺼짐"**이다.
+- **아닌 것**: 공개 도메인에서 생성 · 채팅 · 결제를 실제로 시험한 결과가 아니다(그런 호출 · DB 접근 0). AI 제공사에 실제로 접속이 일어나지 않는지를 네트워크로 확인한 것도 아니다.
+- 이후 푸시도 이 설정을 바꾸지 않는다(provider 값은 코드가 아니라 Vercel 설정이다). **외부 DB migration 적용 · AI 재활성화 · 실결제 · 승인 값 변경은 승인되지 않았다.** 신규 궁합 기능의 실제 유료 품질은 확인할 수 없다(`compat-relationship-v1.md`).
+- 남은 위험(4장 E 관련): 보호가 All Deployments가 아니라 Standard라서 stable domain은 누구나 열 수 있다. AI가 꺼져 있으므로 낯선 사람이 AI 비용을 일으키는 길은 닫혀 있지만, 가입 · 분석 저장이 **어느 Supabase에 쌓이는지는 아직 확인하지 못했다**(외부 DB 용도 · 격리 미확인 — 외부 DB를 쓰는 QA는 계속 보류).

@@ -1,6 +1,7 @@
 // 서비스가 바깥(DB·결제사)과 주고받는 약속.
 // 웹(Next.js + Supabase + 토스페이먼츠)뿐 아니라 이후 다른 채널도 같은 서비스를 구현체만 바꿔 쓴다.
 
+import type { CompatRelationship } from "../compat/relationship.ts";
 import type { InviteDiscountCheck } from "../commerce/invite.ts";
 import type { Answers } from "../assessment/types.ts";
 import type { GatewayPayment, OrderStatus } from "../commerce/order.ts";
@@ -258,7 +259,10 @@ export type CompatPartner = {
   birthMonth: number;
   birthDay: number;
   birthTime: string | null;
+  /** 상대의 성별(남자 · 여자 중 직접 고른 값) — 10년 시기(대운) 계산에만 쓴다. 이 기능 이전에 보관된 입력에는 없다(null) */
   gender: "female" | "male" | null;
+  /** 구매자가 알려 준 두 사람의 사이 — 풀이의 관점 · 표현에만 쓴다. 이 기능 이전에 보관된 입력에는 없다(없으면 중립으로 읽고 특정 관계로 채우지 않는다) */
+  relationship?: CompatRelationship | null;
 };
 export type CompatRequestRecord = { id: string; orderId: string; userId: string; partner: CompatPartner | null; scrubbedAt: string | null; createdAt: string };
 

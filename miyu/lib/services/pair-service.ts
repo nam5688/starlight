@@ -9,6 +9,7 @@
 // - 저장되는 글에는 이름 · 생년월일 · 응답 원문 · 점수가 없다. 화면이 읽는 사람에게 "A님 = 나 / B님 = 상대"를 알려 준다.
 // - 판매 스위치(PAIR_COMPAT.saleOpen)와 AI 연결이 맞아야 새 초대 · 연결 · 결제가 시작된다. 이미 만들어진 쌍의 열람 · 해제 · 철회는 스위치와 관계없이 된다.
 
+import { RELATIONSHIP_REQUIRED_MESSAGE, myGenderError, parseRelationship, type CompatRelationship } from "../compat/relationship.ts";
 import { PAIR_COMPAT, isPairProduct, pairProductId, parsePairProductId } from "../config/product.ts";
 import { createOrderNumber } from "../commerce/order.ts";
 import { createInviteToken, isInviteToken } from "../commerce/invite.ts";
@@ -48,8 +49,12 @@ const usable = (a: AssessmentRecord | null | undefined): a is AssessmentRecord =
 
 const isMissingTable = (e: unknown) => (e as { code?: string } | null)?.code === "42P01";
 
+/** 초대 · 연결 입력의 오류 — 사이(relationship) · 내 성별(myGender) */
+export type PairInputErrors = { relationship?: string; myGender?: string };
+
 export type CreateInviteResult =
   | { kind: "created"; pair: PairRecord }
+  | { kind: "invalid"; errors: PairInputErrors }
   | { kind: "not-open" }
   | { kind: "ai-not-connected" }
   | { kind: "not-found" }
@@ -58,13 +63,22 @@ export type CreateInviteResult =
   | { kind: "too-many" }
   | { kind: "db-not-ready" };
 
-/** A가 내 검사 결과로 초대 링크를 만든다 — A의 동의(체크)가 있어야 한다 */
-export async function createPairInvite(deps: PairDeps, input: { userId: string; assessmentId: string; consent: boolean }): Promise<CreateInviteResult> {
+/**
+ * A가 내 검사 결과로 초대 링크를 만든다 — A의 동의(체크)가 있어야 한다.
+ * 두 사람의 사이(relationship)와 내 성별(myGender)을 직접 골라야 한다. 내 성별이 분석 때 입력한 성별과 다르면 조용히 덮어쓰지 않고 멈춰서 알려 준다(궁합은 분석 결과의 사주를 그대로 쓴다).
+ */
+export async function createPairInvite(deps: PairDeps, input: { userId: string; assessmentId: string; consent: boolean; relationship?: unknown; myGender?: unknown }): Promise<CreateInviteResult> {
   if (!isOpen(deps)) return { kind: "not-open" };
   if (deps.generatorReady === false) return { kind: "ai-not-connected" };
   const assessment = await deps.repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
   if (!usable(assessment)) return { kind: "no-saju" };
+  const relationship = parseRelationship(input.relationship);
+  const errors: PairInputErrors = {};
+  if (!relationship) errors.relationship = RELATIONSHIP_REQUIRED_MESSAGE;
+  const genderError = myGenderError(assessment.saju, input.myGender);
+  if (genderError) errors.myGender = genderError;
+  if (Object.keys(errors).length || !relationship) return { kind: "invalid", errors };
   if (input.consent !== true) return { kind: "no-consent" };
   try {
     const mine = await deps.pairs.listPairsForUser(input.userId);
@@ -80,6 +94,7 @@ export async function createPairInvite(deps: PairDeps, input: { userId: string; 
         aConsentAt: now.toISOString(),
         aConsentVersion: PAIR_COMPAT.consentVersion,
         expiresAt: new Date(now.getTime() + PAIR_COMPAT.inviteDays * DAY).toISOString(),
+        relationship,
       });
       if (r.ok) return { kind: "created", pair: r.value };
     }
@@ -91,7 +106,7 @@ export async function createPairInvite(deps: PairDeps, input: { userId: string; 
 }
 
 export type InvitePeek =
-  | { kind: "open"; inviterNickname: string; expiresAt: string; myAssessment: { id: string; nickname: string } | null }
+  | { kind: "open"; inviterNickname: string; expiresAt: string; /** 초대한 사람이 알려 준 두 사람의 사이(예전 초대는 null) */ relationship: CompatRelationship | null; myAssessment: { id: string; nickname: string; /** 분석 때 입력한 내 성별(없으면 null) */ savedGender: "male" | "female" | null } | null }
   | { kind: "mine"; pairId: string }
   | { kind: "joined"; pairId: string }
   | { kind: "taken" | "expired" | "closed" | "not-found" | "not-open" | "db-not-ready" };
@@ -110,7 +125,14 @@ export async function peekPairInvite(deps: PairDeps, input: { token: string; use
     if (!isOpen(deps)) return { kind: "not-open" };
     const a = await deps.repo.getAssessment(pair.aAssessmentId);
     const mine = await latestUsableAssessment(deps.repo, input.userId);
-    return { kind: "open", inviterNickname: a && usable(a) ? a.nickname : "상대", expiresAt: pair.expiresAt, myAssessment: mine ? { id: mine.id, nickname: mine.nickname } : null };
+    const savedGender = (mine?.saju as { gender?: unknown } | undefined)?.gender;
+    return {
+      kind: "open",
+      inviterNickname: a && usable(a) ? a.nickname : "상대",
+      expiresAt: pair.expiresAt,
+      relationship: pair.relationship ?? null,
+      myAssessment: mine ? { id: mine.id, nickname: mine.nickname, savedGender: savedGender === "male" || savedGender === "female" ? savedGender : null } : null,
+    };
   } catch (e) {
     if (isMissingTable(e)) return { kind: "db-not-ready" };
     throw e;
@@ -128,16 +150,20 @@ export type JoinResult =
   | { kind: "not-open" }
   | { kind: "no-consent" }
   | { kind: "no-assessment" }
+  | { kind: "invalid"; errors: PairInputErrors }
   | { kind: "self" | "taken" | "expired" | "closed" | "not-found" | "bad-assessment" | "db-not-ready" };
 
 /** B가 링크로 들어와 동의하고 연결한다 — B의 동의(체크)가 있어야 하고 B의 검사 결과(사주가 계산된 것)가 있어야 한다 */
-export async function joinPairInvite(deps: PairDeps, input: { token: string; userId: string; consent: boolean; assessmentId?: string | null }): Promise<JoinResult> {
+export async function joinPairInvite(deps: PairDeps, input: { token: string; userId: string; consent: boolean; assessmentId?: string | null; myGender?: unknown }): Promise<JoinResult> {
   if (!isOpen(deps)) return { kind: "not-open" };
   if (!isInviteToken(input.token)) return { kind: "not-found" };
   if (input.consent !== true) return { kind: "no-consent" };
   const mine = input.assessmentId ? await deps.repo.getAssessment(input.assessmentId) : await latestUsableAssessment(deps.repo, input.userId);
   if (!mine) return { kind: "no-assessment" };
   if (mine.userId !== input.userId || !usable(mine)) return { kind: "bad-assessment" };
+  // 내 성별을 직접 골라야 하고, 분석 때 입력한 성별과 다르면 덮어쓰지 않고 멈춘다
+  const genderError = myGenderError(mine.saju, input.myGender);
+  if (genderError) return { kind: "invalid", errors: { myGender: genderError } };
   try {
     const r = await deps.pairs.joinPair({ token: input.token, userId: input.userId, assessmentId: mine.id, consentVersion: PAIR_COMPAT.consentVersion });
     return r.ok ? { kind: "joined", pair: r.pair } : { kind: r.reason };
@@ -200,6 +226,8 @@ export type PairView = {
   token: string | null;
   otherNickname: string | null;
   myNickname: string | null;
+  /** 초대한 사람이 알려 준 두 사람의 사이(예전 쌍은 null) */
+  relationship: CompatRelationship | null;
   consent: { meAt: string | null; otherAt: string | null; meWithdrawn: boolean; otherWithdrawn: boolean };
   purchase: PairPurchase;
   report: PairReportState;
@@ -279,6 +307,7 @@ export async function getPairView(deps: PairDeps, input: { pairId: string; userI
     expiresAt: pair.expiresAt,
     token: mine && pair.status === "invited" ? pair.token : null,
     otherNickname: nick(mine ? b : a),
+    relationship: pair.relationship ?? null,
     myNickname: nick(mine ? a : b),
     consent: { meAt: mine ? pair.aConsentAt : pair.bConsentAt, otherAt: mine ? pair.bConsentAt : pair.aConsentAt, meWithdrawn, otherWithdrawn: Boolean(mine ? pair.bWithdrawnAt : pair.aWithdrawnAt) },
     purchase,
@@ -400,7 +429,8 @@ export async function pairInputFor(repo: MiyuRepository, pairs: PairRepository, 
   if (pair.aWithdrawnAt || pair.bWithdrawnAt) throw new Error("동의가 철회돼 리포트 궁합을 만들 수 없어요.");
   const [a, b] = await Promise.all([repo.getAssessment(pair.aAssessmentId), repo.getAssessment(pair.bAssessmentId)]);
   if (!usable(a) || !usable(b)) throw new Error("두 사람의 검사 결과를 쓸 수 없어 리포트 궁합을 만들 수 없어요.");
-  return { a: personOf(a), b: personOf(b), ...(reference ? { reference } : {}) };
+  // 이 기능 이전의 쌍에는 사이가 없다 — 특정 관계로 채우지 않고 중립으로 읽는다
+  return { a: personOf(a), b: personOf(b), ...(reference ? { reference } : {}), relationship: pair.relationship ?? null };
 }
 
 export type MyPair = { pairId: string; role: PairRole; status: PairRecord["status"]; otherNickname: string | null; createdAt: string; report: "none" | "generating" | "failed" | "ready" | "blocked" };

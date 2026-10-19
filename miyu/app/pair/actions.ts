@@ -13,11 +13,12 @@ import { claimAndSchedule } from "@/server/report-jobs";
 const UUID = /^[0-9a-f-]{36}$/;
 const TOKEN = /^[A-Za-z0-9_-]{24,64}$/;
 
-export type PairActionOutcome = { ok: false; message: string };
+export type PairActionOutcome = { ok: false; message: string; /** 입력 칸별 오류 — 사이(relationship) · 내 성별(myGender) */ errors?: { relationship?: string; myGender?: string } };
 
 const NEED_LOGIN = "로그인이 필요해요. 로그인한 뒤 다시 시도해 주세요.";
 
 const INVITE_MESSAGE: Record<Exclude<CreateInviteResult["kind"], "created">, string> = {
+  invalid: "입력을 확인해 주세요.",
   "not-open": "리포트 궁합은 아직 준비 중이에요.",
   "ai-not-connected": "리포트 궁합은 AI 연결이 끝난 뒤에 이용할 수 있어요.",
   "not-found": "내 검사 결과를 찾을 수 없어요.",
@@ -28,17 +29,19 @@ const INVITE_MESSAGE: Record<Exclude<CreateInviteResult["kind"], "created">, str
 };
 
 /** A가 내 검사 결과로 초대 링크를 만든다 — 동의 체크가 있어야 한다. 성공하면 쌍 화면으로 이동한다 */
-export async function createPairInviteAction(input: { assessmentId: string; consent: boolean }): Promise<PairActionOutcome> {
+export async function createPairInviteAction(input: { assessmentId: string; consent: boolean; relationship?: unknown; myGender?: unknown }): Promise<PairActionOutcome> {
   const assessmentId = typeof input?.assessmentId === "string" ? input.assessmentId : "";
   if (!UUID.test(assessmentId)) return { ok: false, message: INVITE_MESSAGE["not-found"] };
   const member = await getMember();
   if (!member || member.needsConsent) return { ok: false, message: NEED_LOGIN };
-  const r = await createPairInvite(pairDeps(), { userId: member.userId, assessmentId, consent: input.consent === true });
+  const r = await createPairInvite(pairDeps(), { userId: member.userId, assessmentId, consent: input.consent === true, relationship: input.relationship, myGender: input.myGender });
   if (r.kind === "created") redirect(`/pair/${r.pair.id}`);
+  if (r.kind === "invalid") return { ok: false, message: INVITE_MESSAGE.invalid, errors: r.errors };
   return { ok: false, message: INVITE_MESSAGE[r.kind] };
 }
 
 const JOIN_MESSAGE: Record<Exclude<JoinResult["kind"], "joined">, string> = {
+  invalid: "입력을 확인해 주세요.",
   "not-open": "리포트 궁합은 아직 준비 중이에요.",
   "no-consent": "궁합 생성에 사용하는 데 동의해야 연결할 수 있어요.",
   "no-assessment": "내 검사 결과가 없어요. 무료 분석을 먼저 마친 뒤 이 링크를 다시 열어 주세요.",
@@ -52,13 +55,14 @@ const JOIN_MESSAGE: Record<Exclude<JoinResult["kind"], "joined">, string> = {
 };
 
 /** B가 링크로 들어와 동의하고 연결한다 — 성공하면 쌍 화면으로 이동한다 */
-export async function joinPairAction(input: { token: string; consent: boolean }): Promise<PairActionOutcome> {
+export async function joinPairAction(input: { token: string; consent: boolean; myGender?: unknown }): Promise<PairActionOutcome> {
   const token = typeof input?.token === "string" ? input.token : "";
   if (!TOKEN.test(token)) return { ok: false, message: JOIN_MESSAGE["not-found"] };
   const member = await getMember();
   if (!member || member.needsConsent) return { ok: false, message: NEED_LOGIN };
-  const r = await joinPairInvite(pairDeps(), { token, userId: member.userId, consent: input.consent === true });
+  const r = await joinPairInvite(pairDeps(), { token, userId: member.userId, consent: input.consent === true, myGender: input.myGender });
   if (r.kind === "joined") redirect(`/pair/${r.pair.id}`);
+  if (r.kind === "invalid") return { ok: false, message: JOIN_MESSAGE.invalid, errors: r.errors };
   return { ok: false, message: JOIN_MESSAGE[r.kind] };
 }
 

@@ -7,6 +7,8 @@
 //   시기(compat.timing.*)는 5번 장의 한 문단으로 들어갔다 — 계산된 대운 · 세운 범위 안에서만. **가족 · 자녀 인연의 풀이는 계산하지 않았다**(시주 · 자녀 자리의 궁합 규칙이 엔진에 없고 출산 · 자녀 예언은 기존 금지 규칙이다 — 운영자 결정 항목, docs/compat-composition-v2.md).
 // 상대의 응답(기질 · 성격 · 애착)은 사주 궁합에 쓰지 않는다 — 두 사람이 각자 응답한 내용을 비교하는 것은 별도 상품(리포트 궁합)이다.
 
+import type { CompatRelationship } from "../../compat/relationship.ts";
+
 export const COMPAT_REPORT_KIND = "compat-saju-v1" as const;
 export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.5";
 
@@ -86,6 +88,20 @@ const ALL_SECTIONS: CompatSectionPlan[] = [
     paragraphs: { min: 1, max: 2 },
   },
 ];
+
+/**
+ * 5번 장(love)의 제목 위 이름표 — 알려 준 사이에 맞게 바꾼다(친구 · 기타에 "연애와 결혼"을 붙이지 않는다). 장의 id · 질문(ask) · 근거는 그대로이고 이름표만 바뀐다.
+ * 사이가 없는(이 기능 이전의) 글은 예전 이름표 그대로다.
+ */
+const LOVE_TOPIC: Record<CompatRelationship, string> = {
+  lover: "연애와 오래 함께하는 방식",
+  engaged: "결혼 준비와 생활 합의",
+  some: "다가가는 속도와 서로의 선",
+  married: "함께 사는 일상과 회복",
+  friend: "우정과 오래 가는 거리감",
+  other: "오래 함께 지내는 방식",
+};
+export const topicFor = (plan: Pick<CompatSectionPlan, "id" | "topic">, rel: CompatRelationship | null | undefined): string => (plan.id === "love" && rel ? LOVE_TOPIC[rel] : plan.topic);
 
 /** 사주 궁합의 장 — 6번(서로에게 어떤 사람일까?)을 뺀 여섯 장 */
 export const COMPAT_SECTIONS: CompatSectionPlan[] = ALL_SECTIONS.filter((s) => !s.pairOnly);

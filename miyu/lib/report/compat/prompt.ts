@@ -6,6 +6,7 @@
 // 0.4(2026-10-17, 운영자 문체 지시): 미유의 말투 블록(style/voice-prompt.ts)을 더하고 억지 공감 예시를 "~할 때는 ~기 쉬워요"로 바꿨다. 0.3(2026-10-17): 여덟 가지(잘 맞는 부분 · 부딪히는 부분 · 표현과 행동 방식 · 장기 관계 조건 · A→B · B→A · 함께 조율 · 계산된 범위의 시기) 구성.
 // 근거는 궁합 엔진(lib/saju/interpret/compat.ts)이 계산한 compat.* 목록과 compat-extra.ts의 두 사람 오행 분포 · 개운이다. 두 사람의 이름 · 생년월일 원문은 보내지 않고 "A님 · B님"으로만 부른다 — 이름은 조립할 때 코드가 바꿔 넣는다.
 // 커플 유형 · 궁합 지수 · 계산 재료 · 안내문은 코드가 같은 결과에서 채우고 AI는 본문만 쓴다 — 무료 간단 궁합에서 본 것과 유료 풀이가 어긋나지 않게 한다.
+import { relationshipBrief, type CompatRelationship } from "../../compat/relationship.ts";
 import { MIYU_VOICE_PROMPT } from "../style/voice-prompt.ts";
 import type { Evidence } from "../evidence.ts";
 import { COMPAT_LIMITS as L, COMPAT_PROMPT_VERSION, COMPAT_SECTIONS, COMPAT_STEP_GROUPS, PAIR_PROMPT_MARK, PAIR_PROMPT_VERSION, PAIR_SECTIONS, pairSectionsFor, sectionsFor } from "./plan.ts";
@@ -111,10 +112,12 @@ export const COMPAT_SYSTEM_PROMPT = buildSystemPrompt("saju");
 export const PAIR_SYSTEM_PROMPT = buildSystemPrompt("pair");
 
 /** 사용자 메시지 — 장은 id · topic만 건넨다(장마다 묻는 것은 지시문에 있다). 근거 목록에서 이름 · 생년월일 원문 · 응답 원문 · 점수는 빠져 있다 */
-function payloadOf(evidence: Evidence[], sections: { id: string; topic: string }[], cautions: string[], mode?: "pair") {
+function payloadOf(evidence: Evidence[], sections: { id: string; topic: string }[], cautions: string[], mode?: "pair", relationship?: CompatRelationship | null) {
   return {
     ...(mode ? { mode } : {}),
     people: ["A님", "B님"],
+    // 사용자가 직접 알려 준 두 사람의 사이와 그 사이의 읽는 법 — 이름 · 성별 · 생년월일은 없다. 사이가 없으면(예전 방식) 이 항목 자체가 없어 메시지가 예전과 같다
+    ...(relationship ? { relationship: relationshipBrief(relationship) } : {}),
     sections: sections.map((s) => ({ id: s.id, topic: s.topic })),
     steps: COMPAT_STEP_GROUPS.map((g) => g.id),
     ...(cautions.length ? { cautions } : {}),
@@ -130,11 +133,11 @@ function payloadOf(evidence: Evidence[], sections: { id: string; topic: string }
   };
 }
 
-export function buildCompatUserMessage(evidence: Evidence[], cautions: string[] = []): string {
-  return `다음 자료로 사주 궁합 풀이 JSON을 써 주세요.\n${JSON.stringify(payloadOf(evidence, sectionsFor(evidence), cautions))}`;
+export function buildCompatUserMessage(evidence: Evidence[], cautions: string[] = [], relationship?: CompatRelationship | null): string {
+  return `다음 자료로 사주 궁합 풀이 JSON을 써 주세요.\n${JSON.stringify(payloadOf(evidence, sectionsFor(evidence), cautions, undefined, relationship))}`;
 }
 
 /** 리포트 궁합 요청 — 사주 궁합 근거(compat.*) + 두 사람의 응답 비교 근거(pair.*). 이름 · 생년월일 · 응답 원문 · 점수는 담지 않는다 */
-export function buildPairUserMessage(evidence: Evidence[], cautions: string[] = []): string {
-  return `다음 자료로 리포트 궁합 풀이 JSON을 써 주세요.\n${JSON.stringify(payloadOf(evidence, pairSectionsFor(evidence), cautions, "pair"))}`;
+export function buildPairUserMessage(evidence: Evidence[], cautions: string[] = [], relationship?: CompatRelationship | null): string {
+  return `다음 자료로 리포트 궁합 풀이 JSON을 써 주세요.\n${JSON.stringify(payloadOf(evidence, pairSectionsFor(evidence), cautions, "pair", relationship))}`;
 }

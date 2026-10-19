@@ -5,11 +5,11 @@ import type { CardOp } from "../report/reading/talk-card.ts";
 import { COMPAT_CARD_DISCLAIMER, COMPAT_CARD_INVITE, layoutCompatCard } from "./share-card.ts";
 import { computeSimpleCompat, shareTextOf, type CompatPersonInput } from "./simple.ts";
 
-const person = (nickname: string, y: string, m: string, d: string, time = "09:30"): CompatPersonInput => ({ nickname, calendar: "solar", isLeapMonth: false, birthYear: y, birthMonth: m, birthDay: d, birthTime: time, birthTimeUnknown: false });
+const person = (nickname: string, y: string, m: string, d: string, time = "09:30"): CompatPersonInput => ({ nickname, gender: "female", calendar: "solar", isLeapMonth: false, birthYear: y, birthMonth: m, birthDay: d, birthTime: time, birthTimeUnknown: false });
 const measure = (text: string, size: number, weight: number) => [...text].length * size * (weight >= 700 ? 0.62 : 0.56);
 const texts = (ops: CardOp[]) => ops.filter((o): o is Extract<CardOp, { type: "text" }> => o.type === "text");
 
-const outcome = computeSimpleCompat(person("슬기", "1996", "3", "29"), person("남수", "1994", "11", "2"), new Date("2026-10-17T00:00:00+09:00"));
+const outcome = computeSimpleCompat(person("슬기", "1996", "3", "29"), person("남수", "1994", "11", "2"), new Date("2026-10-17T00:00:00+09:00"), "lover");
 assert.ok(outcome.ok);
 const card = outcome.card;
 
@@ -53,7 +53,7 @@ test("배치: 글은 카드 폭 안에 있고 바탕이 맨 앞이며 높이가 
 });
 
 test("공유 카드는 서로 다른 입력에서 서로 다른 유형 · 지수를 그린다(고정 그림이 아니다)", () => {
-  const other = computeSimpleCompat(person("하늘", "1990", "5", "17"), person("도윤", "1991", "8", "8"), new Date("2026-10-17T00:00:00+09:00"));
+  const other = computeSimpleCompat(person("하늘", "1990", "5", "17"), person("도윤", "1991", "8", "8"), new Date("2026-10-17T00:00:00+09:00"), "lover");
   assert.ok(other.ok);
   const x = texts(layoutCompatCard(card, { measure }).ops).map((t) => t.text).join("|");
   const y = texts(layoutCompatCard(other.card, { measure }).ops).map((t) => t.text).join("|");

@@ -25,7 +25,7 @@ const USER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
 const INFO: BasicInfo = { ...EMPTY_BASIC_INFO, nickname: "슬기", birthYear: "1996", birthMonth: "3", birthDay: "29", birthTime: "09:30", gender: "female", knownMbti: "INFJ", regionProvince: "서울특별시", regionDistrict: "마포구" };
 const answersAll = (v: number) => Object.fromEntries(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i) => [i.id, v])));
-const PARTNER = { nickname: "남수", calendar: "solar", isLeapMonth: false, birthYear: "1994", birthMonth: "11", birthDay: "2", birthTime: "09:30", birthTimeUnknown: false };
+const PARTNER = { nickname: "남수", gender: "male", calendar: "solar", isLeapMonth: false, birthYear: "1994", birthMonth: "11", birthDay: "2", birthTime: "09:30", birthTimeUnknown: false };
 
 function done(orderId: string, amount: number, paymentKey: string): GatewayPayment {
   return { paymentKey, orderId, status: "DONE", totalAmount: amount, balanceAmount: amount, method: "카드", approvedAt: "2026-10-17T10:00:00+09:00", mId: "fake" };
@@ -52,7 +52,7 @@ async function setup() {
   const model = createMockModel();
   const generator = createAiReportGenerator({ model, now: () => T0, sleep: async () => {} });
   const start = (partner: unknown = PARTNER, over: Partial<Parameters<typeof startCompatCheckout>[0]> = {}) =>
-    startCompatCheckout({ repo: mem.repo, now: () => clock.now, saleOpen: true, generatorReady: true, ...over }, { userId: USER, assessmentId: assessment.id, partner });
+    startCompatCheckout({ repo: mem.repo, now: () => clock.now, saleOpen: true, generatorReady: true, ...over }, { userId: USER, assessmentId: assessment.id, partner, relationship: "lover", myGender: "female" });
   const gen = () => ({ repo: mem.repo, generator, now: () => clock.now });
   async function buy() {
     const started = await start();
@@ -67,7 +67,7 @@ async function setup() {
 test("판매 스위치가 꺼져 있으면(실제 기본값) 주문을 만들지 않는다 — 돈이 빠지지 않는다", async () => {
   assert.equal(SAJU_COMPAT.saleOpen, false);
   const s = await setup();
-  const r = await startCompatCheckout({ repo: s.mem.repo, now: () => s.clock.now, generatorReady: true }, { userId: USER, assessmentId: s.assessment.id, partner: PARTNER });
+  const r = await startCompatCheckout({ repo: s.mem.repo, now: () => s.clock.now, generatorReady: true }, { userId: USER, assessmentId: s.assessment.id, partner: PARTNER, relationship: "lover", myGender: "female" });
   assert.equal(r.kind, "not-open");
   assert.equal((await s.mem.repo.listOrdersForAssessment(s.assessment.id)).length, 0);
 });
@@ -80,7 +80,7 @@ test("AI가 연결되지 않았으면(개발용 생성기) 스위치가 켜져 �
 
 test("다른 사람의 검사 결과로는 시작하지 못한다", async () => {
   const s = await setup();
-  const r = await startCompatCheckout({ repo: s.mem.repo, now: () => s.clock.now, saleOpen: true, generatorReady: true }, { userId: OTHER, assessmentId: s.assessment.id, partner: PARTNER });
+  const r = await startCompatCheckout({ repo: s.mem.repo, now: () => s.clock.now, saleOpen: true, generatorReady: true }, { userId: OTHER, assessmentId: s.assessment.id, partner: PARTNER, relationship: "lover", myGender: "female" });
   assert.equal(r.kind, "not-found");
 });
 
@@ -90,7 +90,7 @@ test("상대 입력이 잘못되면 주문 없이 이유를 알려 준다", asyn
   assert.equal((await s.start({ ...PARTNER, birthDay: "31", birthMonth: "2" })).kind, "invalid");
   assert.equal((await s.start("not-an-object")).kind, "invalid");
   assert.equal((await s.mem.repo.listOrdersForAssessment(s.assessment.id)).length, 0);
-  assert.equal(readCompatPartner({ ...PARTNER, nickname: "가".repeat(30) }, T0).ok, false);
+  assert.equal(readCompatPartner({ ...PARTNER, nickname: "가".repeat(30) }, T0, "lover").ok, false);
 });
 
 test("시작하면 사주 궁합 주문(상품 번호 saju-compat:요청번호) + 상대 출생정보 보관이 생기고, 개인 통합 리포트 주문과 섞이지 않는다", async () => {
@@ -229,7 +229,7 @@ test("탈퇴하면 상대 출생정보가 지워진다", async () => {
 
 test("관리자 지표에서 사주 궁합(실결제)은 개인 리포트 매출 · 한 건당 계산과 따로 센다", async () => {
   const s = await setup();
-  const started = await startCompatCheckout({ repo: s.mem.repo, now: () => s.clock.now, saleOpen: true, generatorReady: true }, { userId: USER, assessmentId: s.assessment.id, partner: PARTNER, paymentEnv: "live" });
+  const started = await startCompatCheckout({ repo: s.mem.repo, now: () => s.clock.now, saleOpen: true, generatorReady: true }, { userId: USER, assessmentId: s.assessment.id, partner: PARTNER, relationship: "lover", myGender: "female", paymentEnv: "live" });
   assert.equal(started.kind, "order");
   if (started.kind !== "order") return;
   const paid = await confirmPayment({ repo: s.mem.repo, gateway: gatewayOk() }, { userId: USER, orderNumber: started.order.orderNumber, paymentKey: "pk_live_compat", amount: started.order.amount });

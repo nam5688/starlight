@@ -1,5 +1,6 @@
 // 리포트 궁합의 쌍(누구와 누가 어느 검사 결과로 연결됐는가 · 동의 · 해제 · 철회) 저장소 약속 — 서비스(pair-service.ts)는 이 약속만 안다.
 // 이름 · 생년월일 · 응답은 이 표에 없다(회원번호 · 검사 결과 번호 · 동의 시각 · 동의한 문구의 버전 · 상태뿐). 구현은 Supabase(integrations)와 시험용 메모리(testing/memory-pairs.ts).
+import type { CompatRelationship } from "../compat/relationship.ts";
 import type { InsertResult } from "./ports.ts";
 
 /** invited: 상대가 아직 들어오지 않음 · linked: 두 사람이 모두 동의해 연결됨 · unlinked: 끊김(연결 해제 · 동의 철회 · 탈퇴) */
@@ -22,10 +23,12 @@ export type PairRecord = {
   unlinkedAt: string | null;
   unlinkedBy: string | null;
   expiresAt: string;
+  /** 초대한 사람이 알려 준 두 사람의 사이 — 이 기능(DB 26번) 이전의 쌍에는 없다(null: 특정 관계로 채우지 않고 중립으로 읽는다) */
+  relationship: CompatRelationship | null;
   createdAt: string;
 };
 
-export type NewPair = { id: string; token: string; aUserId: string; aAssessmentId: string; aConsentAt: string; aConsentVersion: string; expiresAt: string };
+export type NewPair = { id: string; token: string; aUserId: string; aAssessmentId: string; aConsentAt: string; aConsentVersion: string; expiresAt: string; relationship: CompatRelationship };
 
 export type JoinPairResult =
   | { ok: true; pair: PairRecord }

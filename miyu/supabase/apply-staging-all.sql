@@ -1,9 +1,9 @@
--- ME:U(미유) 스테이징 전용 — DB 변경 1~25번을 SQL Editor에서 한 번에 실행하는 통합 파일
+-- ME:U(미유) 스테이징 전용 — DB 변경 1~26번을 SQL Editor에서 한 번에 실행하는 통합 파일
 --
 -- ⚠ 이 파일은 **아무것도 만들지 않은 새 Supabase 프로젝트(스테이징)에만** 쓴다. 운영 프로젝트에서는 실행하지 않는다.
 --   (운영 DB 적용은 별도 승인이며 docs/db-rollout-19-25.md의 번호별 절차를 따른다.)
 --
--- 이 파일은 supabase/migrations의 1~25번 파일을 한 글자도 고치지 않고 이어 붙인 것이다.
+-- 이 파일은 supabase/migrations의 1~26번 파일을 한 글자도 고치지 않고 이어 붙인 것이다.
 -- (scripts/render-apply-sql.ts --staging 이 만든다 — 직접 고치지 않는다. 내용이 바뀌면 서버 테스트가 알려 준다.)
 --
 -- 사용: 새 Supabase 프로젝트 → SQL Editor → New query → 이 파일 내용을 모두 붙여넣고 Run (한 번만).
@@ -13,7 +13,7 @@
 --     이미 표가 있으면(= 운영 프로젝트이거나 한 번 실행한 프로젝트) 아무것도 바꾸지 않고 "시작 조건 불충족" 오류로 멈춘다.
 --  2) 전체가 하나의 트랜잭션(begin ... commit)이다. 중간에 오류가 나면 이 파일이 한 일이 모두 취소된다.
 --  3) 어떤 기존 데이터도 지우거나 고치지 않는다(새 프로젝트라 지울 데이터가 없다).
---  4) 마지막 결과 표(읽기 전용 확인 조회)에서 1~25번이 모두 "적용됨"이면 끝이다.
+--  4) 마지막 결과 표(읽기 전용 확인 조회)에서 1~26번이 모두 "적용됨"이면 끝이다.
 --
 -- Supabase가 "위험한 작업이 포함되어 있다"는 확인 창을 보여 주면: 제약 조건 교체와 함수 안의 "탈퇴 시 삭제" 문장 때문이다. 새 프로젝트라 실행해도 된다.
 
@@ -5431,6 +5431,20 @@ alter table public.funnel_events drop constraint if exists funnel_events_name_ch
 alter table public.funnel_events add constraint funnel_events_name_check
   check (name in ('visit', 'analyze_start', 'analyze_complete', 'preview_view', 'report_view', 'review_section_view', 'review_all_click'));
 
+-- ═════════════════════════════════════════════════════════════════
+-- 26번: 20261105000000_pair_relationship.sql   (아래는 supabase/migrations 파일 내용 그대로)
+-- ═════════════════════════════════════════════════════════════════
+-- 리포트 궁합 쌍에 "무슨 사이인가요?"(초대한 사람이 알려 준 두 사람의 현재 사이)를 더한다. 마이그레이션 26번 — 파일만 준비한 것이며 어떤 DB에도 적용하지 않았다(운영자 승인 후 적용).
+-- 규칙: 더하기만 한다(기존 표 · 함수 · 마이그레이션은 바꾸지 않는다). 열 하나를 더할 뿐이라 기존 쌍 · 결제 · 열람 권한은 그대로다.
+-- 값: lover(연인) · engaged(결혼준비중) · some(썸타는중) · married(결혼함) · friend(친구) · other(기타). 비어 있으면(null) 이 기능 이전의 쌍이다 —
+--   서비스는 특정 관계로 채우지 않고 예전처럼 중립으로 읽는다. 이름 · 생년월일 · 성별은 이 표에 없다(성별은 각자의 분석 결과에 이미 있다).
+-- 이 열은 풀이의 관점 · 표현에만 쓰이고 궁합 지수 · 사주 계산 · 결제 · 열람 권한을 바꾸지 않는다.
+-- 코드를 먼저 배포해도 깨지지 않는다: 열이 없으면 쌍 읽기는 사이를 null로 읽고, 새 초대 만들기만 "준비 중"(db-not-ready)으로 멈춘다.
+
+alter table public.pairs
+  add column relationship text
+  check (relationship is null or relationship in ('lover', 'engaged', 'some', 'married', 'friend', 'other'));
+
 commit;
 
 -- ═════════════════════════════════════════════════════════════════
@@ -5587,6 +5601,10 @@ wd25 as (
     exists (select 1 from pg_trigger where tgname = 'profiles_reviews_withdraw' and not tgisinternal) as withdraw_trigger,
     exists (select 1 from pg_constraint where conname = 'funnel_events_name_check' and pg_get_constraintdef(oid) like '%review_section_view%') as funnel_names,
     coalesce((select has_table_privilege('service_role', 'public.reviews', 'insert') from information_schema.tables where table_schema = 'public' and table_name = 'reviews'), false) as service_grant
+),
+wd26 as (
+  select
+    exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pairs' and column_name = 'relationship') as relationship_col
 ),
 col as (
   select
@@ -5761,5 +5779,10 @@ select * from (
               when wd25.reviews or wd25.admin_fn or wd25.withdraw_trigger or wd25.funnel_names or wd25.service_grant then '일부만' else '아직 안 함' end,
          '표 reviews (이용 후기 · 보상 한 번 · 삭제는 묘비) · review_admin_log · review_reports / 함수 review_admin_apply · submit_review_report / 탈퇴 시 후기를 지우는 트리거: ' || wd25.withdraw_trigger::text || ' / 방문 단계 이름에 후기 이벤트 포함: ' || wd25.funnel_names::text || ' / 서버 권한: ' || wd25.service_grant::text
   from wd25
+  union all
+  select 26, '20261105000000_pair_relationship.sql',
+         case when wd26.relationship_col then '적용됨' else '아직 안 함' end,
+         '표 pairs의 사이(relationship) 열 — 리포트 궁합 새 초대에만 필요하다. 이 열이 없으면 새 초대 만들기만 준비 중으로 멈추고 기존 쌍 · 개인 리포트 · 무료 궁합 · 사주 궁합은 그대로 동작한다: ' || wd26.relationship_col::text
+  from wd26
 ) r
 order by "번호";

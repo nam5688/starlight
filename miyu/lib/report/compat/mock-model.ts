@@ -6,7 +6,7 @@ import { ELEMENT_FORTUNE } from "../../saju/interpret/fortune.ts";
 import { COMPAT_STEP_GROUPS, pairSectionsFor, sectionsFor } from "./plan.ts";
 import type { CompatDraftV1, CompatStepDraft } from "./types.ts";
 
-type MockPayload = { mode?: string; evidence: { id: string; fact: string; uncertain?: boolean }[] };
+type MockPayload = { mode?: string; relationship?: { id: string; label: string }; evidence: { id: string; fact: string; uncertain?: boolean }[] };
 
 const M = "[모의 생성]";
 
@@ -87,7 +87,8 @@ export function composeMockCompat(userMessage: string): CompatDraftV1 {
   ) as CompatDraftV1["steps"];
 
   return {
-    headline: `${M} 두 사람의 근거 안에서 쓴 풀이 초안`,
+    // 사용자 메시지의 relationship(사용자가 알려 준 사이)이 모델 입력까지 왔는지 시험이 볼 수 있게 이름표를 헤드라인에 남긴다
+    headline: payload.relationship ? `${M} ${payload.relationship.label} 사이의 근거 안에서 쓴 초안` : `${M} 두 사람의 근거 안에서 쓴 풀이 초안`,
     sections,
     steps,
     questions: [`${M} 요즘 어떤 방식이 서로에게 편한지 물어봐 줄래요?`, `${M} 함께 정해 두면 좋을 약속이 있을까요?`],

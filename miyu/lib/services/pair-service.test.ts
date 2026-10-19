@@ -64,10 +64,10 @@ async function setup(over: Partial<PairDeps> = {}) {
   const gen = () => ({ repo: mem.repo, pairs: mp.repo, generator, now: () => clock.now });
   /** A가 초대하고 B가 연결한 쌍 */
   async function linked() {
-    const inv = await createPairInvite(deps, { userId: A, assessmentId: a.id, consent: true });
+    const inv = await createPairInvite(deps, { userId: A, assessmentId: a.id, consent: true, relationship: "lover", myGender: "female" });
     assert.equal(inv.kind, "created");
     if (inv.kind !== "created") throw new Error("초대 실패");
-    const joined = await joinPairInvite(deps, { token: inv.pair.token, userId: B, consent: true });
+    const joined = await joinPairInvite(deps, { token: inv.pair.token, userId: B, consent: true, myGender: "male" });
     assert.equal(joined.kind, "joined");
     return inv.pair;
   }
@@ -85,33 +85,33 @@ async function setup(over: Partial<PairDeps> = {}) {
 test("판매 스위치가 꺼져 있으면(실제 기본값) 초대 · 연결 · 결제를 시작하지 않는다 — 돈이 빠지지 않는다", async () => {
   assert.equal(PAIR_COMPAT.saleOpen, false);
   const s = await setup({ saleOpen: undefined });
-  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true })).kind, "not-open");
+  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" })).kind, "not-open");
   const open = await setup();
   const pair = await open.linked();
   const closed: PairDeps = { ...open.deps, saleOpen: false };
   assert.equal((await startPairCheckout(closed, { userId: A, pairId: pair.id })).kind, "not-open");
-  assert.equal((await joinPairInvite(closed, { token: pair.token, userId: C, consent: true })).kind, "not-open");
+  assert.equal((await joinPairInvite(closed, { token: pair.token, userId: C, consent: true, myGender: "male" })).kind, "not-open");
   // 이미 만들어진 쌍의 열람은 스위치와 관계없이 된다
   assert.equal((await getPairView(closed, { pairId: pair.id, userId: A })).kind, "ok");
 });
 
 test("AI가 연결되지 않았으면(개발용 생성기) 스위치가 켜져 있어도 시작하지 않는다", async () => {
   const s = await setup({ generatorReady: false });
-  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true })).kind, "ai-not-connected");
+  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" })).kind, "ai-not-connected");
   assert.equal(devReportGenerator.generatePair, undefined);
 });
 
 test("초대: 동의가 없으면 만들지 않고, 남의 검사 결과로는 만들지 못하고, 열린 초대 수에 한도가 있다", async () => {
   const s = await setup();
-  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: false })).kind, "no-consent");
-  assert.equal((await createPairInvite(s.deps, { userId: B, assessmentId: s.a.id, consent: true })).kind, "not-found");
-  for (let i = 0; i < PAIR_MAX_OPEN_INVITES; i++) assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true })).kind, "created");
-  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true })).kind, "too-many");
+  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: false, relationship: "lover", myGender: "female" })).kind, "no-consent");
+  assert.equal((await createPairInvite(s.deps, { userId: B, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "male" })).kind, "not-found");
+  for (let i = 0; i < PAIR_MAX_OPEN_INVITES; i++) assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" })).kind, "created");
+  assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" })).kind, "too-many");
 });
 
 test("링크를 연 사람에게는 초대한 사람의 닉네임 말고 아무것도 보이지 않는다", async () => {
   const s = await setup();
-  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true });
+  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" });
   assert.equal(inv.kind, "created");
   if (inv.kind !== "created") return;
   const peek = await peekPairInvite(s.deps, { token: inv.pair.token, userId: B });
@@ -125,18 +125,18 @@ test("링크를 연 사람에게는 초대한 사람의 닉네임 말고 아무�
 
 test("연결: 동의 · 본인 아님 · 내 검사 결과 · 한 번만 · 기간", async () => {
   const s = await setup();
-  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true });
+  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" });
   assert.equal(inv.kind, "created");
   if (inv.kind !== "created") return;
   const token = inv.pair.token;
-  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: false })).kind, "no-consent");
-  assert.equal((await joinPairInvite(s.deps, { token, userId: A, consent: true })).kind, "self");
-  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: true, assessmentId: s.a.id })).kind, "bad-assessment", "남의 검사 결과로는 연결하지 못한다");
-  assert.equal((await joinPairInvite(s.deps, { token, userId: C, consent: true })).kind, "no-assessment");
-  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: true })).kind, "joined");
-  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: true })).kind, "joined", "같은 사람이 다시 눌러도 같은 결과");
+  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: false, myGender: "male" })).kind, "no-consent");
+  assert.equal((await joinPairInvite(s.deps, { token, userId: A, consent: true, myGender: "female" })).kind, "self");
+  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: true, assessmentId: s.a.id, myGender: "male" })).kind, "bad-assessment", "남의 검사 결과로는 연결하지 못한다");
+  assert.equal((await joinPairInvite(s.deps, { token, userId: C, consent: true, myGender: "male" })).kind, "no-assessment");
+  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: true, myGender: "male" })).kind, "joined");
+  assert.equal((await joinPairInvite(s.deps, { token, userId: B, consent: true, myGender: "male" })).kind, "joined", "같은 사람이 다시 눌러도 같은 결과");
   const c = await s.save(C, { ...INFO_B, nickname: "도윤" }, 3);
-  assert.equal((await joinPairInvite(s.deps, { token, userId: C, consent: true, assessmentId: c.id })).kind, "taken");
+  assert.equal((await joinPairInvite(s.deps, { token, userId: C, consent: true, assessmentId: c.id, myGender: "male" })).kind, "taken");
   const pair = s.mp.all()[0];
   assert.equal(pair.status, "linked");
   assert.equal(pair.bAssessmentId, s.b.id, "상대가 따로 고르지 않으면 가장 최근 검사 결과로 연결한다");
@@ -145,21 +145,21 @@ test("연결: 동의 · 본인 아님 · 내 검사 결과 · 한 번만 · 기�
 
 test("연결: 유효 기간이 지나면 들어올 수 없다", async () => {
   const s = await setup();
-  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true });
+  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" });
   assert.equal(inv.kind, "created");
   if (inv.kind !== "created") return;
   s.clock.now = new Date(T0.getTime() + (PAIR_COMPAT.inviteDays + 1) * 86_400_000);
-  assert.equal((await joinPairInvite(s.deps, { token: inv.pair.token, userId: B, consent: true })).kind, "expired");
+  assert.equal((await joinPairInvite(s.deps, { token: inv.pair.token, userId: B, consent: true, myGender: "male" })).kind, "expired");
   assert.equal((await peekPairInvite(s.deps, { token: inv.pair.token, userId: B })).kind, "expired");
 });
 
 test("결제는 연결된 쌍에서만 시작되고, 주문은 결제한 사람의 검사 결과에 묶이며 개인 통합 리포트 주문과 섞이지 않는다", async () => {
   const s = await setup();
-  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true });
+  const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" });
   assert.equal(inv.kind, "created");
   if (inv.kind !== "created") return;
   assert.equal((await startPairCheckout(s.deps, { userId: A, pairId: inv.pair.id })).kind, "not-linked", "상대가 들어오기 전에는 결제할 수 없다");
-  await joinPairInvite(s.deps, { token: inv.pair.token, userId: B, consent: true });
+  await joinPairInvite(s.deps, { token: inv.pair.token, userId: B, consent: true, myGender: "male" });
   assert.equal((await startPairCheckout(s.deps, { userId: C, pairId: inv.pair.id })).kind, "not-found", "쌍의 구성원이 아니면 없는 쌍이다");
   const r = await startPairCheckout(s.deps, { userId: B, pairId: inv.pair.id });
   assert.equal(r.kind, "order");
@@ -328,7 +328,7 @@ test("canReadPairReport: 구성원 · 주문 상태 · 철회를 구분한다", 
 
 test("탈퇴: 상대가 들어오지 않은 초대는 지우고, 연결된 쌍은 끊고 철회로 기록하며 상대는 이미 완성된 글을 계속 읽는다", async () => {
   const s = await setup();
-  const lone = await createPairInvite(s.deps, { userId: B, assessmentId: s.b.id, consent: true });
+  const lone = await createPairInvite(s.deps, { userId: B, assessmentId: s.b.id, consent: true, relationship: "lover", myGender: "male" });
   assert.equal(lone.kind, "created");
   const pair = await s.linked();
   const order = await s.buy(pair.id, B);

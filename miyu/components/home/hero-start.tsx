@@ -86,7 +86,7 @@ export function HeroStart() {
 
         {/* 바로 고르기 */}
         <div className="mt-5 grid gap-3 min-[350px]:grid-cols-2">
-          <Choice href="/compat" icon={<PairIcon />} title="우리 궁합 보기" note="무료 · 커플 유형 · 궁합 지수" />
+          <Choice href="/compat" icon={<PairIcon />} title="우리 궁합 보기" note="무료 · 궁합 지수 · 사이에 맞춘 풀이" />
           <Choice href="/analyze" icon={<PersonIcon />} title="내 사주 보기" note="무료 · 약 5분" />
         </div>
 

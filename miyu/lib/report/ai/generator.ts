@@ -226,8 +226,8 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const result = compatOf(input.a, input.b);
       const evidence = [...result.evidence, ...compatExtraEvidence(input.a, input.b, result), ...compatTimingOf(input.a, input.b, { year: ref.year, month: ref.month }).evidence];
       const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep });
-      const draft = await writer.write({ evidence, cautions: result.cautions }, ctx);
-      return assembleCompatReport(draft, result, input.names, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" });
+      const draft = await writer.write({ evidence, cautions: result.cautions, relationship: input.relationship ?? null }, ctx);
+      return assembleCompatReport(draft, result, input.names, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" }, input.relationship ?? null);
     },
     /**
      * 리포트 궁합 — 사주 궁합과 같은 엔진 결과(compatOf)와 시기 근거에, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*)를 더해 AI가 풀어 쓴 글을 검사해 조립한다.
@@ -239,8 +239,8 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const pairs = pairEvidenceOf({ summary: input.a.summary, mbti: input.a.knownMbti }, { summary: input.b.summary, mbti: input.b.knownMbti });
       const evidence = [...result.evidence, ...compatExtraEvidence(input.a.saju, input.b.saju, result), ...compatTimingOf(input.a.saju, input.b.saju, { year: ref.year, month: ref.month }).evidence, ...pairs.evidence];
       const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep, mode: "pair" });
-      const draft = await writer.write({ evidence, cautions: result.cautions }, ctx);
-      return assemblePairReport(draft, result, { labels: pairs.comparedLabels, skipped: pairs.unclear.length }, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" });
+      const draft = await writer.write({ evidence, cautions: result.cautions, relationship: input.relationship ?? null }, ctx);
+      return assemblePairReport(draft, result, { labels: pairs.comparedLabels, skipped: pairs.unclear.length }, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" }, input.relationship ?? null);
     },
     async generateConcern(input: ConcernInput, ctx: GenerateContext = {}): Promise<ConcernReportV1> {
       const ref = input.reference ? { ...input.reference, iso: seoulYm(now()).iso } : seoulYm(now());

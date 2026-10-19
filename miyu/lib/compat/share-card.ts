@@ -35,12 +35,17 @@ export function layoutCompatCard(card: SimpleCompatCard, o: { measure: Measure; 
   ops.unshift({ type: "rect", x: 0, y: 0, w: width, h: bandH, color: "accent-soft" }, { type: "mark", x: MARGIN, y: headTop - 4, size: MARK });
   y = bandH + 56;
 
-  // 이름 · 커플 유형
+  // 이름 · 커플 유형 (사이를 알려 준 경우: 연인 · 결혼준비중 · 결혼함은 커플 유형, 썸 · 친구 · 기타는 그 사이의 제목)
+  const showType = !card.relation || card.relation.showType;
   block(`${card.names.a} × ${card.names.b}`, MARGIN, inner, 34, 600, "ink-3");
+  if (card.relation) {
+    y += 4;
+    block(`${card.relation.label} 사이로 읽었어요`, MARGIN, inner, 28, 600, "ink-3");
+  }
   y += 10;
-  block(card.typeName, MARGIN, inner, 64, 700, "accent-strong");
+  block(card.relation ? card.relation.heading : card.typeName, MARGIN, inner, 64, 700, "accent-strong");
   y += 8;
-  block(card.typeLine, MARGIN, inner, 36, 400, "ink");
+  block(showType ? card.typeLine : card.relation!.frame.lens, MARGIN, inner, 36, 400, "ink");
   y += 40;
 
   // 궁합 지수 — 큰 숫자 + 재미 · 참고용
@@ -50,17 +55,19 @@ export function layoutCompatCard(card: SimpleCompatCard, o: { measure: Measure; 
   text("/ 100 · 재미 · 참고용", MARGIN + Math.ceil(o.measure(String(card.score), 132, 700)) + 24, y + 78, 28, 400, "ink-3");
   y += Math.round(132 * 1.1) + 24;
 
-  // 우리 커플 핵심
+  // 우리 커플 핵심 — 커플 유형을 보이는 사이에서만
   const pad = 34;
   const coreW = inner - pad * 2;
-  const coreH = pad + Math.round(26 * LH) + measureBlock(card.core, coreW, 36, 700) + pad;
-  ops.push({ type: "rect", x: MARGIN, y, w: inner, h: coreH, color: "accent-soft", r: 32 });
-  const coreTop = y;
-  y += pad;
-  text("우리 커플 핵심", MARGIN + pad, y, 26, 700, "accent-strong");
-  y += Math.round(26 * LH);
-  block(card.core, MARGIN + pad, coreW, 36, 700, "ink");
-  y = coreTop + coreH + 30;
+  if (showType) {
+    const coreH = pad + Math.round(26 * LH) + measureBlock(card.core, coreW, 36, 700) + pad;
+    ops.push({ type: "rect", x: MARGIN, y, w: inner, h: coreH, color: "accent-soft", r: 32 });
+    const coreTop = y;
+    y += pad;
+    text("우리 커플 핵심", MARGIN + pad, y, 26, 700, "accent-strong");
+    y += Math.round(26 * LH);
+    block(card.core, MARGIN + pad, coreW, 36, 700, "ink");
+    y = coreTop + coreH + 30;
+  }
 
   // 잘 맞는 곳 · 맞춰 볼 곳 — 색이 있는 둥근 칸(이름과 색을 함께)
   const box = (label: string, items: string[], face: CardColor, tone: CardColor) => {

@@ -10,6 +10,7 @@ import { CompatReportView } from "@/components/report/compat-report-view";
 import { ReviewLink } from "@/components/reviews/review-link";
 import { ResultHeader } from "@/components/report/result-header";
 import { PageFallback } from "@/components/ui/page-fallback";
+import { RELATIONSHIP_LABEL } from "@/lib/compat/relationship";
 import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
 import { getPairView, paidPairOrder, type PairView } from "@/lib/services/pair-service";
@@ -120,6 +121,9 @@ function Body({ view, reviewRef }: { view: Extract<PairView, { kind: "ok" }>; re
     <>
       <ResultHeader title="리포트 궁합" subtitle="각자의 분석 결과를 서로 동의한 뒤 연결해 읽는 궁합이에요." meta={names ?? "상대를 기다리는 중"} tone="love" />
       <div className={`${pageNarrow} pb-14`}>
+        {view.relationship && (
+          <p className="mb-4 w-fit rounded-full bg-accent-soft px-3 py-1 text-[13px] font-semibold text-accent-strong">{RELATIONSHIP_LABEL[view.relationship]} 사이로 읽어요</p>
+        )}
         {view.report.state === "blocked" ? (
           <Section title={view.report.why === "refunded" ? "환불된 주문이에요" : view.report.why === "unfinished" ? "연결이 끊겨 글을 만들 수 없어요" : "동의를 철회해 이 글을 볼 수 없어요"}>
             <p>

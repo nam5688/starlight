@@ -9,6 +9,7 @@
 
 import { isCompatProduct, parseCompatProductId, SAJU_COMPAT, compatProductId } from "../config/product.ts";
 import { createOrderNumber } from "../commerce/order.ts";
+import { RELATIONSHIP_REQUIRED_MESSAGE, isCompatGender, myGenderError, parseRelationship, type CompatRelationship } from "../compat/relationship.ts";
 import { cleanNickname, parseCompatPerson, validateCompatPerson, type CompatPersonErrors } from "../compat/simple.ts";
 import { isCompatReport } from "../report/compat/types.ts";
 import type { CompatReport } from "../report/compat/types.ts";
@@ -24,22 +25,32 @@ export const COMPAT_UNAVAILABLE_MESSAGE = {
   "db-not-ready": "사주 궁합을 준비하고 있어요. 잠시 뒤에 다시 시도해 주세요.",
 } as const;
 
+/** 상대 입력의 오류에 더해, 내 성별(myGender) · 사이(relationship)의 오류도 같은 모양으로 돌려준다 */
+export type CompatStartErrors = CompatPersonErrors & { myGender?: string; relationship?: string };
+
 export type StartCompatResult =
   | { kind: "order"; order: OrderRecord; requestId: string }
   | { kind: "not-open" }
   | { kind: "ai-not-connected" }
-  | { kind: "invalid"; errors: CompatPersonErrors; message?: string }
+  | { kind: "invalid"; errors: CompatStartErrors; message?: string }
   | { kind: "sales-closed"; reason: GateReason | null }
   /** 질문표(DB 변경 23번)가 아직 없거나 저장에 실패 — 주문을 만들지 않았거나 취소했다 */
   | { kind: "db-not-ready" }
   | { kind: "not-found" };
 
-/** 화면에서 온 상대 입력을 읽고 확인한다 — 이름은 제목용으로만 다듬는다. 성별은 이 궁합에서 쓰지 않는다 */
-export function readCompatPartner(raw: unknown, today: Date): { ok: true; partner: CompatPartner } | { ok: false; errors: CompatPersonErrors; message?: string } {
+/**
+ * 화면에서 온 상대 입력을 읽고 확인한다 — 이름은 호칭용으로만 다듬는다. 성별(남자 · 여자)은 직접 고른 값이어야 하고 10년 시기(대운) 계산에만 쓴다.
+ * 사이(relationship)는 여섯 값 중 하나여야 한다 — 비었거나 알 수 없는 값을 특정 관계로 바꾸지 않는다.
+ */
+export function readCompatPartner(raw: unknown, today: Date, rawRelationship?: unknown): { ok: true; partner: CompatPartner & { relationship: CompatRelationship } } | { ok: false; errors: CompatStartErrors; message?: string } {
   const p = parseCompatPerson(raw);
   if (!p) return { ok: false, errors: {}, message: "입력 형식이 올바르지 않아요." };
-  const errors = validateCompatPerson(p, today);
-  if (Object.keys(errors).length) return { ok: false, errors };
+  const present = rawRelationship !== undefined && rawRelationship !== null && rawRelationship !== "";
+  if (present && !parseRelationship(rawRelationship)) return { ok: false, errors: {}, message: "입력 형식이 올바르지 않아요." };
+  const relationship = parseRelationship(rawRelationship);
+  const errors: CompatStartErrors = validateCompatPerson(p, today);
+  if (!relationship) errors.relationship = RELATIONSHIP_REQUIRED_MESSAGE;
+  if (Object.keys(errors).length || !relationship || !isCompatGender(p.gender)) return { ok: false, errors };
   return {
     ok: true,
     partner: {
@@ -50,14 +61,15 @@ export function readCompatPartner(raw: unknown, today: Date): { ok: true; partne
       birthMonth: Number(p.birthMonth),
       birthDay: Number(p.birthDay),
       birthTime: p.birthTimeUnknown ? null : p.birthTime,
-      gender: null,
+      gender: p.gender,
+      relationship,
     },
   };
 }
 
 /** 보관해 둔 상대 출생정보로 사주를 계산한다 — 계산하지 못하면 오류(리포트 생성이 실패로 남고 같은 주문으로 다시 만들 수 있다) */
 export function partnerSajuOf(partner: CompatPartner): SajuOk {
-  const r = calculateSaju({ year: partner.birthYear, month: partner.birthMonth, day: partner.birthDay, calendar: partner.calendar, isLeapMonth: partner.isLeapMonth, birthTime: partner.birthTime });
+  const r = calculateSaju({ year: partner.birthYear, month: partner.birthMonth, day: partner.birthDay, calendar: partner.calendar, isLeapMonth: partner.isLeapMonth, birthTime: partner.birthTime, ...(partner.gender ? { gender: partner.gender } : {}) });
   if (r.status !== "ok") throw new Error("상대의 사주를 계산하지 못했어요.");
   return r as SajuOk;
 }
@@ -87,7 +99,7 @@ export type StartCompatDeps = {
  */
 export async function startCompatCheckout(
   deps: StartCompatDeps,
-  input: { userId: string; assessmentId: string; partner: unknown; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null },
+  input: { userId: string; assessmentId: string; partner: unknown; /** 구매자가 직접 고른 두 사람의 사이 */ relationship?: unknown; /** 구매자가 직접 고른 내 성별 — 분석 때 입력한 성별과 다르면 덮어쓰지 않고 멈춘다 */ myGender?: unknown; paymentEnv?: PaymentEnv; acquisition?: Acquisition | null },
 ): Promise<StartCompatResult> {
   const { repo } = deps;
   if (!(deps.saleOpen ?? SAJU_COMPAT.saleOpen)) return { kind: "not-open" };
@@ -95,8 +107,10 @@ export async function startCompatCheckout(
   const assessment = await repo.getAssessment(input.assessmentId);
   if (!assessment || assessment.userId !== input.userId) return { kind: "not-found" };
   if (assessment.saju.status !== "ok") return { kind: "invalid", errors: { birthDate: "내 사주를 계산하지 못한 결과라 궁합을 볼 수 없어요." } };
-  const read = readCompatPartner(input.partner, deps.now());
-  if (!read.ok) return { kind: "invalid", errors: read.errors, message: read.message };
+  const read = readCompatPartner(input.partner, deps.now(), input.relationship);
+  const mine = myGenderError(assessment.saju, input.myGender);
+  if (!read.ok) return { kind: "invalid", errors: { ...read.errors, ...(mine ? { myGender: mine } : {}) }, message: read.message };
+  if (mine) return { kind: "invalid", errors: { myGender: mine } };
   // 상대 사주가 계산되는지 미리 확인한다(결제한 뒤에 계산하지 못해 실패하는 일을 줄인다)
   try {
     partnerSajuOf(read.partner);
@@ -138,7 +152,7 @@ export async function startCompatCheckout(
 }
 
 /** 사주 궁합 리포트를 만들 때 쓸 두 사람 — 상대 출생정보가 이미 지워졌거나 없으면 오류 */
-export async function compatInputFor(repo: MiyuRepository, order: OrderRecord, assessment: { nickname: string; saju: unknown }): Promise<{ names: { a: string; b: string }; a: SajuOk; b: SajuOk }> {
+export async function compatInputFor(repo: MiyuRepository, order: OrderRecord, assessment: { nickname: string; saju: unknown }): Promise<{ names: { a: string; b: string }; a: SajuOk; b: SajuOk; relationship: CompatRelationship | null }> {
   const requestId = parseCompatProductId(order.productId);
   if (!requestId) throw new Error("사주 궁합 주문이 아니에요.");
   const request = await repo.getCompatRequestByOrder(order.id);
@@ -146,7 +160,8 @@ export async function compatInputFor(repo: MiyuRepository, order: OrderRecord, a
   if (!request.partner || request.scrubbedAt) throw new Error("상대 입력이 지워져 사주 궁합을 만들 수 없어요.");
   const a = assessment.saju as { status?: string };
   if (a?.status !== "ok") throw new Error("내 사주 계산 결과가 없어 사주 궁합을 만들 수 없어요.");
-  return { names: { a: cleanNickname(assessment.nickname, "나"), b: request.partner.nickname }, a: assessment.saju as SajuOk, b: partnerSajuOf(request.partner) };
+  // 이 기능 이전에 보관된 입력에는 사이가 없다 — 특정 관계로 채우지 않고 중립(null)으로 읽는다
+  return { names: { a: cleanNickname(assessment.nickname, "나"), b: request.partner.nickname }, a: assessment.saju as SajuOk, b: partnerSajuOf(request.partner), relationship: parseRelationship(request.partner.relationship) };
 }
 
 export type MyCompat = { orderNumber: string; names: { a: string; b: string } | null; createdAt: string; status: "paid-ready" | "generating" | "failed" | "refunded" };

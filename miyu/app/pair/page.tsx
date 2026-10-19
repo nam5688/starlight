@@ -10,6 +10,7 @@ import { PageFallback } from "@/components/ui/page-fallback";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonPrimary, pageNarrow, textLink } from "@/components/ui/styles";
 import { formatKrw, PAIR_COMPAT } from "@/lib/config/product";
+import { genderOfSaju } from "@/lib/saju/engine";
 import { listMyPairs, latestUsableAssessment, type MyPair } from "@/lib/services/pair-service";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
@@ -101,7 +102,7 @@ async function Content() {
             ) : (
               <>
                 <PairConsentBox />
-                <PairInviteForm assessmentId={latest.id} myName={latest.nickname} />
+                <PairInviteForm assessmentId={latest.id} myName={latest.nickname} savedGender={genderOfSaju(latest.saju)} />
               </>
             )}
           </div>

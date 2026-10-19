@@ -4,11 +4,27 @@
 import type { SajuOk } from "../saju/engine.ts";
 import { COMPAT_EXPLAIN, compatOf, type CompatResult } from "../saju/interpret/compat.ts";
 import { birthDateError, calculateSaju } from "../saju/manseryeok-engine.ts";
+import {
+  GENDER_REQUIRED_MESSAGE,
+  RELATIONSHIP_LABEL,
+  RELATIONSHIP_REQUIRED_MESSAGE,
+  headingOf,
+  isCompatGender,
+  neutralWording,
+  parseRelationship,
+  relationFrameOf,
+  showsCoupleType,
+  type CompatGender,
+  type CompatRelationship,
+  type RelationFrame,
+} from "./relationship.ts";
 
 export const COMPAT_NICKNAME_MAX = 10;
 
 export type CompatPersonInput = {
   nickname: string;
+  /** 남자 · 여자 중 직접 고른 값. 고르기 전에는 빈 문자열 — 기본 선택도, 이름으로 하는 추정도 없다 */
+  gender: "" | CompatGender;
   calendar: "solar" | "lunar";
   isLeapMonth: boolean;
   birthYear: string;
@@ -18,9 +34,9 @@ export type CompatPersonInput = {
   birthTimeUnknown: boolean;
 };
 
-export const EMPTY_COMPAT_PERSON: CompatPersonInput = { nickname: "", calendar: "solar", isLeapMonth: false, birthYear: "", birthMonth: "", birthDay: "", birthTime: "", birthTimeUnknown: false };
+export const EMPTY_COMPAT_PERSON: CompatPersonInput = { nickname: "", gender: "", calendar: "solar", isLeapMonth: false, birthYear: "", birthMonth: "", birthDay: "", birthTime: "", birthTimeUnknown: false };
 
-export type CompatPersonErrors = Partial<Record<"nickname" | "birthDate" | "birthTime", string>>;
+export type CompatPersonErrors = Partial<Record<"nickname" | "gender" | "birthDate" | "birthTime", string>>;
 
 const isString = (v: unknown): v is string => typeof v === "string";
 
@@ -30,9 +46,13 @@ export function parseCompatPerson(raw: unknown): CompatPersonInput | null {
   const r = raw as Record<string, unknown>;
   if (!isString(r.nickname) || !isString(r.birthYear) || !isString(r.birthMonth) || !isString(r.birthDay) || !isString(r.birthTime)) return null;
   if (r.calendar !== "solar" && r.calendar !== "lunar") return null;
+  // 성별: 빈 값(고르지 않음)은 검사에서 안내하고, 정해진 두 값이 아닌 다른 값은 형식 오류다
+  const gender = r.gender === undefined || r.gender === "" ? "" : isCompatGender(r.gender) ? r.gender : null;
+  if (gender === null) return null;
   if (typeof r.isLeapMonth !== "boolean" || typeof r.birthTimeUnknown !== "boolean") return null;
   return {
     nickname: r.nickname.slice(0, 40),
+    gender,
     calendar: r.calendar,
     isLeapMonth: r.isLeapMonth,
     birthYear: r.birthYear.slice(0, 8),
@@ -63,12 +83,15 @@ const sajuInputOf = (p: CompatPersonInput) => ({
   calendar: p.calendar,
   isLeapMonth: p.calendar === "lunar" && p.isLeapMonth,
   birthTime: p.birthTimeUnknown ? null : p.birthTime,
+  // 성별은 10년 시기(대운) 계산에만 쓴다 — 고르지 않은 입력은 검사에서 걸러져 여기까지 오지 않는다
+  ...(p.gender ? { gender: p.gender } : {}),
 });
 
 /** today는 호출하는 쪽이 넘긴다 — 날짜가 없거나 존재하지 않거나 미래이면 이유를 알려 준다 */
 export function validateCompatPerson(p: CompatPersonInput, today: Date): CompatPersonErrors {
   const errors: CompatPersonErrors = {};
   if ([...p.nickname.trim()].length > COMPAT_NICKNAME_MAX) errors.nickname = `이름은 ${COMPAT_NICKNAME_MAX}자 이내로 입력해 주세요.`;
+  if (!p.gender) errors.gender = GENDER_REQUIRED_MESSAGE;
   const y = Number(p.birthYear);
   const m = Number(p.birthMonth);
   const d = Number(p.birthDay);
@@ -103,9 +126,29 @@ export type SimpleCompatCard = {
   basis: { label: string; direction: string }[];
   cautions: string[];
   notes: { scoreBasis: string; scoreNotProbability: string; tradition: string };
+  /**
+   * 사용자가 알려 준 사이로 읽은 결과(무료 간단 궁합) — 관점 · 표현 · 조언만 바꾸고 위의 점수 · 유형 · 근거는 바꾸지 않는다.
+   * 없으면(예전 방식의 카드) 중립 표시다. showType가 false인 사이(썸 · 친구 · 기타)는 커플 유형 이름을 보이지 않고 heading을 대신 쓴다.
+   */
+  relation?: { id: CompatRelationship; label: string; heading: string; showType: boolean; frame: RelationFrame };
 };
 
-export type SimpleCompatOutcome = { ok: true; card: SimpleCompatCard } | { ok: false; errors: { a: CompatPersonErrors; b: CompatPersonErrors }; message?: string };
+export type SimpleCompatOutcome =
+  | { ok: true; card: SimpleCompatCard }
+  | { ok: false; errors: { a: CompatPersonErrors; b: CompatPersonErrors }; relationship?: string; message?: string };
+
+/** 엔진 결과(변경 없음)에 사이에 맞는 풀이를 얹는다 — 사이에 맞지 않는 말("배우자 자리")만 표시용으로 바꾸고 점수 · 유형 · 근거 순서는 그대로다 */
+export function withRelation(card: SimpleCompatCard, rel: CompatRelationship, levels: CompatResult["levels"]): SimpleCompatCard {
+  const n = (t: string) => neutralWording(t, rel);
+  return {
+    ...card,
+    good: card.good.map(n),
+    care: card.care.map(n),
+    basis: card.basis.map((b) => ({ ...b, label: n(b.label) })),
+    notes: { ...card.notes, scoreBasis: n(card.notes.scoreBasis), tradition: n(card.notes.tradition) },
+    relation: { id: rel, label: RELATIONSHIP_LABEL[rel], heading: headingOf(rel, card.typeName), showType: showsCoupleType(rel), frame: relationFrameOf(rel, levels) },
+  };
+}
 
 /** 같은 엔진 결과에서 무료 카드를 만든다 — 유료가 같은 결과를 풀어 쓰므로 새로 계산하지 않는다 */
 export function cardOf(result: CompatResult, names: { a: string; b: string }): SimpleCompatCard {
@@ -128,12 +171,15 @@ export function cardOf(result: CompatResult, names: { a: string; b: string }): S
 }
 
 /** 두 사람의 입력(브라우저에서 온 값)으로 간단 궁합을 만든다. 저장 · 기록하지 않는다 */
-export function computeSimpleCompat(rawA: unknown, rawB: unknown, today: Date): SimpleCompatOutcome {
+export function computeSimpleCompat(rawA: unknown, rawB: unknown, today: Date, rawRelationship?: unknown): SimpleCompatOutcome {
   const a = parseCompatPerson(rawA);
   const b = parseCompatPerson(rawB);
   if (!a || !b) return { ok: false, errors: { a: {}, b: {} }, message: "입력 형식이 올바르지 않아요." };
+  // 사이: 비어 있으면 고르라고 안내하고, 정해진 여섯 값이 아닌 다른 값은 형식 오류다 — 어떤 값도 대신 채우지 않는다
+  if (rawRelationship !== undefined && rawRelationship !== null && rawRelationship !== "" && !parseRelationship(rawRelationship)) return { ok: false, errors: { a: {}, b: {} }, message: "입력 형식이 올바르지 않아요." };
+  const relationship = parseRelationship(rawRelationship);
   const errors = { a: validateCompatPerson(a, today), b: validateCompatPerson(b, today) };
-  if (Object.keys(errors.a).length || Object.keys(errors.b).length) return { ok: false, errors };
+  if (Object.keys(errors.a).length || Object.keys(errors.b).length || !relationship) return { ok: false, errors, ...(relationship ? {} : { relationship: RELATIONSHIP_REQUIRED_MESSAGE }) };
   const sa = calculateSaju(sajuInputOf(a));
   const sb = calculateSaju(sajuInputOf(b));
   if (sa.status !== "ok" || sb.status !== "ok") {
@@ -141,10 +187,12 @@ export function computeSimpleCompat(rawA: unknown, rawB: unknown, today: Date): 
     return { ok: false, errors: { a: sa.status !== "ok" ? { birthDate: msg(sa) } : {}, b: sb.status !== "ok" ? { birthDate: msg(sb) } : {} } };
   }
   const names = { a: cleanNickname(a.nickname, "나"), b: cleanNickname(b.nickname, "상대") };
-  return { ok: true, card: cardOf(compatOf(sa as SajuOk, sb as SajuOk), names) };
+  const result = compatOf(sa as SajuOk, sb as SajuOk);
+  return { ok: true, card: withRelation(cardOf(result, names), relationship, result.levels) };
 }
 
 /** 공유할 글 — 이름 · 커플 유형 · 총점과 이 서비스 이름만 담고 생년월일은 담지 않는다 */
-export function shareTextOf(card: Pick<SimpleCompatCard, "names" | "typeName" | "score">): string {
-  return `${card.names.a} × ${card.names.b} — ${card.typeName} · 궁합 지수 ${card.score}\n재미로 보는 사주 궁합, 미유(ME:U)에서 우리도 해 볼래?`;
+export function shareTextOf(card: Pick<SimpleCompatCard, "names" | "typeName" | "score" | "relation">): string {
+  const title = card.relation ? card.relation.heading : card.typeName;
+  return `${card.names.a} × ${card.names.b} — ${title} · 궁합 지수 ${card.score}\n재미로 보는 사주 궁합, 미유(ME:U)에서 우리도 해 볼래?`;
 }

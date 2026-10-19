@@ -1,5 +1,6 @@
 "use client";
 
+import { GenderField } from "@/components/compat/choice-fields";
 import { chevronBg, FieldError, inputClass, selectClass } from "@/components/ui/form-controls";
 import { COMPAT_NICKNAME_MAX, type CompatPersonErrors, type CompatPersonInput } from "@/lib/compat/simple";
 
@@ -8,6 +9,7 @@ export function PersonFields({
   prefix,
   title,
   placeholderName,
+  genderLegend,
   value,
   errors,
   onChange,
@@ -15,6 +17,8 @@ export function PersonFields({
   prefix: string;
   title: string;
   placeholderName: string;
+  /** 성별 칸의 이름 — 예: "본인의 성별" · "상대의 성별" */
+  genderLegend: string;
   value: CompatPersonInput;
   errors: CompatPersonErrors;
   onChange: (next: CompatPersonInput) => void;
@@ -29,7 +33,7 @@ export function PersonFields({
 
       <div className="clear-both pt-3">
         <label htmlFor={id("nickname")} className="block text-[15px] font-semibold">
-          이름 <span className="text-[13px] font-normal text-ink-3">선택 · 결과 제목에만 써요</span>
+          이름 <span className="text-[13px] font-normal text-ink-3">선택 · 결과에서 부르는 이름으로만 써요</span>
         </label>
         <input
           id={id("nickname")}
@@ -44,6 +48,8 @@ export function PersonFields({
         />
         <FieldError id={id("nickname-error")} message={errors.nickname} />
       </div>
+
+      <GenderField prefix={prefix} legend={genderLegend} value={value.gender} error={errors.gender} onChange={(g) => set("gender", g)} />
 
       <div className="mt-5">
         <p className="text-[15px] font-semibold">생년월일</p>

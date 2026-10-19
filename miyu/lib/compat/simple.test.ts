@@ -8,10 +8,10 @@ import type { SajuOk } from "../saju/engine.ts";
 import { cleanNickname, computeSimpleCompat, EMPTY_COMPAT_PERSON, parseCompatPerson, shareTextOf, validateCompatPerson, type CompatPersonInput } from "./simple.ts";
 
 const TODAY = new Date("2026-10-16T12:00:00+09:00");
-const person = (over: Partial<CompatPersonInput> = {}): CompatPersonInput => ({ ...EMPTY_COMPAT_PERSON, nickname: "슬기", birthYear: "1994", birthMonth: "11", birthDay: "7", birthTime: "08:40", ...over });
+const person = (over: Partial<CompatPersonInput> = {}): CompatPersonInput => ({ ...EMPTY_COMPAT_PERSON, nickname: "슬기", gender: "female", birthYear: "1994", birthMonth: "11", birthDay: "7", birthTime: "08:40", ...over });
 
 test("두 사람의 입력으로 카드를 만들고, 무료 카드의 유형 · 총점이 같은 엔진 결과(유료가 풀어 쓰는 근거)와 같다", () => {
-  const out = computeSimpleCompat(person(), person({ nickname: "남수", birthYear: "1992", birthMonth: "4", birthDay: "18", birthTime: "", birthTimeUnknown: true }), TODAY);
+  const out = computeSimpleCompat(person(), person({ nickname: "남수", birthYear: "1992", birthMonth: "4", birthDay: "18", birthTime: "", birthTimeUnknown: true }), TODAY, "lover");
   assert.ok(out.ok);
   if (!out.ok) return;
   const sa = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: "08:40" }) as SajuOk;
@@ -24,14 +24,14 @@ test("두 사람의 입력으로 카드를 만들고, 무료 카드의 유형 ·
   assert.ok(out.card.cautions.some((c) => /출생 시각을 모르는 사람/.test(c)));
   assert.equal(out.card.basis.length, r.parts.length);
   // 같은 입력은 항상 같은 카드, A · B를 바꿔도 같은 유형 · 총점
-  const again = computeSimpleCompat(person(), person({ nickname: "남수", birthYear: "1992", birthMonth: "4", birthDay: "18", birthTime: "", birthTimeUnknown: true }), TODAY);
+  const again = computeSimpleCompat(person(), person({ nickname: "남수", birthYear: "1992", birthMonth: "4", birthDay: "18", birthTime: "", birthTimeUnknown: true }), TODAY, "lover");
   assert.deepEqual(again, out);
-  const swapped = computeSimpleCompat(person({ nickname: "남수", birthYear: "1992", birthMonth: "4", birthDay: "18", birthTime: "", birthTimeUnknown: true }), person(), TODAY);
+  const swapped = computeSimpleCompat(person({ nickname: "남수", birthYear: "1992", birthMonth: "4", birthDay: "18", birthTime: "", birthTimeUnknown: true }), person(), TODAY, "lover");
   assert.ok(swapped.ok && swapped.card.typeName === out.card.typeName && swapped.card.score === out.card.score);
 });
 
 test("카드 · 공유 글에는 생년월일이 없고, 이름을 비우면 \"나\" · \"상대\"로 보인다", () => {
-  const out = computeSimpleCompat(person({ nickname: "" }), person({ nickname: "   ", birthYear: "1990", birthMonth: "2", birthDay: "3" }), TODAY);
+  const out = computeSimpleCompat(person({ nickname: "" }), person({ nickname: "   ", birthYear: "1990", birthMonth: "2", birthDay: "3" }), TODAY, "lover");
   assert.ok(out.ok);
   if (!out.ok) return;
   assert.deepEqual(out.card.names, { a: "나", b: "상대" });
@@ -43,7 +43,7 @@ test("카드 · 공유 글에는 생년월일이 없고, 이름을 비우면 \"�
 });
 
 test("총점은 확률이 아니라고 밝히고 전통 해석 · 두 사주만 본 결과임을 카드가 함께 싣는다 — 글에 확률 · 단정 · 속마음이 없다", () => {
-  const out = computeSimpleCompat(person(), person({ birthYear: "1990", birthMonth: "2", birthDay: "3" }), TODAY);
+  const out = computeSimpleCompat(person(), person({ birthYear: "1990", birthMonth: "2", birthDay: "3" }), TODAY, "lover");
   assert.ok(out.ok);
   if (!out.ok) return;
   assert.match(out.card.notes.scoreNotProbability, /확률이나 궁합의 정확도가 아니라/);
@@ -64,7 +64,7 @@ test("입력 검사: 없는 날짜 · 미래 · 시간 · 이름 길이를 이�
   assert.equal(validateCompatPerson(person({ birthTime: "", birthTimeUnknown: true }), TODAY).birthTime, undefined);
   assert.match(validateCompatPerson(person({ nickname: "가나다라마바사아자차카" }), TODAY).nickname!, /10자 이내/);
   // 결과는 한 사람이라도 오류가 있으면 만들지 않는다
-  const bad = computeSimpleCompat(person(), person({ birthYear: "" }), TODAY);
+  const bad = computeSimpleCompat(person(), person({ birthYear: "" }), TODAY, "lover");
   assert.ok(!bad.ok && bad.errors.b.birthDate && Object.keys(bad.errors.a).length === 0);
 });
 
@@ -74,7 +74,7 @@ test("브라우저에서 온 값이 형식에 맞지 않으면 읽지 않는다 
   assert.equal(parseCompatPerson({ ...person(), isLeapMonth: "no" }), null);
   assert.equal(parseCompatPerson({ ...person(), birthYear: 1994 }), null);
   assert.ok(parseCompatPerson(person()));
-  assert.equal(computeSimpleCompat("x", person(), TODAY).ok, false);
+  assert.equal(computeSimpleCompat("x", person(), TODAY, "lover").ok, false);
   assert.equal(cleanNickname(`${String.fromCharCode(0, 0x200b)}슬\n기${String.fromCharCode(0x2028)}`, "나"), "슬기");
   assert.equal(cleanNickname("가나다라마바사아자차카타", "나"), "가나다라마바사아자차");
   assert.equal(cleanNickname("  ", "상대"), "상대");
@@ -83,7 +83,7 @@ test("브라우저에서 온 값이 형식에 맞지 않으면 읽지 않는다 
 });
 
 test("존재하지 않는 음력 날짜는 이유를 알려 주고 계산하지 않는다", () => {
-  const out = computeSimpleCompat(person({ calendar: "lunar", birthYear: "1995", birthMonth: "2", birthDay: "30", isLeapMonth: true }), person(), TODAY);
+  const out = computeSimpleCompat(person({ calendar: "lunar", birthYear: "1995", birthMonth: "2", birthDay: "30", isLeapMonth: true }), person(), TODAY, "lover");
   // 엔진이 거절하는 날짜면 이유가 나오고, 있는 날짜면 계산된다 — 어느 쪽이든 오류 없이 결과 형태를 지킨다
   assert.ok(out.ok || out.errors.a.birthDate);
 });

@@ -1,0 +1,122 @@
+// 실행: npm test — 궁합 입력 화면의 지시 사항을 소스에서 확인한다(실제 화면 확인은 scripts/qa-compat-relationship.ts가 브라우저로 따로 한다).
+//  · 이름 안내 문구는 "본인의 이름을 적어주세요" / "상대의 이름을 적어주세요" 그대로, 예전 "예: 슬기" · "예: 남수" 없음
+//  · "무슨 사이인가요?" 여섯 값은 연인 / 결혼준비중 / 썸타는중 / 결혼함 / 친구 / 기타 순서이고 기본 선택이 없다 · 성별도 기본 선택이 없다
+//  · /compat의 제목 · 안내는 관계 중립이고, 결과는 사이에 맞는 제목 · 유형 표시를 쓴다 · 저장 안내가 실제 보관 방식(탭 1시간, 입력 지우기)과 어긋나지 않는다
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { readSource } from "../lib/report/test-source.ts";
+
+const read = (p: string) => readSource(new URL(`../${p}`, import.meta.url));
+/** 주석을 지운 코드 — 설명 주석에 적힌 낱말이 검사에 걸리지 않게 */
+const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+const compatForm = read("components/compat/compat-form.tsx");
+const buyForm = read("components/compat/compat-buy-form.tsx");
+const person = read("components/compat/person-fields.tsx");
+const choice = read("components/compat/choice-fields.tsx");
+const page = read("app/compat/page.tsx");
+const result = read("components/compat/compat-result.tsx");
+const pairForms = read("components/pair/pair-forms.tsx");
+const reportView = read("components/report/compat-report-view.tsx");
+
+test("이름 안내 문구는 지시한 그대로이고 예전 예시 이름 안내가 어디에도 없다", () => {
+  const rel = read("lib/compat/relationship.ts");
+  assert.ok(rel.includes('self: "본인의 이름을 적어주세요"') && rel.includes('partner: "상대의 이름을 적어주세요"'));
+  for (const src of [compatForm, buyForm, person, pairForms]) assert.doesNotMatch(code(src), /예:\s*슬기|예:\s*남수/);
+  assert.match(code(compatForm), /placeholderName=\{NAME_PLACEHOLDER\.self\}/);
+  assert.match(code(compatForm), /placeholderName=\{NAME_PLACEHOLDER\.partner\}/);
+  assert.match(code(buyForm), /placeholderName=\{NAME_PLACEHOLDER\.partner\}/);
+});
+
+test("사이 · 성별 선택은 여섯 값 · 두 값을 정해진 순서로 그리고 기본 선택이 없다", () => {
+  const c = code(choice);
+  assert.match(c, /COMPAT_RELATIONSHIPS\.map/, "여섯 값을 정해진 목록 순서로 그린다");
+  assert.match(c, /COMPAT_GENDERS\.map/);
+  assert.match(c, /checked=\{value === r\}/);
+  assert.match(c, /checked=\{value === g\}/);
+  assert.doesNotMatch(c, /defaultChecked|checked=\{true\}|defaultValue/, "미리 골라 둔 값이 없다");
+  // 폼 상태의 처음 값은 모두 빈 값("")이다
+  for (const src of [compatForm, buyForm]) {
+    assert.match(code(src), /useState<"" \| CompatRelationship>\(""\)/);
+  }
+  assert.match(code(buyForm), /useState<"" \| CompatGender>\(""\)/);
+  // 모바일: 두 칸 → 세 칸으로 넓어지는 격자, 글자는 단어 단위로 줄바꿈, 터치 칸은 48px 이상
+  assert.match(c, /grid-cols-2 gap-2 pt-3 sm:grid-cols-3/);
+  assert.match(c, /break-keep/);
+  assert.match(c, /min-h-12/);
+});
+
+test("사이는 모든 입구에서 같은 구성 요소를 쓴다 — 간단 궁합 · 사주 궁합 구매 · 리포트 궁합 초대", () => {
+  for (const src of [compatForm, buyForm, pairForms]) assert.match(code(src), /<RelationshipField/);
+  for (const src of [buyForm, pairForms]) assert.match(code(src), /<GenderField/);
+  assert.match(code(person), /<GenderField/);
+});
+
+test("/compat의 제목 · 안내는 관계 중립이고 \"무슨 커플\"이 고정되어 있지 않다", () => {
+  const c = code(page);
+  assert.match(c, /우리 둘은 어떤 사이일까\?/);
+  assert.doesNotMatch(c, /무슨 커플/);
+  assert.doesNotMatch(c.slice(c.indexOf("<h1")), /두 사주에서 읽힌 커플 유형과 궁합 지수/);
+  assert.match(page, /title: "간단 궁합 · 우리 둘은 어떤 사이일까\?/);
+});
+
+test("결과 화면: 커플 유형 이름은 연인 · 결혼준비중 · 결혼함에서만 제목으로 쓰고 그 밖에는 사이의 제목을 쓴다 · 사이에 맞는 풀이 구역이 있다", () => {
+  const r = code(result);
+  assert.match(r, /showType/);
+  assert.match(r, /rel\.heading/);
+  assert.match(r, /data-relation-frame/);
+  for (const label of ["잘 맞는 부분", "부딪히기 쉬운 부분", "서로 이해할 점", "지금 해 볼 행동"]) assert.ok(result.includes(label), label);
+  // 우리 커플 핵심 상자는 유형을 보이는 사이에서만
+  assert.match(r, /\{showType && \(/);
+  const v = code(reportView);
+  assert.match(v, /showsCoupleType/);
+  assert.match(v, /\{showType && \(/);
+});
+
+test("개인정보 안내가 실제 동작과 같다 — 서버에는 저장하지 않고, 새로고침용으로 이 브라우저 탭에만 1시간 두며, 탭을 닫거나 입력 지우기로 지워진다 · 이름 · 생년월일 · 성별은 AI에 보내지 않는다", () => {
+  const f = compatForm.replace(/\s+/g, " ");
+  // 계산을 위한 서버 전달 · 서버 비저장 · 탭 임시 보관(1시간)과 지우는 때를 서로 모순 없이 따로 말한다
+  assert.match(f, /입력한 정보는 궁합 계산을 위해 서버에 전달되지만 서버에는 저장하지 않아요/);
+  assert.match(f, /새로고침해도 이어 쓸 수 있도록 이 브라우저 탭에 1시간 동안 임시 보관해요/);
+  assert.match(f, /탭을 닫거나 \[입력 지우기\]를 누르면 지워져요/);
+  assert.doesNotMatch(f, /서버에서 쓰고|서버로 보내지 않아요/, "무료 간단 궁합 안내에 서로 모순으로 읽히는 옛 문구가 없다");
+  // 유료 입력 안내(구매 폼)는 이 무료 안내와 섞지 않는다 — 상대 정보 보관은 구매 폼에만 있다
+  assert.doesNotMatch(f, /결제|리포트가 완성되면/);
+  const b = buyForm.replace(/\s+/g, " ");
+  assert.match(b, /이름 · 생년월일 · 성별은 AI에 보내지 않고, 사이는 풀이의 관점을 정하는 지침으로만 전달해요/);
+  assert.match(b, /결제 화면으로 넘어가거나 \[입력 지우기\]를 누르면 지워져요/);
+  assert.match(b, /리포트가 완성되면 지워요/);
+  // 임시 보관은 sessionStorage뿐이다(localStorage · 쿠키 · 서버 저장 없음)
+  for (const src of [compatForm, buyForm]) {
+    assert.match(code(src), /sessionStorage/);
+    assert.doesNotMatch(code(src), /localStorage|document\.cookie/);
+  }
+  // 결제 화면으로 넘어갈 때(redirect) 임시 보관을 지운다
+  assert.match(code(buyForm), /NEXT_REDIRECT"\)\) \{\s*clearDraft\(\);\s*throw err;/);
+  // 입력 지우기 단추가 있다
+  for (const src of [compatForm, buyForm]) assert.match(code(src), /입력 지우기/);
+});
+
+test("공개 개인정보 처리방침에 궁합 입력 정보의 사실이 있다 — 수집 항목(사이) · 탭 임시 보관 1시간과 지우는 때 · AI 전달 범위(사이 + 고정 지침, 이름 · 생년월일 원문 · 성별 값 제외) · AI 현재 미연결 · 보관 기간 · 위탁 업체 · 약관 버전은 그대로", () => {
+  const p = read("app/privacy/page.tsx").replace(/\s+/g, " ");
+  assert.match(p, /궁합: 이름\(호칭으로만 사용\).*두 사람의 사이\(연인·결혼준비중·썸타는중·결혼함·친구·기타 중 직접 선택/);
+  assert.match(p, /3-2\. 궁합 입력 정보/);
+  // 무료 간단 궁합: 전달 · 비저장 · 탭 1시간 · 지우는 때 (화면 안내와 같은 사실)
+  assert.match(p, /궁합을 계산하기 위해 서버에 전달되지만 서버에는 저장하지 않습니다/);
+  assert.match(p, /브라우저 탭\(sessionStorage\)에 1시간 동안 임시 보관하며, 탭을 닫거나 ‘입력 지우기’ 또는 ‘다른 두 사람으로 다시 보기’를 누르면 지웁니다/);
+  assert.match(p, /1시간이 지난 것은 다시 열 때 버립니다/);
+  // 유료: 보관과 지우는 때
+  assert.match(p, /리포트가 완성되거나 결제가 취소·환불·만료로 닫히거나 회원이 탈퇴하면 지웁니다/);
+  assert.match(p, /리포트 궁합의 보관 기간은 4번과 같이 출시 전 확정합니다/);
+  // AI 전달 범위 · 현재 미연결
+  assert.match(p, /선택한 사이의 이름표와 읽는 법을 알려 주는 고정 지침이 AI 서비스에 전달됩니다/);
+  assert.match(p, /이름·생년월일 원문과 성별 값은 전달하지 않으며/);
+  assert.match(p, /현재 이 AI 풀이는 연결하지 않은 상태이고, 연결하면 위 범위로 전달합니다/);
+  // 사실 설명이 코드와 어긋나지 않는다: 임시 보관은 sessionStorage뿐
+  assert.doesNotMatch(code(compatForm), /localStorage|document\.cookie/);
+  // 이번에 바꾸지 않은 것: 기존 보관 문구 · 위탁 업체 목록 · 약관 버전(동의 항목)
+  assert.match(p, /회원 탈퇴 시까지 보관합니다\. 다만 관련 법령에 따라 거래 기록 등은 정해진 기간 동안 보관합니다\. 항목별 기간은 출시 전 확정합니다\./);
+  assert.match(p, /Supabase — 회원 인증과 데이터 저장/);
+  assert.match(p, /Anthropic — 자유 질문에 답하는 AI \(질문 글과 그 방의 풀이 글만 전달, 이름 · 생년월일 제외/);
+  assert.match(read("lib/membership/terms.ts"), /TERMS_VERSION = "2026-10-draft-1"/);
+});

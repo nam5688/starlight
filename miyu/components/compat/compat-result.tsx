@@ -13,6 +13,9 @@ import { shareTextOf, type SimpleCompatCard } from "@/lib/compat/simple";
  * 총점은 확률이 아니라 재미 · 참고용 지수라는 안내와 계산 재료를 함께 보이고, 사주 궁합 · 리포트 궁합은 아직 열리지 않아 "준비 중"으로만 안내한다(가격 · 이용 범위는 정해지면 안내).
  */
 export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onReset: () => void }) {
+  const rel = card.relation;
+  const showType = !rel || rel.showType;
+  const heading = rel ? rel.heading : card.typeName;
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const [imageState, setImageState] = useState<"idle" | "busy" | "saved" | "failed">("idle");
 
@@ -23,7 +26,7 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
       const blob = await renderCompatCardPng(card);
       const file = new File([blob], "miyu-compat-card.png", { type: "image/png" });
       if (typeof navigator !== "undefined" && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${card.typeName} · 미유 궁합` });
+        await navigator.share({ files: [file], title: `${heading} · 미유 궁합` });
         setImageState("idle");
         return;
       }
@@ -47,7 +50,7 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
     const url = typeof window !== "undefined" ? `${window.location.origin}/compat` : "";
     try {
       if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-        await navigator.share({ title: `${card.typeName} · 미유 궁합`, text, url });
+        await navigator.share({ title: `${heading} · 미유 궁합`, text, url });
         return;
       }
       await navigator.clipboard.writeText(`${text}\n${url}`);
@@ -66,10 +69,11 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
         <p className="text-[14px] font-medium text-ink-3">
           {card.names.a} × {card.names.b}
         </p>
-        <h2 id="compat-result-title" className="mt-2 text-[28px] leading-tight font-bold tracking-tight text-accent-strong md:text-[34px]">
-          {card.typeName}
+        {rel && <p className="mx-auto mt-2 w-fit rounded-full bg-accent-soft px-3 py-1 text-[13px] font-semibold text-accent-strong">{rel.label} 사이로 읽었어요</p>}
+        <h2 id="compat-result-title" className="mt-2 text-[28px] leading-tight font-bold tracking-tight break-keep text-accent-strong md:text-[34px]">
+          {heading}
         </h2>
-        <p className="mx-auto mt-3 max-w-[30rem] text-[17px] leading-[1.65] text-ink">{card.typeLine}</p>
+        <p className="mx-auto mt-3 max-w-[30rem] text-[17px] leading-[1.65] text-ink">{showType ? card.typeLine : rel!.frame.lens}</p>
 
         <div className="mt-6 border-t border-line pt-6">
           <p className="text-[13px] font-semibold text-ink-3">궁합 지수</p>
@@ -80,10 +84,12 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
           <p className="mx-auto mt-2 max-w-[30rem] text-[13px] leading-[1.7] text-ink-3">{card.notes.scoreNotProbability}</p>
         </div>
 
-        <p className="mx-auto mt-6 max-w-[30rem] rounded-xl bg-accent-soft px-4 py-3 text-[15px] leading-[1.65] font-semibold text-accent-strong">
-          <span className="block text-[13px] font-semibold text-accent">우리 커플 핵심</span>
-          {card.core}
-        </p>
+        {showType && (
+          <p className="mx-auto mt-6 max-w-[30rem] rounded-xl bg-accent-soft px-4 py-3 text-[15px] leading-[1.65] font-semibold text-accent-strong">
+            <span className="block text-[13px] font-semibold text-accent">우리 커플 핵심</span>
+            {card.core}
+          </p>
+        )}
 
         <div className="mt-6 flex flex-col items-center gap-2">
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -103,10 +109,45 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
                   ? "공유할 글을 복사했어요. 붙여넣어 보내 주세요."
                   : shareState === "failed"
                     ? "공유하지 못했어요. 화면을 캡처해서 보내 주세요."
-                    : "이름 · 커플 유형 · 지수만 담겨요. 생년월일은 담기지 않아요."}
+                    : showType ? "이름 · 커플 유형 · 지수만 담겨요. 생년월일은 담기지 않아요." : "이름 · 사이 · 지수만 담겨요. 생년월일은 담기지 않아요."}
           </p>
         </div>
       </div>
+
+      {rel && (
+        <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6" data-relation-frame={rel.id}>
+          <h3 className="text-[17px] font-bold">{rel.frame.title}</h3>
+          <p className="mt-3 text-[15px] leading-[1.75] text-ink-2">{rel.frame.lens}</p>
+          <dl className="mt-4 space-y-4 text-[15px] leading-[1.75]">
+            <div>
+              <dt className="text-[13px] font-semibold text-positive">잘 맞는 부분</dt>
+              <dd className="mt-1 text-ink-2">{rel.frame.fit}</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] font-semibold text-caution">부딪히기 쉬운 부분</dt>
+              <dd className="mt-1 text-ink-2">{rel.frame.friction}</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] font-semibold text-ink-3">서로 이해할 점</dt>
+              <dd className="mt-1 text-ink-2">{rel.frame.understand}</dd>
+            </div>
+            <div>
+              <dt className="text-[13px] font-semibold text-accent">지금 해 볼 행동</dt>
+              <dd className="mt-1">
+                <ul className="list-disc space-y-1.5 pl-5 text-ink-2">
+                  {rel.frame.doNow.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 flex gap-2 text-[13px] leading-[1.7] text-ink-3">
+            <InfoIcon className="mt-1 size-4 shrink-0" />
+            <span>{rel.frame.note}</span>
+          </p>
+        </div>
+      )}
 
       <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
         <h3 className="text-[17px] font-bold">두 사주에서 읽힌 점</h3>

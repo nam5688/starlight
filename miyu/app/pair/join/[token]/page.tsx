@@ -82,7 +82,7 @@ async function Content({ params }: Pick<PageProps<"/pair/join/[token]">, "params
       <p className="text-[15px] leading-[1.75] text-ink-2">두 사람이 각자 분석 결과를 연결하는 데 동의하면, 같은 영역에서 서로 어떻게 다른지 · 어떻게 맞춰 갈지를 읽어 드려요. 동의는 언제든 철회할 수 있어요.</p>
       <PairConsentBox />
       {peek.myAssessment ? (
-        <PairJoinForm token={token} myName={peek.myAssessment.nickname} />
+        <PairJoinForm token={token} myName={peek.myAssessment.nickname} relationship={peek.relationship} savedGender={peek.myAssessment.savedGender} />
       ) : (
         <div className="space-y-3">
           <p className="text-[15px] leading-[1.75] text-ink-2">연결하려면 내 분석 결과가 필요해요. 무료 분석을 마친 뒤 이 링크를 다시 열어 주세요.</p>

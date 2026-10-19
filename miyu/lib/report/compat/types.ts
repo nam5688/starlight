@@ -1,4 +1,5 @@
 // 사주 궁합 리포트의 타입 — AI가 쓰는 초안(CompatDraftV1)과, 코드가 같은 엔진 결과로 채워 저장하는 리포트(CompatReport).
+import type { CompatRelationship } from "../../compat/relationship.ts";
 import type { CompatSectionId, CompatStepGroupId } from "./plan.ts";
 
 /** 서로에게 해 볼 행동 하나 — say는 건넬 짧은 말 한 문장(상대의 반응 · 속마음은 쓰지 않는다) */
@@ -22,6 +23,8 @@ export type CompatReport = {
   ruleVersion: string;
   promptVersion: string;
   names: { a: string; b: string };
+  /** 구매자가 알려 준 두 사람의 사이 — 읽는 관점 · 표현에만 쓰였다. 이 기능 이전에 만든 글에는 없다(없으면 중립으로 읽고 특정 관계로 채우지 않는다) */
+  relationship?: CompatRelationship;
   /** 코드가 간단 궁합과 같은 결과에서 채운 요약 — AI가 쓰지 않는다 */
   summary: {
     typeName: string;
@@ -54,6 +57,8 @@ export const isCompatReport = (c: { kind?: string } | object | null | undefined)
  */
 export type PairReport = Omit<CompatReport, "kind" | "names" | "notes"> & {
   kind: "compat-pair-v1";
+  /** 초대한 사람이 알려 준 두 사람의 사이 — 이 기능 이전에 만든 글에는 없다 */
+  relationship?: CompatRelationship;
   /** 두 사람이 모두 뚜렷하게 답해 비교한 영역의 이름(예: "관계 불안") · 한쪽만 뚜렷해 비교하지 않은 영역 수 */
   response: { comparedLabels: string[]; skipped: number };
   notes: { cautions: string[]; items: string[]; page: string };
