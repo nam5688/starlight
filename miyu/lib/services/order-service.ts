@@ -273,7 +273,8 @@ export async function confirmPayment(
     if (applied.kind === "updated") {
       return { kind: "rejected", code: `PAYMENT_${result.payment.status}`, message: "결제가 완료되지 않았어요.", order: applied.order };
     }
-    return { kind: "rejected", code: applied.code, message: applied.message, order: applied.order };
+    // 바뀐 것이 없다는 응답(NO_CHANGE — 예: 결제사가 아직 승인 전 상태를 돌려줌)은 문구가 비어 있다 — 빈 오류 화면이 되지 않게 안내를 채운다(주문은 대기로 남고 재확인이 결제사 기록으로 맞춘다)
+    return { kind: "rejected", code: applied.code, message: applied.message || "결제가 완료되지 않았어요. 카드에서 금액이 빠져나가지 않았다면 다시 결제해 주세요.", order: applied.order };
   }
 
   await repo.addPaymentEvent({ orderId: order.id, source: "confirm", status: result.code, detail: { retryable: result.retryable } });
