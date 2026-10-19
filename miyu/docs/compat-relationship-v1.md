@@ -67,7 +67,7 @@
 
 보관: 사주 궁합의 사이 · 상대 성별은 상대 입력(`compat_requests.partner`, 서버만 읽는 표)에 함께 보관되고 **리포트 완성 · 환불 · 포기 · 탈퇴 때 상대 입력과 함께 지워진다**(DB 변경 없음 — 기존 jsonb). 완성된 글에는 사이(관점)만 남고 상대 생년월일 · 성별 값은 없다(시험). 리포트 궁합의 사이는 쌍(`pairs.relationship`)에 남는다 — 쌍 표에는 이름 · 생년월일 · 성별이 없다.
 
-## 5. DB — migration 26 (파일만 준비 · 어떤 외부 DB에도 적용하지 않았다)
+## 5. DB — migration 26 (파일 · 로컬 임시 DB 검증 · **외부 테스트 DB에는 운영자가 23 → 24 → 26만 적용함, 2026-10-19 — 아래 5-2**)
 
 `supabase/migrations/20261105000000_pair_relationship.sql`
 
@@ -93,7 +93,7 @@ alter table public.pairs
 
 실제 PostgREST로 확인(로컬 임시 DB, 적용 전): 없는 열 insert → `PGRST204 / 400 "Could not find the 'relationship' column"` → 저장소 `createPair`가 `42P01`("DB 변경 26번 필요")을 던짐 · 읽기 정상 · 쌍 행 불변.
 
-### 5-1. 외부 DB에 26번을 넣기 전의 선행 조건 (2026-10-19 · 읽기 전용 정리 — 외부 DB는 건드리지 않았다)
+### 5-1. 외부 DB에 26번을 넣기 전의 선행 조건 (2026-10-19 · 읽기 전용 정리 — 이 정리 시점에는 외부 DB를 건드리지 않았다; 이후 적용 결과는 5-2)
 
 Windows 방의 읽기 전용 사전점검에서 외부 Supabase(`wdvrwwajakjdfrajgxcm`, 사용자가 "미유 테스트 전용"으로 확정)의 OpenAPI에 public 표 22개만 보이고 `pairs`가 없었다. **26번은 `pairs`(24번이 만든다)에 열을 더하는 파일이라 `pairs`가 없으면 단독 적용할 수 없다 — 단독 적용 전제는 맞지 않는다.** 아래는 이 저장소의 마이그레이션 파일을 읽어 센 값이다.
 
@@ -128,6 +128,13 @@ Windows 방의 읽기 전용 사전점검에서 외부 Supabase(`wdvrwwajakjdfra
 - **순서**: 마이그레이션은 번호 순서로 "아직 안 함"인 것만 적용한다(이미 적용한 파일을 다시 실행하지 않는다). `apply-staging-all.sql`은 **표가 하나도 없는 새 프로젝트 전용**이라 표가 있는 DB에서는 멈춘다 — 부분 적용 DB에는 쓰지 않는다. `apply-4-to-10.sql`은 4~10번 묶음이다.
 - **26번만 보고 "pairs가 없어서 26번을 건너뛴다"고 하지 않는다**: 26번이 필요해지는 것은 리포트 궁합 쌍이 생기는 24번 이후뿐이고, 24번의 선행은 1번(profiles · assessments · orders) · 10번(탈퇴 함수와 연결되는 프로필 트리거) 등 앞 번호 전부다. 19~22번(혜택)은 스위치가 꺼진 채 시작하지만 **20번의 orders 제약 완화는 별도 승인 항목**이고, 23번(사주 궁합)은 24번의 선행은 아니지만 같은 번호 순서에 있다.
 - 이 정리는 **외부 DB 적용 승인이 아니다.** 적용 전 순서: `check-migrations.sql` 결과 확인 → 적용 범위(몇 번부터 몇 번까지)와 20번 제약 완화 승인 → 번호 순서대로 적용 → 다시 `check-migrations.sql`.
+
+### 5-2. 외부 테스트 DB 적용 결과 (운영자 · root 보고, 2026-10-19 — 개발 세션은 외부 DB에 접속하지 않았다)
+
+- **적용**: Supabase `wdvrwwajakjdfrajgxcm`("미유 테스트 전용"으로 확정)에 SQL Editor에서 **23 → 24 → 26번만** 가드 포함 단일 트랜잭션으로 1회 실행, `Success. No rows returned`. 실제 `pairs`가 없다는 것은 `SELECT to_regclass('public.pairs')::text`가 NULL이고 public 표가 22개(모두 RLS true)라는 것으로 먼저 확인했다(OpenAPI에 안 보인 것만으로 단정하지 않았다). **19 ~ 22번 · 25번은 적용하지 않았다.**
+- **사후 검증(SELECT)**: public 표 22 → **24개**, 모두 RLS true · `pairs` / `compat_requests` 존재, 각각 **RLS true · 정책 0 · 행 0** · `relationship`은 nullable text + `lover / engaged / some / married / friend / other` CHECK · 새 인덱스 4개 · `profiles`의 트리거 2개 · 새 함수 6개 모두 `security definer` + `search_path=""` + **anon / authenticated 실행 권한 false**.
+- **그대로 적는 권한 사실**: `service_role`의 실행 권한은 트리거 함수까지 6개 모두 true(호스팅 기본 권한 영향), 새 표 두 개의 anon / authenticated **표 SELECT 권한도 true**로 나온다 — RLS가 켜져 있고 정책이 0이라 **행 접근은 막힌 상태**다. **기존 DB 권한은 임의로 바꾸지 않았다**(바꾸려면 운영자 승인).
+- 기존 데이터에 UPDATE / DELETE 없음 · 새 QA 행 없음. **외부 DB에서 통합 QA · 결제 · AI는 실행하지 않았다** — "외부 DB 적용은 완료, 외부 통합 QA는 미실행"이다. 로컬에서는 같은 구성(1~18 + 23 + 24 + 26)의 임시 DB로 SQL 적용 오류 0 · DB 시험 17/17 · 관계 흐름 6/6 · 리포트 궁합 전 과정 6/6 · 사주 궁합 4/4를 확인했다(`launch-qa-evidence-2026-10-19.md` 5-1).
 
 ## 6. 기존 데이터 호환
 
@@ -174,9 +181,9 @@ Windows 방의 읽기 전용 사전점검에서 외부 Supabase(`wdvrwwajakjdfra
 2. 법률 검토(처리방침 3-2는 사실만 적은 상태): 사이 값의 AI 전달(4장) · 브라우저 임시 보관 · 신규 수집 항목에 대한 재동의 필요 여부(`TERMS_VERSION`을 올리지 않았다).
 3. 초대받은 사람의 사이 확인 방식(2장 마지막).
 4. 무료 간단 궁합에서 성별 입력이 결과에 보이는 효과가 없다는 점.
-5. migration 26의 외부 DB 적용 시점(승인 전 미적용).
+5. ~~migration 26의 외부 DB 적용 시점~~ → 외부 **테스트** DB에는 23 → 24 → 26이 적용됐다(5-2). 19 ~ 22번 · 25번 적용과 20번 제약 완화, 새 표의 anon / authenticated SELECT 권한 정리는 승인 항목으로 남는다. 운영 DB 적용은 별도 승인.
 6. 실제 AI로 사이별 글 품질 확인(별도 승인 · 운영자 PC) — 승인 6/6 · 궁합 2종 상한은 이번에 건드리지 않았다.
 
 ## 10. 하지 않은 것
 
-실제 AI 호출 · 외부 Supabase 적용 · Vercel 설정 변경 · 실결제 · 승인 상한 변경 · 실제 기기 검사. 외부 설정(Vercel AI provider 비움 · 재배포 · Standard Protection)은 운영자가 직접 했고 기록은 `miutest-ai-guard-v1.md` 8장.
+실제 AI 호출 · (개발 세션의) 외부 Supabase 접속 · Vercel 설정 변경 · 실결제 · 승인 상한 변경 · 실제 기기 검사. (외부 테스트 DB 적용은 운영자 · root가 직접 했고 5-2에 결과를 옮겨 적었다.) 외부 설정(Vercel AI provider 비움 · 재배포 · Standard Protection)은 운영자가 직접 했고 기록은 `miutest-ai-guard-v1.md` 8장.
