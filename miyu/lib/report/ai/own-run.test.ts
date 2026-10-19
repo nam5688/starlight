@@ -80,6 +80,30 @@ test("AI 요청: 이름 · 생년월일 · 지역은 가지 않고, 입력 확�
   assert.ok(d.evidence.some((e) => e.source === "saju") && d.evidence.some((e) => e.source === "survey") && d.evidence.some((e) => e.source === "self"));
 });
 
+test("입력 확인 글 1절은 실제 요청 내용과 일치한다 — 응답 환산값 숫자 · MBTI는 근거 문장 안에서 가고, '가지 않는 것'에는 점수 숫자를 적지 않는다(2026-10-19 정정)", async () => {
+  const built = await ownReportInput(CAPTURE, NOW);
+  assert.ok(built.ok);
+  if (!built.ok) return;
+  for (const variant of ["story-v1", "story-7"] as const) {
+    const d = describeOwnInput({ input: built.input, capture: CAPTURE, now: NOW, variant });
+    const [system, user] = promptsFor(variant, d.evidence, referenceFor(NOW).iso, built.input.context);
+    const section1 = d.markdown.slice(d.markdown.indexOf("## 1."), d.markdown.indexOf("## 2."));
+    const notSent = section1.split("\n").find((l) => l.startsWith("- **가지 않는 것**")) ?? "";
+    // 실제 요청: 설문 근거의 사실 줄에 응답 환산값 숫자가 들어 있다
+    const surveyFacts = d.evidence.filter((e) => e.source === "survey" && /응답 환산값/.test(e.fact));
+    assert.ok(surveyFacts.length > 0, "시험 입력에 응답 환산값이 들어간 설문 근거가 있어야 이 시험이 의미가 있다");
+    for (const e of surveyFacts) assert.ok(user.includes(e.fact.split(" (")[0]), `요청에 설문 근거의 사실 줄이 그대로 들어 있다: ${e.id}`);
+    assert.ok(!system.includes("응답 환산값"), "숫자는 지시문이 아니라 근거 문장으로만 간다");
+    // 1절 문구: 가는 것에 환산값 숫자 · MBTI가 적혀 있고, 가지 않는 것에는 점수 숫자를 가지 않는다고 적지 않는다
+    assert.match(section1, /응답 환산값 숫자/);
+    assert.match(section1, /MBTI/);
+    assert.ok(!/점수 숫자\./.test(notSent) && !/· 점수 숫자/.test(notSent), `가지 않는 것에 점수 숫자를 적었다: ${notSent}`);
+    assert.match(notSent, /닉네임 · 생년월일 원문 · 지역 · 22개 문항의 문장과 고른 선택지/);
+    // 이름 · 생년월일 · 지역은 여전히 요청에 없다
+    for (const secret of ["시험닉네임", "1994", "연수구", "인천", "08:40"]) assert.ok(!system.includes(secret) && !user.includes(secret), `요청에 "${secret}"이 들어 있다`);
+  }
+});
+
 test("승인 범위: story-own은 본인 입력 한 건 · story-v1 · 후보 A · 이미 쓴 금액 필수 · 호출 최대 1회의 최악(상한 이내)이며, P01 재시험은 막힌다", async () => {
   const own = COMPARE_STAGES.find((s) => s.name === "story-own")!;
   const p01 = COMPARE_STAGES.find((s) => s.name === "story-p01")!;
