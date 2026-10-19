@@ -148,7 +148,7 @@ export function ReportRow({ card, paymentsReady, deleteAvailable = false }: { ca
       )}
       {deleteAvailable && (
         <div className="mt-3 border-t border-line pt-1">
-          <DeleteRecordButton assessmentId={card.assessmentId} label={`${card.productName}, ${card.subject}`} />
+          <DeleteRecordButton assessmentId={card.assessmentId} productName={card.productName} subject={card.subject} created={formatDate(card.createdAt)} />
         </div>
       )}
     </li>

@@ -54,11 +54,17 @@ test("지우는 버튼은 확인창 안의 '삭제하기'로만 서버 액션을
   const dialog = src.slice(src.indexOf("<dialog"), src.indexOf("</dialog>"));
   assert.match(dialog, /deleteReportRecordAction\.bind\(null, assessmentId\)/);
   assert.match(dialog, /aria-labelledby=\{titleId\}/);
-  assert.match(dialog, /aria-describedby=\{bodyId\}/);
   const opener = src.slice(src.indexOf("data-testid=\"delete-record-open\"") - 400, src.indexOf("data-testid=\"delete-record-open\""));
   assert.match(opener, /type="button"/, "열기 버튼은 보내지 않는다");
   assert.match(opener, /showModal\(\)/);
   assert.match(opener, /min-h-11/);
+  // 어느 카드인지 확인창 맨 위에 다시 보인다: 리포트명 · 표시 이름(분석 대상) · 생성일 (영구 삭제라 다른 카드와 착각하지 않게)
+  const target = dialog.slice(dialog.indexOf('data-testid="delete-record-target"'), dialog.indexOf("<div id={bodyId}>"));
+  assert.ok(dialog.indexOf('data-testid="delete-record-target"') < dialog.indexOf("<div id={bodyId}>"), "대상 표시가 안내 문구보다 위");
+  for (const part of ["{productName}", "{subject}", "{created}", "DELETE_RECORD_COPY.targetTitle", "DELETE_RECORD_COPY.createdPrefix"]) assert.ok(target.includes(part), `확인창 대상 표시에 ${part}`);
+  assert.match(dialog, /aria-describedby=\{`\$\{targetId\} \$\{bodyId\}`\}/, "보조기기도 대상을 먼저 읽는다");
+  const rows = read("components/my/report-rows.tsx");
+  assert.match(rows, /<DeleteRecordButton assessmentId=\{card\.assessmentId\} productName=\{card\.productName\} subject=\{card\.subject\} created=\{formatDate\(card\.createdAt\)\} \/>/, "카드가 보여 주는 값 그대로 넘긴다");
   // 취소 · 삭제하기: 같은 크기(48px) · 보내는 중에는 둘 다 잠긴다(두 번 눌러도 한 번)
   assert.match(src, /useFormStatus/);
   const buttons = src.slice(src.indexOf("function Buttons"), src.indexOf("export function DeleteRecordButton"));

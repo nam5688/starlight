@@ -8,6 +8,9 @@ import { deleteReportRecordAction } from "@/app/my/actions";
 export const DELETE_RECORD_COPY = {
   button: "기록 삭제",
   title: "이 기록을 삭제할까요?",
+  /** 어느 카드를 지우는지 — 확인창 맨 위에 카드에 이미 보이는 리포트명 · 이름 · 생성일을 다시 보인다 */
+  targetTitle: "삭제할 기록",
+  createdPrefix: "생성일",
   lead: "삭제하면 되돌릴 수 없어요.",
   removedTitle: "삭제되는 것",
   removed: [
@@ -60,9 +63,10 @@ function Buttons({ onCancel }: { onCancel: () => void }) {
  * 리포트 카드의 "기록 삭제" — 버튼을 누르면 확인창이 열리고, 확인창의 "삭제하기"를 눌러야 지워진다. 취소 · Esc · 바깥 누르기는 아무것도 지우지 않는다.
  * 네이티브 `<dialog>`라 열려 있는 동안 뒤쪽 화면은 초점과 읽기에서 빠지고 닫으면 눌렀던 버튼으로 초점이 돌아온다. 삭제 중에는 두 버튼이 잠겨 두 번 눌러도 한 번만 보낸다(서버도 한 번만 지운다).
  */
-export function DeleteRecordButton({ assessmentId, label }: { assessmentId: string; /** 보조기기가 읽는 이름 — 어느 기록인지 */ label: string }) {
+export function DeleteRecordButton({ assessmentId, productName, subject, created }: { assessmentId: string; /** 카드의 리포트명 (예: 심층 리포트) */ productName: string; /** 카드의 표시 이름 · 분석 대상 (예: 지민 님 · 1995. 4. 12.) */ subject: string; /** 카드의 생성일 (이미 화면에 보이는 값) */ created: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  const targetId = useId();
   const bodyId = useId();
   const close = () => ref.current?.close();
   return (
@@ -71,7 +75,7 @@ export function DeleteRecordButton({ assessmentId, label }: { assessmentId: stri
         type="button"
         onClick={() => ref.current?.showModal()}
         aria-haspopup="dialog"
-        aria-label={`${label}, ${DELETE_RECORD_COPY.button}`}
+        aria-label={`${productName}, ${subject}, ${DELETE_RECORD_COPY.button}`}
         className="inline-flex min-h-11 items-center rounded-lg px-1 text-[14px] font-semibold text-caution underline underline-offset-2 hover:text-ink"
         data-testid="delete-record-open"
       >
@@ -80,7 +84,7 @@ export function DeleteRecordButton({ assessmentId, label }: { assessmentId: stri
       <dialog
         ref={ref}
         aria-labelledby={titleId}
-        aria-describedby={bodyId}
+        aria-describedby={`${targetId} ${bodyId}`}
         data-testid="delete-record-dialog"
         onClick={(e) => {
           if (e.target === e.currentTarget) close();
@@ -91,8 +95,18 @@ export function DeleteRecordButton({ assessmentId, label }: { assessmentId: stri
           <h2 id={titleId} className="text-[20px] leading-snug font-bold">
             {DELETE_RECORD_COPY.title}
           </h2>
+          <div id={targetId} data-testid="delete-record-target" className="mt-3 rounded-xl bg-mist px-3.5 py-3">
+            <p className="text-[13px] font-semibold text-ink-3">{DELETE_RECORD_COPY.targetTitle}</p>
+            <p className="mt-0.5 text-[16px] leading-snug font-bold break-words">{productName}</p>
+            <p className="mt-0.5 text-[14px] leading-[1.6] break-words text-ink-2">{subject}</p>
+            {created && (
+              <p className="mt-0.5 text-[13px] leading-[1.6] text-ink-3">
+                {DELETE_RECORD_COPY.createdPrefix} {created}
+              </p>
+            )}
+          </div>
           <div id={bodyId}>
-            <p className="mt-1.5 text-[15px] leading-[1.65] font-semibold text-caution">{DELETE_RECORD_COPY.lead}</p>
+            <p className="mt-3 text-[15px] leading-[1.65] font-semibold text-caution">{DELETE_RECORD_COPY.lead}</p>
             <h3 className="mt-4 text-[14px] font-bold text-ink-2">{DELETE_RECORD_COPY.removedTitle}</h3>
             <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[14px] leading-[1.6] text-ink-2">
               {DELETE_RECORD_COPY.removed.map((t) => (
