@@ -3,6 +3,7 @@
 // 자유 질문 · "내 경우는 달라"에 AI가 답하는 기능은 아직 없다(2단계, 운영자 결정 뒤) — 화면에서 "준비 중"으로 밝힌다.
 // 이 파일은 채널 독립 코드다(React · Next · 브라우저 API를 쓰지 않는다). 화면은 components/talk/ 에 있다.
 import { tendencyPhrase } from "../../assessment/dev-rules.ts";
+import { isHourUnknown, softenMonths } from "./hour-text.ts";
 import { CHAT_ROOMS, formatKrw, QUESTION_PACK_SIZE, REPORT_TIER_NAMES } from "../../config/product.ts";
 import type { SajuResult } from "../../saju/engine.ts";
 import { periodPlain } from "../../saju/interpret/period-plain.ts";
@@ -34,7 +35,7 @@ export type TalkTopic = {
   traits?: { name: string; shinesShort: string; burdenShort: string }[];
   caveat?: string;
   /** 지금 나의 시기 그림 — 제목 · 생활 의미는 카드가 계산된 그룹에서 쉬운 말로 보이고, 예시는 이어지는 말풍선(periodExample)으로 보낸다 */
-  timeline?: { slots: LuckSlot[]; reference: { year: number; month: number } };
+  timeline?: { slots: LuckSlot[]; reference: { year: number; month: number }; /** 출생 시각을 모르면 연도 무렵으로만 보인다 */ hourUnknown?: boolean };
   /** 지금 나의 시기의 예시 한 줄 — 계산된 현재 시기의 그룹을 쉬운 말로 옮긴 고정 문구(period-plain.ts) */
   periodExample?: string;
   /** [예를 들어줘] — 비어 있으면 버튼을 보이지 않는다 */
@@ -132,7 +133,7 @@ export type TalkBubble =
   | { kind: "answer"; number: number; title: string; headline: string; paragraphs: string[] }
   | { kind: "text"; text: string; label?: string; muted?: boolean }
   | { kind: "traits"; traits: { name: string; shinesShort: string; burdenShort: string }[] }
-  | { kind: "timeline"; slots: LuckSlot[]; reference: { year: number; month: number } }
+  | { kind: "timeline"; slots: LuckSlot[]; reference: { year: number; month: number }; hourUnknown?: boolean }
   | { kind: "flow"; when: string; steps: { label: string; text: string }[]; helpful: string }
   | { kind: "comfort"; comfortable: string[]; clash: string[]; note: string }
   | { kind: "basis"; basis: ReadingBasis }
@@ -296,7 +297,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: TalkModelO
     headline: f.headline,
     summary: [f.summary],
     caveat: f.caveat,
-    timeline: { slots: report.timeline, reference: report.timelineReference },
+    timeline: { slots: report.timeline, reference: report.timelineReference, ...(isHourUnknown(report) ? { hourUnknown: true } : {}) },
     ...(current ? { periodExample: periodPlain(current.stemGroup, current.branchGroup).example } : {}),
     example: [note(f.scenarioNote), ...f.scenarios.map((s) => para(s.then, s.when))],
     detail: [...(f.paragraphs ?? []).map((t) => para(t)), ...f.years.map((y) => para(y.theme, y.year)), ...f.periods.flatMap((p) => [para(p.theme, p.period), para(p.watch, `${p.period} · 살펴볼 점`)]), note(f.statistics)],
@@ -324,7 +325,7 @@ export function buildTalkModel(report: IntegratedReadingReport, opts: TalkModelO
 
   const cardOf = (kind: "strength" | "caution" | "flow") => {
     const c = report.summary.find((s) => s.kind === kind);
-    return { label: c?.label ?? "", keyword: c?.keyword ?? "", note: c?.note ?? "", ...(c?.foot ? { foot: c.foot } : {}) };
+    return { label: c?.label ?? "", keyword: c?.keyword ?? "", note: c?.note ?? "", ...(c?.foot ? { foot: isHourUnknown(report) ? softenMonths(c.foot) : c.foot } : {}) };
   };
   const inputs = report.inputs.filter((i) => i.status !== "none").map((i) => `${i.name.replace(/\(.*\)/, "").trim()}${i.status === "dev" ? " (개발용 문항)" : ""}`);
 
@@ -398,7 +399,7 @@ export function askFor(topicId: string, name: string): string {
 export function answerBubbles(t: TalkTopic, name = "", pick?: string): TalkBubble[] {
   const out: TalkBubble[] = [{ kind: "answer", number: t.number, title: t.title, headline: t.headline, paragraphs: t.summary }];
   if (t.traits) out.push({ kind: "traits", traits: t.traits });
-  if (t.timeline) out.push({ kind: "timeline", slots: t.timeline.slots, reference: t.timeline.reference });
+  if (t.timeline) out.push({ kind: "timeline", slots: t.timeline.slots, reference: t.timeline.reference, ...(t.timeline.hourUnknown ? { hourUnknown: true } : {}) });
   if (t.periodExample) out.push({ kind: "text", text: t.periodExample });
   const picked = pick ? t.picks?.[pick] : undefined;
   if (picked) out.push(...picked);

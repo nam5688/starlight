@@ -185,7 +185,7 @@ try {
 }
 writeFileSync(join(dir, "recheck.md"), out.join("\n") + "\n\n" + metrics);
 try {
-  writeFileSync(join(dir, "readable-rechecked.md"), `> 이 글은 AI가 쓴 원문(${roundFile})에서 닫는 괄호${closedBrackets > 0 ? ` ${closedBrackets}개` : ""}를 보충하고 조언 행동의 위치만 바로잡아 읽는 순서로 풀어 쓴 것입니다. 문장은 한 글자도 바꾸지 않았고, 생성기가 저장한 리포트가 아닙니다(유료 판매 합격도 아닙니다).\n\n${renderStory7DraftMarkdown(d, { name: capture.info.nickname })}`);
+  writeFileSync(join(dir, "readable-rechecked.md"), `> 이 글은 AI가 쓴 원문(${roundFile})에서 닫는 괄호${closedBrackets > 0 ? ` ${closedBrackets}개` : ""}를 보충하고 조언 행동의 위치만 바로잡아 읽는 순서로 풀어 쓴 것입니다. 문장은 한 글자도 바꾸지 않았고, 생성기가 저장한 리포트가 아닙니다(유료 판매 합격도 아닙니다).\n\n${renderStory7DraftMarkdown(d, { name: capture.info.nickname, tendencyName: built.input.summary.tendency.name })}`);
 } catch (e) {
   console.error(`경고: 읽는 순서로 풀어 쓴 글을 만들지 못했습니다(${e instanceof Error ? e.message : "알 수 없는 오류"}). 원문은 그대로입니다.`);
 }

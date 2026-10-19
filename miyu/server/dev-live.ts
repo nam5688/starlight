@@ -110,5 +110,6 @@ async function readOwn(id: string): Promise<OwnRunDetail> {
     const built = await ownReportInput(capture, new Date());
     if (built.ok && built.input.saju.status === "ok") free = buildFreePreview({ summary: built.input.summary, saju: built.input.saju, reference: seoulReference(new Date()) });
   }
-  return { reading, free, inputCheck: await read(join(dir, "input-check.md")), readable: await read(join(dir, "readable.md")), metrics: await read(join(dir, "metrics.md")) };
+  // 읽는 순서 글: 새 표시용 내보내기(readable-display.md)가 있으면 그것을, 없으면 실행 때 만든 readable.md를 보인다(두 파일 모두 고치지 않는다)
+  return { reading, free, inputCheck: await read(join(dir, "input-check.md")), readable: (await read(join(dir, "readable-display.md"))) ?? (await read(join(dir, "readable.md"))), metrics: await read(join(dir, "metrics.md")) };
 }

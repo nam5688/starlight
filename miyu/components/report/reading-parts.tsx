@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { AdjustIcon, ChevronIcon, FlowIcon, InfoIcon, LeafIcon, StrengthIcon } from "@/components/ui/icons";
 import { lineGroups } from "@/lib/report/reading/line-breaks";
+import { softenMonths } from "@/lib/report/reading/hour-text";
 import { periodLine, periodPlain } from "@/lib/saju/interpret/period-plain";
 import type { LuckSlot, ReadingBasis, ReadingBlock, ReadingSection, ReadingSummaryCard, ReadingTrait } from "@/lib/report/reading/types";
 
@@ -220,6 +221,7 @@ export function ReactionStepper({ flow, compact = false, className = "mt-5" }: {
 }
 
 const fmtMonth = (s: string) => s.replace("-", ".");
+const fmtYear = (s: string) => `${s.slice(0, 4)}년 무렵`;
 const monthIndex = (s: string) => Number(s.slice(0, 4)) * 12 + Number(s.slice(5, 7));
 
 /**
@@ -227,7 +229,23 @@ const monthIndex = (s: string) => Number(s.slice(0, 4)) * 12 + Number(s.slice(5,
  * 계산된 기간으로 이전 · 지금 · 다음을 한 줄에 놓고 현재 위치를 표시한다. 곡선 · 점수는 그리지 않는다.
  * showExample을 끄면 예시를 빼고 보인다(대화에서는 예시를 다음 말풍선으로 이어 준다).
  */
-export function LuckTimelineCard({ timeline, reference, className = "mt-5", soft = false, showExample = true }: { timeline: LuckSlot[]; reference: { year: number; month: number }; className?: string; /** 대화 말풍선 안에서는 테두리 대신 칸 색만으로 */ soft?: boolean; showExample?: boolean }) {
+export function LuckTimelineCard({
+  timeline,
+  reference,
+  className = "mt-5",
+  soft = false,
+  showExample = true,
+  yearsOnly = false,
+}: {
+  timeline: LuckSlot[];
+  reference: { year: number; month: number };
+  className?: string;
+  /** 대화 말풍선 안에서는 테두리 대신 칸 색만으로 */
+  soft?: boolean;
+  showExample?: boolean;
+  /** 출생 시각을 모를 때 — 대운이 바뀌는 달이 달라질 수 있어 연도 "무렵"으로만 보이고 시작한 지 몇 개월이라고 말하지 않는다(내부 계산값은 그대로) */
+  yearsOnly?: boolean;
+}) {
   const cur = timeline.find((s) => s.role === "current");
   if (!cur) return null;
   const plain = periodPlain(cur.stemGroup, cur.branchGroup);
@@ -247,14 +265,18 @@ export function LuckTimelineCard({ timeline, reference, className = "mt-5", soft
       <p className="mt-1.5 text-[20px] leading-snug font-bold tracking-tight">{plain.title}</p>
       <Prose text={plain.meaning} className="mt-1.5 text-[15px] leading-[1.65] text-ink-2" />
       {showExample && <Prose text={plain.example} className="mt-2 text-[15px] leading-[1.65]" />}
-      <p className="mt-2 text-[13px] leading-[1.5] text-ink-3 tabular-nums">{periodLine(cur.from, cur.to)}</p>
+      <p className="mt-2 text-[13px] leading-[1.5] text-ink-3 tabular-nums">{yearsOnly ? softenMonths(periodLine(cur.from, cur.to)) : periodLine(cur.from, cur.to)}</p>
 
       <div className="mt-4">
         <p className="mb-2 text-[13px] leading-[1.6] text-ink-3">사주에서는 사람마다 10년 단위로 분위기가 바뀐다고 봐요. 지금이 그 10년 중 어디쯤인지 보여 드려요.</p>
         <div
           className="grid grid-cols-3 gap-1"
           role="img"
-          aria-label={`이전 ${fmtMonth(timeline[0].from)}부터, 지금 ${fmtMonth(cur.from)}부터 ${fmtMonth(cur.to)}까지, 다음 ${fmtMonth(timeline[timeline.length - 1].to)}까지. ${reference.year}년 ${reference.month}월 기준으로 지금 시기가 시작된 지 ${elapsedText} 지났어요.`}
+          aria-label={
+            yearsOnly
+              ? `이전 ${fmtYear(timeline[0].from)}부터, 지금 ${fmtYear(cur.from)}부터 ${fmtYear(cur.to)}까지, 다음 ${fmtYear(timeline[timeline.length - 1].to)}까지. 지금은 이 시기 안의 ${pct}% 지점쯤이에요.`
+              : `이전 ${fmtMonth(timeline[0].from)}부터, 지금 ${fmtMonth(cur.from)}부터 ${fmtMonth(cur.to)}까지, 다음 ${fmtMonth(timeline[timeline.length - 1].to)}까지. ${reference.year}년 ${reference.month}월 기준으로 지금 시기가 시작된 지 ${elapsedText} 지났어요.`
+          }
         >
           {timeline.map((s) => (
             <div key={s.role} className="relative h-2 rounded-full bg-track">
@@ -274,9 +296,11 @@ export function LuckTimelineCard({ timeline, reference, className = "mt-5", soft
             </p>
           ))}
         </div>
-        <p className="mt-2 text-[13px] text-ink-3">
-          {reference.year}년 {reference.month}월 기준, 이 시기가 시작된 지 {elapsedText} 지난 지점이에요.
-        </p>
+        {!yearsOnly && (
+          <p className="mt-2 text-[13px] text-ink-3">
+            {reference.year}년 {reference.month}월 기준, 이 시기가 시작된 지 {elapsedText} 지난 지점이에요.
+          </p>
+        )}
       </div>
 
       {others.length > 0 && (
@@ -286,7 +310,7 @@ export function LuckTimelineCard({ timeline, reference, className = "mt-5", soft
               <span className="font-semibold text-ink-3">{NAME[s.role]}</span>
               <span>
                 <span className="block tabular-nums">
-                  {fmtMonth(s.from)} — {fmtMonth(s.to)}
+                  {yearsOnly ? `${fmtYear(s.from)} — ${fmtYear(s.to)}` : `${fmtMonth(s.from)} — ${fmtMonth(s.to)}`}
                 </span>
                 <span className="block text-[13px] text-ink-3">{periodPlain(s.stemGroup, s.branchGroup).title}</span>
               </span>

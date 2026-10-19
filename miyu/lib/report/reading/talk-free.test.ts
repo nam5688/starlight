@@ -222,3 +222,12 @@ test("맛보기 리포트를 받았다면 나는 어떤 사람 · 가까운 관�
     assert.ok(byId(withTaste, "love").grounded);
   }
 });
+
+test("무료 맛보기 카드: 출생 시각을 모르면 지금 나의 시기의 기간 줄이 연도 무렵으로만 보이고, 알면 연-월 그대로다", () => {
+  const known = freeModel(PATTERNS[0], A).model.card.flow.foot ?? "";
+  assert.match(known, /\d{4}\.\d{2}–\d{4}\.\d{2}/, "시각을 알면 연-월");
+  const unknown = calculateSaju({ year: 1994, month: 11, day: 7, calendar: "solar", isLeapMonth: false, birthTime: null, gender: "female" });
+  const soft = freeModel(PATTERNS[0], unknown).model.card.flow.foot ?? "";
+  assert.match(soft, /^\d{4}년 무렵–\d{4}년 무렵 · 사주에서 보는 10년 시기$/);
+  assert.ok(!/\d{4}[.-]\d{2}/.test(soft));
+});

@@ -1079,7 +1079,7 @@ function Content({ say, model, dateLabel, dataHref }: { say: TalkSay; model: Tal
         </ul>
       );
     case "timeline":
-      return <LuckTimelineCard soft showExample={false} className="" timeline={say.slots} reference={say.reference} />;
+      return <LuckTimelineCard soft showExample={false} className="" timeline={say.slots} reference={say.reference} yearsOnly={say.hourUnknown} />;
     case "flow":
       return <ReactionStepper compact className="" flow={{ when: say.when, steps: say.steps, helpful: say.helpful }} />;
     case "comfort":

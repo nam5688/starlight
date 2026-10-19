@@ -633,3 +633,20 @@ git status --short
 - `git pull --ff-only`가 그래도 멈추면(`ai-candidates.ts`가 아닌 다른 파일을 PC에서 고쳤다는 뜻) 지우지 말고 `git status --short` 화면을 알려 준다.
 - ④ 뒤 `lastRun`을 인용한 거절 문구가 6차 값(316.45원 · 지시문 0.8)으로 보여야 한다 — 이전에 보고된 "거절 문구가 5차 기록을 인용한다"는 어긋남이 이 동기화로 풀린다.
 - 이후 어떤 이유로도 `--execute`를 다시 치지 않는다 · 새 호출이 필요하면 운영자가 다시 승인한다.
+
+### 15-5. 화면 수정(표시 계층) 뒤 Windows에서 실제 6차 화면 확인 — 호출 0 · 승인 6/6 그대로
+
+개발방이 6차 글의 화면만 고쳤다(`story7-customer-voice-v1.md` 12장): 읽기용 글의 유형명 · 6번 장 시기 칸과 시간축 · 개운 카드 · 출생 시각 미상 연도 무렵 표기. **`lib/config/ai-candidates.ts`는 바뀌지 않았다**(`runsDone 6/6` 그대로). 이미 15-4의 동기화를 마쳤다면 `git status --short`가 깨끗해야 하고 그냥 가져오면 된다(15-4를 아직 안 했다면 그것부터 한다).
+
+```powershell
+cd $HOME\Desktop\starlight-work\miyu
+git status --short            # 기대: 수정 없음(untracked만)
+git pull --ff-only origin claude/miyu-claude-code-setup-klw8ms
+# 같은 상태 조회(14-3의 ① 명령) — 기대: 마친/허용 6/6 · 실제 호출 거절됨
+node scripts/export-readable-display.ts pilot-data\ai-compare\story7-own-20261019-025234
+notepad pilot-data\ai-compare\story7-own-20261019-025234\readable-display.md
+npm.cmd run dev
+# 브라우저: http://localhost:3000/dev/live/story7-own-20261019-025234  → "심층 리포트" 6번 장
+```
+
+`export-readable-display.ts`는 새 파일 `readable-display.md` 하나만 만들고 `round1.txt`(원문) · `report.json` · `readable.md`는 건드리지 않는다(해시를 비교하려면 실행 전후 `Get-FileHash`). 6번 장에서 볼 것: ① 시기 칸을 누르면 풀이가 열리는지 ② 막대를 누르면 같은 칸이 열리는지 ③ 연-월(예: `2022.12`)이나 "N개월"이 없는지 ④ 개운 카드가 금 · 목 같은 무게로 보이는지. 이상하면 화면 캡처와 함께 알려 준다 — 같은 명령으로 호출이 나가지 않는다(AI 호출 코드는 이번에 바뀌지 않았고 6/6에서 `--execute`는 거절된다).

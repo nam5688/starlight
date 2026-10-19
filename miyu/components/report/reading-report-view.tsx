@@ -8,6 +8,10 @@ import { SajuChart } from "./detail-sections";
 import { MonthCalendarView } from "./month-calendar";
 import { SECTION_CALENDAR_NOTE } from "@/lib/report/reading/plan";
 import { STORY7_SECTIONS } from "@/lib/report/reading/story7-plan";
+import { buildFlowView } from "@/lib/report/reading/flow-view";
+import { isHourUnknown, softenMonths } from "@/lib/report/reading/hour-text";
+import { FlowTimeline } from "./flow-timeline";
+import { FortifyCards } from "./fortify-cards";
 import { ItemsSection, PartnerSection, PlainReadingSection, QuestionsSection, SituationsSection } from "./extras-sections";
 import { ActionList } from "./integrated-view";
 import { ReadingNav } from "./reading-nav";
@@ -70,6 +74,9 @@ export function ReadingReportView({
   const scoreGroups = scores ?? (report.base ? [{ title: "기질 · 성격", rows: report.base.temperament }, { title: "가까운 관계 반응(애착 경향)", rows: report.base.relationship }] : []);
   const tendencyTitle = tendencyName ?? report.base?.tendency.name ?? null;
   const tendency = tendencyPhrase(tendencyTitle);
+  // 출생 시각을 모르면 대운이 바뀌는 달이 달라질 수 있어 요약 카드의 기간 줄도 연도 "무렵"으로만 보인다(저장된 글은 그대로, 보이는 방식만)
+  const hourUnknown = isHourUnknown(report);
+  const summaryCards = hourUnknown ? report.summary.map((c) => (c.foot ? { ...c, foot: softenMonths(c.foot) } : c)) : report.summary;
   // 큰 주제에 붙이는 번호 — 주제 5개 다음이 "앞으로의 시기"
   const numberOf = new Map(report.blocks.map((b, i) => [b.id, i + 1]));
   const rangeOf = (g: ReadingGroupId) => {
@@ -107,17 +114,17 @@ export function ReadingReportView({
           <h2 id={id("headline")} className="text-[13px] font-semibold text-accent">
             핵심 해석
           </h2>
-          {tendency && tendencyTitle && (
+          {tendencyTitle && (
             <div className="mt-2.5">
               <p className="text-[13px] text-ink-3">나의 대표 경향</p>
-              {/* 무료 리포트(FreePreviewBody)와 같이 후보 이름(~형)을 크게 보인다 — 심층에서 빠지면 무료에만 있는 이름이 된다 */}
+              {/* 무료 리포트(FreePreviewBody)와 같이 후보 이름(~형)을 크게 보인다 — 심층에서 빠지면 무료에만 있는 이름이 된다. 이름 아래에 한 줄 특징이 바로 오고, 설명을 모르는 이름이어도 이름은 지우지 않는다 */}
               <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight text-accent-strong md:text-[32px]">{tendencyTitle}</p>
-              <p className="mt-2 inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-[14px] font-semibold text-accent-strong">{tendency}</p>
+              {tendency && <p className="mt-2 inline-flex items-center rounded-full bg-accent-soft px-3 py-1 text-[14px] font-semibold text-accent-strong">{tendency}</p>}
             </div>
           )}
           <p className="mt-2 text-[22px] leading-[1.4] font-bold tracking-tight md:text-[28px]">{report.headline}</p>
-          {tendency && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아니에요.</p>}
-          <SummaryCards cards={report.summary} />
+          {tendencyTitle && <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-3">대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아니에요.</p>}
+          <SummaryCards cards={summaryCards} />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <a href={`#${id("tendency")}`} className="inline-flex h-11 items-center justify-center rounded-lg bg-accent px-3 text-[15px] font-semibold text-white transition-colors hover:bg-accent-strong">
               내 성향 자세히
@@ -414,6 +421,9 @@ function NumberBadge({ n }: { n: number }) {
 
 /** 앞으로의 시기(6번) 본문 — 결론 → 이야기(또는 요약) → 조건 안내 → 타임라인 · 가까운 세 해 → 접힘(월별 달력 · 자세한 풀이 · 근거). 7개 대주제는 장 제목을 따로 달아 이름표를 숨긴다 */
 function FlowArticle({ report, id, story, hideLabel = false }: { report: IntegratedReadingReport; id: (name: string) => string; story: boolean; hideLabel?: boolean }) {
+  // 7개 대주제(story-7)는 저장된 글을 시기별 칸과 시간축으로 나눠 보인다(저장된 글은 바꾸지 않는다). 나눌 표지가 없는 글이면 null이라 예전 모양으로 보인다
+  const flowView = report.layout === "story7" ? buildFlowView(report) : null;
+  const hourUnknown = isHourUnknown(report);
   return (
     <article className={hideLabel ? "" : "mt-6"}>
       {!hideLabel && (
@@ -423,28 +433,48 @@ function FlowArticle({ report, id, story, hideLabel = false }: { report: Integra
         </p>
       )}
       <h3 className="text-[20px] leading-snug font-bold tracking-tight md:text-[22px]">{report.flow.headline}</h3>
-      {story ? (
-        <div className="mt-3">
-          <Paragraphs items={[report.flow.summary, ...(report.flow.paragraphs ?? [])]} />
-        </div>
+      {flowView ? (
+        <>
+          {flowView.lead.length > 0 && (
+            <div className="mt-3">
+              <Paragraphs items={flowView.lead} />
+            </div>
+          )}
+          <FlowTimeline view={{ hourUnknown: flowView.hourUnknown, items: flowView.items, notes: flowView.notes, axis: flowView.axis }} idPrefix={id("flow")} />
+          {flowView.fortify && <FortifyCards fortify={flowView.fortify} />}
+          {flowView.rest.length > 0 && (
+            <div className="mt-6">
+              <Paragraphs items={flowView.rest} />
+            </div>
+          )}
+          <CaveatNote text={report.flow.caveat} />
+        </>
       ) : (
-        <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
+        <>
+          {story ? (
+            <div className="mt-3">
+              <Paragraphs items={[report.flow.summary, ...(report.flow.paragraphs ?? [])]} />
+            </div>
+          ) : (
+            <Prose text={report.flow.summary} className="mt-2 text-[16px] leading-[1.7]" />
+          )}
+          <CaveatNote text={report.flow.caveat} />
+
+          <LuckTimelineCard timeline={report.timeline} reference={report.timelineReference} yearsOnly={hourUnknown} />
+
+          <div className="mt-4 rounded-xl border border-line bg-canvas p-4 md:p-5">
+            <p className="text-[17px] font-bold tracking-tight">가까운 세 해</p>
+            <ul className="mt-2 divide-y divide-line">
+              {report.flow.years.map((y) => (
+                <li key={y.year} className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-baseline gap-x-3 py-2.5">
+                  <span className="text-[16px] font-bold text-accent tabular-nums">{y.year}</span>
+                  <span className="text-[15px] leading-snug">{y.theme}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
       )}
-      <CaveatNote text={report.flow.caveat} />
-
-      <LuckTimelineCard timeline={report.timeline} reference={report.timelineReference} />
-
-      <div className="mt-4 rounded-xl border border-line bg-canvas p-4 md:p-5">
-        <p className="text-[17px] font-bold tracking-tight">가까운 세 해</p>
-        <ul className="mt-2 divide-y divide-line">
-          {report.flow.years.map((y) => (
-            <li key={y.year} className="grid grid-cols-[3.25rem_minmax(0,1fr)] items-baseline gap-x-3 py-2.5">
-              <span className="text-[16px] font-bold text-accent tabular-nums">{y.year}</span>
-              <span className="text-[15px] leading-snug">{y.theme}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
 
       <FoldRow>
         {report.calendars && report.calendars.items.length > 0 && (

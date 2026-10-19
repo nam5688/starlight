@@ -7,6 +7,7 @@
 import { formatKrw, PERSONAL_REPORT } from "../../config/product.ts";
 import type { SajuResult } from "../../saju/engine.ts";
 import { periodLine, periodPlain } from "../../saju/interpret/period-plain.ts";
+import { softenMonths } from "./hour-text.ts";
 import { partnerReading } from "../../saju/interpret/partner.ts";
 import { luckTimeline } from "../../saju/interpret/rules.ts";
 import { dayMasterShort } from "../../saju/plain.ts";
@@ -154,7 +155,8 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
         label: "지금 나의 시기",
         keyword: period ? period.title : "리포트에서 이어서 볼 수 있어요",
         note: "",
-        ...(current ? { foot: periodLine(current.from, current.to) } : {}),
+        // 출생 시각을 모르면 대운이 바뀌는 달이 달라질 수 있어 연도 무렵으로만 보인다(내부 계산값은 그대로)
+        ...(current ? { foot: input.saju.status === "ok" && input.saju.hourPillarOmitted ? softenMonths(periodLine(current.from, current.to)) : periodLine(current.from, current.to) } : {}),
       },
       inputs: ["사주 원국", `성향 응답 ${preview.basis.temperamentItems + preview.basis.relationshipItems + preview.basis.mbtiItems}문항 (개발용 문항)`],
     },
