@@ -110,7 +110,7 @@ export function CompatBuyForm({ assessmentId, myName, priceLabel, savedGender }:
       <PersonFields prefix="p" title="상대" placeholderName={NAME_PLACEHOLDER.partner} genderLegend="상대의 성별" value={partner} errors={errors} onChange={setPartner} />
       <RelationshipField prefix="buy-rel" value={relationship} error={errors.relationship} onChange={(r) => { setRelationship(r); setErrors((x) => ({ ...x, relationship: undefined })); }} />
       <p id="compat-buy-note" className="text-[13px] leading-[1.7] text-ink-3">
-        상대의 이름 · 생년월일 · 성별과 두 분의 사이는 궁합 리포트를 만드는 동안에만 보관하고, 리포트가 완성되면 지워요(리포트에는 이름이 호칭으로, 사이가 읽는 관점으로 남아요). 결제 전에 떠나면 보관하지 않아요. 이름 · 생년월일 · 성별은 AI에 보내지 않고, 사이는 풀이의 관점을 정하는 지침으로만 전달해요. 새로고침해도 이어 쓸 수 있게 이 브라우저 탭에만 1시간 임시로 두고(서버로 보내지 않아요), 결제 화면으로 넘어가거나 [입력 지우기]를 누르면 지워져요. 결과는 재미 · 참고용이에요.
+        [서버 보관] 상대의 이름 · 생년월일 · 성별과 두 분의 사이는 결제를 시작하면 궁합 리포트를 만드는 동안에만 서버에 보관하고, 리포트가 완성되면 지워요(리포트에는 이름이 호칭으로, 사이가 읽는 관점으로 남아요). 결제를 시작하기 전에 떠나면 서버에는 보관하지 않아요. 이름 · 생년월일 · 성별은 AI에 보내지 않고, 사이는 풀이의 관점을 정하는 지침으로만 전달해요. [탭 임시 보관] 이와 별개로 새로고침해도 이어 쓸 수 있도록 입력한 내용을 이 브라우저 탭에 1시간 동안 임시 보관하고, 결제 화면으로 넘어가거나 [입력 지우기]를 누르면 지워져요. 결과는 재미 · 참고용이에요.
       </p>
       {message && (
         <p role="alert" className="text-[15px] font-medium text-danger">

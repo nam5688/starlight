@@ -86,6 +86,11 @@ test("개인정보 안내가 실제 동작과 같다 — 서버에는 저장하�
   assert.match(b, /이름 · 생년월일 · 성별은 AI에 보내지 않고, 사이는 풀이의 관점을 정하는 지침으로만 전달해요/);
   assert.match(b, /결제 화면으로 넘어가거나 \[입력 지우기\]를 누르면 지워져요/);
   assert.match(b, /리포트가 완성되면 지워요/);
+  // 서버 보관(유료 리포트용)과 탭 임시 보관을 따로 말하고, 서로 모순으로 읽히는 "(서버로 보내지 않아요)"가 없다
+  assert.match(b, /\[서버 보관\] 상대의 이름 · 생년월일 · 성별과 두 분의 사이는 결제를 시작하면 궁합 리포트를 만드는 동안에만 서버에 보관하고/);
+  assert.match(b, /결제를 시작하기 전에 떠나면 서버에는 보관하지 않아요/);
+  assert.match(b, /\[탭 임시 보관\] 이와 별개로 새로고침해도 이어 쓸 수 있도록 입력한 내용을 이 브라우저 탭에 1시간 동안 임시 보관하고/);
+  assert.doesNotMatch(b, /서버로 보내지 않아요/);
   // 임시 보관은 sessionStorage뿐이다(localStorage · 쿠키 · 서버 저장 없음)
   for (const src of [compatForm, buyForm]) {
     assert.match(code(src), /sessionStorage/);
@@ -112,11 +117,22 @@ test("공개 개인정보 처리방침에 궁합 입력 정보의 사실이 있�
   assert.match(p, /선택한 사이의 이름표와 읽는 법을 알려 주는 고정 지침이 AI 서비스에 전달됩니다/);
   assert.match(p, /이름·생년월일 원문과 성별 값은 전달하지 않으며/);
   assert.match(p, /현재 이 AI 풀이는 연결하지 않은 상태이고, 연결하면 위 범위로 전달합니다/);
+  // 개인 리포트 · 맛보기 · 자유 질문의 실제 전달 항목(코드로 확인한 범위) — 3-3과 3-1
+  assert.match(p, /3-3\. 리포트를 만드는 AI/);
+  assert.match(p, /이름 · 생년월일 원문 · 출생지 · 닉네임 · 회원번호 · 문항 문장과 고른 선택지는 전달하지 않습니다/);
+  assert.match(p, /응답에서 읽은 경향 문장\(응답을 환산한 숫자 포함\)/);
+  assert.match(p, /입력했다면 알고 있는 MBTI 글자/);
+  assert.match(p, /이 정보로 출생 연도와 월을 대략 짐작할 수 있습니다/);
+  assert.match(p, /맛보기 리포트는 무료 결과에 이미 보여 드린 사주 문구와, 직접 고른 뚜렷한 응답의 문항 문장 · 고른 답\(최대 16개\)을 전달합니다/);
+  assert.match(p, /자유 질문을 보내면 질문 글, 그 방의 풀이 글과 요약, 상담방에서 먼저 묻는 질문에 고른 답, 직전 대화와 이전 대화 요약/);
+  assert.match(p, /법적 충분성과 동의 방식은 출시 전 법률 검토로 확정합니다/);
   // 사실 설명이 코드와 어긋나지 않는다: 임시 보관은 sessionStorage뿐
   assert.doesNotMatch(code(compatForm), /localStorage|document\.cookie/);
   // 이번에 바꾸지 않은 것: 기존 보관 문구 · 위탁 업체 목록 · 약관 버전(동의 항목)
   assert.match(p, /회원 탈퇴 시까지 보관합니다\. 다만 관련 법령에 따라 거래 기록 등은 정해진 기간 동안 보관합니다\. 항목별 기간은 출시 전 확정합니다\./);
   assert.match(p, /Supabase — 회원 인증과 데이터 저장/);
-  assert.match(p, /Anthropic — 자유 질문에 답하는 AI \(질문 글과 그 방의 풀이 글만 전달, 이름 · 생년월일 제외/);
+  // 업체 이름(Anthropic) · 승인 범위 문구는 그대로이고, 용도만 실제 사용 범위로 맞췄다
+  assert.match(p, /Anthropic — 리포트 · 궁합 풀이 · 맛보기 리포트 · 자유 질문 답변을 만드는 AI \(전달 항목은 3-1 · 3-2 · 3-3에 적음, 이름 · 생년월일 원문 제외, 현재는 연결하지 않았고 시험 단계에서는 운영자가 승인한 범위 안에서만 호출\)/);
+  assert.doesNotMatch(p, /자유 질문에 답하는 AI/);
   assert.match(read("lib/membership/terms.ts"), /TERMS_VERSION = "2026-10-draft-1"/);
 });
