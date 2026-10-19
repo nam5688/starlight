@@ -112,9 +112,12 @@ test("글자는 하나도 바뀌지 않는다 — 따옴표 · 괄호 · 숫자�
 });
 
 test("화면: Prose는 블록마다 줄을 나누고 블록 사이에 작은 여백을 둔다(문단 안의 줄바꿈만, 글자는 그대로)", () => {
-  const src = readFileSync(new URL("../../../components/report/reading-parts.tsx", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../../../components/ui/prose.tsx", import.meta.url), "utf8");
   assert.match(src, /className=\{i > 0 \? "mt-1\.5 block" : "block"\}/);
   assert.match(src, /lines\.length <= 1/);
+  // 읽기 부품(reading-parts)은 같은 Prose를 다시 내보낼 뿐 다른 구현을 두지 않는다
+  const parts = readFileSync(new URL("../../../components/report/reading-parts.tsx", import.meta.url), "utf8");
+  assert.match(parts, /export \{ Prose \} from "@\/components\/ui\/prose"/);
   const free = readFileSync(new URL("../../../components/report/free-preview-body.tsx", import.meta.url), "utf8");
   assert.ok((free.match(/<Prose /g) ?? []).length >= 4, "무료 리포트 본문의 긴 문단도 같은 규칙으로 나눈다");
 });

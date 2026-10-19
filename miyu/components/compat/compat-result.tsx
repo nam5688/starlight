@@ -1,23 +1,37 @@
 "use client";
 
 import { MiyuAvatar } from "@/components/talk/miyu-character";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronIcon, InfoIcon } from "@/components/ui/icons";
 import { renderCompatCardPng } from "@/components/talk/card-image";
-import { StatusBadge } from "@/components/ui/source-badge";
-import { buttonDisabled, buttonSecondary } from "@/components/ui/styles";
+import { Prose } from "@/components/ui/prose";
+import { buttonSecondary } from "@/components/ui/styles";
 import { shareTextOf, type SimpleCompatCard } from "@/lib/compat/simple";
 
 /**
  * 간단 궁합(무료) 결과 — 커플 유형 · 궁합 지수 · 핵심 한 줄 · 읽힌 점. 사주 궁합 엔진 결과의 대표 한 장이다.
- * 총점은 확률이 아니라 재미 · 참고용 지수라는 안내와 계산 재료를 함께 보이고, 사주 궁합 · 리포트 궁합은 아직 열리지 않아 "준비 중"으로만 안내한다(가격 · 이용 범위는 정해지면 안내).
+ * 총점은 확률이 아니라 재미 · 참고용 지수라는 안내와 계산 재료를 함께 보인다. 아래 "다음 단계"(사주 궁합 · 리포트 궁합 안내)는 판매 스위치를 읽는 서버 컴포넌트(nextSteps)가 그려서 실제 열림 상태와 어긋나지 않는다.
+ * 본문 글은 `Prose`로 문장마다 줄을 바꾸고 짧은 두 문장만 묶는다(저장 · 계산 값은 그대로, 보이는 방식만).
  */
-export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onReset: () => void }) {
+export function CompatResult({ card, onReset, nextSteps }: { card: SimpleCompatCard; onReset: () => void; nextSteps?: React.ReactNode }) {
   const rel = card.relation;
   const showType = !rel || rel.showType;
   const heading = rel ? rel.heading : card.typeName;
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
   const [imageState, setImageState] = useState<"idle" | "busy" | "saved" | "failed">("idle");
+  const sectionRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const placed = useRef(false);
+
+  // 결과가 화면에 그려진 뒤(이 컴포넌트가 붙은 뒤) 한 번만 결과 맨 위로 옮긴다 — 입력 칸이 사라지고 결과로 바뀌면 문서 길이가 달라져
+  // 이전 위치가 결과 중간이 되므로 제출 직후에 옮기면(렌더 전에 실행될 수 있다) 어긋난다.
+  // 고정 머리글은 html의 scroll-padding-top이 비켜 준다. 전체 스크롤을 건드리지 않고 이 결과만 옮기며, 초점도 제목으로 옮겨 키보드 · 보조기기가 결과부터 읽는다(스크롤 없이).
+  useEffect(() => {
+    if (placed.current) return;
+    placed.current = true;
+    sectionRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    titleRef.current?.focus({ preventScroll: true });
+  }, []);
 
   // 공유 이미지(생년월일 없음) — 이 기기 안에서 만들고 서버로 보내지 않는다. 파일 공유를 지원하면 공유 창을, 아니면 저장한다
   const shareImage = async () => {
@@ -63,14 +77,14 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
   };
 
   return (
-    <section id="compat-result" aria-labelledby="compat-result-title" className="space-y-5">
+    <section ref={sectionRef} id="compat-result" aria-labelledby="compat-result-title" className="space-y-5">
       <div className="rounded-2xl bg-canvas p-6 text-center shadow-soft md:p-8">
         <MiyuAvatar tone="love" className="mx-auto mb-3 size-14" />
         <p className="text-[14px] font-medium text-ink-3">
           {card.names.a} × {card.names.b}
         </p>
         {rel && <p className="mx-auto mt-2 w-fit rounded-full bg-accent-soft px-3 py-1 text-[13px] font-semibold text-accent-strong">{rel.label} 사이로 읽었어요</p>}
-        <h2 id="compat-result-title" className="mt-2 text-[28px] leading-tight font-bold tracking-tight break-keep text-accent-strong md:text-[34px]">
+        <h2 ref={titleRef} id="compat-result-title" tabIndex={-1} className="mt-2 text-[28px] leading-tight font-bold tracking-tight break-keep text-accent-strong outline-none md:text-[34px]">
           {heading}
         </h2>
         <p className="mx-auto mt-3 max-w-[30rem] text-[17px] leading-[1.65] text-ink">{showType ? card.typeLine : rel!.frame.lens}</p>
@@ -117,28 +131,38 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
       {rel && (
         <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6" data-relation-frame={rel.id}>
           <h3 className="text-[17px] font-bold">{rel.frame.title}</h3>
-          <p className="mt-3 text-[15px] leading-[1.75] text-ink-2">{rel.frame.lens}</p>
+          <Prose text={rel.frame.lens} className="mt-3 text-[15px] leading-[1.75] text-ink-2" />
           <dl className="mt-4 space-y-4 text-[15px] leading-[1.75]">
             <div>
-              <dt className="text-[13px] font-semibold text-positive">잘 맞는 부분</dt>
-              <dd className="mt-1 text-ink-2">{rel.frame.fit}</dd>
+              <dt className="text-[13px] font-semibold text-positive">잘 맞는 모습</dt>
+              <dd className="mt-1 space-y-2 text-ink-2">
+                <Prose text={rel.frame.fit} />
+                {rel.frame.goodScenes.map((t) => (
+                  <Prose key={t} text={t} />
+                ))}
+              </dd>
             </div>
             <div>
-              <dt className="text-[13px] font-semibold text-caution">부딪히기 쉬운 부분</dt>
-              <dd className="mt-1 text-ink-2">{rel.frame.friction}</dd>
+              <dt className="text-[13px] font-semibold text-caution">차이가 나타나는 상황</dt>
+              <dd className="mt-1 space-y-2 text-ink-2">
+                <Prose text={rel.frame.friction} />
+                {rel.frame.careScenes.map((t) => (
+                  <Prose key={t} text={t} />
+                ))}
+              </dd>
             </div>
             <div>
-              <dt className="text-[13px] font-semibold text-ink-3">서로 이해할 점</dt>
-              <dd className="mt-1 text-ink-2">{rel.frame.understand}</dd>
+              <dt className="text-[13px] font-semibold text-ink-3">서로 이해해 볼 점</dt>
+              <dd className="mt-1 text-ink-2">
+                <Prose text={rel.frame.understand} />
+              </dd>
             </div>
             <div>
               <dt className="text-[13px] font-semibold text-accent">지금 해 볼 행동</dt>
-              <dd className="mt-1">
-                <ul className="list-disc space-y-1.5 pl-5 text-ink-2">
-                  {rel.frame.doNow.map((t) => (
-                    <li key={t}>{t}</li>
-                  ))}
-                </ul>
+              <dd className="mt-1 space-y-2 text-ink-2">
+                {rel.frame.doNow.map((t) => (
+                  <Prose key={t} text={t} />
+                ))}
               </dd>
             </div>
           </dl>
@@ -150,23 +174,31 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
       )}
 
       <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
-        <h3 className="text-[17px] font-bold">두 사주에서 읽힌 점</h3>
-        <p className="mt-3 text-[15px] leading-[1.75] text-ink-2">{card.explain[0]}</p>
-        <p className="mt-2 text-[15px] leading-[1.75] text-ink-2">{card.explain[1]}</p>
-        <dl className="mt-4 space-y-3 text-[15px] leading-[1.7]">
-          <div>
-            <dt className="text-[13px] font-semibold text-positive">잘 맞는 곳</dt>
-            <dd className="mt-1 text-ink-2">{card.good.length ? card.good.join(" · ") : "서로 닿는 부분은 두드러지지 않아요. 맞춰 가며 만들어 가는 모양이에요."}</dd>
-          </div>
-          <div>
-            <dt className="text-[13px] font-semibold text-caution">맞춰 볼 곳</dt>
-            <dd className="mt-1 text-ink-2">{card.care.length ? card.care.join(" · ") : "크게 부딪히는 부분은 두드러지지 않아요."}</dd>
-          </div>
-          <div>
-            <dt className="text-[13px] font-semibold text-ink-3">움직이는 속도</dt>
-            <dd className="mt-1 text-ink-2">{card.pace}.</dd>
-          </div>
-        </dl>
+        <h3 className="text-[17px] font-bold">두 사람이 함께 있을 때</h3>
+        <Prose text={card.explain[0]} className="mt-3 text-[15px] leading-[1.75] text-ink-2" />
+        <Prose text={card.explain[1]} className="mt-2 text-[15px] leading-[1.75] text-ink-2" />
+        {!rel && (
+          <dl className="mt-4 space-y-3 text-[15px] leading-[1.7]">
+            <div>
+              <dt className="text-[13px] font-semibold text-positive">잘 맞는 모습</dt>
+              <dd className="mt-1 space-y-1.5 text-ink-2">
+                {card.good.length ? card.good.map((t) => <Prose key={t} text={t} />) : <Prose text="서로 닿는 부분은 두드러지지 않아요. 맞춰 가며 만들어 가는 모양이에요." />}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[13px] font-semibold text-caution">차이가 나타나는 상황</dt>
+              <dd className="mt-1 space-y-1.5 text-ink-2">
+                {card.care.length ? card.care.map((t) => <Prose key={t} text={t} />) : <Prose text="크게 부딪히는 부분은 두드러지지 않아요." />}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[13px] font-semibold text-ink-3">움직이는 속도</dt>
+              <dd className="mt-1 text-ink-2">
+                <Prose text={`${card.pace}.`} />
+              </dd>
+            </div>
+          </dl>
+        )}
         {card.cautions.map((c) => (
           <p key={c} className="mt-4 flex gap-2 text-[13px] leading-[1.7] text-ink-3">
             <InfoIcon className="mt-1 size-4 shrink-0" />
@@ -195,31 +227,7 @@ export function CompatResult({ card, onReset }: { card: SimpleCompatCard; onRese
         </details>
       </div>
 
-      <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
-        <h3 className="text-[17px] font-bold">이건 두 사람의 사주만으로 본 간단 궁합이에요</h3>
-        <p className="mt-2 text-[15px] leading-[1.75] text-ink-2">왜 잘 맞는지, 어디에서 부딪히는지는 두 사주를 더 자세히 풀어야 알 수 있어요. 두 사람이 각자 답한 성격 · 기질 · 애착까지 함께 보면, 같은 사주 위에서 실제로 어떻게 다르게 반응하는지까지 이야기할 수 있어요.</p>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          <li className="rounded-xl bg-page p-4">
-            <p className="flex flex-wrap items-center gap-2 text-[16px] font-bold">
-              사주 궁합 <StatusBadge>준비 중</StatusBadge>
-            </p>
-            <p className="mt-2 text-[14px] leading-[1.7] text-ink-2">두 사람의 타고난 관계 흐름을 자세히 풀어요. 같은 계산 위에서 이 결과를 더 길게 읽어요.</p>
-            <button type="button" disabled aria-disabled="true" className={`${buttonDisabled} mt-3 w-full`}>
-              자세히 보기 · 준비 중
-            </button>
-          </li>
-          <li className="rounded-xl bg-page p-4">
-            <p className="flex flex-wrap items-center gap-2 text-[16px] font-bold">
-              리포트 궁합 <StatusBadge>준비 중</StatusBadge>
-            </p>
-            <p className="mt-2 text-[14px] leading-[1.7] text-ink-2">두 사람의 사주에 각자가 직접 답한 성격과 관계 반응까지 함께 비교해요.</p>
-            <button type="button" disabled aria-disabled="true" className={`${buttonDisabled} mt-3 w-full`}>
-              리포트로 보기 · 준비 중
-            </button>
-          </li>
-        </ul>
-        <p className="mt-3 text-[13px] leading-[1.7] text-ink-3">사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스예요. 아직 열리지 않았고, 이용 범위와 가격은 정해지면 안내해요.</p>
-      </div>
+      {nextSteps}
 
       <div className="text-center">
         <button type="button" onClick={onReset} className="text-[15px] font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent">

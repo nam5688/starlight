@@ -10,7 +10,7 @@
 import type { CompatRelationship } from "../../compat/relationship.ts";
 
 export const COMPAT_REPORT_KIND = "compat-saju-v1" as const;
-export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.5";
+export const COMPAT_PROMPT_VERSION = "compat-v1-prompt-0.6";
 
 /**
  * 두 사람의 시기(대운 · 세운)를 계산하는가 — 계산한다(compat-timing.ts, 각자의 계산 결과를 나란히 놓는 범위). 근거 목록에 compat.timing.*이 있으면 5번 장(연애와 결혼 궁합)이 한 문단으로 쓰고,
@@ -40,35 +40,35 @@ const ALL_SECTIONS: CompatSectionPlan[] = [
   {
     id: "overview",
     topic: "우리의 궁합 한눈에 보기",
-    ask: "두 사람이 가까이 있을 때 만들어지는 분위기를 한눈에 — 타고난 중심 성향(일간) 사이의 관계 · 배우자 자리(일지) 사이 · 움직이는 속도의 조합에서 가장 두드러지는 연결 하나를 headline으로 잡아 풀어 쓴다. 커플 유형 이름 · 지수는 화면이 이미 보여 주므로 되풀이하지 않는다",
+    ask: "두 사람이 함께 있을 때 가장 두드러지는 모습 하나를 headline으로 잡아, 그 모습이 어떤 상황에서 나타나는지 풀어 쓴다(근거는 일간 사이 · 일지 사이 · 속도 중 가장 뚜렷한 것). 커플 유형 이름 · 지수는 화면이 보여 주므로 되풀이하지 않는다",
     sources: "compat.day-stem · compat.day-branch · compat.pace · compat.type",
     paragraphs: { min: 2, max: 3 },
   },
   {
     id: "harmony",
     topic: "두 사람의 사주와 오행 조화",
-    ask: "각자의 일간과 오행 분포(compat.chart)가 어떻게 생겼는지, 서로 비어 있는 기운을 채우는지 · 같은 기운이 둘 다 두드러지는지 · 두 일간의 오행 관계(같은 기운 · 상생 · 상극 · 합)가 어떤 조화를 만드는지를 명리 용어를 풀이와 함께 써서 설명한다(사주를 읽는 재미가 있는 장). 오행 개수는 천간 · 지지 글자 기준이고 시주를 모르는 사람은 세 기둥 기준임을 밝힌다. 개운(색 · 방향)은 7번 장의 몫이다",
+    ask: "각자 힘의 분포(compat.chart)가 어떻게 생겼는지를 사람의 방식으로 풀고(어떤 힘이 많고 적은지), 서로 비어 있는 쪽을 채우는지 · 같은 쪽이 둘 다 강한지 · 두 일간 사이(같은 기운 · 상생 · 상극 · 합)가 함께 계획하고 정할 때 어떤 모습인지 쓴다. 오행 개수는 천간 · 지지 글자 기준이고 시주를 모르는 사람은 세 기둥 기준임을 밝힌다. 개운(색 · 방향)은 7번 장의 몫이다",
     sources: "compat.chart · compat.day-stem · compat.element.fill · compat.element.overlap",
     paragraphs: { min: 2, max: 4 },
   },
   {
     id: "fit",
     topic: "우리가 잘 맞는 부분",
-    ask: "어떤 때 두 사람이 서로를 편하게 받쳐 주는가 — 근거에서 읽히는 합 · 상생 · 비어 있는 기운을 채우는 조합을 장면으로 쓴다. 근거가 약하면 늘려 쓰지 않는다",
+    ask: "어떤 상황에서 두 사람이 서로 편하게 이어지는가 — 합 · 상생 · 비어 있는 기운을 채우는 조합이 실제로 뜻하는 모습(가까이 있을 때 · 함께 계획할 때 · 일과 생활)을 장면으로 쓴다. 근거가 약하면 늘려 쓰지 않는다",
     sources: "compat.day-stem · compat.day-branch · compat.cross.pull · compat.element.fill",
     paragraphs: { min: 2, max: 3 },
   },
   {
     id: "friction",
     topic: "우리가 부딪히는 부분",
-    ask: "어떤 때 방식이 부딪히기 쉬운가와 그 순간에 도움이 되는 조율 — 누구 탓으로 쓰지 않고 \"이런 때 이렇게 달라요\"로 쓴다. 충 · 형 · 상극 같은 근거가 없으면 차이가 크지 않다고 쓰고 부딪힘을 지어내지 않는다(속도 차이처럼 근거에 있는 차이만)",
+    ask: "어떤 상황에서 방식이 달라지기 쉬운가와 그때 도움이 되는 조율 — 누구 탓으로 쓰지 않고 \"이런 때 이렇게 달라요\"로 쓴다. 충 · 형 · 상극 같은 근거가 없으면 차이가 크지 않다고 쓰고 부딪힘을 지어내지 않는다(속도 차이처럼 근거에 있는 차이만)",
     sources: "compat.day-branch · compat.cross.clash · compat.element.overlap · compat.pace",
     paragraphs: { min: 2, max: 3 },
   },
   {
     id: "love",
     topic: "연애와 결혼 궁합",
-    ask: "애정 표현과 연애 관계(일지끼리의 합 · 충과 일간 사이의 관계가 만드는 가까운 사이의 분위기, compat.role이 읽는 서로의 자리) · 오래 함께할 때의 생활 방식과 조건(함께 사는 생활 · 결혼생활을 포함해, 월지 · 년지끼리의 합 · 충을 \"가족 · 생활 환경 쪽 기준이 맞닿는지 부딪히는지\"로 전통 해석을 조건형으로 읽는다) · 근거에 compat.timing.*이 있으면 지금 각자 지나는 시기의 주제가 겹치는지 다른지를 마지막 한 문단으로. 결혼을 하게 된다 · 언제 한다 · 헤어진다 · 자녀 · 출산 이야기는 쓰지 않는다(계산하지 않았다)",
+    ask: "애정 표현과 연애 관계(가까운 사이의 분위기와 compat.role이 읽는 서로의 자리를 용어 대신 두 사람의 행동으로) · 오래 함께할 때의 생활 방식과 조건(함께 사는 생활 · 결혼생활을 포함해, 월지 · 년지끼리의 합 · 충을 \"가족 · 생활 환경 쪽 기준이 맞닿는지 부딪히는지\"로 조건형으로 한 번) · 근거에 compat.timing.*이 있으면 지금 각자 지나는 시기의 주제가 겹치는지 다른지를 마지막 한 문단으로. 결혼을 하게 된다 · 언제 한다 · 헤어진다 · 자녀 · 출산 이야기는 쓰지 않는다(계산하지 않았다)",
     sources: "compat.day-branch · compat.day-stem · compat.role · compat.cross.pull · compat.cross.clash · compat.pace · compat.timing.*",
     paragraphs: { min: 3, max: 4 },
   },
@@ -110,7 +110,7 @@ export const COMPAT_SECTIONS: CompatSectionPlan[] = ALL_SECTIONS.filter((s) => !
 // 사주 궁합과 같은 엔진 · 같은 위쪽 요약(cardOf) · 같은 여섯 장에, 두 사람이 각자 직접 답한 응답을 같은 영역끼리 비교한 근거(pair.*, pair-evidence.ts)로 6번 "서로에게 어떤 사람일까?"를 더한다.
 // 저장되는 글에는 이름 · 생년월일 · 응답 원문 · 점수가 없다 — 본문은 "A님 · B님"이고 화면이 읽는 사람에게 누가 누구인지 알려 준다.
 export const PAIR_REPORT_KIND = "compat-pair-v1" as const;
-export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.3";
+export const PAIR_PROMPT_VERSION = "pair-v1-prompt-0.4";
 
 /** 리포트 궁합의 장 — 일곱 장 모두 항상 쓴다(비교한 응답이 없으면 6번은 사주만으로, 응답을 지어내지 않는다) */
 export const PAIR_SECTIONS: CompatSectionPlan[] = ALL_SECTIONS;
@@ -156,7 +156,7 @@ export const COMPAT_LIMITS = {
   questions: { min: 2, max: 3, textMin: 12, textMax: 60 },
   /** 같은 근거 ID를 쓸 수 있는 장 수 — 장이 일곱이라 넓혔다(한 근거가 거의 모든 장을 끌고 가는 경우만 걸러낸다). 같은 명리 근거가 여러 장에서 쓰여도 장마다 새로운 해석이면 허용하고(운영자 2026-10-17), 새 정보 없이 되풀이하는지는 사람이 읽고 판단한다 */
   evidenceReuseMax: 5,
-  /** 사주 용어 한도 — 명리 풀이가 이 상품의 내용이라 사주 중심 개인 리포트(story-7)와 같은 한도로 넓혔다(설명 없는 용어 · 근거 없는 판정은 그대로 막는다, terms.ts) */
+  /** 사주 용어 한도 — 지시문 0.6 · 0.4부터 본문에는 명리 용어를 쓰지 않는 쪽이고(고객이 읽는 글), 이 한도는 용어가 새어 나왔을 때의 경고(WARN) 기준이다(설명 없는 용어 · 근거 없는 판정은 그대로 막는다, terms.ts) */
   terms: { perSentenceMax: 3, perParagraphMax: 4, firstParagraphMax: 2 },
 } as const;
 

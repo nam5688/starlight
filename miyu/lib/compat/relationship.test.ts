@@ -25,6 +25,7 @@ import {
   type CompatGender,
   type CompatRelationship,
 } from "./relationship.ts";
+import { SCORE_BASIS_LIFE } from "./life-voice.ts";
 import { computeSimpleCompat, EMPTY_COMPAT_PERSON, parseCompatPerson, shareTextOf, validateCompatPerson, type CompatPersonInput, type SimpleCompatCard } from "./simple.ts";
 
 const TODAY = new Date("2026-10-19T12:00:00+09:00");
@@ -172,14 +173,14 @@ test("친구 · 기타 · 썸에는 커플 유형 이름을 보이지 않고 그
   assert.equal(neutralWording("배우자 자리끼리 서로 끌어당기는 관계로 읽혀요", null), "배우자 자리끼리 서로 끌어당기는 관계로 읽혀요");
 });
 
-test("엔진 문구의 \"배우자 자리\"는 썸 · 친구 · 기타에서만 표시용으로 바꾸고 연인 · 결혼준비중 · 결혼함은 그대로다 — 점수와 순서는 같다", () => {
-  // "배우자 자리"를 말하는 엔진 문구가 나오는 쌍을 찾는다(일지끼리 합 · 충)
+test("화면 문구는 모든 사이에서 생활 말이다 — 엔진의 \"배우자 자리\" 같은 말이 카드에 나오지 않고, 점수 · 읽힌 점의 개수 · 계산 재료는 사이와 상관없이 같다", () => {
+  // 일지끼리 합 · 충이 읽히는 쌍을 찾는다 — 엔진은 "배우자 자리끼리 ~" 문장을 내보내지만(compat.ts, 변경 없음) 카드에는 생활 말로만 나온다
   let found: { a: Partial<CompatPersonInput>; b: Partial<CompatPersonInput> } | null = null;
   outer: for (let m = 1; m <= 12; m++) {
     for (let d = 1; d <= 28; d += 3) {
       const a = { birthMonth: String(m), birthDay: String(d) };
       const lover = computeSimpleCompat(person(a), partner(), TODAY, "lover");
-      if (lover.ok && [...lover.card.good, ...lover.card.care].some((t) => t.includes("배우자 자리"))) {
+      if (lover.ok && lover.card.basis.some((b) => /일지/.test(b.label))) {
         found = { a, b: {} };
         break outer;
       }
@@ -187,26 +188,23 @@ test("엔진 문구의 \"배우자 자리\"는 썸 · 친구 · 기타에서만 
   }
   assert.ok(found, "시험할 쌍을 찾지 못했다");
   const lover = cardOf("lover", found.a);
-  assert.ok(textOf(lover).includes("배우자 자리"), "연인은 엔진 문구 그대로");
-  for (const rel of ["friend", "other", "some"] as const) {
+  for (const rel of COMPAT_RELATIONSHIPS) {
     const c = cardOf(rel, found.a);
     assert.doesNotMatch(textOf(c), /배우자/, rel);
-    assert.ok(textOf(c).includes("가까운 사이를 보는 자리"), rel);
-    assert.equal(c.score, lover.score);
-    assert.equal(c.good.length, lover.good.length);
-    assert.equal(c.care.length, lover.care.length);
+    assert.equal(c.score, lover.score, rel);
+    assert.equal(c.good.length, lover.good.length, rel);
+    assert.equal(c.care.length, lover.care.length, rel);
+    assert.deepEqual(c.basis, lover.basis, `${rel}: 계산 재료는 사이로 바뀌지 않는다`);
   }
-  for (const rel of ["engaged", "married"] as const) assert.ok(textOf(cardOf(rel, found.a)).includes("배우자 자리"), rel);
+  assert.ok(lover.basis.some((b) => b.label === "가까운 사이에서 대하는 방식 (일지)"), "계산 재료는 쉬운 말이 앞이고 전통 이름은 괄호로 남는다");
 });
 
-test("썸 · 친구 · 기타의 카드에는 \"배우자\"가 어디에도 없다 — 읽힌 점 · 계산 재료 · \"이 지수는 이렇게 계산했어요\" 설명까지(실제 화면 검사에서 계산 설명에 남아 있던 것을 고쳤다)", () => {
-  assert.match(cardOf("lover").notes.scoreBasis, /배우자 자리\(일지\)/, "연인은 엔진 설명 그대로");
-  for (const rel of ["some", "friend", "other"] as const) {
+test("\"이 지수는 이렇게 계산했어요\" 설명은 모든 사이에서 같은 생활 말이다 — 재료의 이름과 방향은 숨기지 않는다", () => {
+  for (const rel of COMPAT_RELATIONSHIPS) {
     const c = cardOf(rel);
+    assert.equal(c.notes.scoreBasis, SCORE_BASIS_LIFE, rel);
     assert.doesNotMatch(textOf(c), /배우자/, rel);
-    assert.match(c.notes.scoreBasis, /가까운 사이를 보는 자리\(일지\)/, rel);
   }
-  for (const rel of ["engaged", "married"] as const) assert.match(cardOf(rel).notes.scoreBasis, /배우자 자리\(일지\)/, rel);
 });
 
 test("글 검사(relationshipIssues): 사이마다 지시한 금지 표현만 막고 사이에 맞는 말은 막지 않는다 · 사이가 없으면 예전처럼 아무것도 걸지 않는다", () => {

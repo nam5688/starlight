@@ -4,6 +4,7 @@
 import type { SajuOk } from "../saju/engine.ts";
 import { COMPAT_EXPLAIN, compatOf, type CompatResult } from "../saju/interpret/compat.ts";
 import { birthDateError, calculateSaju } from "../saju/manseryeok-engine.ts";
+import { COUPLE_EXPLAIN_LIFE, PACE_LIFE, SCORE_BASIS_LIFE, lifeHighlightOf, partLabelLife, sceneSignalsOf } from "./life-voice.ts";
 import {
   GENDER_REQUIRED_MESSAGE,
   RELATIONSHIP_LABEL,
@@ -138,7 +139,7 @@ export type SimpleCompatOutcome =
   | { ok: false; errors: { a: CompatPersonErrors; b: CompatPersonErrors }; relationship?: string; message?: string };
 
 /** 엔진 결과(변경 없음)에 사이에 맞는 풀이를 얹는다 — 사이에 맞지 않는 말("배우자 자리")만 표시용으로 바꾸고 점수 · 유형 · 근거 순서는 그대로다 */
-export function withRelation(card: SimpleCompatCard, rel: CompatRelationship, levels: CompatResult["levels"]): SimpleCompatCard {
+export function withRelation(card: SimpleCompatCard, rel: CompatRelationship, levels: CompatResult["levels"], parts: CompatResult["parts"] = []): SimpleCompatCard {
   const n = (t: string) => neutralWording(t, rel);
   return {
     ...card,
@@ -146,12 +147,17 @@ export function withRelation(card: SimpleCompatCard, rel: CompatRelationship, le
     care: card.care.map(n),
     basis: card.basis.map((b) => ({ ...b, label: n(b.label) })),
     notes: { ...card.notes, scoreBasis: n(card.notes.scoreBasis), tradition: n(card.notes.tradition) },
-    relation: { id: rel, label: RELATIONSHIP_LABEL[rel], heading: headingOf(rel, card.typeName), showType: showsCoupleType(rel), frame: relationFrameOf(rel, levels) },
+    relation: { id: rel, label: RELATIONSHIP_LABEL[rel], heading: headingOf(rel, card.typeName), showType: showsCoupleType(rel), frame: relationFrameOf(rel, levels, sceneSignalsOf(parts, levels.dayElement)) },
   };
 }
 
-/** 같은 엔진 결과에서 무료 카드를 만든다 — 유료가 같은 결과를 풀어 쓰므로 새로 계산하지 않는다 */
+/**
+ * 같은 엔진 결과에서 무료 카드를 만든다 — 유료가 같은 결과를 풀어 쓰므로 새로 계산하지 않는다.
+ * 점수 · 커플 유형 이름 · 한 줄 · 핵심은 엔진 값 그대로이고, 화면에 보이는 읽힌 점(good · care · pace) · 유형 설명(explain) · 계산 재료의 이름은
+ * 엔진이 내보낸 말을 그대로 옮기지 않고 생활 말로 바꿔 쓴다(lib/compat/life-voice.ts — 엔진이 읽은 사실의 뜻은 그대로, 말만 바꾼다. 못 알아보는 문장은 지어내지 않고 건너뛴다).
+ */
 export function cardOf(result: CompatResult, names: { a: string; b: string }): SimpleCompatCard {
+  const lifeLines = (lines: string[]) => lines.map(lifeHighlightOf).filter((t): t is string => t !== null);
   return {
     version: result.version,
     names,
@@ -160,13 +166,13 @@ export function cardOf(result: CompatResult, names: { a: string; b: string }): S
     score: result.score,
     scoreMeaning: result.scoreMeaning,
     core: result.coupleType.core,
-    explain: result.coupleType.explain,
-    good: result.highlights.good.slice(0, 2),
-    care: result.highlights.care.slice(0, 2),
-    pace: result.highlights.pace,
-    basis: result.parts.map((p) => ({ label: p.label, direction: p.points > 0 ? "잘 맞는 쪽으로 읽혀요" : p.points < 0 ? "차이가 보이는 쪽으로 읽혀요" : "한쪽으로 기울지 않아요" })),
+    explain: COUPLE_EXPLAIN_LIFE[result.coupleType.id] ?? result.coupleType.explain,
+    good: lifeLines(result.highlights.good.slice(0, 2)),
+    care: lifeLines(result.highlights.care.slice(0, 2)),
+    pace: PACE_LIFE[result.levels.pace],
+    basis: result.parts.map((p) => ({ label: partLabelLife(p), direction: p.points > 0 ? "잘 맞는 쪽으로 읽혀요" : p.points < 0 ? "차이가 보이는 쪽으로 읽혀요" : "한쪽으로 기울지 않아요" })),
     cautions: result.cautions,
-    notes: { scoreBasis: COMPAT_EXPLAIN.scoreBasis, scoreNotProbability: COMPAT_EXPLAIN.scoreNotProbability, tradition: COMPAT_EXPLAIN.tradition },
+    notes: { scoreBasis: SCORE_BASIS_LIFE, scoreNotProbability: COMPAT_EXPLAIN.scoreNotProbability, tradition: COMPAT_EXPLAIN.tradition },
   };
 }
 
@@ -188,7 +194,7 @@ export function computeSimpleCompat(rawA: unknown, rawB: unknown, today: Date, r
   }
   const names = { a: cleanNickname(a.nickname, "나"), b: cleanNickname(b.nickname, "상대") };
   const result = compatOf(sa as SajuOk, sb as SajuOk);
-  return { ok: true, card: withRelation(cardOf(result, names), relationship, result.levels) };
+  return { ok: true, card: withRelation(cardOf(result, names), relationship, result.levels, result.parts) };
 }
 
 /** 공유할 글 — 이름 · 커플 유형 · 총점과 이 서비스 이름만 담고 생년월일은 담지 않는다 */

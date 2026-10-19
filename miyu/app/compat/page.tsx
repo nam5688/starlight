@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { CompatForm } from "@/components/compat/compat-form";
 import { CompatLevels } from "@/components/compat/compat-levels";
+import { CompatNextSteps } from "@/components/compat/compat-next-steps";
 import { CompatPaidSection } from "@/components/compat/compat-paid-section";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow } from "@/components/ui/styles";
@@ -26,7 +27,13 @@ export default function CompatPage() {
         <h1 className="mt-2 text-[26px] leading-snug font-bold tracking-tight md:text-[32px]">우리 둘은 어떤 사이일까?</h1>
         <p className="mt-3 text-[16px] leading-[1.75] text-ink-2">두 사람의 생년월일과 성별, 지금의 사이를 알려 주시면 두 사주에서 읽힌 궁합 지수와 그 사이에 맞춘 풀이를 알려 드려요. 재미로 가볍게 봐 주세요.</p>
         <div className="mt-8">
-          <CompatForm />
+          <CompatForm
+            nextSteps={
+              <Suspense fallback={null}>
+                <CompatNextSteps />
+              </Suspense>
+            }
+          />
         </div>
 
         {/* 판매 스위치가 꺼져 있는 동안은 아무것도 그리지 않는다 */}

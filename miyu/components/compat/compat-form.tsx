@@ -14,7 +14,7 @@ import { EMPTY_COMPAT_PERSON, type CompatPersonErrors, type CompatPersonInput, t
  * 간단 궁합 입력 + 결과. 입력한 값은 계산하는 순간의 서버에서만 쓰고 저장하지 않는다.
  * 새로고침해도 이어 쓸 수 있게 이 브라우저 탭(sessionStorage)에만 1시간 임시로 두고, 탭을 닫거나 [입력 지우기]를 누르면 지워진다(서버로 보내지 않는다).
  */
-export function CompatForm() {
+export function CompatForm({ nextSteps }: { nextSteps?: React.ReactNode } = {}) {
   const [a, setA] = useState<CompatPersonInput>(EMPTY_COMPAT_PERSON);
   const [b, setB] = useState<CompatPersonInput>(EMPTY_COMPAT_PERSON);
   const [relationship, setRelationship] = useState<"" | CompatRelationship>("");
@@ -25,6 +25,7 @@ export function CompatForm() {
   const [pending, startTransition] = useTransition();
   const topRef = useRef<HTMLDivElement>(null);
   const draftReady = useRef(false);
+  const backToForm = useRef(false);
 
   // 이 탭에 임시 보관된 입력이 있으면 그린 직후 한 번 복원한다 (저장소는 브라우저에서만 읽을 수 있다)
   useEffect(() => {
@@ -80,8 +81,8 @@ export function CompatForm() {
         const out = await simpleCompatAction({ a, b, relationship });
         if (out.ok) {
           setErrors({ a: {}, b: {} });
+          // 결과 위치로 옮기는 일은 결과 컴포넌트가 붙은 뒤 스스로 한다(CompatResult) — 여기서 옮기면 렌더 전에 실행될 수 있다
           setCard(out.card);
-          requestAnimationFrame(() => document.getElementById("compat-result")?.scrollIntoView({ behavior: "smooth", block: "start" }));
         } else {
           setErrors(out.errors);
           setRelationshipError(out.relationship);
@@ -94,12 +95,19 @@ export function CompatForm() {
   };
 
   const reset = () => {
+    backToForm.current = true;
     setCard(null);
     clearAll();
-    topRef.current?.scrollIntoView({ block: "start" });
   };
 
-  if (card) return <CompatResult card={card} onReset={reset} />;
+  // "다시 보기"로 입력 화면이 다시 그려진 뒤 입력 맨 위로 옮긴다(그리기 전에는 topRef가 없다)
+  useEffect(() => {
+    if (card || !backToForm.current) return;
+    backToForm.current = false;
+    topRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [card]);
+
+  if (card) return <CompatResult card={card} onReset={reset} nextSteps={nextSteps} />;
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5" aria-describedby="compat-privacy">

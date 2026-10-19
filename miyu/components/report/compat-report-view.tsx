@@ -1,8 +1,10 @@
 import { ChevronIcon, InfoIcon } from "@/components/ui/icons";
+import { Prose } from "@/components/ui/prose";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { headingOf, neutralWording, parseRelationship, RELATIONSHIP_LABEL, relationLensOf, showsCoupleType } from "@/lib/compat/relationship";
 import { COMPAT_STEP_GROUPS, type CompatStepGroupId } from "@/lib/report/compat/plan";
 import type { CompatReport, PairReport } from "@/lib/report/compat/types";
+import { viewerText } from "@/lib/report/compat/viewer-names";
 
 /** 글을 쓴 곳의 표시 — 모의 작성기 · 시험용 대리 작성기만 "실제 서비스 AI가 아니다"라고 밝히고, 실제 AI가 쓴 글에는 붙이지 않는다 */
 export function writerLabelOf(provider: string): string | null {
@@ -37,6 +39,8 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
   const showType = showsCoupleType(rel);
   const pair = report.kind === "compat-pair-v1" ? report : null;
   const names = report.kind === "compat-saju-v1" ? report.names : null;
+  // 리포트 궁합의 저장 글은 익명 "A님 · B님"이다 — 읽는 사람을 알면 보여 주기 직전에만 "본인 · 상대"로 바꾼다(저장 글은 그대로, 읽는 사람마다 서로 뒤바뀐다)
+  const vt = (t: string): string => (pair && viewer ? viewerText(t, viewer) : t);
   // 리포트 궁합: 읽는 사람의 실천 묶음을 먼저 보인다(두 사람이 같은 글을 보지만 각자 먼저 읽을 곳이 다르다)
   const groups = pair && viewer ? [...COMPAT_STEP_GROUPS].sort((x, y) => Number(stepOwner(y.id, viewer) === "mine") - Number(stepOwner(x.id, viewer) === "mine")) : COMPAT_STEP_GROUPS;
   return (
@@ -48,8 +52,8 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
       )}
 
       <div className="rounded-2xl bg-canvas p-6 text-center shadow-soft md:p-8">
-        <p className="text-[14px] font-medium text-ink-3">{names ? `${names.a} × ${names.b}` : "A님 × B님"}</p>
-        {pair && viewer && <p className="mt-1 text-[13px] text-ink-3">이 글에서 {viewer === "a" ? "A님은 나, B님은 상대" : "B님은 나, A님은 상대"}예요.</p>}
+        <p className="text-[14px] font-medium text-ink-3">{names ? `${names.a} × ${names.b}` : pair && viewer ? "본인 × 상대" : "A님 × B님"}</p>
+        {pair && viewer && <p className="mt-1 text-[13px] text-ink-3">이 글에서 &lsquo;본인&rsquo;은 읽는 분이고 &lsquo;상대&rsquo;는 함께 연결한 분이에요.</p>}
         {rel && <p className="mx-auto mt-2 w-fit rounded-full bg-accent-soft px-3 py-1 text-[13px] font-semibold text-accent-strong">{RELATIONSHIP_LABEL[rel]} 사이로 읽었어요</p>}
         <h2 className="mt-2 text-[26px] leading-tight font-bold tracking-tight break-keep text-accent-strong md:text-[32px]">{rel ? headingOf(rel, s.typeName) : s.typeName}</h2>
         <p className="mx-auto mt-3 max-w-[30rem] text-[16px] leading-[1.65] text-ink">{showType ? s.typeLine : relationLensOf(rel!)}</p>
@@ -71,7 +75,7 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
 
       <div className="px-1">
         <p className="text-[13px] font-semibold text-accent">{pair ? "리포트 궁합 풀이" : "사주 궁합 풀이"}</p>
-        <h2 className="mt-1 text-[22px] leading-snug font-bold tracking-tight md:text-[26px]">{report.headline}</h2>
+        <h2 className="mt-1 text-[22px] leading-snug font-bold tracking-tight md:text-[26px]">{vt(report.headline)}</h2>
       </div>
 
       {pair && (
@@ -87,11 +91,11 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
             {i + 1}. {sec.topic}
           </p>
           <h3 id={`compat-sec-${sec.id}`} className="mt-1 text-[18px] leading-snug font-bold">
-            {sec.headline}
+            {vt(sec.headline)}
           </h3>
           <div className="mt-3 space-y-3 text-[16px] leading-[1.75] text-ink-2">
             {sec.paragraphs.map((p) => (
-              <p key={p}>{p}</p>
+              <Prose key={p} text={vt(p)} />
             ))}
           </div>
         </section>
@@ -105,17 +109,17 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
           {groups.map((g) => (
             <div key={g.id}>
               <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-accent">
-                {stepLabel(g.id, names)}
+                {vt(stepLabel(g.id, names))}
                 {stepOwner(g.id, pair ? viewer : null) === "mine" && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[12px] text-accent-strong">내가 해 볼 행동</span>}
                 {stepOwner(g.id, pair ? viewer : null) === "theirs" && <span className="rounded-full bg-mist px-2 py-0.5 text-[12px] text-ink-3">상대가 해 볼 행동</span>}
               </p>
               <ul className="mt-2 space-y-4">
                 {report.steps[g.id].map((a) => (
                   <li key={a.title}>
-                    <p className="text-[16px] font-semibold">{a.title}</p>
-                    <p className="mt-1 text-[15px] leading-[1.75] text-ink-2">{a.detail}</p>
+                    <p className="text-[16px] font-semibold">{vt(a.title)}</p>
+                    <Prose text={vt(a.detail)} className="mt-1 text-[15px] leading-[1.75] text-ink-2" />
                     <p className="mt-2 rounded-xl bg-accent-soft px-3 py-2 text-[15px] leading-[1.65] text-accent-strong">
-                      <span className="block text-[12px] font-semibold text-accent">건네 볼 수 있는 말</span>“{a.say}”
+                      <span className="block text-[12px] font-semibold text-accent">건네 볼 수 있는 말</span>“{vt(a.say)}”
                     </p>
                   </li>
                 ))}
@@ -129,7 +133,7 @@ export function CompatReportView({ report, viewer }: { report: CompatReport | Pa
             <ul className="mt-2 space-y-2 text-[15px] leading-[1.7] text-ink-2">
               {report.questions.map((q) => (
                 <li key={q} className="rounded-xl bg-accent-soft px-3 py-2 text-accent-strong">
-                  {q}
+                  {vt(q)}
                 </li>
               ))}
             </ul>

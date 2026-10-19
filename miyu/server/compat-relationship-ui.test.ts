@@ -65,7 +65,7 @@ test("결과 화면: 커플 유형 이름은 연인 · 결혼준비중 · 결혼
   assert.match(r, /showType/);
   assert.match(r, /rel\.heading/);
   assert.match(r, /data-relation-frame/);
-  for (const label of ["잘 맞는 부분", "부딪히기 쉬운 부분", "서로 이해할 점", "지금 해 볼 행동"]) assert.ok(result.includes(label), label);
+  for (const label of ["잘 맞는 모습", "차이가 나타나는 상황", "서로 이해해 볼 점", "지금 해 볼 행동"]) assert.ok(result.includes(label), label);
   // 우리 커플 핵심 상자는 유형을 보이는 사이에서만
   assert.match(r, /\{showType && \(/);
   const v = code(reportView);
@@ -135,4 +135,26 @@ test("공개 개인정보 처리방침에 궁합 입력 정보의 사실이 있�
   assert.match(p, /Anthropic — 리포트 · 궁합 풀이 · 맛보기 리포트 · 자유 질문 답변을 만드는 AI \(전달 항목은 3-1 · 3-2 · 3-3에 적음, 이름 · 생년월일 원문 제외, 현재는 연결하지 않았고 시험 단계에서는 운영자가 승인한 범위 안에서만 호출\)/);
   assert.doesNotMatch(p, /자유 질문에 답하는 AI/);
   assert.match(read("lib/membership/terms.ts"), /TERMS_VERSION = "2026-10-draft-1"/);
+});
+
+test("결과 위치: 제출 직후(렌더 전)에 스크롤하지 않고, 결과 컴포넌트가 붙은 뒤 한 번만 제목부터 보이게 옮긴다 · 전체 스크롤 초기화 없음", () => {
+  const f = code(compatForm);
+  // 예전 방식(setCard 바로 뒤 requestAnimationFrame → 결과로 스크롤)은 입력 칸이 사라지기 전에 실행될 수 있어 결과 중간이 보였다
+  assert.doesNotMatch(f, /requestAnimationFrame/);
+  assert.doesNotMatch(f, /scrollTo\(0,\s*0\)|window\.scrollTo/);
+  const r = code(result);
+  assert.match(r, /useEffect\(\(\) => \{[\s\S]*placed\.current[\s\S]*scrollIntoView\(\{ block: "start"[\s\S]*\}, \[\]\)/);
+  assert.match(r, /focus\(\{ preventScroll: true \}\)/);
+  assert.match(r, /id="compat-result-title"/);
+  // 고정 머리글은 전체 스크롤 여백이 비켜 준다
+  assert.match(read("app/globals.css"), /scroll-padding-top:\s*5rem/);
+});
+
+test("결과 아래 다음 단계(사주 · 리포트 궁합)는 하드코딩된 준비 중 버튼이 아니라 판매 스위치 값을 따른다 — 스위치는 열지 않았다", () => {
+  const n = code(read("components/compat/compat-next-steps.tsx"));
+  assert.match(n, /saleOpenOf\("saju-compat"\)/);
+  assert.match(n, /saleOpenOf\("report-compat"\)/);
+  assert.doesNotMatch(code(result), /준비 중/);
+  assert.match(read("lib/config/product.ts"), /SAJU_COMPAT[\s\S]{0,400}saleOpen:\s*false/);
+  assert.match(read("lib/config/product.ts"), /PAIR_COMPAT[\s\S]{0,400}saleOpen:\s*false/);
 });

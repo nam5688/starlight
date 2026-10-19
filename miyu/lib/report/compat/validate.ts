@@ -10,6 +10,7 @@ import type { Evidence } from "../evidence.ts";
 import { familyPastErrors, hourUnknownErrors } from "../reading/hour-scope.ts";
 import { ADVICE_RULES_TRADITIONAL } from "../reading/plan.ts";
 import { findRepeatedPhrasesIn, type RepeatedPhrase } from "../reading/repeat.ts";
+import { customerVoiceLeaks } from "../reading/customer-voice.ts";
 import { distinctTerms } from "../reading/terms.ts";
 import { splitWarnings } from "../reading/warn-policy.ts";
 import { checkVoice, voiceErrors } from "../style/voice.ts";
@@ -303,6 +304,13 @@ export function validateCompatDraft(raw: unknown, evidence: Evidence[], opts: Co
     const ev = unfoundedEventIn(t, opts.relationship);
     if (ev) errors.push(`${where}: 입력받지 않은 두 사람의 사건("${ev}")을 아는 사실처럼 쓰지 않습니다 — "~했던 때가 있었을 수 있어요"처럼 조건 · 추측으로 쓰거나 장면의 가능성("~기 쉬워요")으로 바꾸세요.`);
     if (inTiming && TIMING_NOT_COMPUTED.test(t)) errors.push(`${where}: "${TIMING_NOT_COMPUTED.exec(t)![0]}"는 계산하지 않은 시기 이야기라 쓰지 않습니다 — 근거(compat.timing.*)에 적힌 시기 · 연도 안에서 두 시기의 주제가 겹치는지 다른지만 쓰세요.`);
+  }
+
+  // 고객이 읽는 글(지시문 0.6 · 0.4) — 본문에 명리 용어 · 한자 · 간지가 새어 나왔는지는 경고(WARN)로만 센다(저장을 막지 않고 고쳐 쓰기도 부탁하지 않는다, 기존 BLOCK은 하나도 낮추지 않았다).
+  // 오행 이름("물의 기운")은 오행 조화(2번)와 개운(7번) 장에서만 허용한다. 개인 심층 리포트의 같은 지표(customer-voice.ts)를 쓰되 궁합의 두 장 예외만 다르다.
+  for (const { where, text: t } of texts) {
+    const leaks = customerVoiceLeaks(t, { allowElementTalk: /^sections\.(?:harmony|advice)\./.test(where) });
+    if (leaks.length > 0) errors.push(`${where}: 본문에 명리 용어(${leaks.join(" · ")})가 있어요 — 두 사람의 행동 · 함께 정하고 대화하는 상황으로 풀어 쓰세요(경고만 하고 저장은 막지 않습니다).`);
   }
 
   // 알려 준 사이에 맞는 글인가 — 사이를 고른 것으로 풀이의 관점만 바뀌고, 사이에 맞지 않는 단정은 저장하지 않는다

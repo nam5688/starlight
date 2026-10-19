@@ -1,5 +1,5 @@
 // 실행: npm test — 사주 궁합 · 리포트 궁합 생성 경로에 "무슨 사이인가요?"가 정식 구조로 연결됐는지 확인한다(비용 0 · 모의 작성기 · 실제 AI 호출 없음).
-//  ① 지시문(시스템 프롬프트 0.5 / 0.3)은 글자 하나도 바뀌지 않았고, 사이는 사용자 메시지의 relationship 항목으로만 간다(없으면 메시지가 예전과 같다)
+//  ① 사이는 지시문 본문이 아니라 사용자 메시지의 relationship 항목으로만 간다(없으면 메시지가 예전과 같다 — 지시문 0.6 / 0.4는 고객이 읽는 글의 서술 방식만 바꿨고 사이 처리는 그대로다)
 //  ② AI 요청에는 이름 · 성별 · 생년월일이 없다(사이의 이름표와 읽는 법뿐) ③ 여섯 사이마다 요청 · 5번 장 이름표 · 저장 형식 · 안내가 모두 사이를 따른다
 //  ④ 점수 · 유형 · 근거는 사이로 바뀌지 않는다 ⑤ 검사는 사이에 맞는 글은 통과시키고 맞지 않는 글(친구에 연애, 썸에 마음 확정, 결혼 사이에 앞날 보장, 기타에 관계 이름)을 막는다
 // 실제 AI가 사이에 맞는 좋은 글을 쓰는지는 이 시험으로 알 수 없다(실제 AI로 읽지 않았다).
@@ -37,8 +37,8 @@ const clone = (d: CompatDraftV1) => JSON.parse(JSON.stringify(d)) as CompatDraft
 const love = (d: CompatDraftV1) => d.sections.find((s) => s.id === "love")!;
 
 test("지시문(시스템 프롬프트)은 바뀌지 않았다 — 사이는 사용자 메시지로만 가고, 사이가 없으면 메시지가 예전과 글자까지 같다", () => {
-  const saved = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.5.txt", import.meta.url));
-  const savedPair = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.3.txt", import.meta.url));
+  const saved = readSource(new URL("../../../docs/samples/prompts/compat-v1-prompt-0.6.txt", import.meta.url));
+  const savedPair = readSource(new URL("../../../docs/samples/prompts/pair-v1-prompt-0.4.txt", import.meta.url));
   assert.equal(COMPAT_SYSTEM_PROMPT, saved);
   assert.equal(PAIR_SYSTEM_PROMPT, savedPair);
   const neutral = buildCompatUserMessage(evidence, result.cautions);

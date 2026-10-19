@@ -129,12 +129,12 @@ test("무료와 유료의 일치: 새 근거(compat.chart · fortify)는 유료 
 
 test("지시문: 사주 궁합의 일(명리 풀이 · 장면 · 조율 · 개운 · 방향)과 쓰지 않는 것(판정 · 속마음 · 관계 종류 · 시기 · 상품 안내 · 응답 · 점수)을 함께 말한다", () => {
   assert.ok(COMPAT_SYSTEM_PROMPT.startsWith(COMPAT_PROMPT_MARK));
-  for (const must of ["A님", "B님", "해요체", "쓰지 않는 것은 이 일을 해치는 것", "누구 탓", "evidence", "~로 읽혀요", "두 사람의 관계 종류", "속마음", "천생연분", "점수 숫자", "커플 유형 이름을 되풀이하지", "응답은 이 풀이에 없다", "구매 · 가격 · 질문권", "JSON 객체 하나만", "그 모양이 읽히지 않았다는 뜻", "누가 누구를 키우는지의 방향이 없다", "weak 근거", "반복의 기준은 낱말 횟수가 아니다", "compat.timing.*", "맞물리는 해", "aToB", "bToA", "together", "건넬 짧은 말 한 문장", "따옴표 없이", "compat.fortify", "questions", "세 기둥(시주 제외)", "자녀 · 출산", "격국 · 용신 · 희신 · 기신 · 신살 · 십이운성", "명리 풀이가 이 글의 중심이다", "우선 참고(목록에 있는 것만)", "0단계여도 작은 충 · 형"]) {
+  for (const must of ["A님", "B님", "해요체", "쓰지 않는 것은 이 일을 해치는 것", "누구 탓", "evidence", "~로 읽혀요", "두 사람의 관계 종류", "속마음", "천생연분", "점수 숫자", "커플 유형 이름을 되풀이하지", "응답은 이 풀이에 없다", "구매 · 가격 · 질문권", "JSON 객체 하나만", "그 모양이 읽히지 않았다는 뜻", "누가 누구를 키우는지의 방향이 없다", "weak 근거", "반복의 기준은 낱말 횟수가 아니다", "compat.timing.*", "맞물리는 해", "aToB", "bToA", "together", "건넬 짧은 말 한 문장", "따옴표 없이", "compat.fortify", "questions", "세 기둥(시주 제외)", "자녀 · 출산", "격국 · 용신 · 희신 · 기신 · 신살 · 십이운성", "[고객이 읽는 글", "용어만 바꿔 쓰지 않는다", "우선 참고(목록에 있는 것만)", "0단계여도 작은 충 · 형"]) {
     assert.ok(COMPAT_SYSTEM_PROMPT.includes(must), must);
   }
   for (const s of COMPAT_SECTIONS) assert.ok(COMPAT_SYSTEM_PROMPT.includes(` ${s.id} (${s.topic}`), s.id);
   assert.ok(!COMPAT_SYSTEM_PROMPT.includes(" view ("), "사주 궁합에는 6번(응답 비교) 장이 없다");
-  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.5");
+  assert.equal(COMPAT_PROMPT_VERSION, "compat-v1-prompt-0.6");
   assert.equal(COMPAT_TIMING_BUILT, true, "두 사람의 시기(각자의 대운 · 세운을 나란히 놓는 범위)는 계산한다 — 바꾸면 이 시험 · 지시문 · 검사 · 화면 안내를 함께 바꾼다");
 });
 
