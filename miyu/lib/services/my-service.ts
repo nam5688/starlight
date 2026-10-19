@@ -3,7 +3,7 @@
 
 import { packRemaining } from "../commerce/cash.ts";
 import type { OrderStatus } from "../commerce/order.ts";
-import { isCompatProduct, isPersonalProduct, parseCashProductId, parseConcernProductId, parsePairProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf } from "../config/product.ts";
+import { isCompatProduct, isPersonalProduct, parseCashProductId, parseConcernProductId, parsePairProductId, parsePersonalSeq, PERSONAL_REPORT, productNameOf, REPORT_TIER_NAMES } from "../config/product.ts";
 import type { DataSource } from "../report/types.ts";
 import { formatAssessmentBirth } from "./assessment-service.ts";
 import type { MiyuRepository, OrderRecord, PaymentEnv, PaymentEventRecord, ReportRecord } from "./ports.ts";
@@ -161,13 +161,15 @@ export async function getMyPage(repo: MiyuRepository, userId: string, now: Date 
       // 카드의 상태는 가장 최근에 완성된 리포트를 기준으로 한다 (새로 받는 리포트를 만드는 중이어도 이미 받은 리포트는 열 수 있다)
       const current = received.find((x) => x.generation === "ready") ?? received[0];
       const paid = current ? receivedOrders.find((o) => o.orderNumber === current.orderNumber) : undefined;
+      const entitlement: Entitlement = paid ? "purchased" : related.some((o) => o.status === "refunded") ? "refunded" : "free";
       return {
         assessmentId: a.id,
-        productName: PERSONAL_REPORT.name,
+        // 결제하지 않은 무료 결과는 무료 리포트, 구매 · 환불된 건은 심층 리포트 (이름은 REPORT_TIER_NAMES · PERSONAL_REPORT 한 곳)
+        productName: entitlement === "free" ? REPORT_TIER_NAMES.simple : PERSONAL_REPORT.name,
         subject: `${a.nickname} 님 · ${formatAssessmentBirth(a)}`,
         createdAt: a.createdAt,
         period: null,
-        entitlement: paid ? "purchased" : related.some((o) => o.status === "refunded") ? "refunded" : "free",
+        entitlement,
         generation: current ? current.generation : "none",
         paidOrderNumber: paid?.orderNumber ?? null,
         received,

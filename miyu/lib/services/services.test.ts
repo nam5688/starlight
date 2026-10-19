@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
 import type { GatewayPayment } from "../commerce/order.ts";
 import { isValidOrderNumber } from "../commerce/order.ts";
-import { PERSONAL_REPORT } from "../config/product.ts";
+import { PERSONAL_REPORT, REPORT_TIER_NAMES } from "../config/product.ts";
 import { EMPTY_BASIC_INFO, type BasicInfo } from "../profile/basic-info.ts";
 import { createAiReportGenerator } from "../report/ai/generator.ts";
 import { createMockModel } from "../report/ai/mock-model.ts";
@@ -455,6 +455,9 @@ test("MY: 구매 전에는 무료 결과, 결제 후에는 구매 완료 · 생�
   let page = await getMyPage(mem.repo, USER);
   assert.equal(page.cards[0].entitlement, "free");
   assert.equal(page.cards[0].generation, "none");
+  // 결제하지 않은 무료 결과의 카드 제목은 무료 리포트다 (심층 리포트로 보이지 않는다)
+  assert.equal(page.cards[0].productName, REPORT_TIER_NAMES.simple);
+  assert.equal(page.cards[0].productName, "무료 리포트");
   assert.match(page.cards[0].subject, /^지민 님 · 1995년 4월 12일/);
   assert.deepEqual(page.orders, []);
 
@@ -472,6 +475,9 @@ test("MY: 구매 전에는 무료 결과, 결제 후에는 구매 완료 · 생�
   assert.equal(page.cards[0].entitlement, "purchased");
   assert.equal(page.cards[0].generation, "failed");
   assert.equal(page.cards[0].paidOrderNumber, second.order.orderNumber);
+  // 구매한 카드의 제목은 심층 리포트다
+  assert.equal(page.cards[0].productName, PERSONAL_REPORT.name);
+  assert.equal(page.cards[0].productName, "심층 리포트");
 
   await ensureReport({ repo: mem.repo, generator: devReportGenerator, now: () => TODAY }, paid.order);
   page = await getMyPage(mem.repo, USER);
@@ -485,6 +491,41 @@ test("MY: 구매 전에는 무료 결과, 결제 후에는 구매 완료 · 생�
       [first.order.orderNumber, "새 결제로 대체", "test-docs"],
     ],
   );
+});
+
+test("MY: 같은 회원의 무료 결과 · 구매한 결과 · 환불된 결과가 한 화면에서 제목으로 구분된다", async () => {
+  const { mem, assessment: free } = await setup();
+  const mk = async (answers: number) => {
+    const r = await submitAssessment({ repo: mem.repo, saju: sajuEngine }, { userId: USER, channel: "web", info: INFO, answers: answersAll(answers), today: TODAY });
+    if (!r.ok) throw new Error();
+    return r.assessment;
+  };
+  const bought = await mk(2);
+  const refunded = await mk(4);
+  const { gateway } = fakeGateway({ confirm: (i) => ({ ok: true, payment: done(i.orderId, i.amount, i.paymentKey) }) });
+
+  const pay = async (assessmentId: string, key: string) => {
+    const started = await startCheckout(deps(mem), { userId: USER, assessmentId, paymentEnv: "test" });
+    if (started.kind !== "order") throw new Error(started.kind);
+    const paid = await confirmPayment({ repo: mem.repo, gateway }, { userId: USER, orderNumber: started.order.orderNumber, paymentKey: key, amount: started.order.amount });
+    if (paid.kind !== "paid") throw new Error(paid.kind);
+    return started.order;
+  };
+  await pay(bought.id, "pk_title_bought");
+  const refundedOrder = await pay(refunded.id, "pk_title_refund");
+  const canceledGw = fakeGateway({ get: (k) => ({ ok: true, payment: { ...done(refundedOrder.orderNumber, refundedOrder.amount, k), status: "CANCELED", balanceAmount: 0 } }) });
+  await syncPayment({ repo: mem.repo, gateway: canceledGw.gateway }, { paymentKey: "pk_title_refund" });
+
+  const page = await getMyPage(mem.repo, USER);
+  const titleOf = (id: string) => page.cards.find((c) => c.assessmentId === id);
+  assert.equal(titleOf(free.id)?.entitlement, "free");
+  assert.equal(titleOf(free.id)?.productName, REPORT_TIER_NAMES.simple);
+  assert.equal(titleOf(bought.id)?.entitlement, "purchased");
+  assert.equal(titleOf(bought.id)?.productName, PERSONAL_REPORT.name);
+  assert.equal(titleOf(refunded.id)?.entitlement, "refunded");
+  assert.equal(titleOf(refunded.id)?.productName, PERSONAL_REPORT.name);
+  // 두 이름은 서로 달라야 한다 (한쪽으로 합쳐지는 회귀를 막는다)
+  assert.notEqual(REPORT_TIER_NAMES.simple, PERSONAL_REPORT.name);
 });
 
 test("주문 추적: 주문번호로 승인 기록(상점 ID 포함) · 주문 상태 · 리포트 권한을 함께 보고, 다른 회원은 볼 수 없다", async () => {
