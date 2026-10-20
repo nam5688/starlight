@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { Group } from "../../saju/interpret/structure.ts";
 import { FLAVOR_RULES, PERSONAL_TYPES, PERSONAL_TYPE_IDS } from "../personal-type.ts";
+import { readSource } from "../../report/test-source.ts";
 import { SITUATIONAL_V2_ITEMS } from "./situational-v2-draft.ts";
 import {
   DISTINCTIONS,
@@ -31,7 +32,7 @@ import { SIM, mulberry32, operatorSheetFromDoc, randomSheet, renderReadingTables
 
 const root = join(import.meta.dirname, "..", "..", "..");
 const GROUPS: Group[] = ["비겁", "식상", "재성", "관성", "인성"];
-const provenance = readFileSync(join(root, "docs", "assessment-situational-v2-provenance.md"), "utf8");
+const provenance = readSource(join(root, "docs", "assessment-situational-v2-provenance.md"));
 
 /** 장면 번호 → 선택지 번호 */
 const sheet = (o: Record<string, Answer | undefined>): AnswerSheet => o;
@@ -172,7 +173,7 @@ test("누구의 응답도 기본값이 아니다 — 빈 응답은 아무것도 
   }
   assert.equal(typeFrom28([], empty).kind, "mixed");
   // 읽기 모듈은 운영자 예시 답을 모른다 — 예시는 문서 생성 쪽에서만 문서의 블록에서 읽는다
-  const source = readFileSync(join(import.meta.dirname, "situational-v2-reading.ts"), "utf8");
+  const source = readSource(join(import.meta.dirname, "situational-v2-reading.ts"));
   for (const word of ["operator-picks", "assessment-situational-v2-provenance", "readFileSync", "OPERATOR"]) assert.ok(!source.includes(word), `읽기 모듈이 ${word}를 알고 있다`);
   assert.deepEqual(operatorSheetFromDoc(""), {});
   assert.ok(!renderReadingTables("").includes("예시 D"), "운영자 블록이 없으면 예시 D를 만들지 않는다");
@@ -308,7 +309,7 @@ test("연결하지 않았다: 읽기 모듈 · 문서 생성 · 시험 밖의 �
 });
 
 test("생성 문서(docs/assessment-situational-v2-reading-tables.md)가 코드와 어긋나지 않는다", () => {
-  const onDisk = readFileSync(join(root, "docs", "assessment-situational-v2-reading-tables.md"), "utf8");
+  const onDisk = readSource(join(root, "docs", "assessment-situational-v2-reading-tables.md"));
   const rendered = renderReadingTables(provenance);
   assert.equal(onDisk.replace(/\n+$/, ""), rendered.replace(/\n+$/, ""), "문서가 낡았다 — node scripts/situational-v2-render-reading.ts로 다시 만든다");
 });

@@ -8,6 +8,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { splitSentences } from "../report/reading/line-breaks.ts";
+import { readSource } from "../report/test-source.ts";
 import { customerVoiceLeaks } from "../report/reading/customer-voice.ts";
 import { ABSENCE_MAPPING } from "../report/reading/story-plan.ts";
 import { FIVE_ELEMENTS } from "./engine.ts";
@@ -132,6 +133,6 @@ test("생성 문서(docs/free-result-life-language-proposal-v1.md)가 코드와 
   const saju = calculateSaju({ ...SAMPLE_BIRTH });
   assert.equal(saju.status, "ok");
   if (saju.status !== "ok") return;
-  const onDisk = readFileSync(join(root, "docs", "free-result-life-language-proposal-v1.md"), "utf8");
+  const onDisk = readSource(join(root, "docs", "free-result-life-language-proposal-v1.md"));
   assert.equal(onDisk.replace(/\n+$/, ""), renderLifeLanguageProposal(saju).replace(/\n+$/, ""), "문서가 낡았다 — node scripts/plain-life-draft-render.ts로 다시 만든다");
 });
