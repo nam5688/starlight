@@ -244,3 +244,66 @@ test("적용 이력 확인(check-migrations.sql)에 30번 줄이 있다 — 장�
   assert.match(checkSql, /wd30 as \(/);
   assert.match(checkSql, /pairs_block_deleted_record/);
 });
+
+// ── 29번 + 30번 단독 적용 파일(supabase/apply-29-30.sql): 원본 그대로 · 하나의 트랜잭션 · 시작 조건 · 끝 확인 · 삭제 함수 미호출 ──
+import { buildScope2930ApplySql } from "../lib/ops/apply-sql.ts";
+
+const wrapped = readSource(new URL("../supabase/apply-29-30.sql", import.meta.url));
+
+test("29+30 단독 적용 파일은 두 마이그레이션에서 만든 그대로다 (마이그레이션 · 확인 조회를 고쳤다면 node scripts/render-apply-sql.ts --29-30을 다시 실행)", () => {
+  assert.equal(wrapped, buildScope2930ApplySql({ migrations: [{ name: scopeFile, sql: scopeSql }, { name: guardFile, sql: guardSql }], checkSql }));
+});
+
+test("29+30 단독 적용 파일: 두 마이그레이션이 한 글자도 바뀌지 않고 29 → 30 순서로 들어 있으며, 전체가 하나의 트랜잭션이다(시작 조건이 begin 뒤, 끝 확인이 commit 앞)", () => {
+  const i29 = wrapped.indexOf(scopeSql.trimEnd());
+  const i30 = wrapped.indexOf(guardSql.trimEnd());
+  assert.ok(i29 > 0 && i30 > i29, "29 → 30 순서로 그대로 들어 있다");
+  assert.equal(wrapped.match(/\nbegin;\n/g)?.length, 1);
+  assert.equal(wrapped.match(/\ncommit;\n/g)?.length, 1);
+  const begin = wrapped.indexOf("\nbegin;\n");
+  const commit = wrapped.indexOf("\ncommit;\n");
+  const precheck = wrapped.indexOf("시작 조건 불충족 — 필요한 것이 없습니다");
+  const already = wrapped.indexOf("시작 조건 불충족 — 29 · 30번이 만드는 것이 이미 있습니다");
+  const verify = wrapped.indexOf("끝 확인 실패 — 사용자 자료의 행 수 또는 내용이");
+  assert.ok(begin < precheck && precheck < already && already < i29, "시작 조건(선행 · 이미 적용 거절)은 마이그레이션보다 앞에 있다");
+  assert.ok(i30 < verify && verify < commit, "끝 확인은 마이그레이션 뒤 · commit 앞에 있다");
+  // 확인 조회는 commit 뒤의 읽기 전용 조회(check-migrations.sql)다
+  assert.ok(wrapped.endsWith(`${checkSql.trimEnd()}\n`));
+  assert.ok(wrapped.indexOf(checkSql.trimEnd()) > commit);
+  // 락 · 문장 시간 제한(오래 기다리며 다른 요청을 막지 않는다)
+  assert.match(wrapped, /set local lock_timeout = '15s';\s*set local statement_timeout = '180s';/);
+});
+
+test("29+30 단독 적용 파일: 고객 기록 삭제 함수를 부르지 않는다(만들기만 하고 확인은 카탈로그만) · 데이터를 바꾸는 문장은 마이그레이션 원문 안(함수 정의 속)뿐이다", () => {
+  // 마이그레이션 원문 두 개를 뺀 나머지(우리가 더한 부분)에서 주석과 문자열을 지운 뒤 삭제 함수 이름이 남아 있으면 호출이다
+  const own = wrapped.replace(scopeSql.trimEnd(), "").replace(guardSql.trimEnd(), "").replace(checkSql.trimEnd(), "");
+  const code = own.replace(/--.*$/gm, "").replace(/'(?:[^']|'')*'/g, "''");
+  assert.doesNotMatch(code, /delete_assessment_record/i, "삭제 함수를 부르지 않는다(이름은 문자열 · 주석에만 있다)");
+  assert.doesNotMatch(code, /\bperform\b/i);
+  // 우리가 더한 부분이 사용자 표를 바꾸는 문장이 없다: insert는 임시 표(_a2930_*)뿐, update · delete · truncate 없음
+  assert.doesNotMatch(code.replace(/insert into _a2930_\w+/gi, ""), /\b(insert\s+into|update\s+\w|delete\s+from|truncate|alter\s+table|drop\s+(table|column|function|trigger))\b/i);
+  assert.deepEqual([...code.matchAll(/create\s+temp\s+(table|view)\s+(\w+)/gi)].map((m) => m[2]).sort(), ["_a2930_after", "_a2930_allowed", "_a2930_before", "_a2930_changes", "_a2930_state"]);
+  assert.match(code, /drop view _a2930_state;/);
+  assert.equal((code.match(/on commit drop/g) ?? []).length, 4, "임시 표 넷은 트랜잭션이 끝나면 사라진다");
+});
+
+test("29+30 단독 적용 파일: 끝 확인이 구조 · 권한 · 행 · 트리거 · 함수를 모두 보고, 어긋나면 raise exception으로 전체 취소한다", () => {
+  assert.match(wrapped, /raise exception '끝 확인 실패 — 사용자 자료의 행 수 또는 내용이/);
+  assert.match(wrapped, /raise exception '끝 확인 실패 — 예상하지 못한 변화가 있습니다/);
+  assert.match(wrapped, /raise exception '끝 확인 실패 — 만들어져야 할 것이 없습니다/);
+  assert.match(wrapped, /raise exception '끝 확인 실패 — 브라우저 역할이 % 를 실행할 수 있습니다/);
+  assert.match(wrapped, /raise exception '끝 확인 실패 — pair_join의 실행 권한이 예상과 다릅니다/);
+  assert.match(wrapped, /raise exception '끝 확인 실패 — 28번 삭제 함수의 권한이 달라졌습니다/);
+  assert.match(wrapped, /raise exception '끝 확인 실패 — pair_join이 새 정의가 아닙니다/);
+  for (const t of ["talk_rooms_block_purged", "chat_summaries_block_purged", "talk_transcripts_block_purged", "chat_questions_block_purged", "pairs_block_deleted_record"]) assert.match(wrapped, new RegExp(`raise exception '끝 확인 실패 — 트리거 ${t}가`));
+  // 허용하는 변화는 정확히: 열 1 + 새 함수 3(권한 · 정의) + pair_join 정의 교체 + 새 트리거 5
+  assert.equal((wrapped.match(/\('column', 'assessments\.record_purged_at'\)/g) ?? []).length, 1);
+  assert.equal((wrapped.match(/\('function-(acl|def)', 'public\.[a-z_0-9]+\([^)]*\)'\)/g) ?? []).length, 7, "새 함수 3 × 2 + pair_join 새 정의 1");
+  assert.equal((wrapped.match(/\('trigger', '[a-z_]+'\)/g) ?? []).length, 5);
+  // 확인하는 표(사용자 자료) 목록에는 계속 쌓이는 방문 · AI 사용 · 운영 기록 표가 없다(겹치는 활동으로 거짓 실패하지 않게)
+  const rowsList = wrapped.slice(wrapped.indexOf("unnest(array["), wrapped.indexOf("]) as n(name)"));
+  assert.doesNotMatch(rowsList, /funnel_events|ai_usage|ops_events/);
+  assert.match(rowsList, /'assessments'/);
+  assert.match(rowsList, /'orders'/);
+  assert.match(rowsList, /'pairs'/);
+});

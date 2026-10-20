@@ -7,3 +7,4 @@ miyu/supabase/migrations/*.sql text eol=lf
 miyu/supabase/apply-4-to-10.sql text eol=lf
 miyu/supabase/apply-staging-all.sql text eol=lf
 miyu/supabase/check-migrations.sql text eol=lf
+miyu/supabase/apply-29-30.sql text eol=lf

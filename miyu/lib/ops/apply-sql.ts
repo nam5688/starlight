@@ -264,3 +264,220 @@ commit;
 ${postSql.trimEnd()}
 `;
 }
+
+/**
+ * DB 변경 29번(기록 삭제 범위 확대) + 30번(쌍 × 삭제 동시성 장치)을 **하나의 트랜잭션**으로 적용하는 단독 파일(테스트 전용 프로젝트용).
+ * 두 파일을 한 글자도 고치지 않고 이어 붙이고, 시작 조건 · 이미 적용 거절 · 끝 확인(구조 · 행 · 권한 · 트리거 · 함수가 예상과 다르면 전체 취소)을 더한다.
+ * 고객 기록 삭제 함수(delete_assessment_record_v2)는 부르지 않는다 — 존재 · 권한 · 정의만 카탈로그에서 읽는다.
+ * 이 함수는 문자열만 다룬다(파일을 읽고 쓰는 것은 scripts/render-apply-sql.ts --29-30).
+ */
+export function buildScope2930ApplySql(opts: { migrations: [MigrationFile, MigrationFile]; checkSql: string }): string {
+  const [m29, m30] = opts.migrations;
+  // 행 수 · 내용 불변을 확인하는 사용자 자료 표(있는 것만) — 방문 · AI 사용 · 운영 기록처럼 사용자와 상관없이 계속 쌓이는 표는 겹치는 활동 때문에 거짓으로 실패하므로 넣지 않는다
+  const ROW_TABLES = ["profiles", "assessments", "orders", "payment_events", "reports", "report_feedback", "taste_reports", "talk_rooms", "chat_summaries", "talk_transcripts", "chat_questions", "cash_ledger", "cash_wallets", "question_packs", "personal_contexts", "concern_records", "pairs", "user_consents", "compat_requests", "user_regions", "reviews"];
+  const NEW_FUNCTIONS = ["public.delete_assessment_record_v2(uuid,uuid)", "public.block_write_on_purged_record()", "public.pairs_block_deleted_record()"];
+  const NEW_TRIGGERS = [
+    ["talk_rooms_block_purged", "talk_rooms"],
+    ["chat_summaries_block_purged", "chat_summaries"],
+    ["talk_transcripts_block_purged", "talk_transcripts"],
+    ["chat_questions_block_purged", "chat_questions"],
+    ["pairs_block_deleted_record", "pairs"],
+  ];
+  const list = (xs: string[]) => xs.map((x) => `'${x}'`).join(", ");
+  // 함수 키는 '이름(인자 타입, 인자 타입)' 모양(oidvectortypes) — 호출용 서명(공백 없음)과 표기가 달라 키 쪽에 ", "를 넣어 맞춘다
+  const keyOf = (sig: string) => sig.replace(/,/g, ", ");
+  const allowedAdded = [
+    `('column', 'assessments.record_purged_at')`,
+    ...NEW_FUNCTIONS.flatMap((f) => [`('function-acl', '${keyOf(f)}')`, `('function-def', '${keyOf(f)}')`]),
+    `('function-def', '${keyOf("public.pair_join(text,uuid,uuid,text)")}')`,
+    ...NEW_TRIGGERS.map(([t]) => `('trigger', '${t}')`),
+  ].join(",\n      ");
+  const section = (no: number, m: MigrationFile) => `-- ═════════════════════════════════════════════════════════════════
+-- ${no}번: ${m.name}   (아래는 supabase/migrations 파일 내용 그대로)
+-- ═════════════════════════════════════════════════════════════════
+${m.sql.trimEnd()}
+`;
+  return `-- ME:U(미유) DB 변경 29번 + 30번 단독 적용 파일 — SQL Editor에서 한 번 실행한다 (하나의 트랜잭션)
+--
+-- 이 파일은 supabase/migrations/${m29.name} (29번)과 supabase/migrations/${m30.name} (30번)을 한 글자도 고치지 않고 이어 붙인 것이다.
+-- (scripts/render-apply-sql.ts --29-30 이 만든다 — 직접 고치지 않는다. 내용이 바뀌면 서버 테스트가 알려 준다.)
+--
+-- ⚠️ 테스트 전용 프로젝트(wdvrwwajakjdfrajgxcm)에 적용하기 위한 파일이다. 운영 DB에는 운영자가 따로 승인하기 전에는 실행하지 않는다.
+--
+-- 왜 하나로 묶었나: 29번만 먼저 적용한 상태에서는 "리포트 궁합 쌍이 만들어지는 순간과 기록 삭제가 겹치면 원자료가 빈 분석을 쌍이 가리킬 수 있는" 틈이 있다(docs/pair-assessment-guard-v1.md).
+--   두 번호를 틈 없이 같은 순간에 적용해 그 틈이 열린 채로 남지 않게 한다. 두 번호를 따로 적용해도 되지만(각자의 사전 · 사후 확인 파일이 있다) 이 파일이 권장 방법이다.
+--
+-- 사용 순서
+--  1) (읽기 전용) supabase/delete-scope-29-precheck.sql 과 supabase/pair-assessment-guard-30-precheck.sql 은 이 파일을 쓰기 전의 개별 사전 확인이다.
+--     29번 사전 확인은 "종합 OK"여야 하고, 30번 사전 확인은 29번 적용 전에는 "이상(선행 29번 없음)"으로 나오는 것이 정상이다(이 파일이 둘을 함께 적용한다).
+--  2) 이 파일을 SQL Editor에 모두 붙여넣고 Run (한 번만).
+--  3) 끝에 나오는 결과 표(check-migrations.sql)에서 29 · 30번이 "적용됨"인지 본다. 그 뒤 pair-assessment-guard-30-postcheck.sql로 30번 사후 확인을 해도 된다.
+--
+-- 안전장치
+--  - 시작 조건: 28번(기록 삭제)과 24번(리포트 궁합)이 적용돼 있고, 29 · 30번이 만드는 것이 하나도 없어야 하며, 필요한 역할이 있어야 한다.
+--    아니면 아무것도 바꾸지 않고 "시작 조건 불충족"으로 멈춘다(이미 한 번 실행한 뒤 다시 실행해도 여기서 멈춘다 — 문제가 아니다).
+--  - 전체가 하나의 트랜잭션이다. 끝 확인이 하나라도 어긋나면 이 파일이 한 일이 모두 취소된다:
+--      · 구조: 새로 생긴 것은 열 assessments.record_purged_at · 함수 3개 · 트리거 5개 · pair_join의 새 정의뿐이어야 한다(다른 열 · 제약 · 인덱스 · 정책 · 함수 · 트리거 · 표 권한이 하나라도 달라지면 취소).
+--      · 권한: 새 함수 셋은 서버(service_role)만 실행할 수 있고(트리거 함수 둘은 아무도 직접 실행 못 함) 브라우저 역할(anon · authenticated · public)은 실행할 수 없다. pair_join의 권한은 그대로다.
+--      · 데이터: 사용자 자료 표(${ROW_TABLES.length}개 중 있는 것)의 행 수와 행 내용이 적용 전과 같아야 한다. 29 · 30번은 어떤 행도 만들거나 고치거나 지우지 않는다.
+--        (적용하는 동안 다른 사용자의 활동이 겹쳐 행이 바뀌면 안전하게 전체 취소되고 "다시 실행"이라고 알린다.)
+--  - 고객 기록 삭제 함수(delete_assessment_record_v2)는 이 파일이 호출하지 않는다 — 만들기만 하고, 확인은 카탈로그(존재 · 권한 · 정의)만 읽는다. 어떤 기록도 지우지 않는다.
+--  - 락 대기는 15초, 한 문장은 180초에서 멈춘다(오래 기다리며 다른 요청을 막지 않는다). 시간 초과도 전체 취소다.
+--
+-- Supabase가 "위험한 작업이 포함되어 있다"는 확인 창을 보여 주면: 함수 안의 삭제 문장(29번의 기록 삭제 함수)과 열 추가 때문이다.
+--   이 파일은 함수를 만들기만 하고 부르지 않으며 기존 데이터를 지우지 않으므로 실행해도 된다.
+
+begin;
+
+set local lock_timeout = '15s';
+set local statement_timeout = '180s';
+
+do $check$
+declare
+  problems text[] := '{}';
+  t text;
+begin
+  -- 1) 앞 번호가 만드는 것이 있어야 한다
+  if to_regclass('auth.users') is null then problems := problems || '표 auth.users(Supabase Auth)'::text; end if;
+  if (select count(*) from pg_roles where rolname in ('service_role', 'authenticated', 'anon')) <> 3 then problems := problems || '역할 service_role · authenticated · anon'::text; end if;
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'assessments' and column_name = 'record_deleted_at') then problems := problems || '열 assessments.record_deleted_at(28번)'::text; end if;
+  if to_regprocedure('public.delete_assessment_record(uuid,uuid,jsonb)') is null then problems := problems || '함수 delete_assessment_record(28번)'::text; end if;
+  if to_regclass('public.talk_transcripts') is null then problems := problems || '표 talk_transcripts(28번)'::text; end if;
+  if to_regclass('public.pairs') is null or to_regprocedure('public.pair_join(text,uuid,uuid,text)') is null then problems := problems || '표 pairs · 함수 pair_join(24번 리포트 궁합)'::text; end if;
+  foreach t in array array['talk_rooms', 'chat_summaries', 'chat_questions', 'personal_contexts', 'concern_records', 'taste_reports', 'reports', 'orders', 'cash_ledger'] loop
+    if to_regclass('public.' || t) is null then problems := problems || ('표 ' || t)::text; end if;
+  end loop;
+  if cardinality(problems) > 0 then
+    raise exception '시작 조건 불충족 — 필요한 것이 없습니다: %. 아무것도 바꾸지 않았습니다. 이 파일을 실행하지 말고 check-migrations.sql 결과를 알려 주세요.', array_to_string(problems, ' / ');
+  end if;
+
+  -- 2) 29 · 30번이 만드는 것이 하나라도 이미 있으면 멈춘다(일부만 적용된 상태에서 다시 실행하지 않기 위해)
+  problems := '{}';
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'assessments' and column_name = 'record_purged_at') then problems := problems || '열 assessments.record_purged_at(29번)'::text; end if;
+  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname in ('delete_assessment_record_v2', 'block_write_on_purged_record', 'pairs_block_deleted_record')) then problems := problems || '함수(29 · 30번)'::text; end if;
+  if exists (select 1 from pg_trigger where tgname in (${list(NEW_TRIGGERS.map(([t]) => t))}) and not tgisinternal) then problems := problems || '트리거(29 · 30번)'::text; end if;
+  if cardinality(problems) > 0 then
+    raise exception '시작 조건 불충족 — 29 · 30번이 만드는 것이 이미 있습니다: %. 아무것도 바꾸지 않았습니다. 이 파일을 다시 실행하지 말고 check-migrations.sql 결과 표를 그대로 알려 주세요.', array_to_string(problems, ' / ');
+  end if;
+end
+$check$;
+
+-- 적용 전 상태를 임시로 저장한다 (이 트랜잭션이 끝나면 사라진다 — 영구 표 · 뷰를 만들지 않는다)
+create temp view _a2930_state as
+  select 'column'::text as kind, c.table_name::text || '.' || c.column_name::text as key, c.data_type::text || ':' || c.is_nullable::text || ':' || coalesce(c.column_default::text, '') as val
+    from information_schema.columns c where c.table_schema = 'public'
+  union all
+  select 'constraint', conrelid::regclass::text || '.' || conname::text, pg_get_constraintdef(oid) from pg_constraint where connamespace = 'public'::regnamespace
+  union all
+  select 'index', schemaname::text || '.' || indexname::text, indexdef from pg_indexes where schemaname = 'public'
+  union all
+  select 'table-acl', c.relname::text, coalesce(c.relacl::text, '-') || ':rls=' || c.relrowsecurity::text from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'S', 'v')
+  union all
+  select 'policy', tablename::text || '.' || policyname::text, coalesce(cmd::text, '') || ':' || coalesce(qual, '') || ':' || coalesce(with_check, '') from pg_policies where schemaname = 'public'
+  union all
+  select 'function-acl', 'public.' || p.proname::text || '(' || oidvectortypes(p.proargtypes) || ')', coalesce(p.proacl::text, '-') from pg_proc p where p.pronamespace = 'public'::regnamespace
+  union all
+  select 'function-def', 'public.' || p.proname::text || '(' || oidvectortypes(p.proargtypes) || ')', md5(pg_get_functiondef(p.oid)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
+  union all
+  select 'trigger', t.tgname::text, c.relname::text || ':' || t.tgenabled::text || ':' || md5(pg_get_triggerdef(t.oid)) from pg_trigger t join pg_class c on c.oid = t.tgrelid where not t.tgisinternal and c.relnamespace = 'public'::regnamespace
+  union all
+  select 'rows', n.name, (xpath('/row/c/text()', query_to_xml(format('select count(*)::text || '':'' || md5(coalesce(string_agg(md5((to_jsonb(x) - ''record_purged_at'')::text), '''' order by md5((to_jsonb(x) - ''record_purged_at'')::text)), '''')) as c from public.%I x', n.name), false, true, '')))[1]::text
+    from unnest(array[${list(ROW_TABLES)}]) as n(name) where to_regclass('public.' || n.name) is not null;
+
+create temp table _a2930_before on commit drop as select * from _a2930_state;
+
+${section(29, m29)}
+${section(30, m30)}
+-- ═════════════════════════════════════════════════════════════════
+-- 끝 확인 — 하나라도 어긋나면 위의 모든 변경이 취소된다 (고객 삭제 함수는 부르지 않는다: 카탈로그만 읽는다)
+-- ═════════════════════════════════════════════════════════════════
+create temp table _a2930_after on commit drop as select * from _a2930_state;
+
+do $verify$
+declare
+  diff text;
+  rows_diff text;
+  def text;
+  acl text;
+  fn text;
+begin
+  -- 1) 구조 · 권한 · 행의 변화가 정확히 예상한 것뿐인가 (표 · 열 · 제약 · 인덱스 · 정책 · 표 권한 · 함수 권한과 정의 · 트리거 · 사용자 자료 행 수와 내용)
+  create temp table _a2930_allowed (side text, kind text, key text) on commit drop;
+  insert into _a2930_allowed
+    select 'added', k.kind, k.key from (values
+      ${allowedAdded}
+    ) as k(kind, key);
+  insert into _a2930_allowed values ('removed', 'function-def', '${keyOf("public.pair_join(text,uuid,uuid,text)")}');
+
+  create temp table _a2930_changes (side text, kind text, key text) on commit drop;
+  insert into _a2930_changes
+    select 'added', kind, key from (select kind, key, val from _a2930_after except select kind, key, val from _a2930_before) a
+    union all
+    select 'removed', kind, key from (select kind, key, val from _a2930_before except select kind, key, val from _a2930_after) r;
+
+  select string_agg(side || ' ' || kind || ' ' || key, ' / ' order by kind, key) into rows_diff from _a2930_changes where kind = 'rows';
+  if rows_diff is not null then
+    raise exception '끝 확인 실패 — 사용자 자료의 행 수 또는 내용이 적용 전과 달라졌습니다: %. 29 · 30번은 행을 바꾸지 않으므로 이 사이에 다른 사용자의 활동이 겹쳤을 수 있습니다. 전체 취소했습니다 — 다시 실행해 주세요. 반복되면 결과를 그대로 알려 주세요.', rows_diff;
+  end if;
+  select string_agg(c.side || ' ' || c.kind || ' ' || c.key, ' / ' order by c.kind, c.key) into diff
+    from _a2930_changes c where not exists (select 1 from _a2930_allowed a where a.side = c.side and a.kind = c.kind and a.key = c.key);
+  if diff is not null then
+    raise exception '끝 확인 실패 — 예상하지 못한 변화가 있습니다: %. 전체 취소했습니다. 결과를 그대로 알려 주세요.', diff;
+  end if;
+  select string_agg(a.side || ' ' || a.kind || ' ' || a.key, ' / ' order by a.kind, a.key) into diff
+    from _a2930_allowed a where not exists (select 1 from _a2930_changes c where a.side = c.side and a.kind = c.kind and a.key = c.key);
+  if diff is not null then
+    raise exception '끝 확인 실패 — 만들어져야 할 것이 없습니다: %. 전체 취소했습니다. 결과를 그대로 알려 주세요.', diff;
+  end if;
+
+  -- 2) 29번: 삭제 완료 표시는 모든 행이 비어 있다(적용만으로는 어떤 기록도 삭제 완료로 바뀌지 않는다)
+  if exists (select 1 from public.assessments where record_purged_at is not null) then
+    raise exception '끝 확인 실패 — 삭제 완료로 표시된 기록이 있습니다. 전체 취소했습니다.';
+  end if;
+
+  -- 3) 새 함수 셋의 권한: 서버(service_role)만, 브라우저 역할 · public 불가 (트리거 함수 둘은 service_role도 직접 실행할 이유가 없지만 기존 방식과 같은 권한이면 된다 — 브라우저 역할만 막는다)
+  foreach fn in array array[${list(NEW_FUNCTIONS)}] loop
+    if has_function_privilege('anon', fn, 'execute') or has_function_privilege('authenticated', fn, 'execute') then
+      raise exception '끝 확인 실패 — 브라우저 역할이 % 를 실행할 수 있습니다. 전체 취소했습니다.', fn;
+    end if;
+    select coalesce(p.proacl::text, '') into acl from pg_proc p where p.oid = fn::regprocedure;
+    if acl ~ '(^\\{|,)=' then
+      raise exception '끝 확인 실패 — % 에 public 실행 권한이 남아 있습니다 (%). 전체 취소했습니다.', fn, acl;
+    end if;
+  end loop;
+  if not has_function_privilege('service_role', 'public.delete_assessment_record_v2(uuid,uuid)', 'execute') then
+    raise exception '끝 확인 실패 — 서버 역할이 delete_assessment_record_v2를 실행할 수 없습니다. 전체 취소했습니다.';
+  end if;
+  -- pair_join: 서버만 (24번과 같다)
+  select coalesce(p.proacl::text, '') into acl from pg_proc p where p.oid = 'public.pair_join(text,uuid,uuid,text)'::regprocedure;
+  if not has_function_privilege('service_role', 'public.pair_join(text,uuid,uuid,text)', 'execute')
+     or has_function_privilege('anon', 'public.pair_join(text,uuid,uuid,text)', 'execute') or has_function_privilege('authenticated', 'public.pair_join(text,uuid,uuid,text)', 'execute') or acl ~ '(^\\{|,)=' then
+    raise exception '끝 확인 실패 — pair_join의 실행 권한이 예상과 다릅니다 (%). 전체 취소했습니다.', acl;
+  end if;
+  -- 28번 삭제 함수의 권한은 그대로: 서버만
+  if not has_function_privilege('service_role', 'public.delete_assessment_record(uuid,uuid,jsonb)', 'execute')
+     or has_function_privilege('anon', 'public.delete_assessment_record(uuid,uuid,jsonb)', 'execute') or has_function_privilege('authenticated', 'public.delete_assessment_record(uuid,uuid,jsonb)', 'execute') then
+    raise exception '끝 확인 실패 — 28번 삭제 함수의 권한이 달라졌습니다. 전체 취소했습니다.';
+  end if;
+
+  -- 4) 트리거 5개가 올바른 표에 켜져 있다(enabled = O)
+${NEW_TRIGGERS.map(([t, table]) => `  if not exists (select 1 from pg_trigger g join pg_class c on c.oid = g.tgrelid where g.tgname = '${t}' and c.relname = '${table}' and c.relnamespace = 'public'::regnamespace and g.tgenabled = 'O' and not g.tgisinternal) then raise exception '끝 확인 실패 — 트리거 ${t}가 표 ${table}에 켜져 있지 않습니다. 전체 취소했습니다.'; end if;`).join("\n")}
+
+  -- 5) pair_join의 새 정의: 삭제한 결과를 거절하고 결과 행을 공유 잠금으로 읽는다
+  select pg_get_functiondef('public.pair_join(text,uuid,uuid,text)'::regprocedure) into def;
+  if def !~ 'record_purged_at' or def !~ 'record_deleted_at' or def !~* 'for share' then
+    raise exception '끝 확인 실패 — pair_join이 새 정의가 아닙니다. 전체 취소했습니다.';
+  end if;
+end
+$verify$;
+
+drop view _a2930_state;
+
+commit;
+
+-- ═════════════════════════════════════════════════════════════════
+-- 확인: 적용 이력 (읽기 전용 — supabase/check-migrations.sql과 같다. 아무것도 바꾸지 않는다. 29 · 30번이 "적용됨"이면 끝이다)
+-- ═════════════════════════════════════════════════════════════════
+${opts.checkSql.trimEnd()}
+`;
+}

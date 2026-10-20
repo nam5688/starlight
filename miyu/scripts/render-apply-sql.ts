@@ -3,9 +3,10 @@
 // 실행: node scripts/render-apply-sql.ts            → supabase/apply-4-to-10.sql
 //       node scripts/render-apply-sql.ts --reviews  → supabase/apply-25-reviews.sql (DB 변경 25번 후기만 · 19~22번이 없는 테스트 DB에도 쓸 수 있다)
 //       node scripts/render-apply-sql.ts --staging  → supabase/apply-staging-all.sql (아무것도 없는 새 스테이징 프로젝트 전용 · 1번부터 전체 · 운영 DB에는 쓰지 않는다)
+//       node scripts/render-apply-sql.ts --29-30    → supabase/apply-29-30.sql (DB 변경 29번 기록 삭제 범위 확대 + 30번 쌍 × 삭제 동시성 장치를 하나의 트랜잭션으로 · 테스트 전용 프로젝트용)
 // (miyu 폴더에서)
 import { readFileSync as readRaw, readdirSync, writeFileSync } from "node:fs";
-import { buildApplySql, buildReviewsApplySql, buildStagingApplySql } from "../lib/ops/apply-sql.ts";
+import { buildApplySql, buildReviewsApplySql, buildScope2930ApplySql, buildStagingApplySql } from "../lib/ops/apply-sql.ts";
 
 // Windows에서 git이 줄바꿈을 CRLF로 받아 와도 합본은 항상 LF로 만든다 — CRLF만 LF로 바꾸고 그 밖의 글자는 그대로(합본이 마이그레이션과 같은지 시험이 확인한다)
 const readFileSync = (url: URL, encoding: "utf8") => readRaw(url, encoding).replace(/\r\n/g, "\n");
@@ -36,4 +37,15 @@ if (process.argv.includes("--reviews")) {
   const out25 = buildReviewsApplySql({ migration, postSql });
   writeFileSync(new URL("../supabase/apply-25-reviews.sql", import.meta.url), out25);
   console.log(`supabase/apply-25-reviews.sql: ${name} ${out25.length.toLocaleString("ko-KR")}자`);
+}
+
+// DB 변경 29번 + 30번을 한 트랜잭션으로 — 시작 조건 · 끝 확인(구조 · 행 · 권한 · 트리거 · 함수)이 어긋나면 전체 취소
+if (process.argv.includes("--29-30")) {
+  const n29 = files.find((f) => f.endsWith("_record_delete_scope.sql"))!;
+  const n30 = files.find((f) => f.endsWith("_pair_assessment_guard.sql"))!;
+  const m29 = { name: n29, sql: readFileSync(new URL(n29, dir), "utf8") };
+  const m30 = { name: n30, sql: readFileSync(new URL(n30, dir), "utf8") };
+  const out2930 = buildScope2930ApplySql({ migrations: [m29, m30], checkSql });
+  writeFileSync(new URL("../supabase/apply-29-30.sql", import.meta.url), out2930);
+  console.log(`supabase/apply-29-30.sql: ${n29} + ${n30} ${out2930.length.toLocaleString("ko-KR")}자`);
 }
