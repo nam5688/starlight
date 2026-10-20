@@ -7,7 +7,7 @@ import { readSource } from "../lib/report/test-source.ts";
 const read = (p: string) => readSource(new URL(`../${p}`, import.meta.url));
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-const BUYERS = ["components/results/talk-entry.tsx", "components/talk/locked-room.tsx", "components/results/purchase-panel.tsx"];
+const BUYERS = ["components/results/talk-entry.tsx", "components/talk/locked-room.tsx", "components/results/purchase-panel.tsx", "components/results/received-reports.tsx", "components/my/report-rows.tsx", "components/talk/recharge-dialog.tsx"];
 
 test("상담방 · 구매 안내 · 구매 영역의 받기 버튼은 모두 구매를 시작하는 폼 버튼이고 #주소 링크가 아니다", () => {
   for (const path of BUYERS) {
@@ -60,4 +60,28 @@ test("결제 화면은 결제하기를 눌렀는데 결제 창으로 넘어가�
   assert.match(c, /PAY_STALL_MS/);
   assert.match(c, /data-testid="pay-hint"/);
   assert.match(c, /setStatus\("ready"\)/);
+});
+
+test("가격이 적힌 시작 버튼 아래에는 \"결제 화면으로 이동해요 · 이 버튼만으로는 결제되지 않아요\"가 기본으로 보이고, 같은 결과로 새로 받는 경우도 같은 버튼(again)을 쓴다", () => {
+  const btn = read("components/results/purchase-start-button.tsx");
+  assert.match(btn, /data-testid="purchase-start-hint"/);
+  assert.match(btn, /이 버튼만으로는 결제되지 않아요/);
+  assert.match(btn, /name="again"/);
+  const received = code(read("components/results/received-reports.tsx"));
+  assert.match(received, /<PurchaseStartButton[^>]*\bagain\b/);
+  assert.doesNotMatch(received, /startRepurchaseAction/, "새 리포트 받기가 조용히 되돌아가는 예전 폼으로 돌아가면 안 된다");
+  const action = read("app/results/[id]/actions.ts");
+  const start = action.slice(action.indexOf("export async function startPurchaseAction"));
+  assert.match(start, /formData\.get\("again"\) === "1"/);
+});
+
+test("이미 있는 같은 화면 안내(#compat-paid)는 결제 버튼처럼 읽히지 않는 이동 문구다", () => {
+  const next = code(read("components/compat/compat-next-steps.tsx"));
+  assert.match(next, /href="#compat-paid"[\s\S]{0,160}신청 칸으로 이동/);
+  assert.doesNotMatch(next, /href="#compat-paid"[\s\S]{0,120}사주 궁합 받기/);
+});
+
+test("저장된 결과의 무료 풀이는 저장 당시의 옛 문장이 아니라 저장된 응답에서 다시 만든 지금의 문장을 쓴다(결과 화면 · 상담방 모델 두 곳)", () => {
+  assert.match(read("app/results/[id]/page.tsx"), /summary: withCurrentInsight\(assessment\.summary, assessment\.answers\)/);
+  assert.match(read("server/talk-model.ts"), /summary: withCurrentInsight\(assessment\.summary, assessment\.answers\)/);
 });

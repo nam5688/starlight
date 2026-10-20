@@ -13,6 +13,7 @@ import { manseryeokEngine } from "../saju/manseryeok-engine.ts";
 import { submitAssessment } from "../services/assessment-service.ts";
 import { createMemoryRepository } from "../services/testing/memory-repository.ts";
 import { buildDevFreeSummary } from "./build-free-summary.ts";
+import { withCurrentInsight } from "./free-insight.ts";
 import { buildIdentityType } from "./identity.ts";
 import { buildFreePreview } from "./preview.ts";
 import { assessmentTypeTitle, personalTypeTitle } from "./type-title.ts";
@@ -139,4 +140,27 @@ test("고객이 읽는 무료 풀이의 안내 한 줄에는 문항 개수 · �
     assert.doesNotMatch(note, /\d+개|문항|응답 중|기질|애착|근거예요/, note);
     assert.match(note, /답/);
   }
+});
+
+test("예전에 저장된 결과(저장 당시의 옛 문장이 summary에 남아 있음)도 화면에서는 같은 입력의 로그인 전 미리보기와 같은 지금의 문장이 보인다 — 저장된 데이터는 바꾸지 않는다", async () => {
+  const mem = createMemoryRepository();
+  let refreshed = 0;
+  for (const p of PEOPLE) {
+    const before = await preLogin(p);
+    const saved = await submitAssessment({ repo: mem.repo, saju: manseryeokEngine }, { userId: `old-${p.label}`, channel: "web", info: p.info, answers: p.answers, today: TODAY });
+    assert.ok(saved.ok);
+    if (!saved.ok || !saved.assessment.summary.insight) continue;
+    const stored = JSON.parse(JSON.stringify(saved.assessment));
+    // 문장을 고치기 전에 저장된 결과를 흉내 낸다: 저장된 문단을 옛 문장으로 바꿔 둔다
+    stored.summary.insight.text = "예전에 저장될 때 들어간 옛 문장이에요.";
+    const untouched = JSON.stringify(stored);
+    const shown = buildFreePreview({ summary: withCurrentInsight(stored.summary, stored.answers), saju: stored.saju, reference: REF });
+    assert.deepEqual(shown, before.preview, `${p.label}: 예전 저장 결과의 풀이가 로그인 전 미리보기와 다르다`);
+    assert.equal(JSON.stringify(stored), untouched, "저장된 데이터를 바꾸면 안 된다");
+    refreshed++;
+  }
+  assert.ok(refreshed >= 10, `다시 만든 사례가 너무 적다: ${refreshed}`);
+  // 응답이 없으면(예전 문항 구성) 저장된 요약을 그대로 쓴다
+  const s = (await preLogin(PEOPLE[0])).summary;
+  assert.equal(withCurrentInsight(s, null), s);
 });

@@ -38,6 +38,7 @@ import { type BenefitNotice, type PriceQuoteView, readBenefitQuery } from "@/lib
 import { isConcernReport } from "@/lib/report/concern/types";
 import { isCompatReport, isPairReport } from "@/lib/report/compat/types";
 import { isPersonalV2, isReadingReport } from "@/lib/report/generator";
+import { withCurrentInsight } from "@/lib/report/free-insight";
 import { buildIdentity } from "@/lib/report/identity";
 import { assessmentTypeTitle } from "@/lib/report/type-title";
 import { buildFreePreview } from "@/lib/report/preview";
@@ -211,7 +212,8 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   const purchaseQuote = !view.paidOrder && !(gate && !gate.open) ? await loadPurchaseQuote({ userId: member.userId, assessmentId: assessment.id, couponCode: benefitQuery.couponCode, again: benefitQuery.again }) : null;
   const benefitNotice: BenefitNotice | null = purchaseQuote?.failed ? { kind: "error" } : benefitQuery.notice;
   // 잠긴 내용은 서버에서 아예 만들지 않는다 — 전체 요약 · 점수는 구매 후 리포트에만
-  const preview = buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(new Date()) });
+  // 저장된 요약의 무료 해석 문단은 저장 당시의 문장이라, 같은 응답이면 로그인 전 미리보기와 같은 지금의 문장이 보이도록 저장된 응답에서 다시 만든다(저장된 데이터는 바꾸지 않는다)
+  const preview = buildFreePreview({ summary: withCurrentInsight(assessment.summary, assessment.answers), saju: assessment.saju, reference: seoulReference(new Date()) });
   // 개인 유형명 · 럭키 지수 카드 — 운영자가 기준을 확정하기 전에는 스위치가 꺼져 있어 만들지도 보이지도 않는다(lib/config/product.ts). 저장하지 않고 열 때마다 계산한다.
   const identity = PERSONAL_TYPE.visible || LUCKY_INDEX.visible ? buildIdentity({ saju: assessment.saju, summary: assessment.summary }) : null;
   const freeRooms = availableRooms(

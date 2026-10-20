@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { startRepurchaseAction } from "@/app/results/[id]/actions";
 import { StateBadge } from "@/components/my/state-badge";
+import { PurchaseStartButton } from "@/components/results/purchase-start-button";
 import { formatDate } from "@/components/ui/format";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonDisabled, buttonSecondary } from "@/components/ui/styles";
@@ -109,11 +109,7 @@ export function RepurchasePanel({
             </p>
           </div>
         ) : paymentsReady ? (
-          <form action={startRepurchaseAction.bind(null, assessmentId)}>
-            <button type="submit" className={buttonSecondary}>
-              새 리포트 받기 · {formatKrw(PERSONAL_REPORT.priceKrw)}
-            </button>
-          </form>
+          <PurchaseStartButton assessmentId={assessmentId} again label={`새 리포트 받기 · ${formatKrw(PERSONAL_REPORT.priceKrw)}`} buttonClassName={buttonSecondary} />
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" disabled className={buttonDisabled}>

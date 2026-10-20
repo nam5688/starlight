@@ -118,6 +118,8 @@ export async function startPurchaseAction(_prev: PurchaseStartState, formData: F
   const panelHref = String(formData.get("panelHref") ?? "");
   if (!/^[0-9a-f-]{36}$/.test(assessmentId)) return blockedState("not-found");
   const panel = /^(#r-purchase|\/results\/[0-9a-f-]{36}#r-purchase)$/.test(panelHref) ? panelHref : undefined;
+  // 같은 결과로 새 리포트를 한 번 더 받는 경우(이미 받은 리포트는 그대로 둔다) — 예전 "새 리포트 받기"와 같은 규칙
+  const again = formData.get("again") === "1";
   let path: string;
   try {
     const member = await getMember();
@@ -126,13 +128,13 @@ export async function startPurchaseAction(_prev: PurchaseStartState, formData: F
     if (!config.ok) return blockedState("payments-not-ready", { assessmentId });
     const userId = member.userId;
     const deps = { repo: writeRepository(), benefits: benefitRepository(), now };
-    const quote = await quoteForCheckout(deps, { userId, assessmentId, couponCode: null, again: false });
+    const quote = await quoteForCheckout(deps, { userId, assessmentId, couponCode: null, again });
     if (quote.kind === "not-found") return blockedState("not-found", { assessmentId });
     // 견적을 만들지 못한 경우는 구매 영역과 같게 정가 구매를 막지 않는다. 쓸 수 있는 혜택이 있으면 고르는 곳(구매 영역)으로 보낸다
     if (quote.kind === "quote" && (quote.quote.denied.length > 0 || quote.quote.options.length > 1)) return blockedState("options", { assessmentId, panelHref: panel });
     const result = await startCheckout(
       { repo: writeRepository(), now, gate: saleGateCheck },
-      { userId, assessmentId, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition(), again: false, inviteToken: await peekInviteToken() },
+      { userId, assessmentId, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition(), again, inviteToken: again ? null : await peekInviteToken() },
     );
     const decision = purchaseDecisionOf(result, assessmentId);
     if (decision.kind === "blocked") return decision.state;

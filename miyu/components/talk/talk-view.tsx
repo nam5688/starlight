@@ -984,7 +984,7 @@ export function TalkView({ model, room, scope, dateLabel, reportHref, dataHref, 
         </span>
       </form>
       <CloseDialog open={closeOpen} onStay={() => !closing && setCloseOpen(false)} onClose={finishClose} busy={closing} error={closeError} tone={tone} />
-      <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} variant={rechargeVariant} action={rechargeAction} onPick={pickPay} tone={tone} />
+      <RechargeDialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} variant={rechargeVariant} action={rechargeAction} onPick={pickPay} tone={tone} assessmentId={persist && persist.assessmentId !== "sample" ? persist.assessmentId : undefined} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import "server-only";
 import { isReadingReport } from "@/lib/report/generator";
+import { withCurrentInsight } from "@/lib/report/free-insight";
 import { buildFreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import { assessmentTypeTitle } from "@/lib/report/type-title";
@@ -55,7 +56,8 @@ export function roomModelFor(
   const owned = Boolean(view.paidOrder);
   const model = buildFreeTalkModel({
     name: assessment.nickname,
-    preview: buildFreePreview({ summary: assessment.summary, saju: assessment.saju, reference: seoulReference(now()) }),
+    // 저장된 요약의 무료 해석 문단은 저장 당시의 문장 — 결과 화면과 같은 지금의 문장으로 다시 만든다(저장된 데이터는 바꾸지 않는다)
+    preview: buildFreePreview({ summary: withCurrentInsight(assessment.summary, assessment.answers), saju: assessment.saju, reference: seoulReference(now()) }),
     saju: assessment.saju,
     today,
     href: owned ? `/results/${assessment.id}` : `/results/${assessment.id}#r-purchase`,

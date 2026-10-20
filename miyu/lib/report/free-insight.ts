@@ -81,4 +81,17 @@ export function buildFreeInsight(answers: Answers, tendency: TendencyId): FreeIn
   };
 }
 
+/**
+ * 이미 저장된 결과의 무료 해석 문단을 지금의 문장으로 다시 만든다 — 저장된 요약(summary.insight.text)에는 저장 당시의 문장이 들어 있어
+ * 문장을 고쳐도 예전 결과에는 예전 문장이 남는다. 같은 응답이면 같은 문단이 보이도록 화면(무료 미리보기)만 저장된 응답에서 다시 만든다.
+ * 저장된 데이터는 바꾸지 않는다. 구매한 리포트는 저장된 같은 버전을 그대로 보여 주므로 이 함수를 거치지 않는다.
+ * 응답이 없거나(예전 문항 구성) 영역이 맞지 않으면 저장된 요약을 그대로 돌려준다.
+ */
+export function withCurrentInsight<S extends { tendency: { id: TendencyId }; insight?: FreeInsight }>(summary: S, answers: Answers | null | undefined): S {
+  if (!answers) return summary;
+  const insight = buildFreeInsight(answers, summary.tendency.id);
+  if (!insight) return summary;
+  return { ...summary, insight };
+}
+
 export const ANSWER_LABEL: Record<number, string> = { 1: "전혀 그렇지 않다", 2: "그렇지 않다", 3: "보통이다", 4: "그렇다", 5: "매우 그렇다" };

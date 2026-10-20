@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { retryReceivedReportAction, retryReportAction } from "@/app/results/[id]/actions";
 import { DeleteRecordButton, type DeleteScope } from "@/components/my/delete-record-button";
+import { PurchaseStartButton } from "@/components/results/purchase-start-button";
 import { ReceivedReports } from "@/components/results/received-reports";
 import { StateBadge } from "@/components/my/state-badge";
 import { formatDate, formatDateTime } from "@/components/ui/format";
@@ -122,9 +123,7 @@ export function ReportRow({ card, paymentsReady, deleteAvailable = false, delete
               무료 결과 보기
             </Link>
             {card.entitlement === "free" && paymentsReady && (
-              <Link href={`${href}#r-purchase`} className={primary}>
-                전체 리포트 구매
-              </Link>
+              <PurchaseStartButton assessmentId={card.assessmentId} panelHref={`${href}#r-purchase`} label="전체 리포트 구매" buttonClassName={primary} hint={false} />
             )}
           </>
         )}

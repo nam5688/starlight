@@ -28,7 +28,7 @@ export async function CompatNextSteps() {
           {saju.note && <p className="mt-2 text-[13px] leading-[1.65] text-ink-3">{saju.note}</p>}
           {sajuOpen ? (
             <a href="#compat-paid" className={`${buttonSecondary} mt-3 w-full`}>
-              사주 궁합 받기
+              아래 사주 궁합 신청 칸으로 이동
             </a>
           ) : (
             <button type="button" disabled aria-disabled="true" className={`${buttonDisabled} mt-3 w-full`}>

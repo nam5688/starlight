@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
+import { PurchaseStartButton } from "@/components/results/purchase-start-button";
 import { TALK_COPY } from "@/lib/report/reading/talk";
 import { MiyuAvatar } from "./miyu-character";
 import type { MiyuTone } from "./miyu-moods";
@@ -26,6 +27,8 @@ type Props = {
   onPick?: () => void;
   /** 이 방의 캐릭터 색 */
   tone?: MiyuTone;
+  /** 내 결과 번호 — 있으면 심층 리포트 안내가 구매 영역으로 가는 링크가 아니라 "구매를 시작하는 버튼"(진행 중 · 막힌 이유를 이 안내창에 보인다)이다. 예시 화면에는 없다 */
+  assessmentId?: string;
 };
 
 /**
@@ -33,7 +36,7 @@ type Props = {
  * 열려 있는 동안 뒤쪽 화면은 초점과 읽기에서 빠지며, 닫으면 눌렀던 자리로 초점이 돌아온다.
  * 마감 타이머 · 불안을 자극하는 말은 쓰지 않고, "다음에 할게요"로 언제든 닫을 수 있다.
  */
-export function RechargeDialog({ open, onClose, variant, action, onPick, tone }: Props) {
+export function RechargeDialog({ open, onClose, variant, action, onPick, tone, assessmentId }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const bodyId = useId();
@@ -69,9 +72,19 @@ export function RechargeDialog({ open, onClose, variant, action, onPick, tone }:
         </p>
         {action &&
           ("href" in action ? (
+            assessmentId && action.href.endsWith("#r-purchase") ? (
+              <PurchaseStartButton
+                assessmentId={assessmentId}
+                panelHref={action.href}
+                label={action.label}
+                buttonClassName="mt-1 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 py-2 text-[16px] font-semibold text-white hover:bg-accent-strong"
+                className="w-full"
+              />
+            ) : (
             <Link href={action.href} className="mt-1 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 py-2 text-[16px] font-semibold text-white hover:bg-accent-strong">
               {action.label}
             </Link>
+            )
           ) : (
             <button type="button" onClick={onPick} className="mt-1 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-accent px-5 py-2 text-[16px] font-semibold text-white hover:bg-accent-strong">
               {action.label}
