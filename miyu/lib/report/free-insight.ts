@@ -3,6 +3,8 @@
 // - 근거 문항이 부족하면(0개) 문단을 만들지 않는다. 화면은 일반 한 줄 요약으로 돌아간다.
 // - "~할 수 있어요" 표현으로 쓰고 사건이나 성격을 단정하지 않는다. 사주 근거와 섞지 않는다 (응답만 쓴다).
 // 문장은 개발용 예시 문항(dev-example)에 맞춘 초안이며, 상황형 문항으로 바뀌면 함께 바꾼다. 전문가 검토 전.
+// 고객이 읽는 글이라 고른 답을 풀어 쓰지 않고(신중하다 · 익숙한 방식이 좋다 · 확인한다 같은 응답 요약 금지), 그 답이 일상에서 어떻게 나타날 수 있는지를 생활 장면의 말로 쓴다.
+// 문항이 묻지 않은 구체적 사건 · 지난 경험을 지어내지 않고(과거형 단정 없음), 문장 하나는 "~할 수 있어요."로 끝난다. 문항 · 방향 · 개수(12개)는 그대로다.
 
 import type { TendencyId } from "../assessment/dev-rules.ts";
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
@@ -45,17 +47,17 @@ const CLAUSES: Record<TendencyId, { module: FreeInsight["basisModule"]; clauses:
   stability: {
     module: "temperament",
     clauses: [
-      { item: "t3", side: "agree", text: "확신이 서지 않는 일 앞에서는 한 번 더 점검하고 나서야 발을 떼는 편일 수 있어요." },
-      { item: "t2", side: "agree", text: "잘 굴러가는 방식에서 안정감을 얻고, 바꾸려면 그럴 이유가 있어야 마음이 움직일 수 있어요." },
-      { item: "t4", side: "disagree", text: "일단 해 보고 고치기보다, 큰 문제가 없는지 먼저 확인하고 시작하는 편일 수 있어요." },
+      { item: "t3", side: "agree", text: "처음 해 보는 일이나 큰 선택 앞에서는 서둘러 정하기보다 한 번 더 살펴본 뒤에 움직이는 편이라, 실수는 줄어도 주변이 먼저 앞서가 보일 때는 마음이 조급해질 수 있어요." },
+      { item: "t2", side: "agree", text: "한 번 자리 잡은 방식 안에서 마음이 편해지는 편이라, 바꿔야 할 때는 '왜 지금인지'가 납득돼야 몸이 따라 움직일 수 있어요." },
+      { item: "t4", side: "disagree", text: "출발하기 전에 걸림돌이 없을지 미리 그려 보는 편이라, 시작은 느려 보여도 한 번 정한 방향은 쉽게 흔들리지 않을 수 있어요." },
     ],
   },
   exploration: {
     module: "temperament",
     clauses: [
-      { item: "t1", side: "agree", text: "익숙한 길보다 낯선 선택지가 눈에 들어올 때 마음이 먼저 움직일 수 있어요." },
-      { item: "t2", side: "disagree", text: "익숙한 방식이 오래 이어지면, 슬슬 다른 방법을 찾고 싶어질 수 있어요." },
-      { item: "t4", side: "agree", text: "준비가 다 끝나기를 기다리기보다 움직이면서 방향을 맞춰 가는 쪽이 더 편할 수 있어요." },
+      { item: "t1", side: "agree", text: "낯선 곳이나 새로운 일이 눈에 들어오면 이것저것 따지기 전에 마음이 먼저 그쪽으로 기울 수 있어요." },
+      { item: "t2", side: "disagree", text: "같은 방식이 오래 이어지면 슬슬 다른 길을 찾아보고 싶어질 수 있어요." },
+      { item: "t4", side: "agree", text: "준비가 다 끝나길 기다리기보다 먼저 움직이면서 방향을 맞춰 가는 쪽이 더 편할 수 있어요." },
     ],
   },
 };

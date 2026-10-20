@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { retryReceivedReportAction, retryReportAction, startBenefitCheckoutAction, startCheckoutAction } from "@/app/results/[id]/actions";
+import { retryReceivedReportAction, retryReportAction, startBenefitCheckoutAction } from "@/app/results/[id]/actions";
 import { BenefitNoticeBox, hasDiscountOptions, isPlainQuote, PriceOptions, type BenefitNotice, type PriceQuoteView } from "@/components/results/price-options";
+import { PurchaseStartButton } from "@/components/results/purchase-start-button";
 import { ReportStatusPoller } from "@/components/results/report-status-poller";
 import { CheckIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
@@ -168,11 +169,12 @@ export function PurchasePanel({
             sectionId={purchaseId}
           />
         ) : paymentsReady ? (
-          <form action={startCheckoutAction.bind(null, assessment.id)}>
-            <button type="submit" className={`${buttonPrimary} w-full sm:w-auto`}>
-              {PERSONAL_REPORT.name} 전체 보기 · {formatKrw(discount ? discount.priceKrw : PERSONAL_REPORT.priceKrw)}{discount ? " (초대 가격)" : ""}
-            </button>
-          </form>
+          <PurchaseStartButton
+            assessmentId={assessment.id}
+            panelHref={`#${purchaseId}`}
+            label={`${PERSONAL_REPORT.name} 전체 보기 · ${formatKrw(discount ? discount.priceKrw : PERSONAL_REPORT.priceKrw)}${discount ? " (초대 가격)" : ""}`}
+            buttonClassName={`${buttonPrimary} w-full sm:w-auto`}
+          />
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" disabled className={buttonDisabled}>

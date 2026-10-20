@@ -8,6 +8,9 @@ import { formatKrw } from "@/lib/config/product";
 import {
   classifyBrowser,
   errorCodeOf,
+  PAY_STALL_CODE,
+  PAY_STALL_MESSAGE,
+  PAY_STALL_MS,
   startWidgetSession,
   tidyMessage,
   USER_ACTION_CODES,
@@ -81,6 +84,7 @@ export function TossCheckout({
   const [attempt, setAttempt] = useState(1);
   const sessionRef = useRef<WidgetSession | null>(null);
   const reports = useRef(0);
+  const stallRef = useRef<number | null>(null);
 
   function report(issue: WidgetIssue) {
     if (reports.current >= WIDGET_REPORT_LIMIT) return;
@@ -126,6 +130,8 @@ export function TossCheckout({
     }, 0);
     return () => {
       clearTimeout(timer);
+      window.clearTimeout(stallRef.current ?? undefined);
+      stallRef.current = null;
       signal.aborted = true;
       const s = sessionRef.current;
       sessionRef.current = null;
@@ -140,6 +146,18 @@ export function TossCheckout({
     if (!widgets) return;
     setStatus("requesting");
     setMessage(null);
+    // 결제 창으로 넘어가면 이 화면이 사라진다. 일정 시간이 지나도 화면이 그대로면 "넘어가지 않았다"고 알리고 버튼을 다시 연다(앱 전환 중 숨겨진 화면은 기다린다)
+    window.clearTimeout(stallRef.current ?? undefined);
+    stallRef.current = window.setTimeout(function stalled() {
+      if (document.visibilityState !== "visible") {
+        stallRef.current = window.setTimeout(stalled, 2000);
+        return;
+      }
+      stallRef.current = null;
+      setStatus("ready");
+      setMessage(PAY_STALL_MESSAGE);
+      report({ phase: "pay", code: PAY_STALL_CODE, message: "결제하기를 눌렀지만 결제 창으로 넘어가지 않았어요", elapsedMs: PAY_STALL_MS, attempt, env: collectEnv("[data-toss-methods]") });
+    }, PAY_STALL_MS);
     try {
       await widgets.requestPayment({
         orderId,
@@ -149,6 +167,8 @@ export function TossCheckout({
       });
     } catch (error) {
       // 약관 미동의, 결제창 닫기 등 — 다시 시도할 수 있게 둔다. 구매자가 직접 한 행동은 막힘으로 기록하지 않는다
+      window.clearTimeout(stallRef.current ?? undefined);
+      stallRef.current = null;
       setStatus("ready");
       const code = errorCodeOf(error);
       setMessage(error instanceof Error && error.message ? error.message : "결제를 진행하지 못했어요.");
@@ -184,6 +204,22 @@ export function TossCheckout({
       >
         {status === "requesting" ? "결제 진행 중…" : `${formatKrw(amount)} 결제하기`}
       </button>
+      {/* 버튼이 잠겨 있는 이유 — 눌러도 반응이 없는 것처럼 보이지 않게 */}
+      {status === "loading" && (
+        <p role="status" className="mt-2 text-[13px] leading-[1.6] text-ink-3" data-testid="pay-hint">
+          결제 수단을 불러오는 중이에요. 불러온 뒤에 누를 수 있어요.
+        </p>
+      )}
+      {status === "requesting" && (
+        <p role="status" className="mt-2 text-[13px] leading-[1.6] text-ink-3" data-testid="pay-hint">
+          결제 창으로 넘어가는 중이에요. 넘어가지 않으면 잠시 뒤에 안내해 드려요.
+        </p>
+      )}
+      {status === "error" && (
+        <p className="mt-2 text-[13px] leading-[1.6] text-ink-3" data-testid="pay-hint">
+          결제 화면을 불러오지 못해 결제를 시작할 수 없어요. 위의 [결제 화면 다시 불러오기]를 눌러 주세요. 결제는 되지 않았어요.
+        </p>
+      )}
     </div>
   );
 }

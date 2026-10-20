@@ -6,6 +6,8 @@ import { parseAnswers, validateAnswers } from "@/lib/assessment/scoring";
 import type { Answers } from "@/lib/assessment/types";
 import { genderOf, parseBasicInfo, validateBasicInfo, type BasicInfo } from "@/lib/profile/basic-info";
 import { buildDevFreeSummary } from "@/lib/report/build-free-summary";
+import { PERSONAL_TYPE } from "@/lib/config/product";
+import { buildIdentityType, type IdentityTypeView } from "@/lib/report/identity";
 import { buildFreePreview, type FreePreview } from "@/lib/report/preview";
 import { seoulReference } from "@/lib/report/reference";
 import { birthDateError } from "@/lib/saju/manseryeok-engine";
@@ -19,8 +21,12 @@ import { pathAfterSave } from "@/server/room-choice";
 import { sajuEngine, writeRepository } from "@/server/services";
 import { consentPath, getMember } from "@/server/member";
 
-/** 브라우저에는 무료로 공개하는 미리보기만 보낸다 — 잠긴 내용(전체 이름 · 나머지 요약 · 점수 · 상세 · 실천 제안)은 여기 없다 */
-export type ScoreResult = { ok: true; preview: FreePreview } | { ok: false; message: string };
+/**
+ * 브라우저에는 무료로 공개하는 미리보기만 보낸다 — 잠긴 내용(전체 이름 · 나머지 요약 · 점수 · 상세 · 실천 제안)은 여기 없다.
+ * identityType은 로그인 뒤 저장된 결과 화면의 "나의 유형" 카드와 같은 함수(buildIdentityType)로 만든 값이다 — 같은 입력이면 로그인 전후에 같은 이름 · 설명이 보인다.
+ * 럭키 지수는 보내지 않는다(유형만). 개인 유형 표시 스위치가 꺼져 있으면 null이다.
+ */
+export type ScoreResult = { ok: true; preview: FreePreview; identityType: IdentityTypeView | null } | { ok: false; message: string };
 
 function birthInput(info: BasicInfo) {
   return {
@@ -57,7 +63,9 @@ export async function scoreDevAnswers(input: { info: unknown; answers: unknown }
   if (saju.status === "invalid") return { ok: false, message: saju.message };
   // 운영자 본인 입력 시험 — 이 PC의 개발 서버에서 .env.local에 MIYU_OWN_INPUT_CAPTURE=yes를 직접 적었을 때만 로컬 파일로 남긴다(꺼져 있으면 아무 일도 하지 않는다)
   await captureOwnInput(info, answers);
-  return { ok: true, preview: buildFreePreview({ summary: buildDevFreeSummary(answers), saju, reference: seoulReference(new Date()) }) };
+  const summary = buildDevFreeSummary(answers);
+  const identityType = PERSONAL_TYPE.visible ? buildIdentityType({ saju, summary }) : null;
+  return { ok: true, preview: buildFreePreview({ summary, saju, reference: seoulReference(new Date()) }), identityType };
 }
 
 export type SaveResult = { ok: false; message: string };

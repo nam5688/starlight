@@ -17,6 +17,14 @@ export const WIDGET_READY_TIMEOUT_MS = 30_000;
 /** 한 번 화면을 여는 동안 운영 기록으로 보내는 보고의 상한 (다시 시도를 계속 눌러도 기록이 쌓이지 않게) */
 export const WIDGET_REPORT_LIMIT = 3;
 
+/**
+ * 결제하기를 누른 뒤 이 시간이 지나도 결제 창으로 넘어가지 않으면 "넘어가지 않았다"고 알리고 버튼을 다시 연다(운영자 2026-10-20: 모바일에서 결제 버튼을 눌러도 아무 일이 없었다).
+ * 결제 승인은 이 화면이 정하지 않는다 — 넘어가지 않았다면 결제는 시작되지 않았고 금액은 빠져나가지 않았다.
+ */
+export const PAY_STALL_MS = 20_000;
+export const PAY_STALL_CODE = "PAY_NO_REDIRECT";
+export const PAY_STALL_MESSAGE = "결제 창이 열리지 않았어요. 결제는 되지 않았고 금액이 빠져나가지 않았어요. 카드 앱이 따로 열려 있거나 팝업이 막혀 있는지 확인한 뒤 다시 눌러 주세요. 계속되면 이 화면의 주문번호로 문의해 주세요.";
+
 /** 구매자가 직접 한 행동(창 닫기 · 약관 미동의 등)이라 막힘으로 기록하지 않는 코드 */
 export const USER_ACTION_CODES: ReadonlySet<string> = new Set([
   "USER_CANCEL",

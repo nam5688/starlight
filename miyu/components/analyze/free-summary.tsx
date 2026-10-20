@@ -5,12 +5,14 @@ import { useState, useTransition } from "react";
 import { saveResultAndContinue } from "@/app/analyze/actions";
 import { KakaoSymbol, kakaoButtonClass } from "@/components/auth/kakao-login-button";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
+import { IdentityCard } from "@/components/results/identity-card";
 import { CheckIcon } from "@/components/ui/icons";
 import { SourceBadge, StatusBadge } from "@/components/ui/source-badge";
 import { buttonSecondary, textLink } from "@/components/ui/styles";
 import type { Answers } from "@/lib/assessment/types";
 import { formatKrw, PERSONAL_REPORT } from "@/lib/config/product";
 import type { BasicInfo } from "@/lib/profile/basic-info";
+import type { IdentityTypeView } from "@/lib/report/identity";
 import type { FreePreview } from "@/lib/report/preview";
 
 /**
@@ -19,6 +21,7 @@ import type { FreePreview } from "@/lib/report/preview";
  */
 export function FreeSummaryView({
   preview,
+  identityType,
   info,
   answers,
   authReady,
@@ -26,6 +29,8 @@ export function FreeSummaryView({
   onRestart,
 }: {
   preview: FreePreview;
+  /** 저장 후 결과 화면 맨 위와 같은 "나의 유형" 카드(개인 유형 표시가 꺼져 있으면 null) */
+  identityType: IdentityTypeView | null;
   info: BasicInfo;
   answers: Answers;
   authReady: boolean;
@@ -56,7 +61,11 @@ export function FreeSummaryView({
       <p className="mt-2 text-[15px] leading-relaxed text-ink-2">내 결과의 일부를 먼저 보여 드려요. 결과를 저장하면 결과 화면에서 이어서 볼 수 있고, 심층 리포트는 그곳에서 구매할 수 있어요.</p>
 
       <div className="mt-10 space-y-16">
-        <FreePreviewBody preview={preview} idPrefix="free-" />
+        {/* 저장 전에도 저장 후와 같은 순서로: 나의 유형 → 풀이 (같은 입력이면 같은 이름 · 설명) */}
+        <div className="space-y-12">
+          {identityType && <IdentityCard identity={{ type: identityType, lucky: null }} showType showLucky={false} idPrefix="free-id-" inline />}
+          <FreePreviewBody preview={preview} idPrefix="free-" />
+        </div>
 
         <section id="free-locked" aria-labelledby="free-locked-title" className="overflow-hidden rounded-xl border border-line-strong">
           <div className="border-b border-line px-5 py-5 md:px-7">

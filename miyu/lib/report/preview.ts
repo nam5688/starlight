@@ -156,7 +156,8 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     ? {
         kind: "insight",
         text: insight.text,
-        basisNote: `${insight.basisModule === "relationship" ? "관계(애착)" : "기질"} 문항에 답하신 내용 중 ${insight.basis.length}개가 이 문단의 근거예요. 모든 사람에게 같은 문장이 나오지 않고, 응답이 뒷받침할 때만 들어가요.`,
+        // 고객이 읽는 한 줄 — 몇 개 문항이 근거인지 · 어느 검사 영역인지 같은 내부 구현은 적지 않는다(고른 답이 뒷받침할 때만 문장이 들어가는 규칙은 그대로, 시험이 확인한다)
+        basisNote: "직접 고르신 답 가운데 이 모습과 이어지는 내용만 골라 풀어 썼어요. 같은 문장이 모두에게 나오지 않고, 답이 뒷받침할 때만 들어가요.",
         module: insight.basisModule,
       }
     : { kind: "oneLiner", shown: maskOneLiner(summary.oneLiner) };

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PurchaseStartButton } from "@/components/results/purchase-start-button";
 import { sampleRoomPath, talkRoomPath } from "@/components/talk/room-paths";
 import { ArrowIcon, LockIcon } from "@/components/ui/icons";
 import { formatKrw, PERSONAL_REPORT, REPORT_TIER_NAMES } from "@/lib/config/product";
@@ -19,7 +20,7 @@ type Props = {
   tier?: "simple" | "deep";
   /** 자유 질문 AI가 연결돼 있는가 — 아니면 질문 수를 약속하지 않고 "준비 중"으로 밝힌다 */
   chatReady?: boolean;
-  /** 심층 리포트(구매)로 이어지는 주소 */
+  /** 심층 리포트(구매) 안내가 있는 구매 영역의 주소 — 구매 버튼이 "할인 · 혜택을 고를 수 있어요" 같은 안내에서 이어 줄 곳이다(이동은 구매를 시작하는 서버 동작이 정한다) */
   buyHref?: string;
 };
 
@@ -81,10 +82,14 @@ export function TalkEntry({ id, rooms, sample = false, remembered = null, tastin
           <p className="mt-2.5 text-[13px] leading-[1.65] text-ink-3">
             {REPORT_TIER_NAMES.deep}를 받으면 모든 상담방이 열리고, 방마다 무료 질문을 드려요. 더 묻고 싶을 땐 질문 3개 묶음 결제로 이어 갈 수 있어요.
           </p>
-          {buyHref && (
-            <Link href={buyHref} className="mt-3 inline-flex min-h-11 items-center justify-center rounded-full bg-accent px-5 text-[15px] font-semibold text-white hover:bg-accent-strong">
-              {REPORT_TIER_NAMES.deep} 받기 · {formatKrw(PERSONAL_REPORT.priceKrw)}
-            </Link>
+          {buyHref && id && !sample && (
+            <PurchaseStartButton
+              assessmentId={id}
+              panelHref={buyHref}
+              label={`${REPORT_TIER_NAMES.deep} 받기 · ${formatKrw(PERSONAL_REPORT.priceKrw)}`}
+              className="mt-3"
+              buttonClassName="inline-flex min-h-11 items-center justify-center rounded-full bg-accent px-5 text-[15px] font-semibold text-white hover:bg-accent-strong"
+            />
           )}
         </section>
       </div>

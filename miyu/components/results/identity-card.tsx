@@ -1,5 +1,6 @@
 import { InfoIcon } from "@/components/ui/icons";
-import type { IdentityView } from "@/lib/report/identity";
+import type { IdentityTypeView } from "@/lib/report/identity";
+import type { LuckyIndex } from "@/lib/saju/interpret/lucky";
 import { LUCKY_METHOD, LUCKY_NOTE, type LuckySubId } from "@/lib/saju/interpret/lucky";
 
 /**
@@ -24,12 +25,27 @@ function SubIcon({ id }: { id: LuckySubId }) {
   );
 }
 
-export function IdentityCard({ identity, showType, showLucky, idPrefix = "id-" }: { identity: IdentityView; showType: boolean; showLucky: boolean; idPrefix?: string }) {
+/** 로그인 전 미리보기는 유형만 보내므로 lucky가 null일 수 있다 — 그때는 지수 칸을 그리지 않는다 */
+export function IdentityCard({
+  identity,
+  showType,
+  showLucky,
+  idPrefix = "id-",
+  inline = false,
+}: {
+  identity: { type: IdentityTypeView; lucky: LuckyIndex | null };
+  showType: boolean;
+  showLucky: boolean;
+  idPrefix?: string;
+  /** 이미 여백이 있는 틀 안(로그인 전 미리보기)에서는 바깥 여백을 더하지 않는다 */
+  inline?: boolean;
+}) {
   const { type, lucky } = identity;
   const id = (n: string) => `${idPrefix}${n}`;
-  if (!showType && !showLucky) return null;
+  const luckyShown = showLucky && lucky !== null;
+  if (!showType && !luckyShown) return null;
   return (
-    <section aria-labelledby={id("title")} className="mx-auto w-full max-w-[720px] px-5 pt-5">
+    <section aria-labelledby={id("title")} data-testid="identity-card" className={inline ? "w-full" : "mx-auto w-full max-w-[720px] px-5 pt-5"}>
       <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
         {showType && (
           <div>
@@ -58,13 +74,13 @@ export function IdentityCard({ identity, showType, showLucky, idPrefix = "id-" }
           </div>
         )}
 
-        {showLucky && (
+        {luckyShown && (
           <div className={showType ? "mt-6 border-t border-line pt-5" : ""}>
             <h2 id={showType ? undefined : id("title")} className="text-[13px] font-semibold text-accent">
               ME:U 럭키 지수
             </h2>
             <div className="mt-1 flex items-end gap-2">
-              <p className="text-[40px] leading-none font-bold tracking-tight md:text-[46px]" aria-label={`럭키 지수 ${lucky.total}점`}>
+              <p className="text-[40px] leading-none font-bold tracking-tight md:text-[46px]" aria-label={`럭키 지수 ${lucky!.total}점`}>
                 {lucky.total}
               </p>
               <p className="pb-1 text-[14px] text-ink-3">/ 100 · 재미 · 참고용</p>

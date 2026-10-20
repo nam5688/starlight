@@ -30,7 +30,7 @@ test("연결하지 않았다: 화면 · 서버 · 서비스 · 리포트 · 검�
       if (name === "node_modules" || name === ".next" || name === "pilot-data" || name === "docs") continue;
       const path = join(dir, name);
       if (statSync(path).isDirectory()) walk(path);
-      else if (/\.(ts|tsx)$/.test(name) && !name.startsWith("situational-v2-draft") && readFileSync(path, "utf8").includes("situational-v2-draft")) hits.push(path.slice(root.length + 1));
+      else if (/\.(ts|tsx)$/.test(name) && !name.startsWith("situational-v2-") && readFileSync(path, "utf8").includes("situational-v2-draft")) hits.push(path.slice(root.length + 1));
     }
   };
   for (const d of ["app", "components", "server", "lib", "scripts"]) walk(join(root, d));

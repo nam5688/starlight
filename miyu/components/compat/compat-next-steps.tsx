@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonDisabled, buttonSecondary } from "@/components/ui/styles";
-import { saleOpenOf } from "@/server/sale-switch";
+import { compatReadinessFor } from "@/server/compat-readiness";
 
 /**
  * 간단 궁합 결과 아래 "다음 단계" 안내 — 사주 궁합 · 리포트 궁합이 지금 열려 있는지는 요청할 때 판매 스위치로 확인해 같은 값을 보인다(`CompatLevels` · `CompatPaidSection`과 같은 `saleOpenOf`).
@@ -11,8 +11,10 @@ import { saleOpenOf } from "@/server/sale-switch";
  */
 export async function CompatNextSteps() {
   await connection();
-  const sajuOpen = saleOpenOf("saju-compat");
-  const pairOpen = saleOpenOf("report-compat");
+  const saju = compatReadinessFor("saju-compat");
+  const pair = compatReadinessFor("report-compat");
+  const sajuOpen = saju.open;
+  const pairOpen = pair.open;
   return (
     <div className="rounded-2xl bg-canvas p-5 shadow-soft md:p-6">
       <h3 className="text-[17px] font-bold">이건 두 사람의 사주만으로 본 간단 궁합이에요</h3>
@@ -20,9 +22,10 @@ export async function CompatNextSteps() {
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         <li className="rounded-xl bg-page p-4">
           <p className="flex flex-wrap items-center gap-2 text-[16px] font-bold">
-            사주 궁합 <StatusBadge>{sajuOpen ? "지금 이용 가능" : "준비 중"}</StatusBadge>
+            사주 궁합 <StatusBadge>{saju.badge}</StatusBadge>
           </p>
           <p className="mt-2 text-[14px] leading-[1.7] text-ink-2">두 사람의 타고난 관계 흐름을 자세히 풀어요. 같은 계산 위에서 이 결과를 더 길게 읽어요.</p>
+          {saju.note && <p className="mt-2 text-[13px] leading-[1.65] text-ink-3">{saju.note}</p>}
           {sajuOpen ? (
             <a href="#compat-paid" className={`${buttonSecondary} mt-3 w-full`}>
               사주 궁합 받기
@@ -35,9 +38,10 @@ export async function CompatNextSteps() {
         </li>
         <li className="rounded-xl bg-page p-4">
           <p className="flex flex-wrap items-center gap-2 text-[16px] font-bold">
-            리포트 궁합 <StatusBadge>{pairOpen ? "지금 이용 가능" : "준비 중"}</StatusBadge>
+            리포트 궁합 <StatusBadge>{pair.badge}</StatusBadge>
           </p>
           <p className="mt-2 text-[14px] leading-[1.7] text-ink-2">두 사람의 사주에 각자가 직접 답한 성격과 관계 반응까지 함께 비교해요.</p>
+          {pair.note && <p className="mt-2 text-[13px] leading-[1.65] text-ink-3">{pair.note}</p>}
           {pairOpen ? (
             <Link href="/pair" className={`${buttonSecondary} mt-3 w-full`}>
               리포트 궁합 시작하기
@@ -50,7 +54,7 @@ export async function CompatNextSteps() {
         </li>
       </ul>
       <p className="mt-3 text-[13px] leading-[1.7] text-ink-3">
-        {sajuOpen || pairOpen ? "사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스예요. 이용 범위와 가격은 각 안내에서 확인해 주세요." : "사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스예요. 아직 열리지 않았고, 이용 범위와 가격은 정해지면 안내해요."}
+        {sajuOpen || pairOpen ? "사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스예요. 이용 범위와 가격은 각 안내에서 확인해 주세요." : "사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스예요. 지금은 받을 수 없어요."}
       </p>
     </div>
   );

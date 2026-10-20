@@ -19,6 +19,7 @@ import { chatConnected } from "@/server/chat";
 import { peekRoomChoice } from "@/server/room-choice";
 import { Track } from "@/components/analytics/track";
 import { ClearAnalyzeDraft } from "@/components/analyze/clear-draft";
+import { HashScroll } from "@/components/results/hash-scroll";
 import { LoginOptions } from "@/components/auth/login-options";
 import { FreePreviewBody } from "@/components/report/free-preview-body";
 import { FullReportView } from "@/components/report/full-report-view";
@@ -219,6 +220,7 @@ async function ResultContent({ params, searchParams }: Pick<PageProps<"/results/
   return (
     <>
       <ClearAnalyzeDraft />
+      <HashScroll />
       <Track name="preview_view" />
       <ResultHeader title={`${assessment.nickname} 님의 무료 미리보기`} subtitle="사주 · MBTI · 기질 · 애착 중 무료로 보는 범위예요." source={assessment.source} meta={`검사일 ${created} · 저장됨`} />
       {identity && <IdentityCard identity={identity} showType={PERSONAL_TYPE.visible} showLucky={LUCKY_INDEX.visible} />}

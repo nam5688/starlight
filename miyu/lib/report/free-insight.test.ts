@@ -70,3 +70,19 @@ test("새 필드가 없는 이전 저장 결과(insight 없음)도 그대로 읽
   assert.equal(s.insight, undefined);
   assert.ok(s.oneLiner.length > 0);
 });
+
+test("고객이 읽는 말: 고른 답을 요약해 부르지 않고(신중하다 · 익숙한 방식을 좋아한다 같은 라벨 · 응답 · 점수 말) 지난 경험을 지어내지 않는다(과거형 단정 없음)", () => {
+  const seen = new Set<string>();
+  for (const tendency of ["reassurance", "distance", "stability", "exploration"] as const) {
+    for (const v of [5, 1]) {
+      const ins = buildFreeInsight(all(v), tendency);
+      if (ins) for (const sentence of ins.text.split(/(?<=\.)\s+/)) seen.add(sentence);
+    }
+  }
+  assert.equal(seen.size, 12, "모든 문장이 나오도록 점검한다");
+  for (const sentence of seen) {
+    assert.doesNotMatch(sentence, /응답|답하|고르|선택했|점수|문항|신중한 사람|신중하|익숙함|확인한다/, `답을 요약하는 말: ${sentence}`);
+    assert.doesNotMatch(sentence, /했어요|했을 거예요|였어요|그랬|어린 시절|예전에/, `지난 경험을 단정하는 말: ${sentence}`);
+    assert.ok(sentence.length >= 25, `생활 장면 없이 너무 짧다: ${sentence}`);
+  }
+});

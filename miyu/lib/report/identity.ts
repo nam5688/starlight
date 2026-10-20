@@ -7,13 +7,27 @@ import type { SajuResult } from "../saju/engine.ts";
 import { luckyIndexOf, type LuckyIndex } from "../saju/interpret/lucky.ts";
 import type { FreeSummary } from "./types.ts";
 
+export type IdentityTypeView = ReturnType<typeof personalTypeView> & { kind: "type" | "mixed" };
+
 export type IdentityView = {
-  type: ReturnType<typeof personalTypeView> & { kind: "type" | "mixed" };
+  type: IdentityTypeView;
   lucky: LuckyIndex;
 };
 
-export function buildIdentity(input: { saju: SajuResult; summary: Pick<FreeSummary, "temperament" | "relationship" | "mbti"> }): IdentityView | null {
+type IdentityInput = { saju: SajuResult; summary: Pick<FreeSummary, "temperament" | "relationship" | "mbti"> };
+
+/**
+ * 개인 유형만 — 로그인 전 무료 미리보기와 로그인 뒤 저장된 결과가 같은 입력에서 같은 이름 · 같은 설명을 보이도록 두 화면이 이 함수 하나를 쓴다(운영자 2026-10-20).
+ * 럭키 지수를 만들지 않으므로 브라우저로 보내는 값에 지수가 섞이지 않는다.
+ */
+export function buildIdentityType(input: IdentityInput): IdentityTypeView | null {
   if (input.saju.status !== "ok") return null;
   const t = personalTypeOf({ saju: input.saju, summary: input.summary });
-  return { type: { ...personalTypeView(t), kind: t.kind }, lucky: luckyIndexOf(input.saju) };
+  return { ...personalTypeView(t), kind: t.kind };
+}
+
+export function buildIdentity(input: IdentityInput): IdentityView | null {
+  const type = buildIdentityType(input);
+  if (!type || input.saju.status !== "ok") return null;
+  return { type, lucky: luckyIndexOf(input.saju) };
 }

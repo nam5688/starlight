@@ -14,6 +14,7 @@ import { genderOfSaju } from "@/lib/saju/engine";
 import { listMyPairs, latestUsableAssessment, type MyPair } from "@/lib/services/pair-service";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
+import { compatReadinessFor } from "@/server/compat-readiness";
 import { pairDeps } from "@/server/pair";
 
 export const metadata: Metadata = { title: "리포트 궁합 · ME:U 미유", description: "각자의 분석 결과를 서로 동의한 뒤 연결해, 두 사람의 차이와 맞춰 갈 방법을 읽어 드려요.", robots: { index: false, follow: false } };
@@ -37,7 +38,9 @@ export default function PairHubPage() {
 async function Content() {
   await connection();
   const deps = pairDeps();
-  const open = deps.saleOpen === true;
+  // 새 초대는 판매 스위치와 풀이 AI 연결이 모두 맞을 때만 받는다 — 이유는 준비 중 안내에 그대로 적는다(이미 있는 쌍의 열람은 그대로)
+  const readiness = compatReadinessFor("report-compat");
+  const open = readiness.open;
   const member = isAuthConfigured() ? await getMember() : null;
   if (member?.needsConsent) redirect(consentPath("/pair"));
   const mine = member ? await listMyPairs(deps, member.userId).catch(() => [] as MyPair[]) : [];
@@ -59,7 +62,11 @@ async function Content() {
       </ol>
       <p className="mt-4 text-[13px] leading-[1.7] text-ink-3">결과는 재미 · 참고용이에요. 두 사람의 실제 마음이나 관계의 결과를 알려 주지 않고, 어떤 일이 일어난다는 예측이 아니에요. 사주 궁합(두 사람의 사주만)과 같은 계산 위에 응답 비교가 더해진 별도 서비스예요.</p>
 
-      {!open && <p className="mt-8 rounded-xl bg-mist px-4 py-3 text-[15px] leading-[1.7] text-ink-2">리포트 궁합은 지금 준비 중이에요. 무료 간단 궁합은 <Link href="/compat" className={textLink}>여기</Link>에서 볼 수 있어요.</p>}
+      {!open && (
+        <p className="mt-8 rounded-xl bg-mist px-4 py-3 text-[15px] leading-[1.7] text-ink-2" data-testid="pair-not-ready" data-state={readiness.state}>
+          리포트 궁합은 지금 준비 중이에요. {readiness.state === "ai-off" ? `${readiness.note} ` : null}무료 간단 궁합은 <Link href="/compat" className={textLink}>여기</Link>에서 볼 수 있어요.
+        </p>
+      )}
 
       {member && mine.length > 0 && (
         <section aria-labelledby="pair-mine" className="mt-12">

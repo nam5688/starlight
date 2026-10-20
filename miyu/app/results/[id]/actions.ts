@@ -2,6 +2,8 @@
 
 import { notFound, redirect } from "next/navigation";
 import type { PriceOptionKind } from "@/lib/commerce/benefits";
+import { blockedState, purchaseDecisionOf, type PurchaseStartState } from "@/lib/commerce/purchase-start";
+import { newErrorId } from "@/lib/ops/redact";
 import { planCheckout, quoteForCheckout } from "@/lib/services/benefit-service";
 import { startCheckout, type CheckoutPlan, type StartCheckoutResult } from "@/lib/services/order-service";
 import { REPORT_SLA_MS, type ReportStatus } from "@/lib/commerce/report";
@@ -13,6 +15,7 @@ import { peekInviteToken } from "@/server/invite";
 import { claimAndSchedule, queueAndScheduleReport } from "@/server/report-jobs";
 import { benefitRepository, now, readRepository, writeRepository } from "@/server/services";
 import { getMember } from "@/server/member";
+import { logError } from "@/server/ops";
 
 /** 결제 시작 결과를 화면 이동으로 바꾼다 — 예전 결제 시작과 혜택 계획 결제 시작이 같은 규칙을 쓴다 */
 async function goAfterStart(assessmentId: string, result: StartCheckoutResult, back: string): Promise<never> {
@@ -103,6 +106,43 @@ export async function startBenefitCheckoutAction(formData: FormData) {
 /** 결제하기: 서버가 가격으로 새 주문을 만들고 결제 화면으로 보낸다 */
 export async function startCheckoutAction(assessmentId: string) {
   await checkout(assessmentId, false);
+}
+
+/**
+ * 구매 시작 버튼(상담방 · 구매 안내 · 구매 영역)의 서버 동작 — 결제 화면으로 갈 수 있을 때만 이동하고, 못 가면 이유를 화면에 돌려준다(같은 화면으로 조용히 되돌리지 않는다).
+ * 결제 설정 · 로그인 · 새 구매 중지 · 이미 결제함 · 삭제한 기록 · 혜택 선택지를 모두 여기서 서버가 확인한다. 결제 가드(판매 중지 · 용량 · 예산)는 그대로 쓰고 우회하지 않는다.
+ * 혜택 선택지(쿠폰 · 추천 가격 · 포인트)가 있는 구매 영역은 정가로 몰래 시작하지 않고 구매 영역에서 고르게 한다.
+ */
+export async function startPurchaseAction(_prev: PurchaseStartState, formData: FormData): Promise<PurchaseStartState> {
+  const assessmentId = String(formData.get("assessmentId") ?? "");
+  const panelHref = String(formData.get("panelHref") ?? "");
+  if (!/^[0-9a-f-]{36}$/.test(assessmentId)) return blockedState("not-found");
+  const panel = /^(#r-purchase|\/results\/[0-9a-f-]{36}#r-purchase)$/.test(panelHref) ? panelHref : undefined;
+  let path: string;
+  try {
+    const member = await getMember();
+    if (!member || member.needsConsent) return blockedState("login");
+    const config = paymentConfig();
+    if (!config.ok) return blockedState("payments-not-ready", { assessmentId });
+    const userId = member.userId;
+    const deps = { repo: writeRepository(), benefits: benefitRepository(), now };
+    const quote = await quoteForCheckout(deps, { userId, assessmentId, couponCode: null, again: false });
+    if (quote.kind === "not-found") return blockedState("not-found", { assessmentId });
+    // 견적을 만들지 못한 경우는 구매 영역과 같게 정가 구매를 막지 않는다. 쓸 수 있는 혜택이 있으면 고르는 곳(구매 영역)으로 보낸다
+    if (quote.kind === "quote" && (quote.quote.denied.length > 0 || quote.quote.options.length > 1)) return blockedState("options", { assessmentId, panelHref: panel });
+    const result = await startCheckout(
+      { repo: writeRepository(), now, gate: saleGateCheck },
+      { userId, assessmentId, paymentEnv: paymentEnvOf(config), acquisition: await readAcquisition(), again: false, inviteToken: await peekInviteToken() },
+    );
+    const decision = purchaseDecisionOf(result, assessmentId);
+    if (decision.kind === "blocked") return decision.state;
+    path = decision.path;
+  } catch (e) {
+    const errorId = newErrorId();
+    logError(`results.startPurchase ${errorId}`, e);
+    return blockedState("error", { assessmentId, errorId });
+  }
+  redirect(path);
 }
 
 /**

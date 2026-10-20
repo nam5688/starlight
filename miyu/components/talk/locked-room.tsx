@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PurchaseStartButton } from "@/components/results/purchase-start-button";
 import { LockIcon } from "@/components/ui/icons";
 import { buttonPrimary, buttonSecondary, pageNarrow } from "@/components/ui/styles";
 import { CHAT_ROOMS, formatKrw, PERSONAL_REPORT, REPORT_TIER_NAMES } from "@/lib/config/product";
@@ -18,7 +19,7 @@ const OWNED_TEXT: Record<LockedOwnedState, string> = {
   "old-format": `이 결과의 리포트는 예전 형식으로 저장돼 있어서 이 방을 열 수 없어요. 새 형식 ${REPORT_TIER_NAMES.deep}는 내 리포트 화면에서 다시 받을 수 있어요.`,
 };
 
-export function LockedRoom({ room, buyHref, ownedState, backHref }: { room: RoomId; buyHref: string; ownedState: LockedOwnedState | null; backHref: string }) {
+export function LockedRoom({ room, assessmentId, buyHref, ownedState, backHref }: { room: RoomId; assessmentId: string; buyHref: string; ownedState: LockedOwnedState | null; backHref: string }) {
   const def = ROOMS[room];
   const owned = ownedState !== null;
   return (
@@ -42,9 +43,13 @@ export function LockedRoom({ room, buyHref, ownedState, backHref }: { room: Room
             : `이 방은 ${REPORT_TIER_NAMES.deep}로 열려요. ${REPORT_TIER_NAMES.deep}를 받으면 모든 상담방이 열리고, 방마다 무료 질문을 ${CHAT_ROOMS.deepFreeQuestions}번 드려요. 더 묻고 싶을 땐 질문 3개 묶음 결제로 이어 갈 수 있어요.`}
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Link href={buyHref} className={buttonPrimary}>
-            {owned ? "내 리포트 보기" : `${REPORT_TIER_NAMES.deep} 받기 · ${formatKrw(PERSONAL_REPORT.priceKrw)}`}
-          </Link>
+          {owned ? (
+            <Link href={buyHref} className={buttonPrimary}>
+              내 리포트 보기
+            </Link>
+          ) : (
+            <PurchaseStartButton assessmentId={assessmentId} panelHref={buyHref} label={`${REPORT_TIER_NAMES.deep} 받기 · ${formatKrw(PERSONAL_REPORT.priceKrw)}`} buttonClassName={`${buttonPrimary} w-full sm:w-auto`} className="sm:flex-1" />
+          )}
           <Link href={backHref} className={buttonSecondary}>
             무료로 이야기할 수 있는 방 보기
           </Link>

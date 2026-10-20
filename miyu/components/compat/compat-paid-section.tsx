@@ -7,7 +7,7 @@ import { formatKrw, SAJU_COMPAT } from "@/lib/config/product";
 import { genderOfSaju } from "@/lib/saju/engine";
 import { isAuthConfigured } from "@/server/env";
 import { consentPath, getMember } from "@/server/member";
-import { saleOpenOf } from "@/server/sale-switch";
+import { compatReadinessFor } from "@/server/compat-readiness";
 import { readRepository } from "@/server/services";
 
 function Frame({ children }: { children: React.ReactNode }) {
@@ -22,11 +22,23 @@ function Frame({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * /compat의 "사주 궁합 받기" 구역 — **판매 스위치(SAJU_COMPAT.saleOpen, 시험 환경에서만 server/sale-switch.ts)가 꺼져 있으면 아무것도 그리지 않는다**(지금).
+ * /compat의 "사주 궁합 받기" 구역 — **판매 스위치(SAJU_COMPAT.saleOpen, 시험 환경에서만 server/sale-switch.ts)가 꺼져 있으면 아무것도 그리지 않고, 열려 있어도 풀이 AI가 연결되지 않았으면 이유만 알린다**(`compatReadinessFor`).
  * 켜져 있으면: 로그인 → 내 검사 결과(가장 최근) → 상대 입력 → 결제. 내 검사 결과가 없으면 무료 분석으로 안내한다.
  */
 export async function CompatPaidSection() {
-  if (!saleOpenOf("saju-compat") || !isAuthConfigured()) return null;
+  if (!isAuthConfigured()) return null;
+  const readiness = compatReadinessFor("saju-compat");
+  if (readiness.state === "switch-closed") return null;
+  // 판매는 열려 있지만 풀이를 쓰는 AI가 연결되지 않았으면 누르기 전에 이유를 먼저 알린다(결제는 시작되지 않는다)
+  if (!readiness.open) {
+    return (
+      <Frame>
+        <p className="rounded-xl bg-mist px-4 py-3 text-[15px] leading-[1.75] text-ink-2" data-testid="compat-paid-not-ready">
+          사주 궁합은 지금 준비 중이에요. {readiness.note}
+        </p>
+      </Frame>
+    );
+  }
   const member = await getMember();
   if (!member) {
     return (

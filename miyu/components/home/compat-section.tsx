@@ -4,18 +4,21 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { buttonDisabled, buttonPrimary, buttonSecondary, pageWide } from "@/components/ui/styles";
 import { ChevronIcon } from "@/components/ui/icons";
 import { formatKrw, PAIR_COMPAT, SAJU_COMPAT } from "@/lib/config/product";
-import { saleOpenOf } from "@/server/sale-switch";
+import { compatReadinessOf, type CompatReadiness } from "@/lib/compat/readiness";
+import { compatReadinessFor } from "@/server/compat-readiness";
 
 /**
  * 홈의 궁합 구역(운영자 방향 2026-10-16: 나의 사주에서 우리의 관계로 — 궁합은 여러 상담 카드 중 하나가 아니라 별도 주요 입구).
  * 세 단계다(운영자 전달 2026-10-16): **간단 궁합**(무료, 지금 이용 가능 — `/compat`) · **사주 궁합**(두 사람의 사주만으로 관계를 길게 풀이) · **리포트 궁합**(각자의 분석 결과를 동의 아래 연결).
  * 간단 궁합과 사주 궁합은 같은 계산 엔진(`lib/saju/interpret/compat.ts`)을 쓰고, 리포트 궁합은 그 위에 각자의 응답 비교가 더해지는 별도 상품이다(`docs/compat-proposal.md`).
- * **사주 궁합 · 리포트 궁합이 지금 열려 있는지는 요청할 때 판매 스위치로 확인한다**(`saleOpenOf` — `/compat` · `/pair`와 같은 값, 시험 결제 모드에서만 열린다). 꺼져 있으면 "준비 중"이고 누를 수 없다.
+ * **사주 궁합 · 리포트 궁합이 지금 받을 수 있는지는 요청할 때 판매 스위치와 풀이 AI 연결을 함께 확인한다**(`compatReadinessFor` — `/compat` · `/pair`와 같은 값, 시험 결제 모드에서만 열린다). 하나라도 안 되면 "준비 중"이고 누를 수 없으며, AI가 안 켜져 있어 막힌 경우는 그 이유를 카드에 적는다.
  * 가격은 상품 설정(`SAJU_COMPAT` · `PAIR_COMPAT`)에서 읽는다. "더 정확하다" · 심층 리포트에 포함된다는 말은 쓰지 않는다.
  */
-type Way = { name: string; badge: string; lines: readonly string[]; href?: string; cta: string; price?: string; secondary?: boolean };
+type Way = { name: string; badge: string; lines: readonly string[]; note?: string | null; href?: string; cta: string; price?: string; secondary?: boolean };
 
-function waysOf(open: { saju: boolean; pair: boolean; pending?: boolean }): readonly Way[] {
+type Open = { saju: CompatReadiness; pair: CompatReadiness; pending?: boolean };
+
+function waysOf(open: Open): readonly Way[] {
   return [
     {
       name: "간단 궁합",
@@ -26,22 +29,24 @@ function waysOf(open: { saju: boolean; pair: boolean; pending?: boolean }): read
     },
     {
       name: "사주 궁합",
-      badge: open.pending ? "" : open.saju ? "지금 이용 가능" : "준비 중",
+      badge: open.pending ? "" : open.saju.badge,
       lines: ["간단 궁합과 같은 계산을 길게 읽어요.", "어디서 잘 맞고, 어디서 부딪히기 쉬운지 영역별로 풀어봐요."],
-      href: open.saju ? "/compat" : undefined,
-      cta: open.saju ? "사주 궁합 받기" : "자세히 보기",
-      price: open.saju ? formatKrw(SAJU_COMPAT.priceKrw) : undefined,
+      note: open.pending ? null : open.saju.note,
+      href: open.saju.open ? "/compat" : undefined,
+      cta: open.saju.open ? "사주 궁합 받기" : "자세히 보기",
+      price: open.saju.open ? formatKrw(SAJU_COMPAT.priceKrw) : undefined,
       secondary: true,
     },
     {
       name: "리포트 궁합",
-      badge: open.pending ? "" : open.pair ? "지금 이용 가능" : "준비 중",
-      lines: open.pair
+      badge: open.pending ? "" : open.pair.badge,
+      lines: open.pair.open
         ? ["각자의 분석 결과를 연결해요.", "두 사주에 성격 · 기질 · 애착과 입력한 MBTI까지 함께 반영해요.", "둘 중 한 사람만 결제해도 두 사람이 같은 글을 읽어요."]
         : ["각자의 분석 결과를 연결해요.", "두 사주에 성격 · 기질 · 애착과 입력한 MBTI까지 함께 반영해요."],
-      href: open.pair ? "/pair" : undefined,
-      cta: open.pair ? "리포트 궁합 시작하기" : "상대와 결과 연결하기",
-      price: open.pair ? formatKrw(PAIR_COMPAT.priceKrw) : undefined,
+      note: open.pending ? null : open.pair.note,
+      href: open.pair.open ? "/pair" : undefined,
+      cta: open.pair.open ? "리포트 궁합 시작하기" : "상대와 결과 연결하기",
+      price: open.pair.open ? formatKrw(PAIR_COMPAT.priceKrw) : undefined,
       secondary: true,
     },
   ];
@@ -50,17 +55,20 @@ function waysOf(open: { saju: boolean; pair: boolean; pending?: boolean }): read
 /** 판매 스위치를 요청할 때 읽어 그린다 — 홈의 나머지는 정적으로 두고 이 구역만 요청 시점 값을 쓴다 */
 export async function CompatSection() {
   await connection();
-  return <CompatSectionView saju={saleOpenOf("saju-compat")} pair={saleOpenOf("report-compat")} />;
+  return <CompatSectionView saju={compatReadinessFor("saju-compat")} pair={compatReadinessFor("report-compat")} />;
 }
+
+/** 값을 아직 모를 때 — 상태 표시와 안내 문구는 pending 화면이 그리지 않는다 */
+const PENDING: CompatReadiness = { ...compatReadinessOf({ saleOpen: false, generatorReady: false }), note: null };
 
 /** 스위치 값을 아직 모를 때(스트리밍 대기) — 두 유료 단계는 이름만 보이고 상태 표시와 누르는 곳이 없다 */
 export function CompatSectionPending() {
-  return <CompatSectionView saju={false} pair={false} pending />;
+  return <CompatSectionView saju={PENDING} pair={PENDING} pending />;
 }
 
-function CompatSectionView({ saju, pair, pending = false }: { saju: boolean; pair: boolean; pending?: boolean }) {
+function CompatSectionView({ saju, pair, pending = false }: { saju: CompatReadiness; pair: CompatReadiness; pending?: boolean }) {
   const WAYS = waysOf({ saju, pair, pending });
-  const anyOpen = saju || pair;
+  const anyOpen = saju.open || pair.open;
   return (
     <section id="home-compat" aria-labelledby="home-compat-title" className="border-y border-line bg-canvas py-12 md:py-16">
       <div className={pageWide}>
@@ -84,6 +92,11 @@ function CompatSectionView({ saju, pair, pending = false }: { saju: boolean; pai
                   <li key={t}>{t}</li>
                 ))}
               </ul>
+              {w.note && (
+                <p className="mt-3 text-[13px] leading-[1.65] text-ink-3" data-testid="compat-way-note">
+                  {w.note}
+                </p>
+              )}
               {w.href ? (
                 <Link href={w.href} className={`${w.secondary ? buttonSecondary : buttonPrimary} mt-5 w-full`}>
                   {w.cta}
@@ -100,7 +113,7 @@ function CompatSectionView({ saju, pair, pending = false }: { saju: boolean; pai
         <p className="mt-4 text-[13px] leading-[1.7] text-ink-3">
           {anyOpen
             ? "간단 궁합은 무료예요. 사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스예요. 이용 범위와 가격은 각 안내에서 확인해 주세요."
-            : "간단 궁합은 지금 무료로 볼 수 있어요. 사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스이고, 아직 열리지 않았어요. 이용 범위와 가격은 정해지면 안내해요."}
+            : "간단 궁합은 지금 무료로 볼 수 있어요. 사주 궁합과 리포트 궁합은 개인 심층 리포트와 별도 서비스이고, 지금은 받을 수 없어요. 준비가 끝나면 이 자리에서 가격과 함께 알려 드려요."}
         </p>
 
         <details className="group mt-4 border-y border-line">

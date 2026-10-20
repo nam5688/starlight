@@ -14,6 +14,7 @@ import {
   type BasicInfoErrors,
 } from "@/lib/profile/basic-info";
 import { DRAFT_KEY, hasContent, parseDraft, serializeDraft } from "@/lib/profile/draft";
+import type { IdentityTypeView } from "@/lib/report/identity";
 import type { FreePreview } from "@/lib/report/preview";
 import { BasicInfoStep } from "./basic-info-step";
 import { FreeSummaryView } from "./free-summary";
@@ -42,6 +43,8 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [showMissing, setShowMissing] = useState(false);
   const [preview, setPreview] = useState<FreePreview | null>(null);
+  /** 저장 후 결과 화면과 같은 개인 유형 카드 — 서버가 같은 함수로 계산해 보낸 값 */
+  const [identityType, setIdentityType] = useState<IdentityTypeView | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   /** 이전에 입력하던 내용을 복원했을 때의 안내 */
@@ -161,6 +164,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     setAnswers((prev) => ({ ...prev, [id]: value }));
     // 답을 고치면 이전 요약은 더 이상 맞지 않으므로 지운다
     setPreview(null);
+    setIdentityType(null);
   }
 
   function handleNext() {
@@ -208,6 +212,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
       if (result.ok) {
         trackOnce("analyze_complete");
         setPreview(result.preview);
+        setIdentityType(result.identityType);
         summaryRef.current = result.preview;
         pushStep(SUMMARY_STEP);
       } else {
@@ -227,6 +232,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     setInfoErrors({});
     setAnswers({});
     setPreview(null);
+    setIdentityType(null);
     summaryRef.current = null;
     pushStep(0);
   }
@@ -284,6 +290,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
       {step === SUMMARY_STEP && preview ? (
         <FreeSummaryView
           preview={preview}
+          identityType={identityType}
           info={info}
           answers={answers}
           authReady={authReady}
