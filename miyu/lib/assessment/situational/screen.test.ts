@@ -25,6 +25,9 @@ test("질문 화면: 지금 보여 주는 질문은 상황형 28문항이고(한
   const flow = readSource(join(root, "components", "analyze", "analyze-flow.tsx"));
   assert.match(flow, /ASSESSMENT\.active/);
   assert.match(flow, /SceneStep/);
+  // 질문 화면의 안내는 짧게 — 질문 버전 번호 같은 개발 내역을 보이지 않는다
+  assert.match(withComments, /미유 성향 질문 · 개발용 예시 · 진단 아님/);
+  assert.ok(!/situational-v2-live|SITUATIONAL_CONTENT_VERSION/.test(src), "버전 문자열을 질문 화면에 보이지 않는다");
   // 단계 이름은 무엇을 재는지 알려 주지 않는 중립 이름("질문 1")이다
   assert.match(flow, /label: `질문 \$\{i \+ 1\}`/);
 });
@@ -57,8 +60,13 @@ test("공개 안내(상황형 28문항 판): 있는 그대로만 적는다 — �
   const text = [...SITUATIONAL_WHAT, ...SITUATIONAL_DEVELOPMENT, ...SITUATIONAL_CHECKED, ...SITUATIONAL_NOT_CHECKED, ...SITUATIONAL_SOURCES.flatMap((s) => [s.name, s.used, s.scope])].join("\n");
   assert.match(text, /미유가 처음부터 직접 쓴 문항이라고 말하지 않아요/);
   assert.match(text, /외부 AI 도구/);
-  assert.match(text, /읽는 규칙[^\n]*설계/);
-  assert.match(text, /사람에게 시험하지 않은 설계 가설/);
+  assert.match(text, /읽는 방법[^\n]*설계/);
+  assert.match(text, /사람들에게 시험해 보지 않은 설계/);
+  // 짧게: 공개 안내 본문(질문 설명 · 만든 방법 · 자료 · 확인한 것/못 한 것)은 길게 늘어놓지 않는다(운영자 2026-10-20) — 비진단 자기이해 서비스라는 점이 먼저다
+  assert.ok(text.length <= 1300, `공개 안내가 너무 길다: ${text.length}자`);
+  assert.match(SITUATIONAL_WHAT.join("\n"), /진단이 아니라 자기 이해를 돕는 서비스/);
+  assert.ok(SITUATIONAL_DEVELOPMENT.length <= 2 && SITUATIONAL_CHECKED.length <= 2 && SITUATIONAL_NOT_CHECKED.length <= 2 && SITUATIONAL_SOURCES.length <= 2);
+  assert.ok(!/자동 테스트|저장소|파일|OpenPsychometrics|글자까지|보존/.test(text), "개발 내부 사정(파일 · 저장소 · 테스트)을 고객 글에 늘어놓지 않는다");
   for (const bad of [/전문가(의)? (검토|감수)(를|가)? (받았|마쳤|거쳤|완료)/, /(검증|검토)(을)? (마쳤|거쳤|완료)/, /이용 허락을 (받았|얻었)/, /검증된 (검사|문항)/, /정확도가 높/, /과학적으로 검증/]) assert.ok(!bad.test(text), `쓰면 안 되는 표현: ${bad}`);
   assert.ok(SITUATIONAL_NOT_CHECKED.some((t) => /신뢰도 · 타당도/.test(t) && /정확도를 말할 수 없어요/.test(t)));
   assert.ok(SITUATIONAL_NOT_CHECKED.some((t) => /닮았는지/.test(t)), "문장의 독립성을 확인하지 못했다고 적는다");

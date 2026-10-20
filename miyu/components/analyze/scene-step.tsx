@@ -2,7 +2,6 @@
 
 import type { Answers } from "@/lib/assessment/types";
 import { SITUATIONAL_V2_ITEMS, type SituationalItem } from "@/lib/assessment/drafts/situational-v2-draft";
-import { SITUATIONAL_CONTENT_VERSION } from "@/lib/assessment/situational/reading";
 
 /**
  * 상황형 질문 한 단계 — 장면마다 선택지 네 개 중 "실제로 가장 먼저 할 것 같은 행동" 하나를 고른다.
@@ -43,7 +42,7 @@ export function SceneStep({
       </div>
       <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{SCENE_INTRO}</p>
       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="inline-flex rounded-md border border-line-strong bg-mist px-2 py-0.5 text-[13px] font-medium text-ink-2">미유 성향 질문 · 개발용 예시 · {SITUATIONAL_CONTENT_VERSION}</span>
+        <span className="inline-flex rounded-md border border-line-strong bg-mist px-2 py-0.5 text-[13px] font-medium text-ink-2">미유 성향 질문 · 개발용 예시 · 진단 아님</span>
         <a href="/assessment-basis" target="_blank" rel="noopener" className="text-[13px] text-ink-3 underline underline-offset-2 hover:text-ink">
           어떻게 만들었나요?
         </a>

@@ -22,7 +22,7 @@ test("선택지에는 점수 · 유형 이름 · 방향 표시가 없다 — 읽
   for (const it of SITUATIONAL_V2_ITEMS) assert.deepEqual(Object.keys(it).sort(), ["id", "options", "part", "scene"]);
 });
 
-test("연결 지점은 정해져 있다: 이 원문 데이터를 불러오는 곳은 28문항 읽기 모듈 · 공개 안내 글 · 질문 화면 · 문서 생성기뿐이고(원문은 그대로, 읽는 규칙은 읽기 모듈이 따로 가진다) 그 밖의 서버 · 저장 · 리포트 · 검사 모듈은 불러오지 않는다", () => {
+test("연결 지점은 정해져 있다: 이 원문 데이터를 불러오는 곳은 28문항 읽기 모듈 · 질문 화면 · 문서 생성기뿐이고(원문은 그대로, 읽는 규칙은 읽기 모듈이 따로 가진다) 그 밖의 서버 · 저장 · 리포트 · 검사 모듈은 불러오지 않는다", () => {
   const root = join(import.meta.dirname, "..", "..", "..");
   const hits: string[] = [];
   const walk = (dir: string) => {
@@ -34,6 +34,6 @@ test("연결 지점은 정해져 있다: 이 원문 데이터를 불러오는 �
     }
   };
   for (const d of ["app", "components", "server", "lib", "scripts"]) walk(join(root, d));
-  assert.deepEqual(hits.sort(), ["components/analyze/analyze-flow.tsx", "components/analyze/scene-step.tsx", "lib/assessment/situational/basis.ts", "lib/assessment/situational/reading.ts", "lib/assessment/situational/render.ts"], "원문 데이터를 불러오는 파일이 정해진 곳과 다르다");
+  assert.deepEqual(hits.sort(), ["components/analyze/analyze-flow.tsx", "components/analyze/scene-step.tsx", "lib/assessment/situational/reading.ts", "lib/assessment/situational/render.ts"], "원문 데이터를 불러오는 파일이 정해진 곳과 다르다");
   assert.match(SITUATIONAL_V2_VERSION, /draft/);
 });

@@ -251,6 +251,57 @@ async function main() {
     await t.ctx.close();
   }
 
+  console.log("9) 카드사 인증 대기(결제 요청 지연) 뒤 끝나는 방식별: 지연된 성공 · 지연된 오류 · 앱 전환(화면 숨김 → 복귀) — 끝나기 전에는 실패로 보지 않고, 끝나는 순간에만 상태가 정해진다");
+  {
+    const readyAndClick = async (t: any) => {
+      await t.page.waitForFunction(() => !document.querySelector("button[aria-busy]")?.hasAttribute("disabled"), null, { timeout: 8000 });
+      await t.page.click("button[aria-busy]");
+      await t.page.waitForFunction(() => (window as any).__events.includes("pay"), null, { timeout: 4000 });
+    };
+    const payCount = (t: any) => t.page.evaluate(() => (window as any).__events.filter((e: string) => e === "pay").length);
+
+    // (가) 지연된 성공: 안내가 뜨기 전에 요청이 성공 응답으로 끝났지만 화면이 바뀌지 않음(개발 확인 화면에는 이동이 없다) → "결과를 확인하는 중" 안내, 버튼 잠금 유지, 오류 문구 없음
+    const ok = await open({ payPending: true });
+    await readyAndClick(ok);
+    await ok.page.evaluate(() => (window as any).__payGate.res({ paymentKey: "pk_fake" }));
+    await ok.page.waitForSelector('[data-testid="pay-slow-notice"][data-settled="1"]', { timeout: 4000 });
+    const settledText = await ok.page.textContent('[data-testid="pay-slow-notice"]');
+    check(/확인하는 중/.test(settledText) && !/결제는 되지 않았|금액이 빠져나가지 않|결제되지 않았|결제가 완료되었/.test(settledText), "성공 응답 뒤에는 \"결과를 확인하는 중\" 안내만 보이고 결제 여부는 단정하지 않는다", settledText);
+    check((await payEnabled(ok.page)) === false && (await payCount(ok)) === 1, "성공 응답 뒤에도 버튼은 잠긴 채 요청은 한 번뿐이다");
+    check((await ok.page.$('[data-testid="widget-message"]')) === null, "성공 응답 뒤에 실패 문구가 나오지 않는다");
+    await ok.ctx.close();
+
+    // (나) 지연된 오류: 안내가 뜬 뒤(요청이 끝나지 않은 상태) 카드사 오류로 거절 → 그때 오류 문구 + 버튼 재개 + 관찰/오류 보고
+    const err = await open({ payPending: true });
+    await readyAndClick(err);
+    await err.page.waitForSelector('[data-testid="pay-slow-notice"][data-settled="0"]', { timeout: 4000 });
+    await err.page.evaluate(() => {
+      const e: any = new Error("카드사 인증 실패");
+      e.code = "INVALID_CARD_COMPANY";
+      (window as any).__payGate.rej(e);
+    });
+    await err.page.waitForFunction(() => !document.querySelector("button[aria-busy]")?.hasAttribute("disabled"), null, { timeout: 4000 });
+    check(/카드사 인증 실패/.test((await err.page.textContent('[data-testid="widget-message"]')) ?? ""), "거절이 확정된 그 순간에 SDK가 돌려준 오류 문구를 보인다");
+    check((await err.page.$('[data-testid="pay-slow-notice"]')) === null, "거절되면 지연 안내가 사라진다");
+    const errIssues = await issues(err.page);
+    check(errIssues.length === 2 && errIssues[0].code === "PAY_REQUEST_PENDING" && errIssues[1].code === "INVALID_CARD_COMPANY", "운영 기록: 관찰(PAY_REQUEST_PENDING) 한 건 + 확정 오류 한 건", errIssues);
+    await err.ctx.close();
+
+    // (다) 앱 전환: 카드사 인증 앱으로 이동해 화면이 숨겨진 동안은 안내하지 않고, 돌아오면 안내한다. 그동안 버튼은 계속 잠겨 있다
+    const away = await open({ payPending: true });
+    await away.page.addInitScript(`(() => { let hidden = false; Object.defineProperty(document, "visibilityState", { configurable: true, get: () => (hidden ? "hidden" : "visible") }); window.__setHidden = (v) => { hidden = v; document.dispatchEvent(new Event("visibilitychange")); }; })();`);
+    await away.page.reload({ waitUntil: "load" });
+    await readyAndClick(away);
+    await away.page.evaluate(() => (window as any).__setHidden(true));
+    await away.page.waitForTimeout(1600);
+    check((await away.page.$('[data-testid="pay-slow-notice"]')) === null, "화면이 숨겨진 동안(인증 앱 사용 중)에는 지연 안내를 띄우지 않는다");
+    check((await payEnabled(away.page)) === false, "숨겨진 동안에도 버튼은 잠겨 있다");
+    await away.page.evaluate(() => (window as any).__setHidden(false));
+    await away.page.waitForSelector('[data-testid="pay-slow-notice"]', { timeout: 4500 });
+    check((await payEnabled(away.page)) === false && (await payCount(away)) === 1, "돌아온 뒤에도 안내만 보이고 버튼은 잠겨 있으며 요청은 한 번뿐이다");
+    await away.ctx.close();
+  }
+
   console.log("7) 좁은 화면(390px)에서 오류 상태가 가로로 넘치지 않는다");
   {
     const t = await open({ methodsError: "UNKNOWN_ERROR" });

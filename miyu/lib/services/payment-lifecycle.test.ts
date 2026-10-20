@@ -212,3 +212,65 @@ test("④ · ⑤ 개인 리포트: 결제 완료 뒤에만 열리고, 환불되�
   assert.equal(await queueReport({ repo: w.mem.repo }, refundedOrder), null);
   assert.equal((await claimReport({ repo: w.mem.repo, generator: devReportGenerator, now: w.now }, refundedOrder, { retryFailed: true })).report, null);
 });
+
+test("⑥ 카드사 인증 대기(결제 창이 열려 있는 정상 상태): 서버는 대기 중인 주문을 실패 · 취소 · 포기로 바꾸지 않고, 결제사 기록(IN_PROGRESS)을 기다리며, 인증을 마쳐 결제사에서 승인되면 그때 한 번만 결제 완료로 맞춘다(탭을 닫았어도)", async () => {
+  const w = await world();
+  const order = w.personal;
+  const key = "pk_auth_wait";
+  // 고객이 결제 창에서 카드사 본인 인증까지 열었다(승인 전). 이 화면은 서버에 아무것도 알리지 않는다 — 20초 안내도 서버 상태를 바꾸지 않는다.
+  w.toss.authorize(key, order.orderNumber, order.amount);
+
+  // 막 시작한 직후는 확인하지 않고, 몇 분 뒤에도 결제사 기록이 IN_PROGRESS면 기다린다(실패 · 취소 · 포기로 바꾸지 않는다)
+  let elapsed = 0;
+  for (const minutes of [1, 5, 30, 70]) {
+    w.advance((minutes - elapsed) * 60_000);
+    elapsed = minutes;
+    const batch = await reconcileBatch({ repo: w.mem.repo, gateway: w.gateway, now: w.now });
+    assert.equal(batch.counts.paid, 0, `${minutes}분: 아직 결제 완료로 바꾸지 않는다`);
+    const o = await w.fresh(order);
+    assert.equal(o.status, "pending", `${minutes}분: 주문은 대기 그대로`);
+    assert.equal(o.failureCode ?? null, null, `${minutes}분: 실패 코드를 남기지 않는다`);
+    assert.equal(w.statusEvents(order, "ABANDONED") + w.statusEvents(order, "CANCELED"), 0, `${minutes}분: 포기 · 취소 기록이 없다`);
+  }
+  assert.equal(await w.mem.repo.getReportByOrder(order.id), null, "승인 전에는 리포트를 만들지 않는다");
+
+  // 고객이 인증을 마쳤고 결제사에서 승인됐지만 우리 화면으로 돌아오지 못했다(탭 닫힘) → 재대조가 맞춘다
+  w.toss.approveBehindOurBack(key, order.orderNumber, order.amount);
+  const first = await reconcileBatch({ repo: w.mem.repo, gateway: w.gateway, now: w.now });
+  assert.equal(first.counts.paid, 1);
+  assert.equal((await w.fresh(order)).status, "paid");
+  const second = await reconcileBatch({ repo: w.mem.repo, gateway: w.gateway, now: w.now });
+  assert.equal(second.counts.paid, 0, "두 번째 대조는 바꿀 것이 없다");
+  // 돌아온 성공 주소가 뒤늦게 와도 중복 승인되지 않는다
+  assert.equal((await w.confirm(order, key)).kind, "paid");
+  assert.equal(w.toss.byKey.size, 1);
+});
+
+test("⑥ 알려진 한계(서버): 인증 대기 중에 같은 결과의 구매를 다시 시작하면 이전 대기 주문은 대체(SUPERSEDED)로 닫히고 옛 주문의 성공 주소는 승인되지 않는다 — 결제사 승인 요청이 나가지 않아 금액이 청구되지 않지만 안내가 혼란스러울 수 있다(대기 주문 재사용은 운영자 결정 항목)", async () => {
+  const w = await world();
+  const old = w.personal;
+  w.toss.authorize("pk_old_auth", old.orderNumber, old.amount);
+  const again = await startCheckout({ repo: w.mem.repo, now: w.now }, { userId: USER, assessmentId: w.mine.id });
+  assert.equal(again.kind, "order");
+  if (again.kind !== "order") return;
+  assert.notEqual(again.order.orderNumber, old.orderNumber);
+  assert.equal((await w.fresh(old)).status, "canceled");
+  assert.equal((await w.fresh(old)).failureCode, "SUPERSEDED");
+  const calls = w.toss.calls.confirm;
+  const late = await w.confirm(old, "pk_old_auth");
+  assert.equal(late.kind, "rejected");
+  assert.equal(w.toss.calls.confirm, calls, "대체된 주문에는 결제사 승인 요청을 보내지 않는다(청구되지 않는다)");
+  const pendings = (await w.mem.repo.listOrdersForAssessment(w.mine.id)).filter((o) => o.status === "pending" && o.productId.startsWith("personal-integrated-report"));
+  assert.equal(pendings.length, 1, "개인 리포트 대기 주문은 하나만 남는다");
+});
+
+test("⑥ 인증 대기 중 구매자가 창을 닫아 실패 주소로 돌아온 경우에만 취소로 정리하고, 결제 화면 새로고침은 이미 끝난 주문을 결제 화면으로 다시 열지 않는다(소스 확인)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const page = readFileSync(join(import.meta.dirname, "..", "..", "app", "checkout", "[orderNumber]", "page.tsx"), "utf8");
+  assert.match(page, /if \(order\.status !== "pending"\) redirect\(resultPathOf\(order, \{ paid: order\.status === "paid" \}\)\)/, "대기가 아닌 주문(결제 완료 · 환불 · 취소)은 결제 화면 대신 돌아갈 화면으로 보낸다");
+  const w = await world();
+  w.toss.authorize("pk_closed", w.pack.orderNumber, w.pack.amount);
+  const closed = await markCheckoutFailed({ repo: w.mem.repo }, { userId: USER, orderNumber: w.pack.orderNumber, code: "PAY_PROCESS_CANCELED", message: "사용자가 결제를 취소했습니다" });
+  assert.equal(closed?.status, "canceled", "결제사가 돌려준 취소 코드가 있을 때만 취소로 정리한다");
+});

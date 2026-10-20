@@ -143,6 +143,29 @@ test("개발용 규칙 리포트 · 확장 · 대화: 28문항 결과로도 모�
   assert.ok(JSON.stringify(model).includes("상황형 질문 28장면"));
 });
 
+test("개발용 규칙 리포트 구조 호환: 28문항 결과의 리포트는 22문항 결과와 같은 칸 구성(최상위 · 세부 · 통합 · 행동 · 확장)을 가지며, 22문항 점수를 환산한 흔적(점수 · 백분위 · 22문항 점수 막대)이 없고 22문항 요약은 28문항 칸을 만들지 않는다", () => {
+  if (SAJU.status !== "ok") throw new Error("사주 계산 실패");
+  const common = { nickname: "지민", knownMbti: "INFJ" as const, birthText: "1995-04-12", saju: SAJU, gender: "female" as const, reference: REF, context: null };
+  const r28 = buildDevReport({ ...common, summary: buildSituationalFreeSummary(sheet28("explorer")) });
+  const r22 = buildDevReport({ ...common, summary: buildDevFreeSummary(answers22(4)) });
+  const shape = (o: object) => Object.keys(o).filter((k) => k !== "situational").sort();
+  assert.deepEqual(shape(r28), shape(r22), "최상위 칸 구성이 같다(28문항에만 situational이 더해진다)");
+  assert.deepEqual(Object.keys(r28.details).sort(), Object.keys(r22.details).sort());
+  assert.deepEqual(Object.keys(r28.details.mbti).sort(), Object.keys(r22.details.mbti).sort());
+  assert.deepEqual(Object.keys(r28.integrated).sort(), Object.keys(r22.integrated).sort());
+  assert.ok(r28.extras && r22.extras);
+  assert.deepEqual(Object.keys(r28.extras!).sort(), Object.keys(r22.extras!).sort());
+  assert.equal(r28.actions.length, r22.actions.length);
+  assert.ok(r28.situational && !r22.situational);
+  // 28문항 리포트에는 점수 숫자 · 백분위 · 22문항 점수 막대가 없다
+  assert.deepEqual([r28.temperament.length, r28.relationship.length, r28.mbti.axes.length], [0, 0, 0]);
+  const text = JSON.stringify({ details: r28.details, integrated: r28.integrated, actions: r28.actions, extras: r28.extras });
+  assert.ok(!/\d+\s*점|백분위|정확도 \d|\d+\s*%/.test(text), "점수 · 백분위 · 정확도 숫자를 만들지 않는다");
+  assert.ok(!/확인추구|거리유지|안정지향|탐색지향/.test(text), "예전 후보 이름을 만들지 않는다");
+  // 같은 사주 · 같은 답이면 같은 리포트(저장된 같은 버전을 다시 보여 줄 수 있다)
+  assert.deepEqual(buildDevReport({ ...common, summary: buildSituationalFreeSummary(sheet28("explorer")) }), r28);
+});
+
 test("AI 근거(모의 작성기): 28문항 결과의 근거로 7개 대주제 글이 형식 검사를 통과하고 응답 근거(survey.s28.*)가 쓰인다 — 실제 AI는 부르지 않았다", async () => {
   const p01 = buildPersonas(10)[0];
   const input = { ...p01.input, summary: buildSituationalFreeSummary(sheet28("independent-driver")), knownMbti: "INFJ" };

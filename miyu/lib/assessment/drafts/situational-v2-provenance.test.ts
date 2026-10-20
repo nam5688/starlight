@@ -54,7 +54,7 @@ test("채점 원본이 없다는 사실이 원본 데이터에 그대로다: 점
   for (const word of ["score", "weight", "dimension", "direction", "점수", "가중치", "불안형", "회피형"]) assert.ok(!text.includes(word), `데이터에 ${word}`);
 });
 
-test("운영자가 고른 28개는 예시 입력일 뿐 어디서도 기본 답으로 쓰이지 않고, 원문 데이터를 불러오는 곳은 28문항 읽기 모듈 · 공개 안내 글 · 질문 화면 · 문서 생성기뿐이며 예전 22문항 검사 모듈은 28문항을 모른다", () => {
+test("운영자가 고른 28개는 예시 입력일 뿐 어디서도 기본 답으로 쓰이지 않고, 원문 데이터를 불러오는 곳은 28문항 읽기 모듈 · 질문 화면 · 문서 생성기뿐이며 예전 22문항 검사 모듈은 28문항을 모른다", () => {
   const importers: string[] = [];
   const pickUses: string[] = [];
   const walk = (dir: string) => {
@@ -70,7 +70,7 @@ test("운영자가 고른 28개는 예시 입력일 뿐 어디서도 기본 답�
     }
   };
   for (const d of ["app", "components", "server", "lib", "scripts"]) walk(join(root, d));
-  assert.deepEqual(importers.sort(), ["components/analyze/analyze-flow.tsx", "components/analyze/scene-step.tsx", "lib/assessment/situational/basis.ts", "lib/assessment/situational/reading.ts", "lib/assessment/situational/render.ts"]);
+  assert.deepEqual(importers.sort(), ["components/analyze/analyze-flow.tsx", "components/analyze/scene-step.tsx", "lib/assessment/situational/reading.ts", "lib/assessment/situational/render.ts"]);
   assert.deepEqual(pickUses, [], "운영자가 고른 28개 응답은 예시 입력이라 코드에서 읽지 않는다");
   for (const f of ["mbti.ts", "temperament.ts", "relationship.ts", "index.ts"]) assert.ok(!/situational/.test(readFileSync(join(root, "lib", "assessment", "modules", f), "utf8")), f);
 });

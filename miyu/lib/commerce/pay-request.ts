@@ -15,9 +15,18 @@ export const PAY_SLOW_CODE = "PAY_REQUEST_PENDING";
 /** 숨겨진 화면(카드 앱 · 다른 앱으로 이동 중)에서는 보이는 화면이 될 때까지 이만큼씩 기다린다 */
 export const PAY_SLOW_RECHECK_MS = 2_000;
 
-/** 고객에게 보이는 안내 — 결제 여부를 단정하지 않고(되지 않았다고도 되었다고도 말하지 않는다) 다음에 할 수 있는 것을 알린다 */
+/** 고객에게 보이는 안내 — 결제 여부를 단정하지 않고(되지 않았다고도 되었다고도 말하지 않는다) 다음에 할 수 있는 것을 알린다. 결제 요청이 아직 끝나지 않은 경우(카드사 인증 · 결제 창 진행 중) */
 export const PAY_SLOW_NOTICE =
   "결제 창으로 넘어가는 데 시간이 걸리고 있어요. 결제 요청이 아직 끝나지 않았고, 결제가 되었는지는 확인하지 못했어요. 결제 창이나 카드 앱이 열려 있다면 그대로 진행해 주세요. 그래도 아무 창도 보이지 않으면 아래 [화면 새로고침]을 눌러 주세요. 결제가 완료로 확인됐다면 새로고침할 때 결과 화면으로 이동해요. 계속되면 이 화면의 주문번호와 함께 문의해 주세요.";
+
+/** 결제 요청이 성공 응답으로 끝났는데도 20초가 지나도록 화면이 바뀌지 않은 경우의 안내 — 결제 결과는 서버가 결제사 기록으로 확인한다 */
+export const PAY_SETTLED_NOTICE =
+  "결제 요청은 마쳤고, 결제 결과를 확인하는 중이에요. 화면이 바뀔 때까지 잠시만 기다려 주세요. 오래 바뀌지 않으면 아래 [화면 새로고침]을 눌러 주세요. 결제가 완료로 확인됐다면 새로고침할 때 결과 화면으로 이동해요. 계속되면 이 화면의 주문번호와 함께 문의해 주세요.";
+
+/** 안내 문구를 고른다 — 요청이 끝났는지(settled)에 따라 다르고, 어느 쪽도 결제가 되었는지 아닌지는 말하지 않는다 */
+export function payNoticeText(info: { settled: boolean }): string {
+  return info.settled ? PAY_SETTLED_NOTICE : PAY_SLOW_NOTICE;
+}
 
 export type PayRunResult =
   /** 이미 진행 중이라 새 요청을 보내지 않았다 */
@@ -41,9 +50,10 @@ export type PayRequestGuard = {
   inFlight: () => boolean;
   /**
    * 결제 요청을 한 번 보낸다. 이미 진행 중이면 보내지 않는다(같은 틱에 두 번 불러도 한 번만 나간다).
-   * onSlow는 요청이 끝나지 않은 채 slowMs가 지났을 때(화면이 보일 때) 한 번만 불린다 — 요청도 잠금도 건드리지 않는다.
+   * onSlow는 시작한 뒤 slowMs가 지나도록 화면이 사라지지 않았을 때(화면이 보일 때) 한 번만 불린다 — 요청도 잠금도 건드리지 않는다.
+   * settled는 그 시점에 요청이 성공 응답으로 이미 끝났는지(끝났어도 이동하지 않았다면 결제 결과는 서버가 확인한다)다.
    */
-  run: (requestPayment: () => Promise<unknown>, hooks?: { onSlow?: () => void }) => Promise<PayRunResult>;
+  run: (requestPayment: () => Promise<unknown>, hooks?: { onSlow?: (info: { settled: boolean }) => void }) => Promise<PayRunResult>;
   /** 화면이 사라질 때 타이머만 치운다(진행 중인 요청 · 잠금은 건드리지 않는다) */
   dispose: () => void;
 };
@@ -55,6 +65,7 @@ export function createPayRequestGuard(o: PayRequestGuardOptions = {}): PayReques
   const setT = o.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
   const clearT = o.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
   let flying = false;
+  let settled = false;
   let timer: unknown = null;
 
   const clearSlow = () => {
@@ -68,6 +79,7 @@ export function createPayRequestGuard(o: PayRequestGuardOptions = {}): PayReques
       // 첫 줄에서 동기로 잠근다 — 아래 어떤 await보다 먼저라, 이 틱에 다시 불린 호출은 여기서 걸린다
       if (flying) return { started: false };
       flying = true;
+      settled = false;
       clearSlow();
       const slow = () => {
         if (!isVisible()) {
@@ -75,11 +87,12 @@ export function createPayRequestGuard(o: PayRequestGuardOptions = {}): PayReques
           return;
         }
         timer = null;
-        hooks?.onSlow?.();
+        hooks?.onSlow?.({ settled });
       };
       timer = setT(slow, slowMs);
       try {
         await requestPayment();
+        settled = true;
         // 요청이 끝났다 — 결제 결과 화면으로 이동하는 중이다. 이동하지 않더라도 승인 여부를 모르므로 잠금도 안내 타이머도 그대로 둔다
         return { started: true, outcome: "settled" };
       } catch (error) {

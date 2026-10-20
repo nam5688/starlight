@@ -66,7 +66,7 @@ test("결제하기: 결제 요청이 끝나지 않았다고 실패로 보지 않
   assert.ok(pay.indexOf("guard.inFlight()") > 0 && pay.indexOf("guard.inFlight()") < pay.indexOf('setStatus("requesting")'), "ref 잠금 확인이 setStatus보다 먼저다");
   // 느린 안내 콜백은 버튼을 다시 열지 않는다(setStatus("ready") 금지) — 안내 표시와 관찰 보고만 한다
   const onSlow = pay.slice(pay.indexOf("onSlow:"), pay.indexOf("},\n      },\n    );"));
-  assert.match(onSlow, /setSlow\(true\)/);
+  assert.match(onSlow, /setSlow\(info\)/);
   assert.doesNotMatch(onSlow, /setStatus\(/, "끝나지 않은 요청이 있는 동안 버튼을 다시 열지 않는다");
   // 버튼을 다시 여는 것은 분명한 거절 경로뿐이고, 성공 응답(settled) · 이미 진행 중이면 상태를 되돌리지 않는다
   assert.match(pay, /if \(!result\.started \|\| result\.outcome === "settled"\) return;[\s\S]*setStatus\("ready"\)/);

@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { reportWidgetIssueAction } from "@/app/checkout/[orderNumber]/widget-actions";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
-import { createPayRequestGuard, PAY_SLOW_CODE, PAY_SLOW_MS, PAY_SLOW_NOTICE, type PayRequestGuard } from "@/lib/commerce/pay-request";
+import { createPayRequestGuard, PAY_SLOW_CODE, PAY_SLOW_MS, payNoticeText, type PayRequestGuard } from "@/lib/commerce/pay-request";
 import {
   classifyBrowser,
   errorCodeOf,
@@ -86,7 +86,7 @@ export function TossCheckout({
   const reports = useRef(0);
   // 결제하기 잠금은 렌더를 기다리지 않는 ref다 — state만 쓰면 같은 틱의 두 번째 누름이 막히지 않는다
   const payGuardRef = useRef<PayRequestGuard | null>(null);
-  const [slow, setSlow] = useState(false);
+  const [slow, setSlow] = useState<{ settled: boolean } | null>(null);
 
   function report(issue: WidgetIssue) {
     if (reports.current >= WIDGET_REPORT_LIMIT) return;
@@ -150,7 +150,7 @@ export function TossCheckout({
     if (guard.inFlight()) return;
     setStatus("requesting");
     setMessage(null);
-    setSlow(false);
+    setSlow(null);
     const result = await guard.run(
       () =>
         widgets.requestPayment({
@@ -161,9 +161,9 @@ export function TossCheckout({
         }),
       {
         // 요청이 아직 끝나지 않은 채 시간이 지났다 — 실패가 아니다. 버튼은 다시 열지 않고 결제 여부를 단정하지 않는 안내만 보인다(승인 여부는 서버가 정한다)
-        onSlow: () => {
-          setSlow(true);
-          report({ phase: "pay", code: PAY_SLOW_CODE, message: "결제 요청이 오래 끝나지 않았어요(결제 창이 열려 있을 수 있어요)", elapsedMs: PAY_SLOW_MS, attempt, env: collectEnv("[data-toss-methods]") });
+        onSlow: (info) => {
+          setSlow(info);
+          report({ phase: "pay", code: PAY_SLOW_CODE, message: info.settled ? "결제 요청은 끝났지만 화면이 바뀌지 않았어요(결과는 서버가 확인해요)" : "결제 요청이 오래 끝나지 않았어요(결제 창이 열려 있을 수 있어요)", elapsedMs: PAY_SLOW_MS, attempt, env: collectEnv("[data-toss-methods]") });
         },
       },
     );
@@ -171,7 +171,7 @@ export function TossCheckout({
     // 분명히 거절된 경우만(약관 미동의, 결제창 닫기 등) — 다시 시도할 수 있게 둔다. 구매자가 직접 한 행동은 막힘으로 기록하지 않는다
     const error = result.error;
     setStatus("ready");
-    setSlow(false);
+    setSlow(null);
     const code = errorCodeOf(error);
     setMessage(error instanceof Error && error.message ? error.message : "결제를 진행하지 못했어요.");
     if (!USER_ACTION_CODES.has(code)) report({ phase: "pay", code, message: tidyMessage(error), elapsedMs: 0, attempt, env: collectEnv("[data-toss-methods]") });
@@ -218,8 +218,8 @@ export function TossCheckout({
       )}
       {status === "requesting" && slow && (
         <div className="mt-3" data-testid="pay-slow">
-          <p role="status" className="text-[14px] leading-[1.65] text-ink-2" data-testid="pay-slow-notice">
-            {PAY_SLOW_NOTICE}
+          <p role="status" className="text-[14px] leading-[1.65] text-ink-2" data-testid="pay-slow-notice" data-settled={slow.settled ? "1" : "0"}>
+            {payNoticeText(slow)}
           </p>
           <button type="button" onClick={() => window.location.reload()} className={`${buttonSecondary} mt-3 w-full`} data-testid="pay-reload">
             화면 새로고침
