@@ -48,7 +48,7 @@ test("초안 원문 지문 고정: 장면 28개 + 선택지 112개의 글자가 
   assert.equal(h, FINGERPRINT.hash, "문장 지문이 달라졌다 — 원문이 바뀌었는지 확인");
 });
 
-test("채점 원본이 없다는 사실이 데이터에 그대로다: 점수 · 가중치 · 유형 · 방향 필드가 없고 읽는 규칙을 코드에 넣지 않았다", () => {
+test("채점 원본이 없다는 사실이 원본 데이터에 그대로다: 점수 · 가중치 · 유형 · 방향 필드가 없다(읽는 규칙은 이 데이터 파일이 아니라 연결하지 않은 별도 초안 situational-v2-reading.ts에 있다)", () => {
   for (const it of SITUATIONAL_V2_ITEMS) assert.deepEqual(Object.keys(it).sort(), ["id", "options", "part", "scene"], it.id);
   const text = JSON.stringify(SITUATIONAL_V2_ITEMS);
   for (const word of ["score", "weight", "dimension", "direction", "점수", "가중치", "불안형", "회피형"]) assert.ok(!text.includes(word), `데이터에 ${word}`);
