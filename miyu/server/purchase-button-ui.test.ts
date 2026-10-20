@@ -53,13 +53,35 @@ test("결과 화면은 #구매영역 주소로 들어와도 구매 영역으로 
   assert.match(hs, /touchstart|wheel/);
 });
 
-test("결제 화면은 결제하기를 눌렀는데 결제 창으로 넘어가지 않으면 20초 뒤에 이유를 알리고 버튼을 다시 연다", () => {
-  const w = read("lib/commerce/widget-session.ts");
-  assert.match(w, /PAY_STALL_MS = 20_000/);
+test("결제하기: 결제 요청이 끝나지 않았다고 실패로 보지 않는다 — 동기 ref 잠금, 진행 중에는 버튼을 다시 열지 않고, 20초 뒤에는 결제 여부를 단정하지 않는 안내만 보인다(운영자 코드 점검 2026-10-20)", () => {
   const c = read("components/checkout/toss-checkout.tsx");
-  assert.match(c, /PAY_STALL_MS/);
+  const src = code(c);
+  const g = read("lib/commerce/pay-request.ts");
+  // 안전 장치는 공용 모듈이고 20초 상수도 거기에 있다
+  assert.match(g, /PAY_SLOW_MS = 20_000/);
+  assert.match(src, /createPayRequestGuard\(/);
+  assert.match(src, /payGuardRef = useRef<PayRequestGuard \| null>\(null\)/, "잠금은 렌더를 기다리지 않는 ref다");
+  // 눌린 순간 동기 확인이 상태 바꾸기보다 앞선다
+  const pay = src.slice(src.indexOf("async function pay()"), src.indexOf("  return (\n    <div>"));
+  assert.ok(pay.indexOf("guard.inFlight()") > 0 && pay.indexOf("guard.inFlight()") < pay.indexOf('setStatus("requesting")'), "ref 잠금 확인이 setStatus보다 먼저다");
+  // 느린 안내 콜백은 버튼을 다시 열지 않는다(setStatus("ready") 금지) — 안내 표시와 관찰 보고만 한다
+  const onSlow = pay.slice(pay.indexOf("onSlow:"), pay.indexOf("},\n      },\n    );"));
+  assert.match(onSlow, /setSlow\(true\)/);
+  assert.doesNotMatch(onSlow, /setStatus\(/, "끝나지 않은 요청이 있는 동안 버튼을 다시 열지 않는다");
+  // 버튼을 다시 여는 것은 분명한 거절 경로뿐이고, 성공 응답(settled) · 이미 진행 중이면 상태를 되돌리지 않는다
+  assert.match(pay, /if \(!result\.started \|\| result\.outcome === "settled"\) return;[\s\S]*setStatus\("ready"\)/);
+  assert.equal((src.match(/setStatus\("ready"\)/g) ?? []).length, 2, "ready로 되돌리는 곳은 위젯 준비 완료 한 곳과 거절 한 곳뿐이다");
+  // 예전 타이머(stall) · 잘못된 확정 문구가 없다
+  assert.doesNotMatch(src, /stallRef|PAY_STALL|PAY_NO_REDIRECT/);
+  for (const text of [c, g, read("lib/commerce/widget-session.ts")]) {
+    assert.doesNotMatch(code(text), /금액이 빠져나가지 않았|결제는 되지 않았고/, "끝나지 않은 요청을 결제되지 않았다고 말하지 않는다(화면에 보이는 문구 · 코드)");
+    assert.doesNotMatch(text, /넘어가지 않았다면 결제는 시작되지 않았/, "화면이 안 바뀌면 결제가 시작되지 않은 것이라는 가정을 쓰지 않는다");
+  }
+  // 느린 안내 영역(결제 진행 중에만 · 새로고침 길 · 알림 역할)과 버튼 잠금
+  assert.match(c, /data-testid="pay-slow-notice"/);
+  assert.match(c, /data-testid="pay-reload"/);
+  assert.match(c, /disabled=\{status !== "ready"\}/);
   assert.match(c, /data-testid="pay-hint"/);
-  assert.match(c, /setStatus\("ready"\)/);
 });
 
 test("가격이 적힌 시작 버튼 아래에는 \"결제 화면으로 이동해요 · 이 버튼만으로는 결제되지 않아요\"가 기본으로 보이고, 같은 결과로 새로 받는 경우도 같은 버튼(again)을 쓴다", () => {

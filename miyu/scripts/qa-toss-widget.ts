@@ -51,14 +51,19 @@ window.TossPayments = function (clientKey) {
         setAmount: async function (a) { log.push("amount:" + a.value); },
         renderPaymentMethods: function (o) { return mount("methods", o); },
         renderAgreement: function (o) { return mount("agreement", o); },
-        requestPayment: async function () { log.push("pay"); if (cfg.payError) { const e = new Error("pay"); e.code = cfg.payError; throw e; } },
+        requestPayment: async function () {
+          log.push("pay");
+          if (cfg.payError) { const e = new Error("pay"); e.code = cfg.payError; throw e; }
+          // 끝나지 않는 결제 요청(결제 창 · 카드 앱이 진행 중이거나 이동 중인 상태) — 시험이 window.__payGate로 끝내거나 거절한다
+          if (cfg.payPending) await new Promise(function (res, rej) { window.__payGate = { res: res, rej: rej }; });
+        },
       };
     },
   };
 };
 `;
-// 30초 제한을 0.4초로 줄여 시험한다(실제 상수는 lib/commerce/widget-session.ts의 WIDGET_READY_TIMEOUT_MS = 30000)
-const FAST_TIMEOUT = `const __st = window.setTimeout; window.setTimeout = (fn, ms, ...a) => __st(fn, ms === 30000 ? 400 : ms, ...a);`;
+// 시간 제한을 줄여 시험한다: 위젯 준비 30초 → 0.4초(lib/commerce/widget-session.ts의 WIDGET_READY_TIMEOUT_MS = 30000), 결제 요청이 끝나지 않을 때의 안내 20초 → 0.6초(lib/commerce/pay-request.ts의 PAY_SLOW_MS = 20000)
+const FAST_TIMEOUT = `const __st = window.setTimeout; window.setTimeout = (fn, ms, ...a) => __st(fn, ms === 30000 ? 400 : ms === 20000 ? 600 : ms, ...a);`;
 
 let failures = 0;
 const check = (cond: boolean, label: string, detail?: unknown) => {
@@ -197,6 +202,52 @@ async function main() {
     const list = await issues(t.page);
     check(list.length === expected && (expected === 0 || (list[0].phase === "pay" && list[0].code === code)), `${code}: 보고 ${expected}건`, list);
     check(await payEnabled(t.page), `${code}: 다시 눌러 볼 수 있게 결제 버튼이 켜진다`);
+    await t.ctx.close();
+  }
+
+  console.log("8) 결제 요청이 끝나지 않는 동안(결제 창 · 카드 앱 진행 중): 20초(여기선 0.6초) 뒤에도 실패로 바꾸지 않고 버튼을 다시 열지 않으며, 결제 여부를 단정하지 않는 안내만 보인다");
+  {
+    const t = await open({ payPending: true });
+    await t.page.waitForFunction(() => !document.querySelector("button[aria-busy]")?.hasAttribute("disabled"), null, { timeout: 8000 });
+    const payCount = () => t.page.evaluate(() => (window as any).__events.filter((e: string) => e === "pay").length);
+    // 같은 틱에 두 번 눌러도(프로그램으로 연속 클릭) 요청은 한 번만 나간다
+    await t.page.evaluate(() => {
+      const b = document.querySelector("button[aria-busy]") as HTMLButtonElement;
+      b.click();
+      b.click();
+    });
+    await t.page.waitForFunction(() => (window as any).__events.includes("pay"), null, { timeout: 4000 });
+    check((await payCount()) === 1, "연속으로 눌러도 결제 요청은 한 번만 나간다", await payCount());
+    check((await payEnabled(t.page)) === false, "요청이 진행 중이면 결제 버튼이 잠겨 있다");
+    check((await t.page.$('[data-testid="pay-slow-notice"]')) === null, "바로 직후에는 느린 응답 안내가 없다");
+    // 안내가 뜰 때까지(0.6초 + 여유) 기다린다 — 그때까지 요청은 끝나지 않았다
+    await t.page.waitForSelector('[data-testid="pay-slow-notice"]', { timeout: 4000 });
+    const notice = await t.page.textContent('[data-testid="pay-slow-notice"]');
+    check(/확인하지 못했어요/.test(notice) && /새로고침/.test(notice), "결제 여부를 확인하지 못했다고 알리고 새로고침 길을 준다", notice);
+    check(!/결제는 되지 않았|금액이 빠져나가지 않|결제되지 않았/.test(notice), "결제되지 않았다고 단정하지 않는다", notice);
+    check((await payEnabled(t.page)) === false, "안내가 뜬 뒤에도 결제 버튼은 다시 열리지 않는다(요청이 끝나지 않았기 때문)");
+    await t.page.waitForTimeout(1500);
+    check((await payEnabled(t.page)) === false, "더 기다려도 스스로 열리지 않는다");
+    await t.page.click("button[aria-busy]", { force: true, timeout: 1000 }).catch(() => undefined);
+    check((await payCount()) === 1, "잠긴 버튼을 억지로 눌러도 새 결제 요청이 나가지 않는다", await payCount());
+    check((await t.page.$('[data-testid="pay-reload"]')) !== null, "[화면 새로고침] 버튼이 있다");
+    check((await t.page.$('[data-testid="widget-message"]')) === null, "실패 문구(오류 알림)는 나오지 않는다");
+    const list = await issues(t.page);
+    check(list.length === 1 && list[0].phase === "pay" && list[0].code === "PAY_REQUEST_PENDING", "운영 기록에는 관찰 한 건(PAY_REQUEST_PENDING)만 남는다", list);
+    const over = await t.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    check(over <= 0, "안내가 떠도 가로 넘침이 없다(390px)", over);
+    // 뒤늦게 분명히 거절되면(창 닫기) 잠금이 풀리고 안내가 사라지며 다시 누를 수 있다
+    await t.page.evaluate(() => {
+      const e: any = new Error("closed");
+      e.code = "USER_CANCEL";
+      (window as any).__payGate.rej(e);
+    });
+    await t.page.waitForFunction(() => !document.querySelector("button[aria-busy]")?.hasAttribute("disabled"), null, { timeout: 4000 });
+    check((await t.page.$('[data-testid="pay-slow-notice"]')) === null, "거절되면 느린 응답 안내가 사라진다");
+    await t.page.click("button[aria-busy]");
+    await t.page.waitForFunction(() => (window as any).__events.filter((e: string) => e === "pay").length === 2, null, { timeout: 4000 });
+    check((await payCount()) === 2, "분명한 거절 뒤에는 다시 눌러 새 요청을 보낼 수 있다");
+    check(t.external.length === 0 && t.errors.length === 0, "외부 요청 · 페이지 오류 없음", { external: t.external, errors: t.errors });
     await t.ctx.close();
   }
 

@@ -5,12 +5,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { reportWidgetIssueAction } from "@/app/checkout/[orderNumber]/widget-actions";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
+import { createPayRequestGuard, PAY_SLOW_CODE, PAY_SLOW_MS, PAY_SLOW_NOTICE, type PayRequestGuard } from "@/lib/commerce/pay-request";
 import {
   classifyBrowser,
   errorCodeOf,
-  PAY_STALL_CODE,
-  PAY_STALL_MESSAGE,
-  PAY_STALL_MS,
   startWidgetSession,
   tidyMessage,
   USER_ACTION_CODES,
@@ -55,6 +53,8 @@ function collectEnv(selector: string): WidgetEnv {
  *
  * 준비 과정(lib/commerce/widget-session.ts)은 단계마다 시간을 재고 토스의 오류 코드를 잃지 않으며, 30초 안에 준비되지 않으면 멈추고 [다시 불러오기]를 보인다.
  * 막히면 단계 · 코드 · 환경 사실을 운영 기록으로 보낸다(주문번호 외 개인정보 없음, 한 번 열 때 최대 3번). 결제 금액 · 승인은 이 화면이 정하지 않는다.
+ * 결제하기(requestPayment)를 누른 뒤에는 lib/commerce/pay-request.ts의 안전 장치를 거친다 — 눌린 순간 동기로 잠그고(state가 아니라 ref), 요청이 끝나지 않아도 스스로 풀지 않으며(끝나지 않았다는 것은 실패가 아니다:
+ * 결제 창 · 카드 앱이 진행 중이거나 이동 중일 수 있다), 20초가 지나면 "결제 여부를 확인하지 못했다"고만 알린다. 분명히 거절된 경우(약관 미동의 · 창 닫기 · 오류)에만 버튼을 다시 연다. 승인 여부는 서버만 정한다.
  * 결제수단 · 약관 칸의 id는 이 화면마다 다르다 — Next.js는 떠난 화면을 숨긴 채 문서에 남기므로 id가 겹치면 토스가 숨겨진 옛 칸에 그릴 수 있다.
  */
 export function TossCheckout({
@@ -84,7 +84,9 @@ export function TossCheckout({
   const [attempt, setAttempt] = useState(1);
   const sessionRef = useRef<WidgetSession | null>(null);
   const reports = useRef(0);
-  const stallRef = useRef<number | null>(null);
+  // 결제하기 잠금은 렌더를 기다리지 않는 ref다 — state만 쓰면 같은 틱의 두 번째 누름이 막히지 않는다
+  const payGuardRef = useRef<PayRequestGuard | null>(null);
+  const [slow, setSlow] = useState(false);
 
   function report(issue: WidgetIssue) {
     if (reports.current >= WIDGET_REPORT_LIMIT) return;
@@ -130,8 +132,7 @@ export function TossCheckout({
     }, 0);
     return () => {
       clearTimeout(timer);
-      window.clearTimeout(stallRef.current ?? undefined);
-      stallRef.current = null;
+      payGuardRef.current?.dispose();
       signal.aborted = true;
       const s = sessionRef.current;
       sessionRef.current = null;
@@ -144,36 +145,36 @@ export function TossCheckout({
   async function pay() {
     const widgets = sessionRef.current?.widgets as unknown as { requestPayment: (o: { orderId: string; orderName: string; successUrl: string; failUrl: string }) => Promise<unknown> } | undefined;
     if (!widgets) return;
+    const guard = (payGuardRef.current ??= createPayRequestGuard({ isVisible: () => document.visibilityState === "visible" }));
+    // 이미 요청이 진행 중이면(빠른 두 번 누름 · 느린 응답 중의 다시 누름) 새 요청을 보내지 않는다
+    if (guard.inFlight()) return;
     setStatus("requesting");
     setMessage(null);
-    // 결제 창으로 넘어가면 이 화면이 사라진다. 일정 시간이 지나도 화면이 그대로면 "넘어가지 않았다"고 알리고 버튼을 다시 연다(앱 전환 중 숨겨진 화면은 기다린다)
-    window.clearTimeout(stallRef.current ?? undefined);
-    stallRef.current = window.setTimeout(function stalled() {
-      if (document.visibilityState !== "visible") {
-        stallRef.current = window.setTimeout(stalled, 2000);
-        return;
-      }
-      stallRef.current = null;
-      setStatus("ready");
-      setMessage(PAY_STALL_MESSAGE);
-      report({ phase: "pay", code: PAY_STALL_CODE, message: "결제하기를 눌렀지만 결제 창으로 넘어가지 않았어요", elapsedMs: PAY_STALL_MS, attempt, env: collectEnv("[data-toss-methods]") });
-    }, PAY_STALL_MS);
-    try {
-      await widgets.requestPayment({
-        orderId,
-        orderName,
-        successUrl: `${window.location.origin}/payments/success`,
-        failUrl: `${window.location.origin}/payments/fail`,
-      });
-    } catch (error) {
-      // 약관 미동의, 결제창 닫기 등 — 다시 시도할 수 있게 둔다. 구매자가 직접 한 행동은 막힘으로 기록하지 않는다
-      window.clearTimeout(stallRef.current ?? undefined);
-      stallRef.current = null;
-      setStatus("ready");
-      const code = errorCodeOf(error);
-      setMessage(error instanceof Error && error.message ? error.message : "결제를 진행하지 못했어요.");
-      if (!USER_ACTION_CODES.has(code)) report({ phase: "pay", code, message: tidyMessage(error), elapsedMs: 0, attempt, env: collectEnv("[data-toss-methods]") });
-    }
+    setSlow(false);
+    const result = await guard.run(
+      () =>
+        widgets.requestPayment({
+          orderId,
+          orderName,
+          successUrl: `${window.location.origin}/payments/success`,
+          failUrl: `${window.location.origin}/payments/fail`,
+        }),
+      {
+        // 요청이 아직 끝나지 않은 채 시간이 지났다 — 실패가 아니다. 버튼은 다시 열지 않고 결제 여부를 단정하지 않는 안내만 보인다(승인 여부는 서버가 정한다)
+        onSlow: () => {
+          setSlow(true);
+          report({ phase: "pay", code: PAY_SLOW_CODE, message: "결제 요청이 오래 끝나지 않았어요(결제 창이 열려 있을 수 있어요)", elapsedMs: PAY_SLOW_MS, attempt, env: collectEnv("[data-toss-methods]") });
+        },
+      },
+    );
+    if (!result.started || result.outcome === "settled") return;
+    // 분명히 거절된 경우만(약관 미동의, 결제창 닫기 등) — 다시 시도할 수 있게 둔다. 구매자가 직접 한 행동은 막힘으로 기록하지 않는다
+    const error = result.error;
+    setStatus("ready");
+    setSlow(false);
+    const code = errorCodeOf(error);
+    setMessage(error instanceof Error && error.message ? error.message : "결제를 진행하지 못했어요.");
+    if (!USER_ACTION_CODES.has(code)) report({ phase: "pay", code, message: tidyMessage(error), elapsedMs: 0, attempt, env: collectEnv("[data-toss-methods]") });
   }
 
   return (
@@ -210,10 +211,20 @@ export function TossCheckout({
           결제 수단을 불러오는 중이에요. 불러온 뒤에 누를 수 있어요.
         </p>
       )}
-      {status === "requesting" && (
+      {status === "requesting" && !slow && (
         <p role="status" className="mt-2 text-[13px] leading-[1.6] text-ink-3" data-testid="pay-hint">
-          결제 창으로 넘어가는 중이에요. 넘어가지 않으면 잠시 뒤에 안내해 드려요.
+          결제 창으로 넘어가는 중이에요. 결제가 진행 중일 수 있어서 이 버튼은 다시 누를 수 없어요.
         </p>
+      )}
+      {status === "requesting" && slow && (
+        <div className="mt-3" data-testid="pay-slow">
+          <p role="status" className="text-[14px] leading-[1.65] text-ink-2" data-testid="pay-slow-notice">
+            {PAY_SLOW_NOTICE}
+          </p>
+          <button type="button" onClick={() => window.location.reload()} className={`${buttonSecondary} mt-3 w-full`} data-testid="pay-reload">
+            화면 새로고침
+          </button>
+        </div>
       )}
       {status === "error" && (
         <p className="mt-2 text-[13px] leading-[1.6] text-ink-3" data-testid="pay-hint">
