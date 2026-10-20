@@ -2,12 +2,14 @@
 // 마이그레이션 28번은 지워도 되는 표만 건드리고 접근 정책 · 기존 권한을 넓히지 않으며 새 함수는 서버만 부를 수 있고,
 // 삭제한 기록에서는 결과 · 구매 화면이 먼저 막히고, 읽기용 대화 기록을 만드는 코드는 AI를 부르지 않는다.
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { readSource } from "../lib/report/test-source.ts";
 
 const ROOT = join(import.meta.dirname, "..");
-const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
+// 줄바꿈이 든 글(여러 줄 문자열)로 소스를 찾는 점검이 있어 CRLF ↔ LF만 맞춰 읽는다(Windows의 core.autocrlf — 다른 글자 · 공백은 그대로라 점검은 약해지지 않는다)
+const read = (path: string) => readSource(join(ROOT, path));
 
 /** SQL 주석(-- 한 줄)을 뺀 문장만 */
 const sqlStatements = (sql: string) => sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
