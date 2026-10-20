@@ -48,6 +48,8 @@ export const PAIR_MAX_OPEN_INVITES = 5;
 const usable = (a: AssessmentRecord | null | undefined): a is AssessmentRecord => !!a && a.contentVersion !== "withdrawn" && (a.saju as { status?: string })?.status === "ok" && !!a.summary;
 
 const isMissingTable = (e: unknown) => (e as { code?: string } | null)?.code === "42P01";
+/** DB(30번 트리거)가 삭제 중이거나 삭제한 검사 결과를 가리키는 쌍을 거절했다 — 앱의 삭제 확인과 읽기 · 쓰기 사이에 삭제가 끼어든 경우다 */
+const isDeletedRecord = (e: unknown) => /record_(deleted|purged)/.test(String((e as { message?: unknown } | null)?.message ?? ""));
 
 /** 초대 · 연결 입력의 오류 — 사이(relationship) · 내 성별(myGender) */
 export type PairInputErrors = { relationship?: string; myGender?: string };
@@ -102,6 +104,8 @@ export async function createPairInvite(deps: PairDeps, input: { userId: string; 
     return { kind: "db-not-ready" };
   } catch (e) {
     if (isMissingTable(e)) return { kind: "db-not-ready" };
+    // 앱이 읽은 뒤 같은 순간 이 결과의 기록이 삭제됐다 — 삭제한 기록으로 연결을 만들지 않는다(위 읽기 검사와 같은 답)
+    if (isDeletedRecord(e)) return { kind: "not-found" };
     throw e;
   }
 }

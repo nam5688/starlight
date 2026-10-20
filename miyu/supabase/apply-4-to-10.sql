@@ -675,6 +675,13 @@ wd29 as (
     coalesce(not has_function_privilege('anon', 'public.delete_assessment_record_v2(uuid, uuid)', 'execute') and not has_function_privilege('authenticated', 'public.delete_assessment_record_v2(uuid, uuid)', 'execute'), false) as browser_blocked,
     exists (select 1 from pg_trigger where tgname in ('talk_rooms_block_purged', 'chat_summaries_block_purged', 'talk_transcripts_block_purged', 'chat_questions_block_purged') having count(*) = 4) as guard_triggers
 ),
+wd30 as (
+  select
+    exists (select 1 from pg_trigger t where t.tgname = 'pairs_block_deleted_record' and not t.tgisinternal) as guard_trigger,
+    exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'pairs_block_deleted_record') as guard_fn,
+    coalesce(pg_get_functiondef(to_regprocedure('public.pair_join(text,uuid,uuid,text)')) ~ 'record_purged_at', false) as join_checks_deleted,
+    coalesce(not has_function_privilege('anon', 'public.pairs_block_deleted_record()', 'execute') and not has_function_privilege('authenticated', 'public.pairs_block_deleted_record()', 'execute'), false) as browser_blocked
+),
 col as (
   select
     exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'orders' and column_name = 'payment_env')  as payment_env,
@@ -871,5 +878,11 @@ select * from (
               when wd29.purged_col or wd29.delete_fn or wd29.guard_triggers then '일부만' else '아직 안 함' end,
          '열 assessments.record_purged_at(삭제 완료 표시) / 함수 delete_assessment_record_v2(서버만 실행: ' || wd29.service_grant::text || ' · 브라우저 실행 막힘: ' || wd29.browser_blocked::text || ') / 삭제를 마친 기록에 대화방 · 요약 · 읽기용 기록 · 질문 횟수가 다시 생기지 않게 막는 장치 4개: ' || wd29.guard_triggers::text || ' — 이 함수가 없으면 MY의 기록 삭제는 예전 범위(채팅방은 읽기용 기록으로 남음)로 동작하고 나머지는 그대로 동작한다'
   from wd29
+  union all
+  select 30, '20261109000000_pair_assessment_guard.sql',
+         case when wd30.guard_trigger and wd30.guard_fn and wd30.join_checks_deleted and wd30.browser_blocked then '적용됨'
+              when wd30.guard_trigger or wd30.guard_fn or wd30.join_checks_deleted then '일부만' else '아직 안 함' end,
+         '장치 pairs_block_deleted_record(삭제 중이거나 삭제한 검사 결과를 가리키는 쌍을 막음, 삭제와 같은 행을 잠그는 읽기): ' || wd30.guard_trigger::text || ' / 함수 pair_join이 삭제한 결과를 거절하는 새 정의: ' || wd30.join_checks_deleted::text || ' / 브라우저 실행 막힘: ' || wd30.browser_blocked::text || ' — 이 장치가 없으면 리포트 궁합 쌍을 만드는 일과 기록 삭제가 같은 순간 겹칠 때 DB가 막지 못한다(앱의 삭제 확인만 있다). 29번(기록 삭제 범위 확대)이 먼저 적용돼 있어야 한다'
+  from wd30
 ) r
 order by "번호";

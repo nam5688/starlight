@@ -557,8 +557,9 @@ test("실제 Supabase와 같은 기본 권한(새 함수에 서버 역할 모든
   const dir = join(import.meta.dirname, "..", "migrations");
   const all = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
   const last = "20261108000000_record_delete_scope.sql";
-  assert.equal(all.at(-1), last, "29번이 마지막 마이그레이션이다");
-  const files = all.slice(0, -1);
+  assert.ok(all.includes(last), "29번 파일이 있다");
+  // 29번 앞까지만 적용한 DB에 29번을 얹는다(뒤 번호가 생겨도 이 시험은 29번만 본다 — 30번은 pair-purge.db.test.ts가 같은 방식으로 본다)
+  const files = all.slice(0, all.indexOf(last));
   const base = ["-h", "127.0.0.1", "-p", process.env.PG_PORT ?? "54329", "-U", "postgres"];
   const db = `acl29_${process.pid}`;
   const inDb = (q: string) => execFileSync("psql", [...base, "-d", db, "-At", "-q", "-v", "ON_ERROR_STOP=1", "-c", q]).toString().trim();

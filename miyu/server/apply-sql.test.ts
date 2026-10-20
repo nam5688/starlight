@@ -149,7 +149,7 @@ const scopePost = readSource(new URL("../supabase/delete-scope-29-postcheck.sql"
 
 test("기록 삭제 범위 확대 29번: 새 파일이고 28번 파일은 건드리지 않으며, 더하기만 한다(기존 표 · 열을 지우거나 바꾸지 않는다)", () => {
   assert.equal(scopeFile, "20261108000000_record_delete_scope.sql");
-  assert.equal(files.at(-1), scopeFile, "29번이 마지막 번호");
+  assert.ok(files.indexOf(scopeFile) >= 0 && files.indexOf(scopeFile) === files.indexOf("20261107000000_record_delete.sql") + 1, "29번은 28번 바로 다음 번호");
   const code = scopeSql.replace(/--.*$/gm, "");
   assert.doesNotMatch(code, /\b(drop\s+(table|column|function|trigger)|truncate|alter\s+table\s+\S+\s+(drop|rename|alter))/i, "기존 표 · 열을 지우거나 바꾸지 않는다(열 추가뿐)");
   // 29번이 하는 쓰기는 삭제 함수 안(본인 결과 한 건)뿐이다: 함수 밖의 최상위 문장은 열 추가 · 함수 · 트리거 · 권한이다
@@ -192,4 +192,55 @@ test("적용 이력 확인(check-migrations.sql)에 29번 줄이 있다 — 열 
   assert.match(checkSql, /wd29 as \(/);
   assert.match(checkSql, /record_purged_at/);
   assert.match(checkSql, /talk_rooms_block_purged/);
+});
+
+// ── 리포트 궁합 쌍 × 기록 삭제 동시성 장치(30번): 단독 마이그레이션 + 읽기 전용 사전 / 사후 확인 ──
+const guardFile = files.find((f) => f.endsWith("_pair_assessment_guard.sql"))!;
+const guardSql = readSource(new URL(guardFile, dir));
+const guardPre = readSource(new URL("../supabase/pair-assessment-guard-30-precheck.sql", import.meta.url));
+const guardPost = readSource(new URL("../supabase/pair-assessment-guard-30-postcheck.sql", import.meta.url));
+
+test("쌍 × 삭제 동시성 장치 30번: 29번 바로 다음 새 파일이고 28 · 29번 파일은 건드리지 않으며, 데이터를 바꾸지 않는다(트리거 하나 + pair_join 새 정의)", () => {
+  assert.equal(guardFile, "20261109000000_pair_assessment_guard.sql");
+  assert.equal(files.indexOf(guardFile), files.indexOf("20261108000000_record_delete_scope.sql") + 1, "30번은 29번 바로 다음 번호");
+  const code = guardSql.replace(/--.*$/gm, "");
+  assert.doesNotMatch(code, /\b(drop\s+(table|column|function|trigger)|truncate|alter\s+table|delete\s+from|insert\s+into)/i, "기존 표 · 열 · 행을 건드리지 않는다");
+  // 함수 밖의 최상위 문장에는 데이터를 바꾸는 문장이 없다(update는 pair_join 함수 안의 한 건뿐)
+  const topLevel = code.replace(/\$\$[\s\S]*?\$\$/g, "$$$$");
+  assert.doesNotMatch(topLevel, /\b(insert\s+into|update\s+public|delete\s+from)/i);
+  assert.equal((code.match(/create trigger /g) ?? []).length, 1);
+  assert.match(code, /create trigger pairs_block_deleted_record before insert or update of a_assessment_id, b_assessment_id on public\.pairs/);
+  // 삭제 함수(for update)와 같은 행을 공유 잠금(for share)으로 읽고, 삭제 완료 · 삭제 표시 둘 다 거절한다
+  assert.equal((code.match(/from public\.assessments a where a\.id = new\.(a|b)_assessment_id for share/g) ?? []).length, 2);
+  assert.match(code, /raise exception 'record_purged'/);
+  assert.match(code, /raise exception 'record_deleted'/);
+  assert.match(code, /from public\.assessments where id = p_assessment for share/);
+  // 번호를 바꾸지 않는 갱신은 지나가고, 없는 결과(외래 키 없는 설계)는 거절하지 않는다
+  assert.match(code, /tg_op = 'INSERT' or new\.a_assessment_id is distinct from old\.a_assessment_id/);
+  const triggerFn = code.slice(code.indexOf("create or replace function public.pairs_block_deleted_record"), code.indexOf("create trigger pairs_block_deleted_record"));
+  assert.ok(triggerFn.length > 200 && !/if not found/.test(triggerFn), "트리거 함수는 결과 행이 없어도(탈퇴로 지워진 번호) 거절하지 않는다");
+  // 선행 조건(24 · 29번)이 없으면 아무것도 바꾸기 전에 멈춘다
+  assert.match(code, /to_regclass\('public\.pairs'\) is null/);
+  assert.match(code, /column_name = 'record_purged_at'/);
+  // 권한: 새 트리거 함수는 아무도 직접 부르지 못하고 pair_join은 서버만(24번과 같음)
+  assert.match(code, /revoke all on function public\.pairs_block_deleted_record\(\) from public, anon, authenticated;/);
+  assert.match(code, /revoke all on function public\.pair_join\(text, uuid, uuid, text\) from public, anon, authenticated;\s*grant execute on function public\.pair_join\(text, uuid, uuid, text\) to service_role;/);
+  assert.equal((code.match(/security definer\s+set search_path = ''/g) ?? []).length, 2);
+});
+
+test("쌍 × 삭제 동시성 30번 사전 · 사후 확인은 읽기 전용 조회 하나다(쓰기 문장 없음) — 종합 판정을 낸다", () => {
+  for (const [name, sql] of [["사전", guardPre], ["사후", guardPost]] as const) {
+    const code = sql.replace(/--.*$/gm, "").replace(/'(?:[^']|'')*'/g, "''");
+    assert.doesNotMatch(code, /\b(insert\s+into|update\s+public|delete\s+from|drop\s|alter\s|create\s|truncate|grant\s|revoke\s|notify\s)/i, `${name} 확인에 쓰기 문장이 없다`);
+    assert.match(sql, /'종합'/);
+    assert.equal((code.match(/;/g) ?? []).length, 1, `${name} 확인은 문장 하나`);
+  }
+  assert.match(guardPre, /30번을 실행하지 말고/);
+  assert.match(guardPost, /OK — 30번이 적용됐다/);
+});
+
+test("적용 이력 확인(check-migrations.sql)에 30번 줄이 있다 — 장치 · pair_join 새 정의 · 권한으로 적용됨 / 일부만 / 아직 안 함을 가른다", () => {
+  assert.match(checkSql, /select 30, '20261109000000_pair_assessment_guard\.sql'/);
+  assert.match(checkSql, /wd30 as \(/);
+  assert.match(checkSql, /pairs_block_deleted_record/);
 });

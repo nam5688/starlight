@@ -109,6 +109,18 @@ test("초대: 동의가 없으면 만들지 않고, 남의 검사 결과로는 �
   assert.equal((await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" })).kind, "too-many");
 });
 
+test("초대: 앱이 결과를 읽은 뒤 같은 순간 기록이 삭제돼 DB(30번 트리거)가 거절하면 오류 화면이 아니라 '없는 결과'로 답하고, 다른 DB 오류는 그대로 던진다", async () => {
+  const s = await setup();
+  const input = { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" };
+  for (const message of ["쌍 만들기: record_purged", "쌍 만들기: record_deleted"]) {
+    const deps: PairDeps = { ...s.deps, pairs: { ...s.mp.repo, async createPair() { throw Object.assign(new Error(message), { code: "P0001" }); } } };
+    assert.deepEqual(await createPairInvite(deps, input), { kind: "not-found" }, message);
+  }
+  const broken: PairDeps = { ...s.deps, pairs: { ...s.mp.repo, async createPair() { throw Object.assign(new Error("쌍 만들기: connection reset"), { code: "08006" }); } } };
+  await assert.rejects(() => createPairInvite(broken, input), /connection reset/);
+  assert.equal((await s.mp.repo.listPairsForUser(A)).length, 0, "거절된 순간에 쌍은 하나도 남지 않았다");
+});
+
 test("링크를 연 사람에게는 초대한 사람의 닉네임 말고 아무것도 보이지 않는다", async () => {
   const s = await setup();
   const inv = await createPairInvite(s.deps, { userId: A, assessmentId: s.a.id, consent: true, relationship: "lover", myGender: "female" });
