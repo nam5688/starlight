@@ -6,6 +6,7 @@ import { sajuSection } from "../saju/display.ts";
 import type { ReportGenerator, ReportInput } from "./generator.ts";
 import { buildReportExtras } from "./extras.ts";
 import { seoulReference } from "./reference.ts";
+import { devDetailsOf, starterActionsOf } from "../assessment/situational/summary.ts";
 import { STARTER_ACTIONS } from "./starter-actions.ts";
 import type { AxisRow, FullReport, ScoreRow } from "./types.ts";
 
@@ -32,7 +33,45 @@ function byStrength(rows: ScoreRow[]): ScoreRow[] {
   return [...rows].sort((a, b) => Math.abs(b.score - 50) - Math.abs(a.score - 50));
 }
 
+/** 상황형 28문항 결과의 개발용 규칙 리포트 — 점수 칸 대신 읽기 결과로 같은 구성을 채운다(AI 미사용) */
+function buildSituationalDevReport(input: ReportInput): FullReport {
+  const { summary, knownMbti } = input;
+  const sit = summary.situational!;
+  const d = devDetailsOf(sit);
+  const saju = input.saju;
+  const extras = buildReportExtras({ summary, saju, reference: input.reference ?? seoulReference(new Date()) });
+  const mbtiFindings = [...d.mbti.findings];
+  if (knownMbti) mbtiFindings.push(`본인이 입력한 MBTI는 ${knownMbti}이며, 참고값으로 따로 보관했고 이번 응답과 비교하거나 유형으로 바꾸지 않습니다.`);
+  return {
+    ...summary,
+    personName: input.nickname,
+    knownMbti,
+    details: {
+      mbti: { ...d.mbti, findings: mbtiFindings },
+      temperament: d.temperament,
+      relationship: d.relationship,
+      saju: {
+        basis: `${input.birthText}${saju.status === "ok" ? " · 만세력으로 계산한 원국" : " — 만세력 계산 연결 전"}`,
+        findings:
+          saju.status === "ok"
+            ? [
+                `일간은 ${saju.dayMaster.stem}${saju.dayMaster.element}(${saju.dayMaster.stemHanja}), ${saju.dayMaster.yinYang}의 ${saju.dayMaster.element}입니다. ${extras.plain ? `전통 해석에서는 ${extras.plain.dayMaster.image}에 비유하며, ${extras.plain.dayMaster.trait}` : ""}`.trim(),
+                elementFinding(saju.elementCounts),
+                ...(extras.plain?.everyday ?? []),
+              ]
+            : ["만세력 계산 결과가 없습니다."],
+        limits: "사주는 전통 해석 체계이며 과학적으로 검증된 성격 측정이 아닙니다. 심리검사 점수와 합산하지 않습니다.",
+        saju: sajuSection(saju),
+      },
+    },
+    integrated: { common: d.common, different: d.different },
+    actions: starterActionsOf(sit),
+    extras,
+  };
+}
+
 export function buildDevReport(input: ReportInput): FullReport {
+  if (input.summary.situational) return buildSituationalDevReport(input);
   const { summary, knownMbti } = input;
   const t = Object.fromEntries(summary.temperament.map((r) => [r.id, r.score]));
   const r = Object.fromEntries(summary.relationship.map((row) => [row.id, row.score]));

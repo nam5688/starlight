@@ -1,7 +1,7 @@
-// 실행: npm test — 무료 결과 문장의 생활 말 시안(plain-life-draft.ts)의 기준을 확인한다. 비용 0 · 연결하지 않은 초안이다.
+// 실행: npm test — 무료 결과 문장의 생활 말 시안(plain-life-draft.ts)의 기준을 확인한다. 비용 0 · 무료 미리보기(lib/report/preview.ts)에만 적용된 문구다.
 //  · 앞에서 읽히는 문장에는 사주 용어 · 한자 · 합쇼체가 없고 한 문장이 짧다.
 //  · 없거나 적은 기운은 지금 문구가 말하는 범위(시기 · 권하는 해석 · 부족하다는 뜻이 아님)만 말하고 "없음 → 기능 부족"으로 번역하지 않는다.
-//  · 어디에서도 불러오지 않는다 · 생성 문서(docs/free-result-life-language-proposal-v1.md)가 코드와 어긋나지 않는다.
+//  · 연결 지점은 lib/report/preview.ts 하나뿐이다 · 생성 문서(docs/free-result-life-language-proposal-v1.md)가 코드와 어긋나지 않는다.
 // "읽기 편한가"를 판정하는 시험이 아니다 — 글자 수 · 용어 · 어미 규칙만 지킨다.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -114,7 +114,7 @@ test("예시 사주(1988-12-23 · 가상)의 지금 문장은 사주 용어가 �
   assert.deepEqual(cur.plain.elements.filter((e) => e.level === "many").map((e) => e.element), ["수"]);
 });
 
-test("연결하지 않았다: 시안 파일 · 시험 · 생성 스크립트 밖의 어떤 화면 · 서버 · 저장 · 리포트 · 스크립트도 시안을 불러오지 않고, plain.ts는 시안을 모른다", () => {
+test("연결 지점은 무료 미리보기(lib/report/preview.ts) 하나뿐이다: 그 밖의 화면 · 서버 · 저장 · 리포트 · 스크립트는 이 문구를 불러오지 않고, plain.ts는 문구를 모른다", () => {
   const hits: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
@@ -125,7 +125,7 @@ test("연결하지 않았다: 시안 파일 · 시험 · 생성 스크립트 밖
     }
   };
   for (const d of ["app", "components", "server", "lib", "scripts"]) walk(join(root, d));
-  assert.deepEqual(hits, []);
+  assert.deepEqual(hits, ["lib/report/preview.ts"]);
   assert.ok(!/life-draft/.test(readFileSync(join(root, "lib", "saju", "plain.ts"), "utf8")));
 });
 

@@ -240,7 +240,7 @@ export function createAiReportGenerator(opts: AiGeneratorOptions): ReportGenerat
       const evidence = [...result.evidence, ...compatExtraEvidence(input.a.saju, input.b.saju, result), ...compatTimingOf(input.a.saju, input.b.saju, { year: ref.year, month: ref.month }).evidence, ...pairs.evidence];
       const writer = createCompatWriter({ model, maxRepairs, maxRetries, sleep, mode: "pair" });
       const draft = await writer.write({ evidence, cautions: result.cautions, relationship: input.relationship ?? null }, ctx);
-      return assemblePairReport(draft, result, { labels: pairs.comparedLabels, skipped: pairs.unclear.length }, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" }, input.relationship ?? null);
+      return assemblePairReport(draft, result, { labels: pairs.comparedLabels, skipped: pairs.unclear.length, versionMismatch: pairs.versionMismatch }, { provider: model.provider, model: model.model, at: now().toISOString(), placeholder: model.provider === "mock" }, input.relationship ?? null);
     },
     async generateConcern(input: ConcernInput, ctx: GenerateContext = {}): Promise<ConcernReportV1> {
       const ref = input.reference ? { ...input.reference, iso: seoulYm(now()).iso } : seoulYm(now());

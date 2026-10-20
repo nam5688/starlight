@@ -54,6 +54,11 @@ export function IdentityCard({
             </h2>
             <p className="mt-1 text-[26px] leading-tight font-bold tracking-tight md:text-[30px]">{type.name}</p>
             <p className="mt-2 text-[16px] leading-relaxed text-ink-2">{type.line}</p>
+            {type.why && (
+              <p data-testid="identity-why" className="mt-2 text-[14px] leading-relaxed text-ink-3">
+                {type.why}
+              </p>
+            )}
             {(type.strength || type.burden) && (
               <dl className="mt-4 grid gap-2.5 sm:grid-cols-2">
                 {type.strength && (

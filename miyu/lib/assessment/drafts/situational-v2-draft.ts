@@ -1,8 +1,8 @@
 // ME:U 통합 성향 질문 v2 — 28문항 상황 선택형 후보 (운영자 전달 2026-10-17, 검토용 초안).
 //
 // **운영자가 외부 AI(Claude 밖)의 추천으로 전달한 문항이며 미유가 직접 만든 문항이라는 보증이 없다** — 문장의 독립성 · 기존 검사와의 닮음은 확인하지 않았다(`docs/assessment-source-audit.md`와 같은 기준으로 따로 확인해야 한다).
-// 화면 · 점수 · 저장 · 리포트 · 운영 DB · 기존 회원 응답 어디에도 연결하지 않았다(`situational-v2-draft.test.ts`가 확인). 선택지에는 점수 · 유형 · 방향 표시가 없다 — 어떻게 읽을지는 `docs/assessment-situational-v2-review.md`의 제안(미확정)이다.
-// 검토 결과 · 비교 · 개선안: docs/assessment-situational-v2-review.md. 승인 전에는 지금 22문항(`modules/`)을 바꾸지 않는다.
+// 이 파일은 **원문 보존본**이라 글자 · 순서 · 개수를 바꾸지 않는다(`situational-v2-provenance.test.ts`가 고정). 2026-10-20 운영자 승인(결정 B)으로 읽기 규칙을 붙인 연결판 `lib/assessment/situational/`이 무료 검사 화면에 연결됐고, 이 파일은 그 연결판(허용 목록 파일)만 불러온다 — 운영 DB · 기존 회원 응답은 바꾸지 않았다.
+// 선택지에는 점수 · 유형 · 방향 표시가 없다(원본에 채점이 없었다) — 읽는 규칙은 미유 쪽의 새 설계다: docs/assessment-situational-v2-reading-design.md · docs/assessment-situational-v2-review.md. 이전 22문항(`modules/`)은 저장된 결과를 읽기 위해 그대로 남아 있다.
 
 export type SituationalPart = { id: 1 | 2 | 3 | 4; title: string; reads: string };
 

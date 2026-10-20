@@ -5,7 +5,9 @@ import { checkBirthAction, scoreDevAnswers } from "@/app/analyze/actions";
 import { trackOnce } from "@/components/analytics/track";
 import { buttonPrimary, buttonSecondary } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
+import { SITUATIONAL_V2_PARTS } from "@/lib/assessment/drafts/situational-v2-draft";
 import type { Answers } from "@/lib/assessment/types";
+import { ASSESSMENT } from "@/lib/config/product";
 import {
   EMPTY_BASIC_INFO,
   hasRequiredBasicInfo,
@@ -19,16 +21,21 @@ import type { FreePreview } from "@/lib/report/preview";
 import { BasicInfoStep } from "./basic-info-step";
 import { FreeSummaryView } from "./free-summary";
 import { QuestionStep } from "./question-step";
+import { SceneStep, sceneItemsOfPart } from "./scene-step";
 
+// 지금 화면이 보여 주는 질문(lib/config/product.ts의 ASSESSMENT.active) — 상황형 28문항(질문 묶음 4개 × 장면 7개) 또는 예전 22문항(검사 모듈 3개)
+const SCENE_MODE = ASSESSMENT.active === "situational-28";
+/** 질문 단계마다 그 단계의 문항 id — 끝까지 답했는지 확인하는 데 쓴다 */
+const QUESTION_STEP_IDS: string[][] = SCENE_MODE ? SITUATIONAL_V2_PARTS.map((p) => sceneItemsOfPart(p.id).map((i) => i.id)) : ASSESSMENT_MODULES.map((m) => m.items.map((i) => i.id));
 // 단계 이름은 무엇을 재는지 알려 주지 않는 중립 이름만 쓴다 — "평소 행동 방식 · 기질 · 관계" 같은 이름을 미리 보면 답을 예측해서 고르게 된다(운영자 2026-10-15)
 const STEPS = [
   { key: "basic", label: "기본 정보" },
-  ...ASSESSMENT_MODULES.map((m, i) => ({ key: m.id, label: `질문 ${i + 1}` })),
+  ...QUESTION_STEP_IDS.map((_, i) => ({ key: `q${i + 1}`, label: `질문 ${i + 1}` })),
   { key: "summary", label: "결과" },
 ];
 const SUMMARY_STEP = STEPS.length - 1;
 const LAST_QUESTION_STEP = SUMMARY_STEP - 1;
-const TOTAL_ITEMS = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
+const TOTAL_ITEMS = QUESTION_STEP_IDS.reduce((n, ids) => n + ids.length, 0);
 
 /**
  * 기본 정보 → 검사 응답(모듈별) → 무료 미리보기.
@@ -64,7 +71,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        const draft = parseDraft(window.sessionStorage.getItem(DRAFT_KEY), Date.now(), LAST_QUESTION_STEP);
+        const draft = parseDraft(window.sessionStorage.getItem(DRAFT_KEY), Date.now(), LAST_QUESTION_STEP, ASSESSMENT.active);
         if (draft) {
           setInfo(draft.info);
           setAnswers(draft.answers);
@@ -86,7 +93,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
     if (!draftReady.current) return;
     try {
       if (hasContent(info, answers)) {
-        window.sessionStorage.setItem(DRAFT_KEY, serializeDraft({ step: Math.min(step, LAST_QUESTION_STEP), info, answers }, Date.now()));
+        window.sessionStorage.setItem(DRAFT_KEY, serializeDraft({ step: Math.min(step, LAST_QUESTION_STEP), info, answers, assessment: ASSESSMENT.active }, Date.now()));
       } else {
         window.sessionStorage.removeItem(DRAFT_KEY);
       }
@@ -193,11 +200,10 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
       return;
     }
 
-    const current = ASSESSMENT_MODULES[step - 1];
-    const missing = current.items.find((i) => answers[i.id] === undefined);
-    if (missing) {
+    const missingId = QUESTION_STEP_IDS[step - 1].find((id) => answers[id] === undefined);
+    if (missingId) {
       setShowMissing(true);
-      document.querySelector<HTMLInputElement>(`input[name="${missing.id}"]`)?.focus();
+      document.querySelector<HTMLInputElement>(`input[name="${missingId}"]`)?.focus();
       return;
     }
 
@@ -240,7 +246,7 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
   const answered = Object.keys(answers).length;
   const basicDone = hasRequiredBasicInfo(info);
   const progress = step === SUMMARY_STEP ? 1 : ((basicDone ? 1 : 0) + answered) / (1 + TOTAL_ITEMS);
-  const currentModule = step > 0 && step <= LAST_QUESTION_STEP ? ASSESSMENT_MODULES[step - 1] : null;
+  const questionStep = step > 0 && step <= LAST_QUESTION_STEP ? step - 1 : null;
 
   return (
     <>
@@ -308,14 +314,12 @@ export function AnalyzeFlow({ authReady }: { authReady: boolean }) {
                 </button>
               </p>
             )}
-            {currentModule ? (
-              <QuestionStep
-                module={currentModule}
-                heading={STEPS[step].label}
-                answers={answers}
-                showMissing={showMissing}
-                onAnswer={handleAnswer}
-              />
+            {questionStep !== null ? (
+              SCENE_MODE ? (
+                <SceneStep items={sceneItemsOfPart(SITUATIONAL_V2_PARTS[questionStep].id)} heading={STEPS[step].label} answers={answers} showMissing={showMissing} onAnswer={handleAnswer} />
+              ) : (
+                <QuestionStep module={ASSESSMENT_MODULES[questionStep]} heading={STEPS[step].label} answers={answers} showMissing={showMissing} onAnswer={handleAnswer} />
+              )
             ) : (
               <BasicInfoStep info={info} errors={infoErrors} onChange={handleInfoChange} />
             )}

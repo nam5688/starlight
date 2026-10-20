@@ -3,7 +3,8 @@ import { MiyuAvatar } from "@/components/talk/miyu-character";
 import { ArrowIcon, PairIcon, PersonIcon } from "@/components/ui/icons";
 import { pageWide } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
-import { formatKrw, FREE_ANALYSIS_TIME, PERSONAL_REPORT } from "@/lib/config/product";
+import { SCENE_IDS } from "@/lib/assessment/situational/reading";
+import { ASSESSMENT, formatKrw, FREE_ANALYSIS_TIME, PERSONAL_REPORT } from "@/lib/config/product";
 import type { TalkMood } from "@/lib/report/reading/talk-room";
 
 /**
@@ -15,7 +16,8 @@ import type { TalkMood } from "@/lib/report/reading/talk-room";
  * - 후기 · 이용자 수 · 정확도 · 검증됨 같은 말은 쓰지 않는다. 정직 안내 한 줄과 분석 방법 링크는 그대로 둔다.
  * - 움직임은 `motion-safe:`로만 걸어 모션을 줄이는 설정이면 멈춘다(말풍선이 차례로 떠오르는 것뿐).
  */
-const QUESTION_COUNT = ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
+// 지금 화면이 묻는 문항 수 — 상황형 28문항(장면 28개) 또는 예전 22문항
+const QUESTION_COUNT = ASSESSMENT.active === "situational-28" ? SCENE_IDS.length : ASSESSMENT_MODULES.reduce((n, m) => n + m.items.length, 0);
 
 type Bubble = { from: "me"; text: string } | { from: "miyu"; mood: TalkMood; text: string };
 
@@ -87,7 +89,7 @@ export function HeroStart() {
         {/* 바로 고르기 */}
         <div className="mt-5 grid gap-3 min-[350px]:grid-cols-2">
           <Choice href="/compat" icon={<PairIcon />} title="우리 궁합 보기" note="무료 · 궁합 지수 · 사이에 맞춘 풀이" />
-          <Choice href="/analyze" icon={<PersonIcon />} title="내 사주 보기" note="무료 · 약 5분" />
+          <Choice href="/analyze" icon={<PersonIcon />} title="내 사주 보기" note="무료 · 약 7분" />
         </div>
 
         <p className="mt-5 text-[14px] leading-[1.65] text-balance text-ink-2">

@@ -30,7 +30,7 @@ export function ScopeCompare() {
         <div className="rounded-2xl bg-canvas p-6 shadow-soft">
           <p className="text-[15px] font-semibold text-ink-2">{REPORT_TIER_NAMES.simple}</p>
           <p className="mt-2 text-[30px] font-bold tracking-tight">무료</p>
-          <p className="mt-1 text-[14px] text-ink-3">약 5분 · 시작은 로그인 없이</p>
+          <p className="mt-1 text-[14px] text-ink-3">약 7분 · 시작은 로그인 없이</p>
           <ul className="mt-5 space-y-2.5 border-t border-line pt-5 text-[15px]">
             {FREE_ITEMS.map((t) => (
               <li key={t} className="flex gap-2">

@@ -4,6 +4,17 @@ import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
 import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
 import { CHECKED, DEVELOPMENT, NOT_CHECKED, PROVENANCE_UPDATED, SOURCES, STANCE_NOTE, versionRows } from "@/lib/assessment/provenance";
+import {
+  SITUATIONAL_BASIS_UPDATED,
+  SITUATIONAL_CHECKED,
+  SITUATIONAL_DEVELOPMENT,
+  SITUATIONAL_NOT_CHECKED,
+  SITUATIONAL_SOURCES,
+  SITUATIONAL_STANCE_NOTE,
+  SITUATIONAL_WHAT,
+  situationalVersionRows,
+} from "@/lib/assessment/situational/basis";
+import { ASSESSMENT } from "@/lib/config/product";
 
 export const metadata: Metadata = {
   title: "미유 성향 질문은 어떻게 만들었나요? · ME:U 미유",
@@ -20,12 +31,19 @@ const list = "mt-3 list-disc space-y-2 pl-5 text-[15px] leading-[1.7] text-ink-2
  * 개발 과정을 알리는 글이며 법적으로 문제가 없다는 확인이나 검사의 정확도 · 타당도 보증이 아니다.
  */
 export default function AssessmentBasisPage() {
-  const versions = versionRows();
+  // 지금 화면이 보여 주는 질문 버전의 안내를 보인다(상황형 28문항 · 예전 22문항) — 어느 쪽이든 하지 않은 확인을 했다고 쓰지 않는다
+  const scene = ASSESSMENT.active === "situational-28";
+  const versions = scene ? situationalVersionRows() : versionRows();
+  const updated = scene ? SITUATIONAL_BASIS_UPDATED : PROVENANCE_UPDATED;
+  const development = scene ? SITUATIONAL_DEVELOPMENT : DEVELOPMENT;
+  const sources = scene ? SITUATIONAL_SOURCES : SOURCES;
+  const checked = scene ? SITUATIONAL_CHECKED : CHECKED;
+  const notChecked = scene ? SITUATIONAL_NOT_CHECKED : NOT_CHECKED;
   return (
     <main className={`${pageNarrow} py-12 md:py-16`}>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge>개발용 예시 문항</StatusBadge>
-        <span className="text-[13px] text-ink-3">{PROVENANCE_UPDATED} 수정</span>
+        <span className="text-[13px] text-ink-3">{updated} 수정</span>
       </div>
       <h1 className="mt-3 text-[24px] leading-snug font-bold tracking-tight md:text-[28px]">미유 성향 질문은 어떻게 만들었나요?</h1>
       <p className="mt-3 text-[16px] leading-[1.7] text-ink-2">
@@ -40,19 +58,27 @@ export default function AssessmentBasisPage() {
           1. 어떤 성향을 살펴보나요?
         </h2>
         <div className="mt-3 space-y-4 text-[15px] leading-[1.7] text-ink-2">
-          {ASSESSMENT_MODULES.map((m) => (
-            <div key={m.id}>
-              <h3 className="font-semibold text-ink">
-                {m.title} · 문항 {m.items.length}개
-              </h3>
-              <ul className="mt-1 list-disc space-y-0.5 pl-5">
-                {m.dimensions.map((d) => (
-                  <li key={d.id}>{d.label}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
-          <p>{STANCE_NOTE}</p>
+          {scene ? (
+            <ul className="list-disc space-y-2 pl-5">
+              {SITUATIONAL_WHAT.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          ) : (
+            ASSESSMENT_MODULES.map((m) => (
+              <div key={m.id}>
+                <h3 className="font-semibold text-ink">
+                  {m.title} · 문항 {m.items.length}개
+                </h3>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  {m.dimensions.map((d) => (
+                    <li key={d.id}>{d.label}</li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+          <p>{scene ? SITUATIONAL_STANCE_NOTE : STANCE_NOTE}</p>
         </div>
       </section>
 
@@ -61,7 +87,7 @@ export default function AssessmentBasisPage() {
           2. 문항은 어떻게 만들었나요?
         </h2>
         <ul className={list}>
-          {DEVELOPMENT.map((t) => (
+          {development.map((t) => (
             <li key={t}>{t}</li>
           ))}
         </ul>
@@ -72,7 +98,7 @@ export default function AssessmentBasisPage() {
           3. 참고한 자료와 이용 허락 범위
         </h2>
         <ul className="mt-3 space-y-5 text-[15px] leading-[1.7] text-ink-2">
-          {SOURCES.map((s) => (
+          {sources.map((s) => (
             <li key={s.name}>
               <p className="font-semibold text-ink">{s.name}</p>
               <p className="mt-0.5">
@@ -96,7 +122,7 @@ export default function AssessmentBasisPage() {
           <div>
             <h3 className="font-semibold text-ink">확인한 것</h3>
             <ul className="mt-1 list-disc space-y-2 pl-5">
-              {CHECKED.map((t) => (
+              {checked.map((t) => (
                 <li key={t}>{t}</li>
               ))}
             </ul>
@@ -104,7 +130,7 @@ export default function AssessmentBasisPage() {
           <div>
             <h3 className="font-semibold text-ink">아직 확인하지 못한 것</h3>
             <ul className="mt-1 list-disc space-y-2 pl-5">
-              {NOT_CHECKED.map((t) => (
+              {notChecked.map((t) => (
                 <li key={t}>{t}</li>
               ))}
             </ul>
@@ -127,7 +153,7 @@ export default function AssessmentBasisPage() {
           ))}
           <div className="py-3">
             <dt className="font-semibold text-ink">이 안내 글</dt>
-            <dd className="tabular-nums">{PROVENANCE_UPDATED} 수정</dd>
+            <dd className="tabular-nums">{updated} 수정</dd>
           </div>
         </dl>
       </section>

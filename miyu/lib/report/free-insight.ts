@@ -87,7 +87,9 @@ export function buildFreeInsight(answers: Answers, tendency: TendencyId): FreeIn
  * 저장된 데이터는 바꾸지 않는다. 구매한 리포트는 저장된 같은 버전을 그대로 보여 주므로 이 함수를 거치지 않는다.
  * 응답이 없거나(예전 문항 구성) 영역이 맞지 않으면 저장된 요약을 그대로 돌려준다.
  */
-export function withCurrentInsight<S extends { tendency: { id: TendencyId }; insight?: FreeInsight }>(summary: S, answers: Answers | null | undefined): S {
+export function withCurrentInsight<S extends { tendency: { id: TendencyId }; insight?: FreeInsight; situational?: unknown }>(summary: S, answers: Answers | null | undefined): S {
+  // 상황형 28문항 결과의 문단은 읽기 결과에서 만든 것이라 22문항 문장으로 다시 만들지 않는다
+  if (summary.situational) return summary;
   if (!answers) return summary;
   const insight = buildFreeInsight(answers, summary.tendency.id);
   if (!insight) return summary;

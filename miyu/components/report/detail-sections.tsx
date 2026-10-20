@@ -12,11 +12,12 @@ export function DetailSections({ report, showChart = true }: { report: FullRepor
     .map((r) => `${r.label} ${r.score}`)
     .join(" · ");
   const relationship = report.relationship.map((r) => `${r.label} ${r.score}`).join(" · ");
+  const situational = Boolean(report.situational);
   const saju = details.saju.saju;
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Detail title="평소 행동 방식" headline={report.knownMbti ? `본인이 입력한 MBTI ${report.knownMbti}는 참고값으로 따로 표시` : "네 가지 방향의 응답"} block={details.mbti}>
+      <Detail title="평소 행동 방식" headline={report.knownMbti ? `본인이 입력한 MBTI ${report.knownMbti}는 참고값으로 따로 표시` : situational ? "일상과 사람들 사이 장면에서 읽은 방식" : "네 가지 방향의 응답"} block={details.mbti}>
         <dl className="border-y border-line text-[15px]">
           <div className="px-1 py-3">
             <dt className="text-[13px] text-ink-3">본인이 알고 있던 MBTI</dt>
@@ -26,9 +27,9 @@ export function DetailSections({ report, showChart = true }: { report: FullRepor
         <p className="mt-2 text-[13px] text-ink-3">본인이 입력한 값은 참고용이며, 미유의 응답 결과와 비교하거나 유형으로 바꾸지 않고 따로 표시해요.</p>
       </Detail>
 
-      <Detail title="기질" headline={`두드러진 지표: ${strongest}`} block={details.temperament} />
+      <Detail title="기질" headline={situational ? "막혔을 때 · 시도 장면에서 읽은 방식" : `두드러진 지표: ${strongest}`} block={details.temperament} />
 
-      <Detail title="관계(애착)" headline={relationship} block={details.relationship} />
+      <Detail title="관계(애착)" headline={situational ? "가까운 사이 장면에서 읽은 방식" : relationship} block={details.relationship} />
 
       <Detail
         title="사주"

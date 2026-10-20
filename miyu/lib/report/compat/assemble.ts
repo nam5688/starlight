@@ -67,7 +67,7 @@ export function assembleCompatReport(draft: CompatDraftV1, result: CompatResult,
  * 본문의 "A님 · B님"은 **바꾸지 않는다**(저장되는 글에는 이름 · 생년월일이 없다 — 화면이 읽는 사람에게 누가 누구인지 알려 준다).
  * 비교한 응답 영역은 이름과 개수만 담고 점수 · 원래 답은 담지 않는다.
  */
-export function assemblePairReport(draft: CompatDraftV1, result: CompatResult, compared: { labels: string[]; skipped: number }, meta: CompatAssembleMeta, relationship?: CompatRelationship | null): PairReport {
+export function assemblePairReport(draft: CompatDraftV1, result: CompatResult, compared: { labels: string[]; skipped: number; /** 두 사람의 성향 질문 버전이 달라 응답 비교를 하지 않았다 */ versionMismatch?: boolean }, meta: CompatAssembleMeta, relationship?: CompatRelationship | null): PairReport {
   const card = cardOf(result, { a: "A님", b: "B님" });
   const sections = PAIR_SECTIONS.flatMap((plan) => {
     const s = draft.sections.find((x) => x.id === plan.id);
@@ -99,7 +99,7 @@ export function assemblePairReport(draft: CompatDraftV1, result: CompatResult, c
       cautions: card.cautions,
       items: [
         PAIR_NOTES.privacy,
-        compared.labels.length === 0 ? PAIR_NOTES.noCompared : compared.skipped > 0 ? PAIR_NOTES.skipped : "",
+        compared.versionMismatch ? PAIR_NOTES.versionMismatch : compared.labels.length === 0 ? PAIR_NOTES.noCompared : compared.skipped > 0 ? PAIR_NOTES.skipped : "",
         hasTiming ? COMPAT_NOTES.timingUsed : COMPAT_NOTES.timingMissing,
         COMPAT_NOTES.noFamilyChild,
         COMPAT_NOTES.noInnerMind,

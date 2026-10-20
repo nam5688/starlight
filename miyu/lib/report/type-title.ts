@@ -8,9 +8,10 @@
 //  · 스위치가 꺼져 있으면 예전 그대로 옛 후보 이름 + 설명을 보인다(한 줄로 되돌릴 수 있게).
 //  · 사주 후보가 정해지지 않았거나 응답이 비었거나 둘 이상이 비슷하면 억지로 이름을 붙이지 않고 "혼합 경향"이다(personal-type.ts의 판단을 그대로 따른다).
 import { tendencyPhrase } from "../assessment/dev-rules.ts";
-import { personalTypeOf, personalTypeView } from "../assessment/personal-type.ts";
+import { personalTypeView } from "../assessment/personal-type.ts";
 import { PERSONAL_TYPE } from "../config/product.ts";
 import type { SajuResult } from "../saju/engine.ts";
+import { personalTypeFor } from "./identity.ts";
 import type { FreeSummary } from "./types.ts";
 
 export type TypeTitle = {
@@ -22,9 +23,11 @@ export type TypeTitle = {
   kind: "type" | "mixed" | "legacy";
   /** 이름 옆에 항상 적는 안내(진단이 아니라는 뜻) */
   note: string;
+  /** 이름의 근거 · 붙이지 않은 이유 한 문장 — 상황형 28문항 결과에만 있다 */
+  why?: string | null;
 };
 
-export type TypeInput = { saju: SajuResult; summary: Pick<FreeSummary, "temperament" | "relationship" | "mbti"> };
+export type TypeInput = { saju: SajuResult; summary: Pick<FreeSummary, "temperament" | "relationship" | "mbti" | "situational"> };
 
 export const LEGACY_NOTE = "대표 경향은 응답을 보고 붙인 후보 설명이며, 진단이나 평생 가는 유형이 아니에요.";
 
@@ -34,9 +37,9 @@ export const legacyTypeTitle = (name: string | null | undefined): TypeTitle | nu
 /** 새 유형을 계산한다 — 사주가 계산되지 않은 입력이면 null(이름을 만들지 않는다). 스위치를 읽지 않는 순수 계산 */
 export function personalTypeTitle(input: TypeInput | null | undefined): TypeTitle | null {
   if (!input || input.saju.status !== "ok") return null;
-  const t = personalTypeOf({ saju: input.saju, summary: input.summary });
+  const t = personalTypeFor({ saju: input.saju, summary: input.summary });
   const v = personalTypeView(t);
-  return { name: v.name, line: v.line, kind: t.kind, note: v.note };
+  return { name: v.name, line: v.line, kind: t.kind, note: v.note, ...(v.why ? { why: v.why } : {}) };
 }
 
 /**
@@ -49,7 +52,7 @@ export function typeTitleFor(input: TypeInput | null | undefined, legacy?: strin
 }
 
 /** 저장된 검사 결과(사주 + 응답 요약)에서 — 화면 · 대화 · 관리자 보기 · 읽기용 글이 모두 이 한 함수를 쓴다 */
-export function assessmentTypeTitle(a: { saju: SajuResult; summary: Pick<FreeSummary, "temperament" | "relationship" | "mbti" | "tendency"> }): TypeTitle | null {
+export function assessmentTypeTitle(a: { saju: SajuResult; summary: Pick<FreeSummary, "temperament" | "relationship" | "mbti" | "tendency" | "situational"> }): TypeTitle | null {
   return typeTitleFor({ saju: a.saju, summary: a.summary }, a.summary.tendency.name);
 }
 

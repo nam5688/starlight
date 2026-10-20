@@ -161,7 +161,7 @@ export function buildFreeTalkModel(input: FreeTalkInput): TalkModel {
         // 출생 시각을 모르면 대운이 바뀌는 달이 달라질 수 있어 연도 무렵으로만 보인다(내부 계산값은 그대로)
         ...(current ? { foot: input.saju.status === "ok" && input.saju.hourPillarOmitted ? softenMonths(periodLine(current.from, current.to)) : periodLine(current.from, current.to) } : {}),
       },
-      inputs: ["사주 원국", `성향 응답 ${preview.basis.temperamentItems + preview.basis.relationshipItems + preview.basis.mbtiItems}문항 (개발용 문항)`],
+      inputs: ["사주 원국", preview.basis.scenes ? `상황형 질문 ${preview.basis.scenes}장면 (개발용 문항)` : `성향 응답 ${preview.basis.temperamentItems + preview.basis.relationshipItems + preview.basis.mbtiItems}문항 (개발용 문항)`],
     },
     topics,
     groups: groupsOf(topics),

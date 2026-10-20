@@ -48,27 +48,31 @@ test("초안 원문 지문 고정: 장면 28개 + 선택지 112개의 글자가 
   assert.equal(h, FINGERPRINT.hash, "문장 지문이 달라졌다 — 원문이 바뀌었는지 확인");
 });
 
-test("채점 원본이 없다는 사실이 원본 데이터에 그대로다: 점수 · 가중치 · 유형 · 방향 필드가 없다(읽는 규칙은 이 데이터 파일이 아니라 연결하지 않은 별도 초안 situational-v2-reading.ts에 있다)", () => {
+test("채점 원본이 없다는 사실이 원본 데이터에 그대로다: 점수 · 가중치 · 유형 · 방향 필드가 없다(읽는 규칙은 이 데이터 파일이 아니라 28문항 읽기 모듈 lib/assessment/situational/reading.ts에 따로 있다)", () => {
   for (const it of SITUATIONAL_V2_ITEMS) assert.deepEqual(Object.keys(it).sort(), ["id", "options", "part", "scene"], it.id);
   const text = JSON.stringify(SITUATIONAL_V2_ITEMS);
   for (const word of ["score", "weight", "dimension", "direction", "점수", "가중치", "불안형", "회피형"]) assert.ok(!text.includes(word), `데이터에 ${word}`);
 });
 
-test("연결하지 않았다: 고른 답 · 28문항 어느 쪽도 화면 · 서버 · 저장 · 리포트 · 검사 모듈 · 스크립트에서 불러오지 않고, 기본 답으로 쓰이지 않는다", () => {
-  const hits: string[] = [];
+test("운영자가 고른 28개는 예시 입력일 뿐 어디서도 기본 답으로 쓰이지 않고, 원문 데이터를 불러오는 곳은 28문항 읽기 모듈 · 공개 안내 글 · 질문 화면 · 문서 생성기뿐이며 예전 22문항 검사 모듈은 28문항을 모른다", () => {
+  const importers: string[] = [];
+  const pickUses: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
       if (name === "node_modules" || name === ".next" || name === "pilot-data" || name === "docs") continue;
       const path = join(dir, name);
       if (statSync(path).isDirectory()) walk(path);
-      else if (/\.(ts|tsx)$/.test(name) && !name.startsWith("situational-v2-") && /situational-v2|SITUATIONAL_V2|operator-picks/.test(readFileSync(path, "utf8"))) hits.push(path.slice(root.length + 1));
+      else if (/\.(ts|tsx)$/.test(name) && !name.startsWith("situational-v2-") && !/\.test\.ts$/.test(name)) {
+        const text = readFileSync(path, "utf8");
+        if (/situational-v2-draft/.test(text)) importers.push(path.slice(root.length + 1));
+        if (/operator-picks|OPERATOR_PICKS/.test(text)) pickUses.push(path.slice(root.length + 1));
+      }
     }
   };
   for (const d of ["app", "components", "server", "lib", "scripts"]) walk(join(root, d));
-  assert.deepEqual(hits, []);
-  // 지금 화면의 검사 모듈은 22문항 그대로다
-  const ids = readFileSync(join(root, "lib", "assessment", "modules", "index.ts"), "utf8");
-  assert.ok(ids.length > 0);
+  assert.deepEqual(importers.sort(), ["components/analyze/analyze-flow.tsx", "components/analyze/scene-step.tsx", "lib/assessment/situational/basis.ts", "lib/assessment/situational/reading.ts", "lib/assessment/situational/render.ts"]);
+  assert.deepEqual(pickUses, [], "운영자가 고른 28개 응답은 예시 입력이라 코드에서 읽지 않는다");
+  for (const f of ["mbti.ts", "temperament.ts", "relationship.ts", "index.ts"]) assert.ok(!/situational/.test(readFileSync(join(root, "lib", "assessment", "modules", f), "utf8")), f);
 });
 
 const FINGERPRINT = { chars: 2955, hash: 4243384941 };

@@ -169,8 +169,8 @@ export function readFlavor(group: Group, scores: Record<string, number>): Flavor
 }
 
 export type PersonalType =
-  | { kind: "type"; info: PersonalTypeInfo; tilt: TiltResult; flavor: FlavorRead }
-  | { kind: "mixed"; tilt: TiltResult; flavor: FlavorRead | null; reason: "saju-balanced" | "month-uncertain" | "response-unclear" | "response-missing" };
+  | { kind: "type"; info: PersonalTypeInfo; tilt: TiltResult; flavor: FlavorRead; /** 상황형 28문항 읽기에서만 있다 — 이름의 근거 한 문장 */ why?: string }
+  | { kind: "mixed"; tilt: TiltResult; flavor: FlavorRead | null; reason: "saju-balanced" | "month-uncertain" | "response-unclear" | "response-missing"; /** 상황형 28문항 읽기에서만 있다 — 이름을 붙이지 않은 이유 한 문장 */ why?: string };
 
 /** 후보 갈래가 둘 이상일 때, 가장 또렷하게 기운 모습의 갈래가 둘째보다 이만큼 이상 앞서야 고른다 — 임의로 정한 값, 검증되지 않음 */
 export const CANDIDATE_MIN_LEAD = 10;
@@ -194,8 +194,8 @@ export function personalTypeOf(input: { saju: SajuOk; summary: Pick<FreeSummary,
 }
 
 /** 화면에 보일 이름과 한 줄 — 혼합 경향이면 사주에서 두드러진 쪽이 있을 때 그 쪽을 쉬운 말로 덧붙인다 */
-export function personalTypeView(t: PersonalType): { name: string; line: string; strength: string | null; burden: string | null; note: string } {
-  if (t.kind === "type") return { name: t.info.name, line: t.info.line, strength: t.info.whenStrength, burden: t.info.whenBurden, note: PERSONAL_TYPE_NOTE };
+export function personalTypeView(t: PersonalType): { name: string; line: string; strength: string | null; burden: string | null; note: string; /** 이름의 근거 · 붙이지 않은 이유 한 문장(상황형 28문항 결과에만) */ why: string | null } {
+  if (t.kind === "type") return { name: t.info.name, line: t.info.line, strength: t.info.whenStrength, burden: t.info.whenBurden, note: PERSONAL_TYPE_NOTE, why: t.why ?? null };
   const tilt = t.tilt.candidates.length ? ` 사주에서는 ${t.tilt.candidates.map((g) => `‘${GROUP_PLAIN[g]}’`).join(" · ")} 쪽이 조금 더 두드러져요.` : "";
-  return { name: MIXED_TYPE.name, line: MIXED_TYPE.line, strength: null, burden: null, note: MIXED_TYPE.note + tilt + " " + PERSONAL_TYPE_NOTE };
+  return { name: MIXED_TYPE.name, line: MIXED_TYPE.line, strength: null, burden: null, note: MIXED_TYPE.note + tilt + " " + PERSONAL_TYPE_NOTE, why: t.why ?? null };
 }

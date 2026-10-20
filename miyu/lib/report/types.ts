@@ -2,6 +2,7 @@
 // source로 출처를 항상 표시한다 — 샘플과 실제 결과를 섞지 않기 위해서다.
 
 import type { TendencyId } from "../assessment/dev-rules.ts";
+import type { SituationalSummary } from "../assessment/situational/reading.ts";
 import type { ReportExtras } from "./extras.ts";
 import type { FreeInsight } from "./free-insight.ts";
 
@@ -49,6 +50,11 @@ export type FreeSummary = {
   relationship: ScoreRow[];
   /** 평소 행동 방식(예전 이름 "MBTI 성향") 네 가지 — code는 예전에 저장된 요약에만 있고 지금은 만들지 않는다 */
   mbti: { code?: string; axes: AxisRow[] };
+  /**
+   * 상황형 28문항으로 답한 결과의 읽기(점수 없음) — 있으면 이 요약은 28문항 결과이고 temperament · relationship · mbti.axes는 비어 있다(점수 환산을 만들지 않는다).
+   * 22문항으로 저장된 예전 결과에는 없다 — 예전 결과는 그대로 점수 줄로 읽는다.
+   */
+  situational?: SituationalSummary;
 };
 
 export type SajuPillar = {

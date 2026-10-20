@@ -9,8 +9,10 @@ import { pillarsLine } from "../saju/display.ts";
 import type { SajuResult } from "../saju/engine.ts";
 import type { ElementReading } from "../saju/plain.ts";
 import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
+import { SCENE_IDS } from "../assessment/situational/reading.ts";
 import { buildReportExtras } from "./extras.ts";
 import { sajuSection } from "../saju/display.ts";
+import { dayMasterLife, elementLife, headlineLife, relationLeadLife, relationLife } from "../saju/plain-life-draft.ts";
 import type { DataSource, FreeSummary, SajuSection } from "./types.ts";
 
 export const PREVIEW_VERSION = "preview-2";
@@ -51,6 +53,11 @@ export type FreePreview = {
          * 나머지 기운의 관계 · 일 · 선택 풀이는 구매 후 리포트에 있다(맛보기는 한 줄, 같은 문장이 구매한 리포트의 오행별 풀이에 그대로 들어 있다).
          */
         relation: { lead: string; text: string } | null;
+        /**
+         * 같은 내용을 생활 말로 옮긴 문장(운영자 승인 2026-10-20) — 화면은 이 문장을 앞에 읽히게 하고, 사주 용어로 부르는 이름은 접힌 보조 영역(term)에만 둔다.
+         * 새 해석을 더하지 않았다(지금 문구가 말하는 범위를 옮겼고 plain-life-draft.test.ts가 지킨다). 위의 headline · dayMaster · everyday · relation은 그대로 남아 다른 곳(대화 · 시험)이 쓴다.
+         */
+        life: { headline: string[]; dayMaster: { lines: string[]; term: string }; everyday: { lines: string[]; term: string } | null; relation: { lines: string[]; term: string } | null };
         notes: string[];
       }
     | { status: "not-ready"; message: string };
@@ -62,8 +69,8 @@ export type FreePreview = {
   locked: LockedFeature[];
   /** 구매하면 답을 주는 질문 목록 */
   answers: LockedAnswer[];
-  /** "분석에 사용한 정보" 표 */
-  basis: { mbtiItems: number; temperamentItems: number; relationshipItems: number };
+  /** "분석에 사용한 정보" 표 — 상황형 28문항 결과는 scenes(장면 수)만 있고 세 문항 수는 0이다 */
+  basis: { mbtiItems: number; temperamentItems: number; relationshipItems: number; scenes?: number };
 };
 
 /** 쉼표 앞까지만 (쉼표가 없으면 앞 8글자) */
@@ -112,8 +119,22 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
   const relation: { lead: string; text: string } | null = notable?.domains
     ? { lead: `${notable.element}(${notable.image}) 기운이 ${notable.level === "many" ? "많아요" : notable.level === "none" ? "없어요" : "적어요"}`, text: notable.domains.relation }
     : null;
+  const lifeOf = (): Extract<FreePreview["saju"], { status: "ok" }>["life"] | null => {
+    if (saju.status !== "ok" || !plain) return null;
+    const lv = (e: { level: string }) => (e.level === "many" || e.level === "few" || e.level === "none" ? e.level : null);
+    const manyEls = plain.elements.filter((e) => e.level === "many").map((e) => e.element);
+    const dm = dayMasterLife(saju.dayMaster.stem, plain.dayMaster.label, plain.dayMaster.image);
+    const head = headlineLife(saju.dayMaster.stem, manyEls);
+    if (!dm || !head) return null;
+    // 오행 첫 설명 — 지금 everyday[0]과 같은 기운(없음 → 많음 → 적음 순)
+    const firstEl = [...plain.elements.filter((e) => e.level === "none"), ...plain.elements.filter((e) => e.level === "many"), ...plain.elements.filter((e) => e.level === "few")][0];
+    const everyday = firstEl && lv(firstEl) ? elementLife(firstEl.element, lv(firstEl)!) : null;
+    const rel = notable && lv(notable) ? { lines: [relationLeadLife(notable.element, lv(notable)!)!, ...(relationLife(notable.element, lv(notable)!) ?? [])], term: elementLife(notable.element, lv(notable)!).term } : null;
+    return { headline: head, dayMaster: dm, everyday, relation: rel };
+  };
+  const life = lifeOf();
   const sajuPart: FreePreview["saju"] =
-    saju.status === "ok" && plain
+    saju.status === "ok" && plain && life
       ? {
           status: "ok",
           section: sajuSection(saju),
@@ -123,6 +144,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
           elements: plain.elements.map(({ element, hanja, image, count, level, levelLabel, force, keywords }) => ({ element, hanja, image, count, level, levelLabel, force, keywords })),
           everyday: { shown: plain.everyday[0] ?? null, lockedCount: Math.max(plain.everyday.length - 1, 0) },
           relation,
+          life,
           notes: saju.notes.filter((n) => n.kind !== "hour-unknown").map((n) => n.message),
         }
       : { status: "not-ready", message: saju.status === "invalid" ? saju.message : "만세력 계산 결과가 없어요." };
@@ -131,7 +153,8 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     // "그렇게 읽은 이유(근거 응답)"는 분석 근거 화면 노출 스위치(lib/config/product.ts)가 켜져 있을 때만 약속한다 — 꺼져 있으면 구매 후에도 보이지 않는다
     ...(summary.insight && REPORT_BASIS.visible ? [{ id: "tendency", title: "대표 경향을 그렇게 읽은 이유", teaser: "이 경향을 읽는 데 쓴 내 응답" }] : []),
     { id: "core", title: "핵심 요약 나머지 2가지", teaser: "스트레스를 받기 쉬운 상황 · 바로 적용해볼 행동" },
-    { id: "scores", title: "기질 · 관계(애착) 점수와 그 의미", teaser: "4가지 기질과 가까운 관계에서의 반응" },
+    // 상황형 28문항 결과에는 점수가 없다 — 점수 칸을 약속하지 않는다
+    ...(summary.situational ? [] : [{ id: "scores", title: "기질 · 관계(애착) 점수와 그 의미", teaser: "4가지 기질과 가까운 관계에서의 반응" }]),
     { id: "detail", title: "상세 분석", teaser: "관점마다 풀이와 한계를 함께 적은 분석" },
     { id: "situations", title: "상황별 잘하는 점 · 주의할 점 상세", teaser: "일 · 관계 · 선택 · 갈등 4가지 상황" },
     ...(qs.length ? [{ id: "questions", title: `내 원국에서 나온 질문 ${qs.length}개의 답`, teaser: "질문마다 쉬운 말로 풀어 드려요" }] : []),
@@ -171,7 +194,7 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     mbti: summary.mbti,
     saju: sajuPart,
     questions: { shown: shownQuestions, lockedCount: Math.max(qs.length - shownQuestions.length, 0) },
-    scoreQuestions: SCORE_QUESTIONS,
+    scoreQuestions: summary.situational ? [] : SCORE_QUESTIONS,
     situations: extras.situations.map((s, i) => ({
       title: s.title,
       strengthLabel: i === 0 ? s.strengthLabel : null,
@@ -181,6 +204,8 @@ export function buildFreePreview(input: { summary: FreeSummary; saju: SajuResult
     action: { shown: extras.starterActions[0] ?? null, lockedCount: Math.max(extras.starterActions.length - 1, 0) },
     locked,
     answers,
-    basis: { mbtiItems: itemCount("mbti"), temperamentItems: itemCount("temperament"), relationshipItems: itemCount("relationship") },
+    basis: summary.situational
+      ? { mbtiItems: 0, temperamentItems: 0, relationshipItems: 0, scenes: SCENE_IDS.length }
+      : { mbtiItems: itemCount("mbti"), temperamentItems: itemCount("temperament"), relationshipItems: itemCount("relationship") },
   };
 }

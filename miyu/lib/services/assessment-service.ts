@@ -1,12 +1,10 @@
 // 검사 결과 저장 — 응답 검증 → 서버 채점 → 사주 엔진 → 저장.
 // 브라우저가 보낸 점수는 받지 않고, 응답 원본으로 항상 다시 계산한다.
 
-import { ASSESSMENT_MODULES } from "../assessment/modules/index.ts";
-import { validateAnswers } from "../assessment/scoring.ts";
+import { summarizeAnswers } from "../assessment/active.ts";
 import type { Answers } from "../assessment/types.ts";
 import { genderOf, MBTI_TYPES, PROVINCES, validateBasicInfo, type BasicInfo } from "../profile/basic-info.ts";
 import { ASSESSMENT_DAILY_LIMIT } from "../commerce/report.ts";
-import { buildDevFreeSummary } from "../report/build-free-summary.ts";
 import type { SajuEngine } from "../saju/engine.ts";
 import type { AssessmentRecord, Channel, MiyuRepository } from "./ports.ts";
 
@@ -22,10 +20,10 @@ export async function submitAssessment(
   const infoErrors = Object.values(validateBasicInfo(info, input.today));
   if (infoErrors.length > 0) return { ok: false, message: infoErrors[0] };
 
-  const answers = pickKnownAnswers(input.answers);
-  if (!validateAnswers(ASSESSMENT_MODULES, answers).ok) {
-    return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있어요." };
-  }
+  // 질문 버전(상황형 28문항 · 예전 22문항)은 응답의 키로 알아보고 그 버전의 규칙으로 검증 · 요약한다
+  const summarized = summarizeAnswers(input.answers);
+  if (!summarized.ok) return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있어요." };
+  const { answers, summary } = summarized;
 
   const birthTime = info.birthTimeUnknown ? null : info.birthTime;
   const isLeapMonth = info.calendar === "lunar" && info.isLeapMonth;
@@ -40,7 +38,6 @@ export async function submitAssessment(
     return { ok: false, message: `하루에 저장할 수 있는 검사는 ${ASSESSMENT_DAILY_LIMIT}개까지예요. MY에서 저장한 결과를 확인하거나 내일 다시 시도해 주세요.` };
   }
 
-  const summary = buildDevFreeSummary(answers);
   const saju = await deps.saju.calculate({ year, month, day, calendar: info.calendar, isLeapMonth, birthTime, gender: genderOf(info) });
   if (saju.status === "invalid") return { ok: false, message: saju.message };
   if (saju.status === "ok" && toDate(saju.solarDate) > input.today) {
@@ -77,16 +74,6 @@ export async function submitAssessment(
 }
 
 const toDate = (d: { year: number; month: number; day: number }) => new Date(d.year, d.month - 1, d.day);
-
-/** 알려진 문항 id의 응답만 남긴다 (모르는 키는 저장하지 않는다) */
-function pickKnownAnswers(raw: Answers): Answers {
-  const known = new Set(ASSESSMENT_MODULES.flatMap((m) => m.items.map((i) => i.id)));
-  const out: Answers = {};
-  for (const [id, value] of Object.entries(raw ?? {})) {
-    if (known.has(id)) out[id] = value;
-  }
-  return out;
-}
 
 export function formatAssessmentBirth(a: Pick<AssessmentRecord, "calendar" | "isLeapMonth" | "birthYear" | "birthMonth" | "birthDay" | "birthTime">): string {
   const cal = a.calendar === "solar" ? "양력" : a.isLeapMonth ? "음력 윤달" : "음력";

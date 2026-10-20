@@ -1,11 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { ASSESSMENT_MODULES } from "@/lib/assessment/modules";
-import { parseAnswers, validateAnswers } from "@/lib/assessment/scoring";
+import { summarizeAnswers } from "@/lib/assessment/active";
+import { parseAnswers } from "@/lib/assessment/scoring";
 import type { Answers } from "@/lib/assessment/types";
 import { genderOf, parseBasicInfo, validateBasicInfo, type BasicInfo } from "@/lib/profile/basic-info";
-import { buildDevFreeSummary } from "@/lib/report/build-free-summary";
 import { PERSONAL_TYPE } from "@/lib/config/product";
 import { buildIdentityType, type IdentityTypeView } from "@/lib/report/identity";
 import { buildFreePreview, type FreePreview } from "@/lib/report/preview";
@@ -55,15 +54,14 @@ export async function scoreDevAnswers(input: { info: unknown; answers: unknown }
   const info = parseBasicInfo(input?.info);
   const answers = parseAnswers(input?.answers);
   if (!info || !answers) return { ok: false, message: "응답 형식이 올바르지 않아요." };
-  const check = validateAnswers(ASSESSMENT_MODULES, answers);
-  if (!check.ok) {
-    return { ok: false, message: "답하지 않았거나 올바르지 않은 문항이 있어요. 응답을 다시 확인해 주세요." };
-  }
+  // 질문 버전(상황형 28문항 · 예전 22문항)은 응답의 키로 알아본다 — 서로의 응답을 환산하지 않는다
+  const summarized = summarizeAnswers(answers, { strict: true });
+  if (!summarized.ok) return { ok: false, message: summarized.message };
   const saju = await sajuEngine.calculate(birthInput(info));
   if (saju.status === "invalid") return { ok: false, message: saju.message };
   // 운영자 본인 입력 시험 — 이 PC의 개발 서버에서 .env.local에 MIYU_OWN_INPUT_CAPTURE=yes를 직접 적었을 때만 로컬 파일로 남긴다(꺼져 있으면 아무 일도 하지 않는다)
   await captureOwnInput(info, answers);
-  const summary = buildDevFreeSummary(answers);
+  const { summary } = summarized;
   const identityType = PERSONAL_TYPE.visible ? buildIdentityType({ saju, summary }) : null;
   return { ok: true, preview: buildFreePreview({ summary, saju, reference: seoulReference(new Date()) }), identityType };
 }
@@ -83,7 +81,7 @@ export async function saveResultAndContinue(input: { info: unknown; answers: unk
   if (!info || !answers) return { ok: false, message: "입력 형식이 올바르지 않아요." };
   const infoError = Object.values(validateBasicInfo(info, new Date()))[0];
   if (infoError) return { ok: false, message: infoError };
-  if (!validateAnswers(ASSESSMENT_MODULES, answers).ok) {
+  if (!summarizeAnswers(answers, { strict: true }).ok) {
     return { ok: false, message: "답하지 않은 문항이 있어요." };
   }
 

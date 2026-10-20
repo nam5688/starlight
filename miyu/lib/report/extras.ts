@@ -6,6 +6,7 @@ import { itemSuggestions, type ItemSuggestions } from "../saju/items.ts";
 import { sajuEvidence, spousePalace } from "../saju/interpret/rules.ts";
 import { plainSajuReading, type PlainReading } from "../saju/plain.ts";
 import type { SajuResult } from "../saju/engine.ts";
+import { situationsOf, starterActionsOf } from "../assessment/situational/summary.ts";
 import { buildPartnerConditions, type PartnerConditions } from "./partner.ts";
 import { personalQuestions, type PersonalQA } from "./questions.ts";
 import { buildSituations, type Situation } from "./situations.ts";
@@ -27,12 +28,14 @@ export type ReportExtras = {
 };
 
 export function buildReportExtras(input: {
-  summary: Pick<FreeSummary, "temperament" | "relationship" | "tendency">;
+  summary: Pick<FreeSummary, "temperament" | "relationship" | "tendency" | "situational">;
   saju: SajuResult;
   reference: { year: number; month: number };
 }): ReportExtras {
-  const situations = buildSituations(input.summary);
-  const starterActions = STARTER_ACTIONS[input.summary.tendency.id];
+  // 상황형 28문항 결과는 점수 줄이 없다 — 상황별 · 실천 제안을 읽기 결과에서 만든다(22문항 결과와 예전 저장본은 그대로 점수 규칙)
+  const sit = input.summary.situational;
+  const situations = sit ? situationsOf(sit) : buildSituations(input.summary);
+  const starterActions = sit ? starterActionsOf(sit) : STARTER_ACTIONS[input.summary.tendency.id];
   if (input.saju.status !== "ok") return { version: EXTRAS_VERSION, plain: null, questions: [], situations, partner: null, items: null, starterActions };
 
   const saju = input.saju;

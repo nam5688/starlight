@@ -2,6 +2,7 @@
 // 상대의 나이 · 직업 · 만나는 날짜는 계산하거나 예측하지 않는다 (지어낼 수 없는 정보). 특정 인물 · 사건을 만들지 않는다.
 // 시기는 일지와 직접 맞닿는 세운(연 단위) 주제만 알려 준다. 문구는 초안 — 전문가 검토 전.
 
+import type { SituationalSummary } from "../assessment/situational/reading.ts";
 import type { Evidence } from "./evidence.ts";
 import type { Group } from "./questions.ts";
 import type { FreeSummary } from "./types.ts";
@@ -70,6 +71,37 @@ function fromResponses(s: Pick<FreeSummary, "relationship">) {
   };
 }
 
+/** 상황형 28문항 결과 — 가까운 사이 장면(확인 방식 · 갈등 뒤 회복)의 읽기에서 편안한 조건을 쓴다. 두 방향이 함께 읽히거나 읽히지 않았으면 방향을 정하지 않는다 */
+function fromSituational(s: SituationalSummary) {
+  const sideOf = (d: string) => {
+    const r = s.readings.find((x) => x.d === d);
+    return r?.status === "sufficient" ? r.side : null;
+  };
+  const c = sideOf("confirm");
+  const r = sideOf("repair");
+  const direct = c === "ask" || r === "now";
+  const space = c === "wait" || r === "later";
+  if (direct && !space)
+    return {
+      fit: { title: "궁금한 것을 편하게 묻고 바로 이야기를 나누는 사람", detail: "가까운 사이 장면의 답에서 달라 보일 때 직접 묻고 갈등은 바로 풀려는 모습이 읽혔어요. 솔직하게 묻고 답해 주는 사람과 있을 때 편안해질 수 있어요." },
+      watch: { title: "물어도 답을 미루거나 돌려 말하는 사람", detail: "묻는 쪽과 미루는 쪽의 속도가 어긋나면 서로 답답해질 수 있어요." },
+    };
+  if (space && !direct)
+    return {
+      fit: { title: "혼자 정리할 시간을 존중하고 다시 이야기할 때를 알려 주는 사람", detail: "가까운 사이 장면의 답에서 거리를 두고 진정된 뒤에 이야기하려는 모습이 읽혔어요. 기다려 주고 돌아올 시점을 서로 말해 주는 사람과 편안할 수 있어요." },
+      watch: { title: "바로 답과 감정 표현을 계속 요구하는 사람", detail: "요구가 이어지면 부담이 커져 더 물러서게 될 수 있어요." },
+    };
+  if (!direct && !space && r === "sort")
+    return {
+      fit: { title: "차이를 차분히 정리해서 이야기해 주는 사람", detail: "가까운 사이 장면의 답에서 갈등이 생기면 무엇이 다른지 먼저 정리하려는 모습이 읽혔어요. 정리한 말을 끝까지 들어 주는 사람과 편안할 수 있어요." },
+      watch: { title: "마음을 풀기도 전에 결론부터 재촉하는 사람", detail: "정리할 시간이 없으면 하고 싶은 말이 닿지 못한 채 쌓일 수 있어요." },
+    };
+  return {
+    fit: { title: "편한 거리와 속도를 말로 맞춰 가는 사람", detail: "가까운 사이 장면의 답이 한쪽으로 모이지 않고 장면마다 달랐어요. 서로 편한 거리와 속도를 말로 확인해 주는 사람과 편안할 수 있어요." },
+    watch: { title: "한쪽이 일방적으로 속도를 정하는 관계", detail: "서로 편한 거리를 말하지 못하면 어긋남이 쌓일 수 있어요." },
+  };
+}
+
 const RELATION_WHY: Record<string, string> = {
   천간합: "배우자 자리와 기운이 묶이는 해로, 관계에 대한 생각이 서로 영향을 주고받는 주제가 두드러질 수 있어요.",
   육합: "배우자 자리와 끌어당기는 해로, 관계에서 맞춰 가려는 주제가 두드러질 수 있어요.",
@@ -79,11 +111,11 @@ const RELATION_WHY: Record<string, string> = {
 };
 
 export function buildPartnerConditions(input: {
-  summary: Pick<FreeSummary, "relationship">;
+  summary: Pick<FreeSummary, "relationship" | "situational">;
   spouseGroup: Group;
   evidence: Evidence[];
 }): PartnerConditions {
-  const resp = fromResponses(input.summary);
+  const resp = input.summary.situational ? fromSituational(input.summary.situational) : fromResponses(input.summary);
   const years = input.evidence
     .filter((e) => /^saju\.seun\.\d{4}\.day\./.test(e.id))
     .map((e) => {

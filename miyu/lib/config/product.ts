@@ -69,10 +69,10 @@ export const SAJU_COMPAT = {
 } as const;
 
 /**
- * 무료 분석(검사)에 걸리는 시간 안내 — 운영자 요청(2026-10-15). **직접 재서 얻은 값이 아니라 어림**이다(기본 정보 + 문항 약 22개를 한 문항 10초 안팎으로 읽고 고르는 것으로 셈).
+ * 무료 분석(검사)에 걸리는 시간 안내 — 운영자 요청(2026-10-15). **직접 재서 얻은 값이 아니라 어림**이다(기본 정보 + 상황형 28장면을 한 장면 12~15초 안팎으로 읽고 고르는 것으로 셈 — 예전 22문항은 한 문항 10초 안팎으로 약 5분이었다).
  * 시범 응답으로 실제 시간을 재면 여기서만 고친다.
  */
-export const FREE_ANALYSIS_TIME = "약 5분";
+export const FREE_ANALYSIS_TIME = "약 7분";
 
 /**
  * 채팅 요약 — 저장하지 않고 끝낸 대화의 "보이지 않는 참고 기록"을 며칠 보관하나(운영자 2026-10-15: 일정 기간 뒤 자동 삭제, 기간은 90일로 시작).
@@ -121,6 +121,14 @@ export const REPORT_BASIS = { visible: false } as const;
  * **럭키 지수(LUCKY_INDEX)는 여전히 꺼 둔다** — 계산 기준(규칙 · 분포)을 운영자가 확정하기 전에는 임의 점수를 화면에 표시하지 않는다(`docs/lucky-index-v1.md`).
  */
 export const PERSONAL_TYPE = { visible: true } as const;
+
+/**
+ * 지금 화면(/analyze)이 보여 주는 성향 질문 버전(운영자 승인 2026-10-20: 상황형 28문항 적용 · 테스트 사이트 반영).
+ *  · "situational-28": 상황형 28문항(장면 28개 · 선택지 4개, 점수 환산 없이 여러 장면을 가로로 읽는다 — lib/assessment/situational/).
+ *  · "likert-22": 예전 22문항(동의 척도 · 점수 환산).
+ * 한 줄로 되돌릴 수 있다. 이미 저장된 결과는 어느 쪽으로 바꿔도 만든 그 버전 그대로 열리고, 서로의 응답을 환산하지 않는다(서버는 응답의 키로 버전을 알아본다 — lib/assessment/active.ts).
+ */
+export const ASSESSMENT = { active: "situational-28" as "situational-28" | "likert-22" };
 export const LUCKY_INDEX = { visible: false } as const;
 
 /**

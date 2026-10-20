@@ -1,5 +1,6 @@
 // 실행: npm test — 상담방 입구 규칙 (분석 직후 바로 열 방 · "무료 리포트가 필요해요!" 안내 문구)
 import assert from "node:assert/strict";
+import { FREE_ANALYSIS_TIME } from "../../config/product.ts";
 import { test } from "node:test";
 import { isSimpleRoom } from "../chat/quota.ts";
 import { NEED_REPORT_COPY, ownedStateOf, roomAfterAnalysis } from "./room-entry.ts";
@@ -19,7 +20,7 @@ test("안내 문구: 무료 리포트가 필요하다고 알리고, 방마다 �
   for (const room of ROOM_ORDER) {
     const lead = NEED_REPORT_COPY.lead(room);
     assert.match(lead, /무료 분석/);
-    assert.match(lead, /약 5분/);
+    assert.ok(lead.includes(FREE_ANALYSIS_TIME), "안내하는 시간은 설정 한 곳(FREE_ANALYSIS_TIME)을 따른다");
     const next = NEED_REPORT_COPY.next(room);
     if (roomAfterAnalysis(room)) assert.match(next, /상담방으로 이어서 가요/, room);
     else assert.match(next, /먼저 보여 드려요/, room);

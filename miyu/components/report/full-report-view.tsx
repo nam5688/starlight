@@ -81,15 +81,23 @@ export function FullReportView({
       </section>
 
       <section aria-labelledby={id("scores")}>
-        <SectionTitle id={id("scores")} note="점수와 영역별 근거 · 한계는 접어 두었어요. 눌러서 펼쳐 보세요.">
-          점수와 상세 분석
-        </SectionTitle>
-        <FoldRow>
-          <Fold label="항목별 점수 보기" hint="0~100은 응답 환산값이며 백분위나 정확도가 아니에요" wide>
-            <p className="mb-5 text-[13px] leading-[1.65] text-ink-3">{SCORE_NOTE}</p>
-            <ScoreGroups summary={report} />
-          </Fold>
-        </FoldRow>
+        {report.situational ? (
+          <SectionTitle id={id("scores")} note="영역별 근거 · 한계는 접어 두었어요. 눌러서 펼쳐 보세요. 이 질문은 점수 대신 여러 장면을 가로로 읽어요.">
+            상세 분석
+          </SectionTitle>
+        ) : (
+          <>
+            <SectionTitle id={id("scores")} note="점수와 영역별 근거 · 한계는 접어 두었어요. 눌러서 펼쳐 보세요.">
+              점수와 상세 분석
+            </SectionTitle>
+            <FoldRow>
+              <Fold label="항목별 점수 보기" hint="0~100은 응답 환산값이며 백분위나 정확도가 아니에요" wide>
+                <p className="mb-5 text-[13px] leading-[1.65] text-ink-3">{SCORE_NOTE}</p>
+                <ScoreGroups summary={report} />
+              </Fold>
+            </FoldRow>
+          </>
+        )}
         <div className="mt-2">
           <DetailSections report={report} showChart={false} />
         </div>

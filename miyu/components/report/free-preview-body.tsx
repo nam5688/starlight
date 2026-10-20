@@ -49,12 +49,21 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
           {saju.status === "ok" ? (
             <div>
               <h3 className="text-[15px] font-semibold text-accent">사주에서 읽으면</h3>
-              <p className="mt-2 text-[19px] font-semibold leading-snug">{saju.headline}</p>
-              <p className="mt-3 text-[16px] leading-relaxed text-ink-2">
-                나를 나타내는 글자(일간)는 <span className="font-semibold text-ink">{saju.dayMaster.label}</span>이고, 전통 해석에서는 <span className="font-semibold text-ink">{saju.dayMaster.image}</span>에 비유합니다.{" "}
-                {saju.dayMaster.trait}
-              </p>
-              {saju.everyday.shown && <Prose text={saju.everyday.shown} className="mt-4 text-[16px] leading-relaxed" />}
+              {/* 생활 말로 옮긴 문장이 앞에 읽히고, 사주 용어로 부르는 이름은 아래 접힌 보조 영역에만 둔다(운영자 승인 2026-10-20) */}
+              <Prose text={saju.life.headline.join(" ")} className="mt-2 text-[19px] font-semibold leading-snug" />
+              <Prose text={saju.life.dayMaster.lines.join(" ")} className="mt-3 text-[16px] leading-relaxed text-ink-2" />
+              {saju.life.everyday && <Prose text={saju.life.everyday.lines.join(" ")} className="mt-4 text-[16px] leading-relaxed" />}
+              <details data-fold className="mt-3 text-[13px] leading-relaxed text-ink-3">
+                <summary className="inline-flex min-h-8 cursor-pointer items-center font-semibold text-accent">사주 용어로는 이렇게 불러요</summary>
+                <div className="mt-1.5 space-y-1.5">
+                  <p>
+                    나를 나타내는 글자(일간)는 <span className="font-semibold text-ink-2">{saju.dayMaster.label}</span>이고, 전통 해석에서는 <span className="font-semibold text-ink-2">{saju.dayMaster.image}</span>에 비유해요.
+                  </p>
+                  <p>{saju.life.dayMaster.term}</p>
+                  {saju.life.everyday && <p>{saju.life.everyday.term}</p>}
+                  <p>{saju.headline}</p>
+                </div>
+              </details>
             </div>
           ) : (
             <p className="flex flex-wrap items-center gap-2 text-[16px] text-ink-2">
@@ -114,8 +123,14 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
             {saju.status === "ok" && saju.relation && (
               <div>
                 <h3 className="text-[15px] font-semibold text-ink-2">가까운 관계에서는 이렇게 나타날 수 있어요</h3>
-                <Prose text={`${saju.relation.lead} — ${saju.relation.text}`} className="mt-2 text-[16px] leading-relaxed" />
+                <Prose text={(saju.life.relation?.lines ?? [`${saju.relation.lead} — ${saju.relation.text}`]).join(" ")} className="mt-2 text-[16px] leading-relaxed" />
                 <p className="mt-2 text-[14px] text-ink-3">전통 해석을 쉬운 말로 옮긴 한 가지이고, 성격을 확정하는 말이 아니에요.</p>
+                {saju.life.relation && (
+                  <details data-fold className="mt-2 text-[13px] leading-relaxed text-ink-3">
+                    <summary className="inline-flex min-h-8 cursor-pointer items-center font-semibold text-accent">사주 용어로는 이렇게 불러요</summary>
+                    <p className="mt-1.5">{saju.life.relation.term}</p>
+                  </details>
+                )}
               </div>
             )}
           </div>
@@ -206,7 +221,9 @@ export function FreePreviewBody({ preview, idPrefix }: { preview: FreePreview; i
                 <div>
                   <h3 className="text-[15px] font-semibold text-ink-2">분석에 사용한 정보</h3>
                   <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-                    평소 행동 방식 문항 {preview.basis.mbtiItems}개 · 기질 문항 {preview.basis.temperamentItems}개 · 관계(애착) 문항 {preview.basis.relationshipItems}개 (모두 개발용 예시 문항)
+                    {preview.basis.scenes
+                      ? `상황형 질문 ${preview.basis.scenes}장면 (개발용 예시 문항)`
+                      : `평소 행동 방식 문항 ${preview.basis.mbtiItems}개 · 기질 문항 ${preview.basis.temperamentItems}개 · 관계(애착) 문항 ${preview.basis.relationshipItems}개 (모두 개발용 예시 문항)`}
                     {saju.status === "ok" && saju.chartLine && <> · 사주 {saju.chartLine}</>}
                   </p>
                   <p className="mt-2 text-[13px] leading-relaxed text-ink-3">사주와 심리검사 점수는 합산하지 않고 각각 따로 계산해요.</p>

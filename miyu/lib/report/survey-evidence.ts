@@ -3,6 +3,7 @@
 // 0.2(2026-10-16, 운영자 검토): 기질 4 · 가까운 관계 2에 더해 "평소 행동 방식" 네 가지(에너지 · 정보 · 판단 · 생활)도 근거로 넘긴다 — 사주가 이 사람에게 어떻게 나타나는지 구체화하는 재료다.
 //   예전에는 summary.temperament · relationship만 읽어 네 가지가 AI에게 가지 않았다. MBTI는 알파벳이 아니라 선호의 방향(참고)으로 풀어 주고, 실제 응답과 다르면 응답이 먼저다.
 
+import { situationalEvidence } from "../assessment/situational/summary.ts";
 import type { Evidence, Topic } from "./evidence.ts";
 import type { AxisRow, FreeSummary, ScoreRow } from "./types.ts";
 
@@ -69,7 +70,8 @@ export function mbtiDirections(code: string): string[] | null {
 }
 
 export function surveyEvidence(summary: FreeSummary, knownMbti: string | null): Evidence[] {
-  const out = [...summary.temperament, ...summary.relationship].map(rowEvidence).filter((e): e is Evidence => e !== null);
+  // 상황형 28문항 결과는 점수 줄이 없다 — 장면을 가로로 읽은 결과(survey.s28.*)를 근거로 건넨다. 입력한 MBTI는 아래에서 같은 방식으로 더한다
+  const out = summary.situational ? situationalEvidence(summary.situational) : [...summary.temperament, ...summary.relationship].map(rowEvidence).filter((e): e is Evidence => e !== null);
   // 평소 행동 방식(에너지 · 정보 · 판단 · 생활) — 점수가 뚜렷한 쪽만. 예전에 저장된 요약에도 axes가 있으면 그대로 읽는다
   for (const axis of summary.mbti?.axes ?? []) {
     const e = axisEvidence(axis);
