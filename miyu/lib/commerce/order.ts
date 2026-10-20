@@ -62,6 +62,11 @@ export type GatewayPayment = {
   mId: string | null;
   /** 지금까지 취소된 누적 금액(원) — 결제사의 cancels 중 완료된 것의 합. 없으면 totalAmount − balanceAmount로 본다 */
   canceledAmount?: number;
+  /**
+   * 결제사가 준 영수증 주소(receipt.url) — 토스페이먼츠 공식 도메인의 https 주소만 담는다(lib/commerce/receipt.ts의 officialReceiptUrl 검사를 통과한 것).
+   * 저장하지 않는다(결제 처리 기록 · 주문 어디에도 넣지 않고, 구매자가 영수증을 열 때 결제사에서 다시 읽는다). 없거나 검사를 통과하지 못하면 이 값은 없다.
+   */
+  receiptUrl?: string;
 };
 
 /** 결제사 기록에서 지금까지 취소된 누적 금액 (부분 취소 반영에 쓴다) */

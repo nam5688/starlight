@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { RecheckPayment } from "@/components/my/recheck-payment";
 import { StatusBadge } from "@/components/ui/source-badge";
 import { pageNarrow, textLink } from "@/components/ui/styles";
+import { receiptEligible, receiptNoticeOf, RECEIPT_NOTICES } from "@/lib/commerce/receipt";
 import { cashOrderKind, formatKrw, MIYU_CASH, QUESTION_PACK_SIZE } from "@/lib/config/product";
 import { GENERATION_LABEL, PAYMENT_ENV_LABEL, traceOrder } from "@/lib/services/my-service";
 import { consentPath, getMember } from "@/server/member";
@@ -15,7 +16,7 @@ import { PageFallback } from "@/components/ui/page-fallback";
 
 export const metadata: Metadata = { title: "주문 상세 · ME:U 미유", robots: { index: false } };
 
-export default function OrderPage({ params }: PageProps<"/my/orders/[orderNumber]">) {
+export default function OrderPage({ params, searchParams }: PageProps<"/my/orders/[orderNumber]">) {
   return (
     <main className={`${pageNarrow} py-12 md:py-16`}>
       <p className="text-[14px]">
@@ -25,7 +26,7 @@ export default function OrderPage({ params }: PageProps<"/my/orders/[orderNumber
       </p>
       <h1 className="mt-2 text-[26px] font-bold tracking-tight">주문 상세</h1>
       <Suspense fallback={<PageFallback className="mt-6" />}>
-        <OrderContent params={params} />
+        <OrderContent params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
@@ -33,8 +34,9 @@ export default function OrderPage({ params }: PageProps<"/my/orders/[orderNumber
 
 const time = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) : "-");
 
-async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]">, "params">) {
+async function OrderContent({ params, searchParams }: Pick<PageProps<"/my/orders/[orderNumber]">, "params" | "searchParams">) {
   const { orderNumber } = await params;
+  const receiptNotice = receiptNoticeOf((await searchParams).receipt);
   const member = await getMember();
   if (!member) redirect("/my");
   if (member.needsConsent) redirect(consentPath(`/my/orders/${orderNumber}`));
@@ -65,7 +67,22 @@ async function OrderContent({ params }: Pick<PageProps<"/my/orders/[orderNumber]
         <Row label="승인 시각">{time(order.approvedAt)}</Row>
         <Row label="결제수단">{order.method ?? "-"}</Row>
         {order.failureMessage && <Row label="안내">{order.failureMessage}</Row>}
+        {receiptEligible(order.status) && (
+          <Row label="영수증">
+            <a href={`/my/orders/${order.orderNumber}/receipt`} target="_blank" rel="noopener noreferrer" className={textLink} data-testid="order-receipt-open">
+              영수증 보기 (결제사 화면)
+            </a>
+          </Row>
+        )}
       </dl>
+      {receiptEligible(order.status) && (
+        <p className="-mt-6 text-[13px] leading-[1.6] text-ink-3">영수증은 결제사(토스페이먼츠)가 제공하는 결제 영수증이고, 열 때마다 결제사에서 불러와요. 미유가 만든 문서가 아니고 이 사이트에는 영수증 주소를 저장하지 않아요.</p>
+      )}
+      {receiptNotice && (
+        <p role="status" className="-mt-6 text-[15px] font-medium text-danger" data-testid="order-receipt-notice">
+          {RECEIPT_NOTICES[receiptNotice]}
+        </p>
+      )}
 
       {trace.cash ? (
         <section aria-labelledby="o-access">

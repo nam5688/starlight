@@ -3,6 +3,7 @@
 // 참고: https://docs.tosspayments.com/reference
 
 import type { GatewayPayment, GatewayPaymentStatus } from "../../commerce/order.ts";
+import { officialReceiptUrl } from "../../commerce/receipt.ts";
 import type { GatewayResult, PaymentGateway } from "../../services/ports.ts";
 
 export const TOSS_API_BASE_URL = "https://api.tosspayments.com";
@@ -120,6 +121,9 @@ export function toGatewayPayment(json: Record<string, unknown>): GatewayPayment 
     return null;
   }
   const balanceAmount = typeof json.balanceAmount === "number" ? json.balanceAmount : json.totalAmount;
+  // 영수증 주소는 receipt.url 하나만, 공식 도메인 검사를 통과한 것만 꺼낸다(카드 정보 · 그 밖의 receipt 값은 읽지 않는다)
+  const receiptRaw = json.receipt && typeof json.receipt === "object" ? (json.receipt as Record<string, unknown>).url : undefined;
+  const receiptUrl = officialReceiptUrl(receiptRaw);
   return {
     paymentKey: json.paymentKey,
     orderId: json.orderId,
@@ -130,5 +134,6 @@ export function toGatewayPayment(json: Record<string, unknown>): GatewayPayment 
     method: typeof json.method === "string" ? json.method : null,
     approvedAt: typeof json.approvedAt === "string" ? json.approvedAt : null,
     mId: typeof json.mId === "string" ? json.mId : null,
+    ...(receiptUrl ? { receiptUrl } : {}),
   };
 }

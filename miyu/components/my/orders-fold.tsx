@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatDate } from "@/components/ui/format";
 import { ChevronIcon } from "@/components/ui/icons";
 import { StatusBadge } from "@/components/ui/source-badge";
+import { receiptEligible } from "@/lib/commerce/receipt";
 import { formatKrw } from "@/lib/config/product";
 import { PAYMENT_ENV_LABEL, type MyOrderRow } from "@/lib/services/my-service";
 
@@ -21,8 +22,8 @@ export function OrdersFold({ orders }: { orders: MyOrderRow[] }) {
       </summary>
       <ul className="divide-y divide-line border-t border-line">
         {orders.map((o) => (
-          <li key={o.orderNumber}>
-            <Link href={`/my/orders/${o.orderNumber}`} className="block px-4 py-3.5 hover:bg-mist/60">
+          <li key={o.orderNumber} className="flex items-stretch">
+            <Link href={`/my/orders/${o.orderNumber}`} className="block min-w-0 flex-1 px-4 py-3.5 hover:bg-mist/60">
               <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                 <span className="text-[15px] font-semibold">{o.productName}</span>
                 <span className="text-[15px] font-semibold tabular-nums">{formatKrw(o.amount)}</span>
@@ -34,10 +35,22 @@ export function OrdersFold({ orders }: { orders: MyOrderRow[] }) {
                 {PAYMENT_ENV_LABEL[o.paymentEnv] && <StatusBadge>{PAYMENT_ENV_LABEL[o.paymentEnv]}</StatusBadge>}
               </span>
             </Link>
+            {receiptEligible(o.status) && (
+              <a
+                href={`/my/orders/${o.orderNumber}/receipt`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${o.productName} 영수증 보기 (결제사 화면, 새 창)`}
+                data-testid="order-receipt-link"
+                className="flex min-w-16 shrink-0 items-center justify-center border-l border-line px-3 text-[13px] font-semibold text-accent hover:bg-mist/60"
+              >
+                영수증
+              </a>
+            )}
           </li>
         ))}
       </ul>
-      <p className="border-t border-line px-4 py-3 text-[13px] leading-[1.6] text-ink-3">주문을 누르면 결제 승인 기록과 리포트 제공 상태를 주문번호 기준으로 볼 수 있어요.</p>
+      <p className="border-t border-line px-4 py-3 text-[13px] leading-[1.6] text-ink-3">주문을 누르면 결제 승인 기록과 리포트 제공 상태를 주문번호 기준으로 볼 수 있어요. 영수증은 결제사(토스페이먼츠) 화면으로 열려요.</p>
     </details>
   );
 }

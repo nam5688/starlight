@@ -17,7 +17,7 @@ export type ConfirmMode =
 export function createFakeToss(now: () => Date = () => new Date()) {
   const byKey = new Map<string, GatewayPayment>();
   const calls = { confirm: 0, getPayment: 0, byOrder: 0 };
-  const state = { confirmMode: "ok" as ConfirmMode, lookupDown: false, lookupDownAfterApprove: false };
+  const state = { confirmMode: "ok" as ConfirmMode, lookupDown: false, lookupDownAfterApprove: false, /** 승인될 결제에 실어 줄 영수증 주소(시험이 정한다 — 실제 영수증이 아니다). 비우면 영수증 주소가 없는 응답 */ receiptUrl: undefined as unknown };
   const authorized = new Map<string, { orderId: string; amount: number }>(); // 결제창에서 인증까지 끝난 결제 (아직 승인 전)
 
   const find = (orderId: string) => [...byKey.values()].find((p) => p.orderId === orderId) ?? null;
@@ -34,6 +34,7 @@ export function createFakeToss(now: () => Date = () => new Date()) {
       method: "카드",
       approvedAt: now().toISOString(),
       mId: "fake-merchant",
+      ...(state.receiptUrl !== undefined ? { receiptUrl: state.receiptUrl as string } : {}),
     };
     byKey.set(paymentKey, p);
     return p;
