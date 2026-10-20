@@ -150,11 +150,20 @@ test("결과 위치: 제출 직후(렌더 전)에 스크롤하지 않고, 결과
   assert.match(read("app/globals.css"), /scroll-padding-top:\s*5rem/);
 });
 
-test("결과 아래 다음 단계(사주 · 리포트 궁합)는 하드코딩된 준비 중 버튼이 아니라 판매 스위치 값을 따른다 — 스위치는 열지 않았다", () => {
+test("결과 아래 다음 단계(사주 · 리포트 궁합)는 하드코딩된 준비 중 버튼이 아니라 판매 스위치 값을 따른다 — 실결제 스위치는 열지 않았고 시험 결제 모드에서만 열린다", () => {
   const n = code(read("components/compat/compat-next-steps.tsx"));
   assert.match(n, /saleOpenOf\("saju-compat"\)/);
   assert.match(n, /saleOpenOf\("report-compat"\)/);
   assert.doesNotMatch(code(result), /준비 중/);
   assert.match(read("lib/config/product.ts"), /SAJU_COMPAT[\s\S]{0,400}saleOpen:\s*false/);
-  assert.match(read("lib/config/product.ts"), /PAIR_COMPAT[\s\S]{0,400}saleOpen:\s*false/);
+  assert.match(read("lib/config/product.ts"), /PAIR_COMPAT[\s\S]{0,700}saleOpen:\s*false/);
+  assert.match(read("lib/config/product.ts"), /SAJU_COMPAT[\s\S]{0,700}testModeOpen:\s*true/);
+  assert.match(read("lib/config/product.ts"), /PAIR_COMPAT[\s\S]{0,700}testModeOpen:\s*true/);
+});
+
+test("홈 궁합 구역도 같은 판매 스위치 값을 따른다 — 고정된 \"준비 중\"이 없다", () => {
+  const h = code(read("components/home/compat-section.tsx"));
+  assert.match(h, /saleOpenOf\("saju-compat"\)/);
+  assert.match(h, /saleOpenOf\("report-compat"\)/);
+  assert.doesNotMatch(h, /badge:\s*"준비 중"/);
 });

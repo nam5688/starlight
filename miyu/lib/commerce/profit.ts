@@ -78,8 +78,8 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   listPriceKrw: 9900,
   invitePriceKrw: 6900,
   questionPackPriceKrw: 2500,
-  sajuCompatPriceKrw: 4900,
-  reportCompatPriceKrw: 7900,
+  sajuCompatPriceKrw: 8900,
+  reportCompatPriceKrw: 15900,
   vatMode: "general",
   simpleValueAddedRate: 0.4,
   pgFeeRate: 0.033,
@@ -113,8 +113,8 @@ export const ASSUMPTION_SOURCES: Record<keyof Assumptions, { source: Source; not
   listPriceKrw: { source: "policy", note: "정가(운영자 확정)" },
   invitePriceKrw: { source: "policy", note: "추천받은 친구의 첫 구매 가격(운영자 확정 2026-10-17, 기존 5,900원 대체)" },
   questionPackPriceKrw: { source: "policy", note: "질문 3개 묶음(운영자 확정, 가안)" },
-  sajuCompatPriceKrw: { source: "assumed", note: "가격 미정 — 관리자 가정값. 제안이 아니다" },
-  reportCompatPriceKrw: { source: "assumed", note: "가격 미정 — 관리자 가정값. 제안이 아니다" },
+  sajuCompatPriceKrw: { source: "policy", note: "운영자 확정 2026-10-20 — 8,900원(lib/config/product.ts의 SAJU_COMPAT)" },
+  reportCompatPriceKrw: { source: "policy", note: "운영자 확정 2026-10-20 — 15,900원, 둘 중 한 사람이 한 번 결제하면 두 사람이 열람(PAIR_COMPAT)" },
   vatMode: { source: "assumed", note: "과세 유형 미정(세무사 확인)" },
   simpleValueAddedRate: { source: "assumed", note: "업종코드 미정 — 간이과세 부가가치율은 업종별이라 15~40% 범위로만 알려져 있다. 보수적으로 40%" },
   pgFeeRate: { source: "assumed", note: "토스페이먼츠 계약 수수료를 모른다 — 실제 계약서 값으로 바꾼다" },
@@ -299,8 +299,8 @@ export function productJourneys(a: Assumptions): Journey[] {
   const base = { earnRate: 0.03, referral: false, review: false, paidAd: true } as const;
   return [
     { id: "P1", label: "질문 3개 묶음(질문 3개를 모두 쓴다고 가정)", product: "question-pack", paidKrw: a.questionPackPriceKrw, ...base, paidAd: false },
-    { id: "P2", label: "사주 궁합(가격 미정 — 가정값)", product: "saju-compat", paidKrw: a.sajuCompatPriceKrw, ...base },
-    { id: "P3", label: "리포트 궁합(가격 미정 — 가정값)", product: "report-compat", paidKrw: a.reportCompatPriceKrw, ...base },
+    { id: "P2", label: "사주 궁합(8,900원)", product: "saju-compat", paidKrw: a.sajuCompatPriceKrw, ...base },
+    { id: "P3", label: "리포트 궁합(15,900원, 한 쌍 한 번)", product: "report-compat", paidKrw: a.reportCompatPriceKrw, ...base },
   ];
 }
 
