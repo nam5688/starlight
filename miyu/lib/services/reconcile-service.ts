@@ -49,7 +49,10 @@ export type ReconcileOutcome =
   | { kind: "closed"; order: OrderRecord; reason: string }
   /** 아직 판단할 수 없음 (결제 진행 중 · 너무 이른 시간 · 결제사 기록 아직 없음) — 다음에 다시 확인 */
   | { kind: "waiting"; order: OrderRecord; reason: string }
-  /** 이미 결제사 기록과 맞음. payment: 무엇과 맞았는지(결제사 상태 · 금액 · 잔액 · 어느 경로로 조회했는지) — 관리자 안내용이며 판단에는 쓰지 않는다 */
+  /**
+   * 이미 맞음. payment가 있으면 결제사에 실제로 물어 맞았다는 증거(결제사 상태 · 금액 · 잔액 · 어느 경로로 조회했는지)이고, **없으면 결제사에 묻지 않은 결과**다
+   * (결제 완료 · 대기가 아닌 주문 — 환불 완료 · 취소 · 실패 — 은 이미 정리된 상태라 조회하지 않고 이 값으로 끝난다). 관리자 안내용이며 판단에는 쓰지 않는다 — 안내는 payment가 있을 때만 "결제사 기록과 맞음"이라고 말한다
+   */
   | { kind: "ok"; order: OrderRecord; payment?: { status: string; totalAmount: number; balanceAmount: number; via: "paymentKey" | "orderId" } }
   /** 사람이 확인해야 함 (금액 · 주문 불일치, 부분 취소, 결제사에 기록 없음 등) */
   | { kind: "anomaly"; order: OrderRecord; code: string; message: string }
@@ -150,7 +153,9 @@ export async function reconcileOrder(deps: Deps, order: OrderRecord, options: Re
       if (applied.kind === "paid" && applied.refund) {
         const att = refundAttention(applied.refund);
         if (att) return { kind: "anomaly", order: applied.order, ...att };
-        return applied.refund.status === "applied" ? { kind: "partial-refund", order: applied.order, refund: applied.refund } : { kind: "ok", order: applied.order };
+        return applied.refund.status === "applied"
+          ? { kind: "partial-refund", order: applied.order, refund: applied.refund }
+          : { kind: "ok", order: applied.order, payment: { status: payment.status, totalAmount: payment.totalAmount, balanceAmount: payment.balanceAmount, via: order.paymentKey ? "paymentKey" : "orderId" } };
       }
       return { kind: "anomaly", order: applied.order, code: "REFUND_NOT_APPLIED", message: "결제사에서 일부 취소됐지만 묶음 장부에 반영하지 못했습니다." };
     }

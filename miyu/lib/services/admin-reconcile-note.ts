@@ -94,34 +94,47 @@ export function describeReconcile(outcome: ReconcileOutcome, now: Date): AdminRe
       };
     }
     case "ok": {
+      // 불변식: "결제사 기록과 맞다 · 승인 완료"는 결제사에 실제로 물은 증거(outcome.payment)가 있을 때만 말한다. 주문 상태만 보고 결제사와 맞다고 말하지 않는다.
       const p = outcome.payment;
       if (p) {
-        // 결제사에 물어 DONE과 맞았다 — 무엇과 맞았는지(결제사 상태 · 금액 · 취소된 금액 · 조회 경로)를 말한다
-        const detail = `결제사 ${p.status} · ${p.totalAmount.toLocaleString("ko-KR")}원 · 취소 ${(p.totalAmount - p.balanceAmount).toLocaleString("ko-KR")}원 · ${p.via === "paymentKey" ? "결제 키로 조회" : "주문번호로 조회"}`;
+        const canceled = p.totalAmount - p.balanceAmount;
+        const detail = `결제사 ${p.status} · ${p.totalAmount.toLocaleString("ko-KR")}원 · 취소 ${canceled.toLocaleString("ko-KR")}원 · ${p.via === "paymentKey" ? "결제 키로 조회" : "주문번호로 조회"}`;
+        const via = p.via === "paymentKey" ? "결제 키" : "주문번호";
+        if (p.status === "DONE") {
+          return {
+            kind: "ok",
+            changed: false,
+            severity: "info",
+            note: `결제사 기록도 승인 완료이고 주문번호 · 금액이 주문과 같습니다 (${detail}). 주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다.`,
+            record: `운영자가 결제사와 대조: 결제사 기록과 일치 (${p.status} ${p.totalAmount}원, ${via} 조회), 변경 없음`,
+          };
+        }
+        // DONE이 아닌 일치(이미 반영한 부분 취소) — 승인 완료라고 말하지 않고 결제사가 말한 상태를 그대로 말한다
         return {
           kind: "ok",
           changed: false,
           severity: "info",
-          note: `결제사 기록도 승인 완료이고 주문번호 · 금액이 주문과 같습니다 (${detail}). 주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다.`,
-          record: `운영자가 결제사와 대조: 결제사 기록과 일치 (${p.status} ${p.totalAmount}원, ${p.via === "paymentKey" ? "결제 키" : "주문번호"} 조회), 변경 없음`,
+          note: `결제사 기록이 이미 주문에 반영돼 있습니다 (${detail}). 주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다.`,
+          record: `운영자가 결제사와 대조: 이미 반영됨 (${p.status} ${p.totalAmount}원, 취소 ${canceled}원, ${via} 조회), 변경 없음`,
         };
       }
       if (order.status !== "paid") {
-        // 결제 완료 · 대기가 아닌 주문(환불 완료 · 취소 등)은 이미 정리된 상태라 결제사에 다시 묻지 않는다
+        // 결제 완료 · 대기가 아닌 주문(환불 완료 · 취소 · 실패)은 이미 정리된 상태라 reconcileOrder가 결제사에 묻지 않고 끝낸다 — 승인 확인이 아니다
         return {
           kind: "ok",
           changed: false,
           severity: "info",
-          note: `이 주문은 이미 '${stateNow}'로 정리돼 있어 결제사에 다시 묻지 않았고 바꾼 것이 없습니다.`,
+          note: `이 주문은 이미 '${stateNow}'로 정리돼 있어 결제사에 다시 묻지 않았습니다. 결제사 기록과 맞는지는 이번에 확인하지 않았고, 바꾼 것도 없습니다.`,
           record: `운영자가 결제사와 대조: 이미 정리된 주문(${stateNow}), 결제사 조회 없음, 변경 없음`,
         };
       }
+      // 결제 완료인데 결제사 조회 내용이 담기지 않은 결과 — 맞았다고도 말하지 않는다
       return {
         kind: "ok",
         changed: false,
         severity: "info",
-        note: `결제사 기록과 이미 맞습니다 (이미 반영한 부분 취소 포함). 주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다.`,
-        record: "운영자가 결제사와 대조: 결제사 기록과 일치 (변경 없음)",
+        note: `주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다. 이 결과에는 결제사 조회 내용이 담기지 않아 무엇과 맞았는지는 말할 수 없습니다.`,
+        record: "운영자가 결제사와 대조: 변경 없음 (결제사 조회 내용 없음)",
       };
     }
     case "anomaly":

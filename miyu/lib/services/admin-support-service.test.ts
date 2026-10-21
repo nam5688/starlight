@@ -9,6 +9,7 @@ import { manseryeokEngine } from "../saju/manseryeok-engine.ts";
 import { submitAssessment } from "./assessment-service.ts";
 import { adminCreditQuestionOrder, adminReportView, questionLedgerState, recentOrdersForAdmin, reportStateLabel } from "./admin-support-service.ts";
 import { adminReconcileOnce, describeReconcile } from "./admin-reconcile-note.ts";
+import { orderStatusLabel } from "./my-service.ts";
 import { readSource } from "../report/test-source.ts";
 import { getAdminOverview, adminLookup } from "./admin-service.ts";
 import { getCashView, startQuestionPayment } from "./cash-service.ts";
@@ -443,4 +444,93 @@ test("대조 버튼: 서버 동작 버튼은 처리 중 표시를 보이고(눌�
     assert.ok(at > 0 && page.lastIndexOf("<AdminSubmitButton", at) > page.lastIndexOf("<button", at), `${label}: 처리 중 표시가 있는 버튼을 쓴다`);
   }
   assert.ok(!/결제사에 확인하는 중…[^]*결제가 되지 않/.test(page), "처리 중 안내가 결제 여부를 단정하지 않는다");
+});
+
+// ─────────────────────────────────────────────
+// 2026-10-22 root 확인(208b17a 배포): 이미 환불된 주문을 대조하면 "결제사 기록도 승인 완료이고 주문번호 · 금액이 주문과 같습니다 … 환불 완료 그대로"라고 나왔다.
+// 환불 완료 · 취소 · 실패 주문은 reconcileOrder가 결제사에 묻지 않고 kind ok로 끝내므로, 조회하지 않은 결과를 승인 확인이라고 말한 것이다.
+// ─────────────────────────────────────────────
+
+const CLAIMS_VERIFIED = /승인 완료|결제사 기록도|주문번호 · 금액이 주문과 같|결제사 기록과 (이미 맞|일치)/;
+
+test("대조 버튼: 환불 완료 · 취소 · 실패처럼 이미 정리된 주문은 결제사에 묻지 않고 끝나며, 그 결과를 승인 확인 · 금액 일치라고 말하지 않는다", async () => {
+  const w = await world();
+  const paid = await paidReportOrder(w, "ready");
+  const calls: string[] = [];
+  const spy = {
+    ...w.toss.gateway,
+    getPayment: async (k: string) => (calls.push("getPayment"), w.toss.gateway.getPayment(k)),
+    getPaymentByOrderId: async (o: string) => (calls.push("getPaymentByOrderId"), w.toss.gateway.getPaymentByOrderId(o)),
+  };
+  const run = (o: OrderRecord) => adminReconcileOnce({ reconcile: (x) => reconcileOrder({ repo: w.mem.repo, gateway: spy, now: w.now }, x, { pendingMinAgeMs: 0 }), now: w.now }, o);
+
+  // 결제 완료 주문은 결제사에 물어 맞았음을 말한다 (기준선)
+  const verified = await run(paid);
+  assert.equal(verified.kind, "ok");
+  assert.ok(calls.length >= 1, "결제 완료 주문은 결제사에 물었다");
+  assert.match(verified.note, CLAIMS_VERIFIED);
+
+  // 같은 주문을 환불 완료로 맞춘 뒤(결제사 취소 → 대조) 다시 대조
+  assert.equal(w.toss.cancel(paid.paymentKey!), true);
+  const refunded = await run(paid);
+  assert.equal(refunded.kind, "refunded");
+  const refundedOrder = (await w.mem.repo.getOrderByNumber(paid.orderNumber))!;
+  assert.equal(refundedOrder.status, "refunded");
+
+  const cases: { name: string; order: OrderRecord }[] = [{ name: "환불 완료", order: refundedOrder }];
+  for (const [name, patch] of [
+    ["결제 미완료", { status: "canceled" as const, failureCode: "ABANDONED", failureMessage: "t" }],
+    ["새 결제로 대체", { status: "canceled" as const, failureCode: "SUPERSEDED", failureMessage: "t" }],
+    ["결제 취소", { status: "canceled" as const, failureCode: "CANCELED", failureMessage: "t" }],
+    ["결제 실패", { status: "failed" as const, failureCode: "REJECT_CARD_PAYMENT", failureMessage: "t" }],
+  ] as const) {
+    const w2 = await world();
+    const started = await startCheckout({ repo: w2.mem.repo, now: w2.now }, { userId: USER, assessmentId: w2.assessment.id });
+    if (started.kind !== "order") throw new Error(started.kind);
+    const closed = await w2.mem.repo.updateOrder(started.order.id, ["pending"], patch);
+    assert.ok(closed, name);
+    cases.push({ name, order: closed! });
+  }
+
+  for (const c of cases) {
+    const before = calls.length;
+    const w3 = await world();
+    let asked = 0;
+    const gw = { ...w3.toss.gateway, getPayment: async (k: string) => (asked++, w3.toss.gateway.getPayment(k)), getPaymentByOrderId: async (o: string) => (asked++, w3.toss.gateway.getPaymentByOrderId(o)) };
+    const r = await adminReconcileOnce({ reconcile: (x) => reconcileOrder({ repo: w3.mem.repo, gateway: gw, now: w3.now }, x, { pendingMinAgeMs: 0 }), now: w3.now }, c.order);
+    assert.equal(asked, 0, `${c.name}: 결제사에 묻지 않았다`);
+    assert.equal(r.kind, "ok", c.name);
+    assert.equal(r.changed, false, c.name);
+    assert.doesNotMatch(r.note, CLAIMS_VERIFIED, `${c.name}: 조회하지 않은 결과를 승인 확인 · 금액 일치라고 말하지 않는다 — ${r.note}`);
+    assert.match(r.note, /결제사에 다시 묻지 않았습니다/, c.name);
+    assert.match(r.note, new RegExp(`이미 '${orderStatusLabel(c.order, w3.now())}'`), `${c.name}: 주문 상태를 말한다`);
+    assert.match(r.record, /결제사 조회 없음/, c.name);
+    assert.doesNotMatch(r.record, CLAIMS_VERIFIED, c.name);
+    void before;
+  }
+});
+
+test("대조 버튼: '승인 완료 · 결제사 기록과 맞음'은 결제사에 실제로 물은 증거(DONE)가 있을 때만 말한다 — 주문 상태 × 증거 유무 전수", () => {
+  const statuses: OrderRecord["status"][] = ["pending", "paid", "refunded", "canceled", "failed"];
+  const now = new Date("2026-10-22T03:00:00Z");
+  const evidences = [
+    undefined,
+    { status: "DONE", totalAmount: 9900, balanceAmount: 9900, via: "paymentKey" as const },
+    { status: "DONE", totalAmount: 9900, balanceAmount: 9900, via: "orderId" as const },
+    { status: "PARTIAL_CANCELED", totalAmount: 2500, balanceAmount: 1666, via: "paymentKey" as const },
+  ];
+  for (const status of statuses) {
+    for (const payment of evidences) {
+      const order = { id: "o1", orderNumber: "MEU-20261015-ABCDEFGHJK", status, failureCode: status === "canceled" ? "ABANDONED" : null, createdAt: "2026-10-15T03:00:00Z" } as unknown as OrderRecord;
+      const r = describeReconcile({ kind: "ok", order, ...(payment ? { payment } : {}) }, now);
+      const claims = CLAIMS_VERIFIED.test(r.note) || CLAIMS_VERIFIED.test(r.record);
+      const allowed = payment?.status === "DONE";
+      assert.equal(claims, allowed, `${status} / ${payment ? `${payment.status} ${payment.via}` : "증거 없음"}: ${r.note}`);
+      assert.equal(r.changed, false);
+    }
+  }
+  // DONE이 아닌 일치는 결제사가 말한 상태를 그대로 말한다
+  const partial = describeReconcile({ kind: "ok", order: { id: "o1", orderNumber: "MEU-20261015-ABCDEFGHJK", status: "paid", failureCode: null, createdAt: "2026-10-15T03:00:00Z" } as unknown as OrderRecord, payment: evidences[3]! }, now);
+  assert.match(partial.note, /PARTIAL_CANCELED/);
+  assert.match(partial.note, /취소 834원/);
 });
