@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { adminCreditQuestionAction, adminReconcileOrderAction, adminRetryReportAction, adminRunAllAction, adminTestAlertAction } from "@/app/admin/actions";
 import { buttonPrimary, buttonSecondary, pageWide, textLink } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
-import { getAdminOverview, adminLookup, type AdminReportRow, type OrderTraceForAdmin } from "@/lib/services/admin-service";
+import { getAdminOverview, adminLookup, type OrderTraceForAdmin } from "@/lib/services/admin-service";
 import { recentOrdersForAdmin, type AdminRecentOrder } from "@/lib/services/admin-support-service";
 import { costSummary, saleGate, type CapacityConfig, type CostSummary, type SaleGate } from "@/lib/services/capacity-service";
 import type { OpsEventRecord } from "@/lib/services/ports";
@@ -38,7 +38,7 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
   if (!(await getAdminMember())) notFound();
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q.slice(0, 80) : "";
-  const note = typeof params.note === "string" ? params.note.slice(0, 200) : "";
+  const note = typeof params.note === "string" ? params.note.slice(0, 600) : "";
   const repo = writeRepository();
   const cfg = capacityConfig();
   const [overview, lookup, gate, cost, recent, heartbeat] = await Promise.all([
@@ -53,17 +53,15 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
   const lastCron = heartbeat[0] ?? null;
   const notes = deployNotes(deploy, lastCron?.createdAt ?? null, now());
   const { counts } = overview;
+  const noteInTrace = lookup.kind === "order" || (lookup.kind === "error-id" && lookup.order !== null);
 
   return (
     <div className="mt-6 space-y-10">
       <p className="text-[14px] leading-relaxed text-ink-3">
         주문 · 결제 · 리포트 생성 상태와 운영 기록, 누가(닉네임 · 회원번호 앞 8자) 무엇을 샀는지만 보입니다. 생년월일 · 답변 · 채팅 대화 · 고민은 이 화면에 없고, 리포트 본문은 고객 문의에 답하려고 따로 열 때만 보입니다(열람 기록이 남습니다). 환불은 이 화면에서 실행하지 않습니다 — 토스페이먼츠 관리자에서 직접 하세요.
       </p>
-      {note && (
-        <p role="status" className="rounded-md bg-mist px-4 py-3 text-[14px]">
-          {note}
-        </p>
-      )}
+      {/* 주문을 조회 중이면 결과는 버튼 바로 아래(주문 상세)에 보이고, 아니면 여기 맨 위에 보인다 — 같은 주소의 #admin-result가 어느 쪽이든 그 자리로 이끈다 */}
+      {note && !noteInTrace && <ResultNote note={note} />}
 
       <section aria-labelledby="a-summary">
         <h2 id="a-summary" className="text-[18px] font-bold">
@@ -163,7 +161,7 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
             찾기
           </button>
         </form>
-        <Lookup lookup={lookup} />
+        <Lookup lookup={lookup} note={noteInTrace ? note : ""} />
       </section>
 
       <section aria-labelledby="a-recent">
@@ -213,7 +211,7 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
                     {r.orderNumber}
                   </Link>
                 </td>
-                <td className="py-2.5 pr-3">{reportLabel(r)}</td>
+                <td className="py-2.5 pr-3">{r.stateLabel}</td>
                 <td className="py-2.5 pr-3 tabular-nums">
                   {r.attempts}/{r.maxAttempts}
                 </td>
@@ -258,10 +256,13 @@ function Capacity({ gate, cost, cfg }: { gate: SaleGate; cost: CostSummary; cfg:
   );
 }
 
-function reportLabel(r: AdminReportRow) {
-  if (r.status === "failed") return "생성 실패";
-  if (r.pastSla) return "생성 지연 (30분 넘음)";
-  return r.status === "queued" ? "대기 중" : "생성 중";
+/** 대조 · 재생성 같은 관리자 동작의 결과 안내 — 무엇을 했고 주문이 어떻게 됐는지 */
+function ResultNote({ note }: { note: string }) {
+  return (
+    <p id="admin-result" role="status" className="scroll-mt-4 rounded-md bg-mist px-4 py-3 text-[14px] leading-relaxed" data-testid="admin-result">
+      {note}
+    </p>
+  );
 }
 
 function Stat({ label, value, warn }: { label: string; value: number; warn: boolean }) {
@@ -298,7 +299,7 @@ function Events({ events }: { events: OpsEventRecord[] }) {
     <ol className="mt-3 border-t border-line text-[14px]">
       {events.map((e) => (
         <li key={e.id} className="border-b border-line py-2.5">
-          <span className={e.severity === "error" ? "font-semibold text-danger" : "font-semibold"}>{e.severity === "error" ? "오류" : "주의"}</span> <span className="font-mono text-[12px] text-ink-3">{e.kind}</span>
+          <span className={e.severity === "error" ? "font-semibold text-danger" : "font-semibold"}>{e.severity === "error" ? "오류" : e.severity === "warn" ? "주의" : "기록"}</span> <span className="font-mono text-[12px] text-ink-3">{e.kind}</span>
           <span className="mt-0.5 block text-ink-2">{e.message}</span>
           <span className="mt-0.5 block text-[12px] text-ink-3">
             {time(e.createdAt)}
@@ -340,7 +341,7 @@ function RecentOrders({ rows }: { rows: AdminRecentOrder[] }) {
   );
 }
 
-function Lookup({ lookup }: { lookup: Awaited<ReturnType<typeof adminLookup>> }) {
+function Lookup({ lookup, note }: { lookup: Awaited<ReturnType<typeof adminLookup>>; note: string }) {
   switch (lookup.kind) {
     case "empty":
       return null;
@@ -349,7 +350,7 @@ function Lookup({ lookup }: { lookup: Awaited<ReturnType<typeof adminLookup>> })
     case "not-found":
       return <p className="mt-3 text-[14px] text-ink-2">{lookup.query}에 해당하는 기록이 없습니다.</p>;
     case "order":
-      return <OrderTrace trace={lookup.order} />;
+      return <OrderTrace trace={lookup.order} note={note} />;
     case "error-id":
       return (
         <div className="mt-4 space-y-6">
@@ -357,13 +358,13 @@ function Lookup({ lookup }: { lookup: Awaited<ReturnType<typeof adminLookup>> })
             <p className="text-[14px] font-semibold">{lookup.query} 기록</p>
             <Events events={lookup.events} />
           </div>
-          {lookup.order && <OrderTrace trace={lookup.order} />}
+          {lookup.order && <OrderTrace trace={lookup.order} note={note} />}
         </div>
       );
   }
 }
 
-function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
+function OrderTrace({ trace, note }: { trace: OrderTraceForAdmin; note: string }) {
   const { order, report, question } = trace;
   return (
     <div className="mt-4 space-y-5 border-t border-ink pt-4">
@@ -400,7 +401,7 @@ function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
             )}
           </>
         ) : (
-          <Row label="리포트">{report ? `${reportLabel(report)} · 시도 ${report.attempts}/${report.maxAttempts}${report.lastError ? ` · ${report.lastError}` : ""}` : order.status === "paid" ? "리포트 기록 없음" : "-"}</Row>
+          <Row label="리포트">{report ? `${report.stateLabel} · 생성 시도 ${report.attempts}/${report.maxAttempts}${report.lastError ? ` · ${report.lastError}` : ""}` : order.status === "paid" ? "리포트 기록 없음" : "-"}</Row>
         )}
       </dl>
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -432,6 +433,7 @@ function OrderTrace({ trace }: { trace: OrderTraceForAdmin }) {
           </form>
         )}
       </div>
+      {note && <ResultNote note={note} />}
       {question && (
         <p className="text-[13px] leading-relaxed text-ink-3">
           질문 결제는 결제 완료가 되는 순간 자동으로 질문이 들어갑니다. 위 버튼은 결제사 기록으로 결제 완료를 다시 확인한 뒤, 빠진 경우에만 한 번 넣습니다(주문 한 건에 한 번만, 이미 들어가 있으면 더 넣지 않습니다). 결제가 안 된 주문에는 넣지 않습니다.

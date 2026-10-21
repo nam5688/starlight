@@ -6,6 +6,7 @@
 import { isCashProduct } from "../config/product.ts";
 import { nextRefundSteps, packRemaining, packShortfall, questionsLeft } from "../commerce/cash.ts";
 import { isValidOrderNumber } from "../commerce/order.ts";
+import { REPORT_SLA_MS } from "../commerce/report.ts";
 import { isReadingReport, type AnyReportContent } from "../report/generator.ts";
 import { renderReadingMarkdown } from "../report/reading/render-text.ts";
 import { assessmentTypeTitle, type TypeTitle } from "../report/type-title.ts";
@@ -132,6 +133,18 @@ export type AdminRecentOrder = AdminOrderRow & {
 
 const REPORT_STATE = { ready: "완성", queued: "대기 중", generating: "만드는 중", failed: "만들지 못함" } as const;
 
+/**
+ * 리포트 상태를 운영자 화면에 쓰는 말로 — 최근 주문 목록과 주문 상세가 **같은 함수**를 쓴다.
+ * (2026-10-22 운영자 확인: 같은 주문이 목록에서는 "완성", 상세에서는 "생성 중 · 시도 1/5"로 나왔다. 상세 쪽 라벨 함수에 완성(ready) 분기가 없어
+ * 완성된 리포트도 "생성 중"으로 떨어졌다. 화면마다 따로 말을 만들지 않고 여기 한 곳에서 정한다.)
+ * pastSla는 만드는 중인 리포트가 고객 지연 안내 기준(30분)을 넘었는지다 — 완성 · 실패에는 쓰지 않는다.
+ */
+export function reportStateLabel(r: { status: keyof typeof REPORT_STATE; pastSla?: boolean }): string {
+  if (r.status === "ready" || r.status === "failed") return REPORT_STATE[r.status];
+  if (r.pastSla) return `${REPORT_STATE[r.status]} · 지연 (30분 넘음)`;
+  return REPORT_STATE[r.status];
+}
+
 export async function recentOrdersForAdmin(repo: MiyuRepository, now: Date, limit = 30): Promise<AdminRecentOrder[]> {
   const orders = await repo.listRecentOrders(limit);
   const names = new Map<string, string>();
@@ -148,7 +161,9 @@ export async function recentOrdersForAdmin(repo: MiyuRepository, now: Date, limi
       if (!isQuestion) {
         if (o.status === "paid") {
           const r = await repo.getReportByOrder(o.id).catch(() => null);
-          report = r ? REPORT_STATE[r.status] : "리포트 기록 없음";
+          // 주문 상세(adminLookup)와 같은 기준으로 지연도 같이 보인다 — 만드는 중인 리포트가 30분을 넘으면 두 화면 모두 "지연"이라고 말한다
+          const pastSla = r !== null && (r.status === "queued" || r.status === "generating") && now.getTime() - new Date(r.updatedAt).getTime() >= REPORT_SLA_MS;
+          report = r ? reportStateLabel({ status: r.status, pastSla }) : "리포트 기록 없음";
         } else {
           report = "-";
         }

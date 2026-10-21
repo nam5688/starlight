@@ -4,7 +4,7 @@
 import { REPORT_DELAY_ALERT_MS, REPORT_MAX_ATTEMPTS, REPORT_SLA_MS } from "../commerce/report.ts";
 import { isValidOrderNumber } from "../commerce/order.ts";
 import { ERROR_ID_PATTERN } from "../ops/redact.ts";
-import { questionLedgerState, type QuestionLedgerState } from "./admin-support-service.ts";
+import { questionLedgerState, reportStateLabel, type QuestionLedgerState } from "./admin-support-service.ts";
 import { EVENT_STATUS_LABEL, generationOf, orderStatusLabel, productName, SOURCE_LABEL, type Generation } from "./my-service.ts";
 import type { MiyuRepository, OpsEventRecord, OrderRecord, PaymentEventRecord, ProblemReport } from "./ports.ts";
 import { RECONCILE_DEFAULTS } from "./reconcile-service.ts";
@@ -36,6 +36,8 @@ const orderRow = (o: OrderRecord, now: Date): AdminOrderRow => ({
 export type AdminReportRow = {
   orderNumber: string;
   status: ProblemReport["status"];
+  /** 화면에 쓰는 상태 말 — 최근 주문 목록과 같은 함수(reportStateLabel)로 만든다. 화면이 status를 보고 따로 말을 만들지 않는다 */
+  stateLabel: string;
   generation: Generation;
   attempts: number;
   maxAttempts: number;
@@ -65,6 +67,7 @@ async function reportRow(repo: MiyuRepository, r: ProblemReport, now: Date): Pro
   return {
     orderNumber: order.orderNumber,
     status: r.status,
+    stateLabel: reportStateLabel({ status: r.status, pastSla: inProgress && age >= REPORT_SLA_MS }),
     generation: generationOf(r),
     attempts: r.attempts,
     maxAttempts: REPORT_MAX_ATTEMPTS,

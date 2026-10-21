@@ -1,21 +1,23 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { adminReconcileOnce } from "@/lib/services/admin-reconcile-note";
 import { adminResetReport } from "@/lib/services/admin-service";
 import { adminCreditQuestionOrder, type AdminCreditResult } from "@/lib/services/admin-support-service";
 import { isValidOrderNumber } from "@/lib/commerce/order";
 import { getAdminMember } from "@/server/member";
-import { recordOps, testTelegram } from "@/server/ops";
+import { logError, recordOps, testTelegram } from "@/server/ops";
 import { reconcileAllNow, reconcileOneNow } from "@/server/reconcile";
 import { claimAndSchedule } from "@/server/report-jobs";
 import { sweepReports } from "@/server/report-sweep";
-import { writeRepository } from "@/server/services";
+import { now, writeRepository } from "@/server/services";
 import { paymentConfig } from "@/server/env";
 
 // 관리자 동작은 모두 서버에서 관리자 여부를 다시 확인하고, 운영 기록(ops_events)에 남긴다.
 // 환불 실행 기능은 없다 — 환불은 토스페이먼츠 관리자에서 직접 한다.
 
-const back = (q: string, note: string) => redirect(`/admin?q=${encodeURIComponent(q)}&note=${encodeURIComponent(note)}`);
+// #admin-result: 결과 안내가 있는 자리(주문 상세의 버튼 아래, 없으면 맨 위)로 이끈다
+const back = (q: string, note: string) => redirect(`/admin?q=${encodeURIComponent(q)}&note=${encodeURIComponent(note)}#admin-result`);
 
 async function adminOrder(formData: FormData) {
   const admin = await getAdminMember();
@@ -27,13 +29,30 @@ async function adminOrder(formData: FormData) {
   return { admin, order: order! };
 }
 
-/** 결제사 기록과 주문 하나를 바로 맞춘다 */
+/**
+ * 결제사 기록과 주문 하나를 바로 맞춘다.
+ * 결과가 무엇이든(맞춤 · 이미 일치 · 기다리는 중 · 불일치 · 결제사 조회 실패 · 예외) 무엇을 했고 주문이 어떻게 됐는지를 한 번 안내하고 운영 기록(admin.reconcile)에 남긴다 —
+ * 조회 실패(error)는 예전에 "결과: error"라는 한 줄뿐이었고 운영 기록에 코드도 없었다. 주문 상태는 결제사 기록으로만 바뀐다(reconcileOneNow).
+ */
 export async function adminReconcileOrderAction(formData: FormData) {
   const { order } = await adminOrder(formData);
-  if (!paymentConfig().ok) back(order.orderNumber, "결제 설정이 없어 결제사에 조회할 수 없습니다.");
-  const outcome = await reconcileOneNow(order);
-  await recordOps({ kind: "admin.reconcile", orderNumber: order.orderNumber, message: `운영자가 결제사와 대조: ${outcome.kind}` });
-  back(order.orderNumber, `결제사 대조 결과: ${outcome.kind}`);
+  if (!paymentConfig().ok) back(order.orderNumber, "결제 설정이 없어 결제사에 조회할 수 없습니다. 주문은 바꾸지 않았습니다.");
+  const result = await adminReconcileOnce(
+    {
+      reconcile: async (o) => {
+        try {
+          return await reconcileOneNow(o);
+        } catch (e) {
+          logError("admin.reconcile", e);
+          throw e;
+        }
+      },
+      now,
+    },
+    order,
+  );
+  await recordOps({ kind: "admin.reconcile", severity: result.severity, orderNumber: order.orderNumber, errorId: result.errorId, message: result.record });
+  back(order.orderNumber, result.note);
 }
 
 /** 결제가 확인된 주문의 리포트를 다시 만든다 (고객 재시도 상한과 별개) */
