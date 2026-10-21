@@ -402,3 +402,45 @@ test("대조 버튼: 서버 동작이 결과 안내를 운영 기록(admin.recon
   assert.ok(/id="admin-result"/.test(page), "안내가 붙는 자리가 있다");
   assert.ok(/note && <ResultNote note=\{note\} \/>/.test(page), "주문 상세 안에 결과가 버튼 아래에 나온다");
 });
+
+test("대조 버튼: 결제 완료 주문(결제 키 있음)이 결제사 기록과 맞으면 무엇과 맞았는지(결제사 상태 · 금액 · 취소 0 · 조회 경로)를 말하고, 결제사 기록이 DONE이 아니면 일치로 말하지 않는다", async () => {
+  const w = await world();
+  const order = await paidReportOrder(w, "ready");
+  assert.ok(order.paymentKey, "승인 때 저장한 결제 키가 있다");
+  const ok = await adminReconcileOnce({ reconcile: (o) => w.verify(o), now: w.now }, order);
+  assert.equal(ok.kind, "ok");
+  assert.match(ok.note, /DONE/);
+  assert.match(ok.note, new RegExp(order.amount.toLocaleString("ko-KR")));
+  assert.match(ok.note, /취소 0원/);
+  assert.match(ok.note, /결제 키로 조회/, "결제 키가 있는 주문은 결제 키로 조회한다");
+  assert.match(ok.record, /DONE/);
+  assert.equal(ok.changed, false);
+
+  // 결제사에서 전액 취소된 뒤의 대조 — 같은 버튼이 '환불 완료'로 맞추고 열람 권한을 회수했다고 안내한다 (실제 검수: 2026-10-22 운영자 확인, 취소는 결제사 쪽에서 했고 미유는 취소를 실행하지 않는다)
+  assert.equal(w.toss.cancel(order.paymentKey!), true);
+  const refunded = await adminReconcileOnce({ reconcile: (o) => w.verify(o), now: w.now }, order);
+  assert.equal(refunded.kind, "refunded");
+  assert.equal(refunded.changed, true);
+  assert.match(refunded.note, /환불 완료/);
+  assert.match(refunded.note, /열람 권한을 회수/);
+  const after = await w.mem.repo.getOrderByNumber(order.orderNumber);
+  assert.equal(after?.status, "refunded");
+
+  // 이미 정리된 주문을 다시 누르면 결제사에 묻지 않고 '이미 정리됨'이라고 말한다 — 승인 완료라고 말하지 않는다
+  const again = await adminReconcileOnce({ reconcile: (o) => w.verify(o), now: w.now }, after!);
+  assert.equal(again.kind, "ok");
+  assert.match(again.note, /이미 '환불 완료'로 정리/);
+  assert.doesNotMatch(again.note, /승인 완료/);
+});
+
+test("대조 버튼: 서버 동작 버튼은 처리 중 표시를 보이고(눌렀는지 알 수 있게) 두 번 눌리지 않는다 — 처리는 끝났는데 화면이 그대로여서 응답 없음으로 보이던 문제", () => {
+  const page = readSource(new URL("../../app/admin/page.tsx", import.meta.url));
+  const btn = readSource(new URL("../../components/admin/admin-submit-button.tsx", import.meta.url));
+  assert.ok(/useFormStatus\(\)/.test(btn) && /disabled=\{pending\}/.test(btn) && /aria-busy=\{pending\}/.test(btn), "누르면 잠긴다");
+  assert.ok(/role="status"/.test(btn) && /pendingNote/.test(btn), "처리 중 안내가 그 자리에 보인다");
+  for (const label of ["결제사와 대조해 맞추기", "리포트 다시 만들기", "결제사 확인 후 질문 넣기", "결제 · 리포트 전체 점검 지금 실행"]) {
+    const at = page.indexOf(`label="${label}"`);
+    assert.ok(at > 0 && page.lastIndexOf("<AdminSubmitButton", at) > page.lastIndexOf("<button", at), `${label}: 처리 중 표시가 있는 버튼을 쓴다`);
+  }
+  assert.ok(!/결제사에 확인하는 중…[^]*결제가 되지 않/.test(page), "처리 중 안내가 결제 여부를 단정하지 않는다");
+});

@@ -49,8 +49,8 @@ export type ReconcileOutcome =
   | { kind: "closed"; order: OrderRecord; reason: string }
   /** 아직 판단할 수 없음 (결제 진행 중 · 너무 이른 시간 · 결제사 기록 아직 없음) — 다음에 다시 확인 */
   | { kind: "waiting"; order: OrderRecord; reason: string }
-  /** 이미 결제사 기록과 맞음 */
-  | { kind: "ok"; order: OrderRecord }
+  /** 이미 결제사 기록과 맞음. payment: 무엇과 맞았는지(결제사 상태 · 금액 · 잔액 · 어느 경로로 조회했는지) — 관리자 안내용이며 판단에는 쓰지 않는다 */
+  | { kind: "ok"; order: OrderRecord; payment?: { status: string; totalAmount: number; balanceAmount: number; via: "paymentKey" | "orderId" } }
   /** 사람이 확인해야 함 (금액 · 주문 불일치, 부분 취소, 결제사에 기록 없음 등) */
   | { kind: "anomaly"; order: OrderRecord; code: string; message: string }
   /** 결제사 조회 실패 (장애 · 연결 끊김) — 단정하지 않고 다음에 다시 확인 */
@@ -143,7 +143,7 @@ export async function reconcileOrder(deps: Deps, order: OrderRecord, options: Re
       await safeEvent(repo, order, "PAYMENT_MISMATCH", { gatewayAmount: payment.totalAmount, orderAmount: order.amount });
       return { kind: "anomaly", order, code: "PAYMENT_MISMATCH", message: "결제사 기록의 주문번호 또는 금액이 주문과 다릅니다." };
     }
-    if (payment.status === "DONE") return { kind: "ok", order };
+    if (payment.status === "DONE") return { kind: "ok", order, payment: { status: payment.status, totalAmount: payment.totalAmount, balanceAmount: payment.balanceAmount, via: order.paymentKey ? "paymentKey" : "orderId" } };
     if (payment.status === "PARTIAL_CANCELED" && isCashProduct(order.productId)) {
       // 질문 묶음의 부분 취소 — 결제사의 누적 취소액을 묶음 장부에 반영한다(이미 반영했다면 "already"라 ok)
       const applied = await applyPayment(repo, order, payment, "reconcile");

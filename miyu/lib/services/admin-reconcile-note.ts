@@ -93,14 +93,37 @@ export function describeReconcile(outcome: ReconcileOutcome, now: Date): AdminRe
         record: `운영자가 결제사와 대조: 기다리는 중 (${outcome.reason}), 변경 없음`,
       };
     }
-    case "ok":
+    case "ok": {
+      const p = outcome.payment;
+      if (p) {
+        // 결제사에 물어 DONE과 맞았다 — 무엇과 맞았는지(결제사 상태 · 금액 · 취소된 금액 · 조회 경로)를 말한다
+        const detail = `결제사 ${p.status} · ${p.totalAmount.toLocaleString("ko-KR")}원 · 취소 ${(p.totalAmount - p.balanceAmount).toLocaleString("ko-KR")}원 · ${p.via === "paymentKey" ? "결제 키로 조회" : "주문번호로 조회"}`;
+        return {
+          kind: "ok",
+          changed: false,
+          severity: "info",
+          note: `결제사 기록도 승인 완료이고 주문번호 · 금액이 주문과 같습니다 (${detail}). 주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다.`,
+          record: `운영자가 결제사와 대조: 결제사 기록과 일치 (${p.status} ${p.totalAmount}원, ${p.via === "paymentKey" ? "결제 키" : "주문번호"} 조회), 변경 없음`,
+        };
+      }
+      if (order.status !== "paid") {
+        // 결제 완료 · 대기가 아닌 주문(환불 완료 · 취소 등)은 이미 정리된 상태라 결제사에 다시 묻지 않는다
+        return {
+          kind: "ok",
+          changed: false,
+          severity: "info",
+          note: `이 주문은 이미 '${stateNow}'로 정리돼 있어 결제사에 다시 묻지 않았고 바꾼 것이 없습니다.`,
+          record: `운영자가 결제사와 대조: 이미 정리된 주문(${stateNow}), 결제사 조회 없음, 변경 없음`,
+        };
+      }
       return {
         kind: "ok",
         changed: false,
         severity: "info",
-        note: `결제사 기록도 승인 완료이고 주문번호 · 금액이 주문과 같습니다. 주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다.`,
+        note: `결제사 기록과 이미 맞습니다 (이미 반영한 부분 취소 포함). 주문은 '${stateNow}' 그대로이고 바꾼 것이 없습니다.`,
         record: "운영자가 결제사와 대조: 결제사 기록과 일치 (변경 없음)",
       };
+    }
     case "anomaly":
       return {
         kind: "anomaly",

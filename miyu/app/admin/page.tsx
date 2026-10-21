@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { adminCreditQuestionAction, adminReconcileOrderAction, adminRetryReportAction, adminRunAllAction, adminTestAlertAction } from "@/app/admin/actions";
-import { buttonPrimary, buttonSecondary, pageWide, textLink } from "@/components/ui/styles";
+import { AdminSubmitButton } from "@/components/admin/admin-submit-button";
+import { buttonSecondary, pageWide, textLink } from "@/components/ui/styles";
 import { formatKrw } from "@/lib/config/product";
 import { getAdminOverview, adminLookup, type OrderTraceForAdmin } from "@/lib/services/admin-service";
 import { recentOrdersForAdmin, type AdminRecentOrder } from "@/lib/services/admin-support-service";
@@ -75,9 +76,7 @@ async function AdminContent({ searchParams }: Pick<PageProps<"/admin">, "searchP
         </dl>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <form action={adminRunAllAction}>
-            <button type="submit" className={buttonPrimary}>
-              결제 · 리포트 전체 점검 지금 실행
-            </button>
+            <AdminSubmitButton tone="primary" label="결제 · 리포트 전체 점검 지금 실행" pendingLabel="점검하는 중…" pendingNote="주문마다 결제사에 확인하는 중입니다. 주문이 많으면 시간이 걸릴 수 있으니 이 화면을 그대로 두세요. 끝나면 맨 위에 결과가 나옵니다." />
           </form>
           <form action={adminTestAlertAction}>
             <button type="submit" className={buttonSecondary}>
@@ -407,16 +406,12 @@ function OrderTrace({ trace, note }: { trace: OrderTraceForAdmin; note: string }
       <div className="flex flex-col gap-3 sm:flex-row">
         <form action={adminReconcileOrderAction}>
           <input type="hidden" name="orderNumber" value={order.orderNumber} />
-          <button type="submit" className={buttonSecondary}>
-            결제사와 대조해 맞추기
-          </button>
+          <AdminSubmitButton label="결제사와 대조해 맞추기" pendingLabel="결제사에 확인하는 중…" pendingNote="결제사에 이 주문을 묻고 있습니다. 몇 초 걸릴 수 있으니 이 화면을 그대로 두세요. 끝나면 이 버튼 아래에 결과가 나옵니다." />
         </form>
         {order.status === "paid" && !question && (
           <form action={adminRetryReportAction}>
             <input type="hidden" name="orderNumber" value={order.orderNumber} />
-            <button type="submit" className={trace.needsReportAction ? buttonPrimary : buttonSecondary}>
-              리포트 다시 만들기
-            </button>
+            <AdminSubmitButton tone={trace.needsReportAction ? "primary" : "secondary"} label="리포트 다시 만들기" pendingLabel="요청하는 중…" pendingNote="리포트 생성을 다시 시작하도록 요청하고 있습니다. 끝나면 이 버튼 아래에 결과가 나옵니다." />
           </form>
         )}
         {order.status === "paid" && !question && (
@@ -427,9 +422,7 @@ function OrderTrace({ trace, note }: { trace: OrderTraceForAdmin; note: string }
         {question && order.status === "paid" && question.ready && !question.credited && (
           <form action={adminCreditQuestionAction}>
             <input type="hidden" name="orderNumber" value={order.orderNumber} />
-            <button type="submit" className={buttonPrimary}>
-              결제사 확인 후 질문 넣기
-            </button>
+            <AdminSubmitButton tone="primary" label="결제사 확인 후 질문 넣기" pendingLabel="결제사에 확인하는 중…" pendingNote="결제사에서 결제 완료를 확인한 뒤 질문을 넣고 있습니다. 끝나면 이 버튼 아래에 결과가 나옵니다." />
           </form>
         )}
       </div>
